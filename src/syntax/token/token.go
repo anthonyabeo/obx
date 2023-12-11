@@ -31,6 +31,7 @@ const (
 
 	MODULE
 	PROC
+	PROCEDURE
 	BEGIN
 	END
 	RETURN
@@ -39,6 +40,10 @@ const (
 	OR
 	VAR
 	THEN
+	DEFINITION
+	IMPORT
+	CONST
+	TYPE
 
 	keyword_end
 
@@ -46,7 +51,7 @@ const (
 
 	PLUS
 	MINUS
-
+	STAR
 	EQUAL
 
 	LPAREN
@@ -55,6 +60,7 @@ const (
 	COLON
 	SEMICOLON
 	ASSIGN
+	PERIOD
 
 	operator_end
 )
@@ -70,6 +76,7 @@ var tokens = [...]string{
 	PLUS:  "+",
 	MINUS: "-",
 	EQUAL: "=",
+	STAR:  "*",
 
 	LPAREN:    "(",
 	RPAREN:    ")",
@@ -77,17 +84,21 @@ var tokens = [...]string{
 	COLON:     ":",
 	SEMICOLON: ";",
 	ASSIGN:    ":=",
+	PERIOD:    ".",
 
-	MODULE: "module",
-	PROC:   "proc",
-	BEGIN:  "begin",
-	END:    "end",
-	RETURN: "return",
-	ELSE:   "else",
-	IF:     "if",
-	OR:     "or",
-	VAR:    "var",
-	THEN:   "then",
+	MODULE:    "module",
+	PROC:      "proc",
+	BEGIN:     "begin",
+	END:       "end",
+	RETURN:    "return",
+	ELSE:      "else",
+	IF:        "if",
+	OR:        "or",
+	VAR:       "var",
+	THEN:      "then",
+	CONST:     "const",
+	PROCEDURE: "procedure",
+	TYPE:      "type",
 }
 
 var keywords map[string]Token
