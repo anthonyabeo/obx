@@ -8,3 +8,5 @@ type Ident struct {
 func (i *Ident) String() string {
 	return i.Name
 }
+
+func (i *Ident) expr() {}
