@@ -44,6 +44,9 @@ const (
 	IMPORT
 	CONST
 	TYPE
+	ARRAY
+	RECORD
+	POINTER
 
 	keyword_end
 
@@ -61,6 +64,7 @@ const (
 	SEMICOLON
 	ASSIGN
 	PERIOD
+	CARET
 
 	operator_end
 )
@@ -85,6 +89,7 @@ var tokens = [...]string{
 	SEMICOLON: ";",
 	ASSIGN:    ":=",
 	PERIOD:    ".",
+	CARET:     "^",
 
 	MODULE:    "module",
 	PROC:      "proc",
@@ -99,6 +104,9 @@ var tokens = [...]string{
 	CONST:     "const",
 	PROCEDURE: "procedure",
 	TYPE:      "type",
+	ARRAY:     "array",
+	POINTER:   "pointer",
+	RECORD:    "record",
 }
 
 var keywords map[string]Token
