@@ -54,6 +54,7 @@ const (
 	WITH
 	WHILE
 	ELSIF
+	CASE
 
 	keyword_end
 
@@ -140,6 +141,7 @@ var tokens = [...]string{
 	WITH:       "with",
 	WHILE:      "while",
 	ELSIF:      "elsif",
+	CASE:       "case",
 }
 
 var keywords map[string]Token
