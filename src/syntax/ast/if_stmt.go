@@ -1,9 +1,15 @@
 package ast
 
-type IfStmt struct {
+type ElsIfBranch struct {
 	BoolExpr Expression
-	ThenPath Statement
-	ElsePath Statement
+	ThenPath []Statement
+}
+
+type IfStmt struct {
+	BoolExpr       Expression
+	ThenPath       []Statement
+	ElseIfBranches []*ElsIfBranch
+	ElsePath       []Statement
 }
 
 func (stmt *IfStmt) stmt() {}
