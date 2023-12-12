@@ -1,5 +1,9 @@
 package ast
 
 type Oberon struct {
-	program map[string]*Module
+	Program map[string]*Module
+}
+
+func NewOberon() *Oberon {
+	return &Oberon{Program: make(map[string]*Module)}
 }
