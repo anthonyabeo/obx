@@ -47,6 +47,13 @@ const (
 	ARRAY
 	RECORD
 	POINTER
+	LOOP
+	EXIT
+	REPEAT
+	FOR
+	WITH
+	WHILE
+	ELSIF
 
 	keyword_end
 
@@ -56,9 +63,23 @@ const (
 	MINUS
 	STAR
 	EQUAL
+	IN
+	IS
+	LESS
+	LEQ
+	GREAT
+	GEQ
+	DIV
+	AND
+	QUOT
+	TILDE
 
 	LPAREN
 	RPAREN
+	LBRACK
+	RBRACK
+	LBRACE
+	RBRACE
 	COMMA
 	COLON
 	SEMICOLON
@@ -84,6 +105,10 @@ var tokens = [...]string{
 
 	LPAREN:    "(",
 	RPAREN:    ")",
+	LBRACK:    "[",
+	RBRACK:    "]",
+	LBRACE:    "{",
+	RBRACE:    "}",
 	COMMA:     ",",
 	COLON:     ":",
 	SEMICOLON: ";",
@@ -91,22 +116,30 @@ var tokens = [...]string{
 	PERIOD:    ".",
 	CARET:     "^",
 
-	MODULE:    "module",
-	PROC:      "proc",
-	BEGIN:     "begin",
-	END:       "end",
-	RETURN:    "return",
-	ELSE:      "else",
-	IF:        "if",
-	OR:        "or",
-	VAR:       "var",
-	THEN:      "then",
-	CONST:     "const",
-	PROCEDURE: "procedure",
-	TYPE:      "type",
-	ARRAY:     "array",
-	POINTER:   "pointer",
-	RECORD:    "record",
+	MODULE:     "module",
+	PROC:       "proc",
+	BEGIN:      "begin",
+	END:        "end",
+	RETURN:     "return",
+	ELSE:       "else",
+	IF:         "if",
+	OR:         "or",
+	VAR:        "var",
+	THEN:       "then",
+	DEFINITION: "definition",
+	CONST:      "const",
+	PROCEDURE:  "procedure",
+	TYPE:       "type",
+	ARRAY:      "array",
+	POINTER:    "pointer",
+	RECORD:     "record",
+	LOOP:       "loop",
+	EXIT:       "exit",
+	REPEAT:     "repeat",
+	FOR:        "for",
+	WITH:       "with",
+	WHILE:      "while",
+	ELSIF:      "elsif",
 }
 
 var keywords map[string]Token
