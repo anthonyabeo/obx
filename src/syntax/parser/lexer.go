@@ -67,6 +67,9 @@ func (lex *Lexer) Lex() (tok token.Token, lit string) {
 		case '+':
 			tok = token.PLUS
 			lit = "+"
+		case '>':
+			tok = token.GREAT
+			lit = ">"
 		default:
 			tok = token.ILLEGAL
 			lit = string(ch)
