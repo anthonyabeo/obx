@@ -74,6 +74,7 @@ const (
 	AND
 	QUOT
 	TILDE
+	HASH
 
 	LPAREN
 	RPAREN
@@ -103,6 +104,13 @@ var tokens = [...]string{
 	MINUS: "-",
 	EQUAL: "=",
 	STAR:  "*",
+	LESS:  "<",
+	LEQ:   "<=",
+	GREAT: ">",
+	GEQ:   ">=",
+	AND:   "&",
+	QUOT:  "/",
+	TILDE: "~",
 
 	LPAREN:    "(",
 	RPAREN:    ")",
@@ -116,6 +124,7 @@ var tokens = [...]string{
 	ASSIGN:    ":=",
 	PERIOD:    ".",
 	CARET:     "^",
+	HASH:      "#",
 
 	MODULE:     "module",
 	PROC:       "proc",
@@ -142,6 +151,9 @@ var tokens = [...]string{
 	WHILE:      "while",
 	ELSIF:      "elsif",
 	CASE:       "case",
+	IN:         "in",
+	IS:         "is",
+	DIV:        "div",
 }
 
 var keywords map[string]Token
