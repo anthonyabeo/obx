@@ -30,12 +30,28 @@ end Main
 	p := &Parser{}
 	p.InitParser(lexer)
 
-	_ = p.Oberon()
+	ob := p.Oberon()
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
 			t.Log(err)
 		}
+	}
+
+	mainMod := ob.Program["Main"]
+	if mainMod.BeginName.Name != mainMod.EndName.Name {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			mainMod.BeginName, mainMod.EndName)
+	}
+
+	if len(mainMod.DeclSeq) != 1 {
+		t.Errorf("expected 1 declaration in '%v' module, found %d",
+			mainMod.BeginName, len(mainMod.DeclSeq))
+	}
+
+	if len(mainMod.StmtSeq) != 2 {
+		t.Errorf("expected 2 statements in '%s' module, found %d",
+			mainMod.BeginName, len(mainMod.StmtSeq))
 	}
 
 }

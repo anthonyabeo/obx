@@ -120,7 +120,6 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 	case token.TYPE:
 	case token.CONST:
 	case token.PROC, token.PROCEDURE:
-		//p.next()
 		seq = append(seq, p.parseProcDecl())
 	default:
 
