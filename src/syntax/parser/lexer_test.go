@@ -14,7 +14,7 @@ module Main
 		var a, b: integer 
 
   	begin
-		if n = 0 or n = 1 then
+		if (n = 0) or (n = 1) then
 			return n
 		else
 		  a := fib(n - 1)
