@@ -55,6 +55,10 @@ const (
 	WHILE
 	ELSIF
 	CASE
+	DO
+	IN
+	IS
+	DIV
 
 	keyword_end
 
@@ -64,13 +68,10 @@ const (
 	MINUS
 	STAR
 	EQUAL
-	IN
-	IS
 	LESS
 	LEQ
 	GREAT
 	GEQ
-	DIV
 	AND
 	QUOT
 	TILDE
@@ -154,6 +155,7 @@ var tokens = [...]string{
 	IN:         "in",
 	IS:         "is",
 	DIV:        "div",
+	DO:         "do",
 }
 
 var keywords map[string]Token
