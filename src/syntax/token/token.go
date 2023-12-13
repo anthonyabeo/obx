@@ -59,6 +59,7 @@ const (
 	IN
 	IS
 	DIV
+	UNTIL
 
 	keyword_end
 
@@ -156,6 +157,7 @@ var tokens = [...]string{
 	IS:         "is",
 	DIV:        "div",
 	DO:         "do",
+	UNTIL:      "until",
 }
 
 var keywords map[string]Token
