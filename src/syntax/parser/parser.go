@@ -369,23 +369,10 @@ func (p *Parser) parseQualifiedIdent(id *ast.Ident) ast.Expression {
 // IdentList = identdef { [','] identdef}
 // identdef  = ident ['*' | '-']
 func (p *Parser) parseIdentList() (list []*ast.Ident) {
-	//name := p.parseIdentDef()
-	//if p.tok == token.STAR || p.tok == token.MINUS {
-	//	name.Exported = true
-	//	p.next()
-	//}
-
 	list = append(list, p.parseIdentDef())
 
 	for p.tok == token.COMMA {
 		p.next()
-
-		//name := p.parseIdent()
-		//if p.tok == token.STAR || p.tok == token.MINUS {
-		//	name.Exported = true
-		//	p.next()
-		//}
-
 		list = append(list, p.parseIdentDef())
 	}
 
@@ -586,6 +573,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 	case token.RETURN:
 		stmt = p.parseReturnStmt()
 	case token.WHILE:
+		stmt = p.parseWhileStmt()
 	case token.REPEAT:
 	case token.IDENT:
 		dsg := p.parseDesignator()
@@ -600,6 +588,29 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 				fmt.Sprintf("expected '%v' or '%v', found %v", token.ASSIGN, token.LPAREN, p.tok))
 		}
 	}
+
+	return
+}
+
+func (p *Parser) parseWhileStmt() (stmt *ast.WhileStmt) {
+	stmt = &ast.WhileStmt{}
+
+	p.match(token.WHILE)
+	stmt.BoolExpr = p.parseExpression()
+	p.match(token.DO)
+	stmt.StmtSeq = p.parseStatementSeq()
+
+	for p.tok == token.ELSIF {
+		p.next()
+
+		elsif := &ast.ElsIfBranch{BoolExpr: p.parseExpression()}
+		p.match(token.DO)
+		elsif.ThenPath = p.parseStatementSeq()
+
+		stmt.ElsIfs = append(stmt.ElsIfs, elsif)
+	}
+
+	p.match(token.END)
 
 	return
 }
