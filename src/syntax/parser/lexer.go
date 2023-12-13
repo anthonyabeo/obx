@@ -29,10 +29,10 @@ func (lex *Lexer) Lex() (tok token.Token, lit string) {
 
 	switch ch := lex.ch; {
 	case lex.startsIdent(ch):
-		lit = lex.scanIdentifier()
+		lit = lex.identifier()
 		tok = token.Lookup(lit)
 	case lex.isDigit(ch):
-		tok, lit = lex.scanNumber()
+		tok, lit = lex.number()
 	default:
 		switch ch {
 		case eof:
@@ -91,16 +91,16 @@ func (lex *Lexer) skipWhitespace() {
 	}
 }
 
-func (lex *Lexer) scanIdentifier() string {
+func (lex *Lexer) identifier() string {
 	pos := lex.offset
-	for lex.isLetter(lex.ch) || lex.isDigit(lex.ch) {
+	for lex.isLetter(lex.ch) || lex.isDigit(lex.ch) || lex.ch == '_' {
 		lex.next()
 	}
 
 	return string(lex.src[pos:lex.offset])
 }
 
-func (lex *Lexer) scanNumber() (token.Token, string) {
+func (lex *Lexer) number() (token.Token, string) {
 	pos := lex.offset
 	for lex.isDigit(lex.ch) {
 		lex.next()
@@ -116,6 +116,7 @@ func (lex *Lexer) isDigit(ch rune) bool {
 func (lex *Lexer) startsIdent(ch rune) bool {
 	return lex.isLetter(ch) || '_' == ch
 }
+
 func (lex *Lexer) isLetter(ch rune) bool {
 	return 'a' <= ch && ch <= 'z' ||
 		'A' <= ch && ch <= 'Z'

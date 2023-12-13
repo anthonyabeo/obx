@@ -7,6 +7,40 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
+func TestLexingOfIdentifiers(t *testing.T) {
+	input := `
+x
+Scan
+Oberon_2
+_y
+firstLetter
+`
+	lexer := Lexer{}
+	lexer.InitLexer([]byte(input))
+
+	tests := []struct {
+		tokenKind token.Token
+		tokenLit  string
+	}{
+		{token.IDENT, "x"},
+		{token.IDENT, "Scan"},
+		{token.IDENT, "Oberon_2"},
+		{token.IDENT, "_y"},
+		{token.IDENT, "firstLetter"},
+	}
+
+	for _, tt := range tests {
+		tok, lit := lexer.Lex()
+		if tok != tt.tokenKind {
+			t.Errorf(fmt.Sprintf("lex.Lex(). Expected token kind = %v, Got %v", tt.tokenKind, tok))
+		}
+
+		if lit != tt.tokenLit {
+			t.Errorf("lex.Lex(). Expected token literal = %v, Got %v", tt.tokenLit, lit)
+		}
+	}
+}
+
 func TestLexingOfMinimalObxProgram(t *testing.T) {
 	input := `
 module Main
@@ -59,13 +93,17 @@ end Main
 		{token.BEGIN, "begin"},
 
 		{token.IF, "if"},
+		{token.LPAREN, "("},
 		{token.IDENT, "n"},
 		{token.EQUAL, "="},
 		{token.INT, "0"},
+		{token.RPAREN, ")"},
 		{token.OR, "or"},
+		{token.LPAREN, "("},
 		{token.IDENT, "n"},
 		{token.EQUAL, "="},
 		{token.INT, "1"},
+		{token.RPAREN, ")"},
 		{token.THEN, "then"},
 
 		{token.RETURN, "return"},
