@@ -564,6 +564,7 @@ func (p *Parser) metaParams() {}
 func (p *Parser) parseStatement() (stmt ast.Statement) {
 	switch p.tok {
 	case token.LOOP:
+		stmt = p.parseLoopStmt()
 	case token.EXIT:
 	case token.IF:
 		stmt = p.parseIfStmt()
@@ -575,6 +576,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 	case token.WHILE:
 		stmt = p.parseWhileStmt()
 	case token.REPEAT:
+		stmt = p.parseRepeatStmt()
 	case token.IDENT:
 		dsg := p.parseDesignator()
 		switch p.tok {
@@ -588,6 +590,25 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 				fmt.Sprintf("expected '%v' or '%v', found %v", token.ASSIGN, token.LPAREN, p.tok))
 		}
 	}
+
+	return
+}
+
+func (p *Parser) parseLoopStmt() (stmt *ast.LoopStmt) {
+	p.match(token.LOOP)
+	stmt.StmtSeq = p.parseStatementSeq()
+	p.match(token.END)
+
+	return
+}
+
+func (p *Parser) parseRepeatStmt() (stmt *ast.RepeatStmt) {
+	stmt = &ast.RepeatStmt{}
+
+	p.match(token.REPEAT)
+	stmt.StmtSeq = p.parseStatementSeq()
+	p.match(token.UNTIL)
+	stmt.BoolExpr = p.parseExpression()
 
 	return
 }
