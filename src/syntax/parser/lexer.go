@@ -34,27 +34,23 @@ func (lex *Lexer) Lex() (tok token.Token, lit string) {
 	case lex.isDigit(ch):
 		tok, lit = lex.number()
 	default:
+		lex.next()
 		switch ch {
 		case eof:
 			tok = token.EOF
 		case ',':
 			tok = token.COMMA
 			lit = ","
-			lex.next()
 		case ';':
 			tok = token.SEMICOLON
 			lit = ";"
-			lex.next()
 		case '(':
 			tok = token.LPAREN
 			lit = "("
-			lex.next()
 		case ')':
 			tok = token.RPAREN
 			lit = ")"
-			lex.next()
 		case ':':
-			lex.next()
 			if lex.ch == '=' {
 				lex.next()
 				return token.ASSIGN, ":="
@@ -62,23 +58,18 @@ func (lex *Lexer) Lex() (tok token.Token, lit string) {
 
 			tok = token.COLON
 			lit = ":"
-			lex.next()
 		case '=':
 			tok = token.EQUAL
 			lit = "="
-			lex.next()
 		case '-':
 			tok = token.MINUS
 			lit = "-"
-			lex.next()
 		case '+':
 			tok = token.PLUS
 			lit = "+"
-			lex.next()
 		default:
 			tok = token.ILLEGAL
 			lit = string(ch)
-			lex.next()
 		}
 	}
 
@@ -86,7 +77,7 @@ func (lex *Lexer) Lex() (tok token.Token, lit string) {
 }
 
 func (lex *Lexer) skipWhitespace() {
-	for lex.ch == ' ' || lex.ch == '\t' || lex.ch == '\n' || /* && !lex.insertSemi || */ lex.ch == '\r' {
+	for lex.ch == ' ' || lex.ch == '\t' || lex.ch == '\n' || lex.ch == '\r' {
 		lex.next()
 	}
 }
@@ -111,6 +102,10 @@ func (lex *Lexer) number() (token.Token, string) {
 
 func (lex *Lexer) isDigit(ch rune) bool {
 	return '0' <= ch && ch <= '9'
+}
+
+func (lex *Lexer) isHexDigit(ch rune) bool {
+	return lex.isDigit(ch) || 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z'
 }
 
 func (lex *Lexer) startsIdent(ch rune) bool {
@@ -140,5 +135,6 @@ func (lex *Lexer) peek() byte {
 	if lex.rdOffset < len(lex.src) {
 		return lex.src[lex.rdOffset]
 	}
+
 	return 0
 }
