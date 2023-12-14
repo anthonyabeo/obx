@@ -7,6 +7,51 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
+func TestLexingWithTokenPositions(t *testing.T) {
+	input := `module Main
+begin
+
+end Main
+`
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lexer := Lexer{}
+	lexer.InitLexer(file, []byte(input))
+
+	tests := []struct {
+		kind   token.Token
+		lit    string
+		lineNo int
+		colNo  int
+	}{
+		{token.MODULE, "module", 1, 1},
+		{token.IDENT, "Main", 1, 8},
+		{token.BEGIN, "begin", 2, 1},
+		{token.END, "end", 4, 1},
+		{token.IDENT, "Main", 4, 5},
+	}
+
+	for _, tt := range tests {
+		tok, lit, pos := lexer.Lex()
+		if tok != tt.kind {
+			t.Errorf("lex.Lex(). Expected token kind = %v, Got %v", tt.kind, tok)
+		}
+
+		if lit != tt.lit {
+			t.Errorf("lex.Lex(). Expected token literal = %v, Got %v", tt.lit, lit)
+		}
+
+		if pos.Column != tt.colNo {
+			t.Errorf("lex.Lex(): Expected colNo %v, Got %v instead", tt.colNo, pos.Column)
+		}
+
+		if pos.Line != tt.lineNo {
+			t.Errorf("lex.Lex(): Expected line number %v, Got %v instead", tt.lineNo, pos.Line)
+		}
+
+	}
+
+}
+
 func TestLexingOfIdentifiers(t *testing.T) {
 	input := `
 x
@@ -15,28 +60,39 @@ Oberon_2
 _y
 firstLetter
 `
+	file := token.NewFile("test.obx", len([]byte(input)))
 	lexer := Lexer{}
-	lexer.InitLexer([]byte(input))
+	lexer.InitLexer(file, []byte(input))
 
 	tests := []struct {
-		tokenKind token.Token
-		tokenLit  string
+		kind   token.Token
+		lit    string
+		lineNo int
+		colNo  int
 	}{
-		{token.IDENT, "x"},
-		{token.IDENT, "Scan"},
-		{token.IDENT, "Oberon_2"},
-		{token.IDENT, "_y"},
-		{token.IDENT, "firstLetter"},
+		{token.IDENT, "x", 2, 1},
+		{token.IDENT, "Scan", 3, 1},
+		{token.IDENT, "Oberon_2", 4, 1},
+		{token.IDENT, "_y", 5, 1},
+		{token.IDENT, "firstLetter", 6, 1},
 	}
 
 	for _, tt := range tests {
-		tok, lit := lexer.Lex()
-		if tok != tt.tokenKind {
-			t.Errorf(fmt.Sprintf("lex.Lex(). Expected token kind = %v, Got %v", tt.tokenKind, tok))
+		tok, lit, pos := lexer.Lex()
+		if tok != tt.kind {
+			t.Errorf("lex.Lex(). Expected token kind = %v, Got %v", tt.kind, tok)
 		}
 
-		if lit != tt.tokenLit {
-			t.Errorf("lex.Lex(). Expected token literal = %v, Got %v", tt.tokenLit, lit)
+		if lit != tt.lit {
+			t.Errorf("lex.Lex(). Expected token literal = %v, Got %v", tt.lit, lit)
+		}
+
+		if pos.Column != tt.colNo {
+			t.Errorf("lex.Lex(): Expected colNo %v, Got %v instead", tt.colNo, pos.Column)
+		}
+
+		if pos.Line != tt.lineNo {
+			t.Errorf("lex.Lex(): Expected line number %v, Got %v instead", tt.lineNo, pos.Line)
 		}
 	}
 }
@@ -63,8 +119,9 @@ begin
 end Main
 `
 
+	file := token.NewFile("test.obx", len([]byte(input)))
 	lexer := Lexer{}
-	lexer.InitLexer([]byte(input))
+	lexer.InitLexer(file, []byte(input))
 
 	tests := []struct {
 		tokenKind token.Token
@@ -158,7 +215,7 @@ end Main
 	}
 
 	for _, tt := range tests {
-		tok, lit := lexer.Lex()
+		tok, lit, _ := lexer.Lex()
 		if tok != tt.tokenKind {
 			t.Errorf(fmt.Sprintf("lex.Lex(). Expected token kind = %v, Got %v", tt.tokenKind, tok))
 		}

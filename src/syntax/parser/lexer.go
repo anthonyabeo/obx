@@ -7,6 +7,8 @@ import (
 const eof = -1
 
 type Lexer struct {
+	file *token.File
+
 	src []byte
 
 	ch       rune // current character
@@ -14,7 +16,9 @@ type Lexer struct {
 	rdOffset int  // next character offset
 }
 
-func (lex *Lexer) InitLexer(src []byte) {
+func (lex *Lexer) InitLexer(file *token.File, src []byte) {
+	lex.file = file
+
 	lex.src = src
 
 	lex.ch = ' '
@@ -24,8 +28,11 @@ func (lex *Lexer) InitLexer(src []byte) {
 	lex.next()
 }
 
-func (lex *Lexer) Lex() (tok token.Token, lit string) {
+func (lex *Lexer) Lex() (tok token.Token, lit string, pos token.Position) {
 	lex.skipWhitespace()
+
+	colNo := (lex.offset - lex.file.LastLineOffset()) + 1
+	pos = token.Position{Line: lex.file.CurLineNo(), Column: colNo}
 
 	switch ch := lex.ch; {
 	case lex.startsIdent(ch):
@@ -53,7 +60,7 @@ func (lex *Lexer) Lex() (tok token.Token, lit string) {
 		case ':':
 			if lex.ch == '=' {
 				lex.next()
-				return token.ASSIGN, ":="
+				return token.ASSIGN, ":=", pos
 			}
 
 			tok = token.COLON
@@ -123,9 +130,17 @@ func (lex *Lexer) isLetter(ch rune) bool {
 func (lex *Lexer) next() {
 	if lex.rdOffset >= len(lex.src) {
 		lex.offset = len(lex.src)
+		if lex.ch == '\n' {
+			lex.file.UpdateLineNo()
+			lex.file.AddLine(lex.offset)
+		}
 		lex.ch = eof
 	} else {
 		lex.offset = lex.rdOffset
+		if lex.ch == '\n' {
+			lex.file.UpdateLineNo()
+			lex.file.AddLine(lex.offset)
+		}
 
 		r, w := rune(lex.src[lex.rdOffset]), 1
 
