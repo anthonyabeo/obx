@@ -1,6 +1,10 @@
 package parser
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/anthonyabeo/obx/src/syntax/token"
+)
 
 func TestParseOberonMinimalProgram(t *testing.T) {
 	input := `
@@ -24,8 +28,9 @@ begin
 end Main
 `
 
+	file := token.NewFile("test.obx", len([]byte(input)))
 	lexer := &Lexer{}
-	lexer.InitLexer([]byte(input))
+	lexer.InitLexer(file, []byte(input))
 
 	p := &Parser{}
 	p.InitParser(lexer)
@@ -73,8 +78,9 @@ begin
 end Main
 `
 
+	file := token.NewFile("test.obx", len([]byte(input)))
 	lexer := &Lexer{}
-	lexer.InitLexer([]byte(input))
+	lexer.InitLexer(file, []byte(input))
 
 	p := &Parser{}
 	p.InitParser(lexer)

@@ -14,6 +14,7 @@ type Parser struct {
 	// Next token
 	tok token.Token
 	lit string
+	pos token.Position
 }
 
 func (p *Parser) InitParser(lex *Lexer) {
@@ -44,7 +45,7 @@ func (p *Parser) match(tok token.Token) {
 }
 
 func (p *Parser) next() {
-	p.tok, p.lit = p.lex.Lex()
+	p.tok, p.lit, p.pos = p.lex.Lex()
 }
 
 func (p *Parser) Oberon() *ast.Oberon {
