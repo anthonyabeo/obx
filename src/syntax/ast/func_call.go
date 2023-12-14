@@ -3,13 +3,12 @@ package ast
 import "github.com/anthonyabeo/obx/src/syntax/token"
 
 type FuncCall struct {
-	NamePos      *token.Position
 	Dsg          Expression
 	ActualParams []Expression
 }
 
 func (f *FuncCall) Pos() *token.Position {
-	return f.NamePos
+	return f.Dsg.Pos()
 }
 
 func (f *FuncCall) End() (pos *token.Position) {
