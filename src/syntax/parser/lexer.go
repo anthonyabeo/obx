@@ -28,11 +28,11 @@ func (lex *Lexer) InitLexer(file *token.File, src []byte) {
 	lex.next()
 }
 
-func (lex *Lexer) Lex() (tok token.Token, lit string, pos token.Position) {
+func (lex *Lexer) Lex() (tok token.Token, lit string, pos *token.Position) {
 	lex.skipWhitespace()
 
 	colNo := (lex.offset - lex.file.LastLineOffset()) + 1
-	pos = token.Position{Line: lex.file.CurLineNo(), Column: colNo}
+	pos = &token.Position{Line: lex.file.CurLineNo(), Column: colNo}
 
 	switch ch := lex.ch; {
 	case lex.startsIdent(ch):
