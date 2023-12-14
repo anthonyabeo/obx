@@ -6,8 +6,17 @@ import (
 )
 
 type UnaryExpr struct {
-	Op token.Token
-	X  Expression
+	OpPos *token.Position
+	Op    token.Token
+	X     Expression
+}
+
+func (u *UnaryExpr) Pos() *token.Position {
+	return u.OpPos
+}
+
+func (u *UnaryExpr) End() *token.Position {
+	return u.X.End()
 }
 
 func (u *UnaryExpr) expr() {}

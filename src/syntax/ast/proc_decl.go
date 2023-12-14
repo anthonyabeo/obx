@@ -19,9 +19,20 @@ type ProcBody struct {
 	StmtSeq []Statement
 }
 
+// ProcDecl
+// ----------------------------------------------
 type ProcDecl struct {
+	Proc *token.Position
 	Head *ProcHead
 	Body *ProcBody
+}
+
+func (p *ProcDecl) Pos() *token.Position {
+	return p.Proc
+}
+
+func (p *ProcDecl) End() *token.Position {
+	panic("not implemented")
 }
 
 func (p *ProcDecl) decl() {}
@@ -30,6 +41,8 @@ func (p *ProcDecl) String() string {
 	return ""
 }
 
+// FPSection
+// ----------------------------------------------
 type FPSection struct {
 	Mod   token.Token
 	Names []*Ident

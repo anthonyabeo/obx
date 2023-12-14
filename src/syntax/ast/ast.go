@@ -1,9 +1,15 @@
 package ast
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/anthonyabeo/obx/src/syntax/token"
+)
 
 type Node interface {
 	fmt.Stringer
+	Pos() *token.Position
+	End() *token.Position
 }
 
 type Statement interface {
@@ -19,14 +25,4 @@ type Expression interface {
 type Declaration interface {
 	Node
 	decl()
-}
-
-type Module struct {
-	BeginName, EndName *Ident
-	//ImportList []*Import
-	DeclSeq []Declaration
-	StmtSeq []Statement
-}
-
-type Definition struct {
 }

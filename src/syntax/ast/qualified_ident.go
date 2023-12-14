@@ -1,10 +1,21 @@
 package ast
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/anthonyabeo/obx/src/syntax/token"
+)
 
 type QualifiedIdent struct {
 	X   Expression
 	Sel *Ident
+}
+
+func (q *QualifiedIdent) Pos() *token.Position {
+	return q.X.Pos()
+}
+
+func (q *QualifiedIdent) End() *token.Position {
+	panic("not implemented")
 }
 
 func (q *QualifiedIdent) expr() {}

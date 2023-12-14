@@ -1,10 +1,22 @@
 package ast
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/anthonyabeo/obx/src/syntax/token"
+)
 
 type AssignStmt struct {
-	LValue Expression
-	RValue Expression
+	AssignPos *token.Position
+	LValue    Expression
+	RValue    Expression
+}
+
+func (a *AssignStmt) Pos() *token.Position {
+	return a.AssignPos
+}
+
+func (a *AssignStmt) End() *token.Position {
+	return a.RValue.End()
 }
 
 func (a *AssignStmt) stmt() {}

@@ -1,9 +1,28 @@
 package ast
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/anthonyabeo/obx/src/syntax/token"
+)
 
 type ReturnStmt struct {
-	Value Expression
+	Return *token.Position
+	Value  Expression
+}
+
+func (r *ReturnStmt) Pos() *token.Position {
+	return r.Return
+}
+
+func (r *ReturnStmt) End() (pos *token.Position) {
+	if r.Value != nil {
+		pos = r.Value.End()
+	} else {
+		pos = r.Pos()
+		pos.Column += len("return")
+	}
+
+	return
 }
 
 func (r *ReturnStmt) stmt() {}
