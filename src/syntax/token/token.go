@@ -15,6 +15,8 @@ func (tok Token) String() string {
 	return s
 }
 
+func (tok Token) IsLiteral() bool { return literal_beg < tok && tok < literal_end }
+
 const (
 	ILLEGAL Token = iota
 	EOF
