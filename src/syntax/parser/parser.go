@@ -1,8 +1,6 @@
 package parser
 
 import (
-	"fmt"
-
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
@@ -23,7 +21,7 @@ func (p *Parser) InitParser(lex *Lexer) {
 	p.next()
 }
 
-func (p *Parser) error(msg string) {
+func (p *Parser) error(pos *token.Position, msg string) {
 	n := len(p.errors)
 	if n > 10 {
 		for _, err := range p.errors {
@@ -33,12 +31,26 @@ func (p *Parser) error(msg string) {
 		panic("too many errors")
 	}
 
-	p.errors.Append(msg)
+	p.errors.Append(pos, msg)
+}
+
+func (p *Parser) errorExpected(pos *token.Position, msg string) {
+	msg = "expected " + msg
+	if pos == p.pos {
+		switch {
+		case p.tok.IsLiteral():
+			msg += ", found " + p.lit
+		default:
+			msg += ", found '" + p.tok.String() + "'"
+		}
+	}
+
+	p.error(pos, msg)
 }
 
 func (p *Parser) match(tok token.Token) {
 	if p.tok != tok {
-		p.error(fmt.Sprintf("expected %v, but found %v", tok, p.tok))
+		p.errorExpected(p.pos, "'"+tok.String()+"'")
 	}
 
 	p.next()
@@ -57,7 +69,7 @@ func (p *Parser) Oberon() *ast.Oberon {
 		ob.Program[mod.BeginName.Name] = mod
 	case token.DEFINITION:
 	default:
-		p.error(fmt.Sprintf("expected MODULE or DEFINITION, found %v", p.tok))
+		p.errorExpected(p.pos, "MODULE or DEFINITION")
 	}
 
 	return ob
@@ -84,7 +96,7 @@ func (p *Parser) parseModule() *ast.Module {
 		case token.VAR, token.TYPE, token.CONST, token.PROC, token.PROCEDURE:
 			mod.DeclSeq = p.parseDeclarationSeq()
 		default:
-			p.error(fmt.Sprintf("expected an import or declaration, found %v", p.tok))
+			p.errorExpected(p.pos, "import or declaration")
 		}
 	}
 
@@ -146,7 +158,7 @@ func (p *Parser) parseType() ast.Expression {
 	case token.IDENT:
 		typ := p.parseNamedType()
 		if typ == nil {
-			p.errors.Append("expected type")
+			p.errorExpected(p.pos, "type")
 			p.advance(exprEnd)
 			return &ast.BadExpr{}
 		}
@@ -173,8 +185,20 @@ func (p *Parser) advance(to map[token.Token]bool) {
 	}
 }
 
+var stmtStart = map[token.Token]bool{
+	token.EXIT:   true,
+	token.WHILE:  true,
+	token.FOR:    true,
+	token.LOOP:   true,
+	token.IF:     true,
+	token.RETURN: true,
+	token.CASE:   true,
+	token.WITH:   true,
+	token.REPEAT: true,
+	token.IDENT:  true,
+}
+
 var declStart = map[token.Token]bool{
-	token.IMPORT:    true,
 	token.CONST:     true,
 	token.TYPE:      true,
 	token.VAR:       true,
@@ -409,7 +433,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcHead) {
 	head = &ast.ProcHead{}
 
 	if p.tok != token.PROC && p.tok != token.PROCEDURE {
-		p.error(fmt.Sprintf("expected 'proc' or 'procedure', found %v", p.tok))
+		p.errorExpected(p.pos, "proc or procedure")
 		p.advance(declStart)
 	} else {
 		p.next()
@@ -563,13 +587,6 @@ func (p *Parser) parseIdent() *ast.Ident {
 
 func (p *Parser) metaParams() {}
 
-// statement = [
-//
-//	assignment | ProcedureCall
-//	| IfStatement | CaseStatement
-//	| WithStatement | LoopStatement
-//	| ExitStatement | ReturnStatement
-//	| WhileStatement | RepeatStatement | ForStatement ]
 func (p *Parser) parseStatement() (stmt ast.Statement) {
 	switch p.tok {
 	case token.LOOP:
@@ -595,9 +612,16 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 		case token.LPAREN:
 			stmt = &ast.ProcCall{ProcName: dsg, ActualParams: p.parseActualParameters()}
 		default:
-			p.errors.Append(
-				fmt.Sprintf("expected '%v' or '%v', found %v", token.ASSIGN, token.LPAREN, p.tok))
+			pos := p.pos
+			p.errorExpected(p.pos, ":= or (")
+			p.advance(stmtStart)
+			stmt = &ast.BadStmt{From: pos, To: p.pos}
 		}
+	default:
+		pos := p.pos
+		p.errorExpected(pos, "statement")
+		p.advance(stmtStart)
+		stmt = &ast.BadStmt{From: pos, To: p.pos}
 	}
 
 	return
