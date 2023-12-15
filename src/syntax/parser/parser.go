@@ -13,6 +13,9 @@ type Parser struct {
 	tok token.Token
 	lit string
 	pos *token.Position
+
+	syncPos *token.Position // last synchronization position
+	syncCnt int             // number of parser.advance calls without progress
 }
 
 func (p *Parser) InitParser(lex *Lexer) {
@@ -79,7 +82,6 @@ func (p *Parser) parseModule() *ast.Module {
 	mod := new(ast.Module)
 
 	p.match(token.MODULE)
-
 	mod.BeginName = p.parseIdent()
 
 	if p.tok == token.LPAREN {
@@ -96,7 +98,10 @@ func (p *Parser) parseModule() *ast.Module {
 		case token.VAR, token.TYPE, token.CONST, token.PROC, token.PROCEDURE:
 			mod.DeclSeq = p.parseDeclarationSeq()
 		default:
+			pos := p.pos
 			p.errorExpected(p.pos, "import or declaration")
+			p.advance(declStart)
+			mod.DeclSeq = append(mod.DeclSeq, &ast.BadDecl{From: pos, To: p.pos})
 		}
 	}
 
@@ -106,9 +111,7 @@ func (p *Parser) parseModule() *ast.Module {
 	}
 
 	p.match(token.END)
-
 	mod.EndName = p.parseIdent()
-
 	if p.tok == token.PERIOD {
 		p.next()
 	}
@@ -134,7 +137,10 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 	case token.PROC, token.PROCEDURE:
 		seq = append(seq, p.parseProcDecl())
 	default:
-
+		pos := p.pos
+		p.errorExpected(pos, "declaration")
+		p.advance(declStart)
+		seq = append(seq, &ast.BadDecl{From: pos, To: p.pos})
 	}
 
 	return seq
@@ -154,22 +160,28 @@ func (p *Parser) varDecl() (v *ast.VarDecl) {
 }
 
 func (p *Parser) parseType() ast.Expression {
+	typ := p.parseIdentOrType()
+
+	if typ == nil {
+		pos := p.pos
+		p.errorExpected(pos, "type")
+		p.advance(exprEnd)
+		return &ast.BadExpr{From: pos, To: p.pos}
+	}
+
+	return typ
+}
+
+func (p *Parser) parseIdentOrType() ast.Expression {
 	switch p.tok {
 	case token.IDENT:
 		typ := p.parseNamedType()
-		if typ == nil {
-			p.errorExpected(p.pos, "type")
-			p.advance(exprEnd)
-			return &ast.BadExpr{}
-		}
-
 		return typ
 	case token.ARRAY:
 	case token.RECORD:
+	case token.PROCEDURE:
 	case token.POINTER, token.CARET:
 	case token.LPAREN:
-	default:
-
 	}
 
 	return nil
@@ -180,7 +192,16 @@ func (p *Parser) parseType() ast.Expression {
 func (p *Parser) advance(to map[token.Token]bool) {
 	for ; p.tok != token.EOF; p.next() {
 		if to[p.tok] {
-			return
+			if p.pos.Cmp(p.syncPos) == 0 && p.syncCnt < 10 {
+				p.syncCnt++
+				return
+			}
+
+			if p.pos.Cmp(p.syncPos) == 1 {
+				p.syncPos = p.pos
+				p.syncCnt = 0
+				return
+			}
 		}
 	}
 }
@@ -199,6 +220,7 @@ var stmtStart = map[token.Token]bool{
 }
 
 var declStart = map[token.Token]bool{
+	token.IMPORT:    true,
 	token.CONST:     true,
 	token.TYPE:      true,
 	token.VAR:       true,
@@ -305,6 +327,11 @@ func (p *Parser) parseFactor() (expr ast.Expression) {
 		}
 	case token.INT: // literal = number | string | hexstring | hexchar | NIL | TRUE | FALSE | set
 		expr = p.parseLiteral()
+	default:
+		pos := p.pos
+		p.errorExpected(pos, "literal, parenthesized expression, operator or name")
+		p.advance(exprEnd)
+		expr = &ast.BadExpr{From: pos, To: p.pos}
 	}
 
 	return
@@ -435,6 +462,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcHead) {
 	if p.tok != token.PROC && p.tok != token.PROCEDURE {
 		p.errorExpected(p.pos, "proc or procedure")
 		p.advance(declStart)
+		return nil
 	} else {
 		p.next()
 		if p.tok == token.LPAREN {
@@ -614,7 +642,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 		default:
 			pos := p.pos
 			p.errorExpected(p.pos, ":= or (")
-			p.advance(stmtStart)
+			p.advance(exprEnd)
 			stmt = &ast.BadStmt{From: pos, To: p.pos}
 		}
 	default:
