@@ -62,6 +62,13 @@ const (
 	IS
 	DIV
 	UNTIL
+	TRUE
+	FALSE
+	BY
+	MOD
+	NIL
+	OF
+	TO
 
 	keyword_end
 
@@ -160,6 +167,14 @@ var tokens = [...]string{
 	DIV:        "div",
 	DO:         "do",
 	UNTIL:      "until",
+	TRUE:       "true",
+	FALSE:      "false",
+	BY:         "by",
+	IMPORT:     "import",
+	MOD:        "mod",
+	NIL:        "nil",
+	OF:         "of",
+	TO:         "to",
 }
 
 var keywords map[string]Token
