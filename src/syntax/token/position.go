@@ -11,6 +11,23 @@ type Position struct {
 	Column   int    // column number, starting at 1 (byte count)
 }
 
+func (pos *Position) Equals(p *Position) bool {
+	return pos.Line == p.Line &&
+		pos.Column == p.Column
+}
+
+func (pos *Position) Cmp(p *Position) int {
+	if pos.Line == p.Line && pos.Column == p.Column {
+		return 0
+	}
+
+	if pos.Line > p.Line {
+		return 1
+	}
+
+	return -1
+}
+
 func (pos *Position) String() string {
 	s := pos.Filename
 	if pos.Filename != "" {
