@@ -41,3 +41,23 @@ func (b *BadStmt) stmt() {}
 func (b *BadStmt) String() string {
 	return ""
 }
+
+// BadDecl
+// ------------------------------------------
+type BadDecl struct {
+	From *token.Position
+	To   *token.Position
+}
+
+func (b *BadDecl) Pos() *token.Position {
+	return b.From
+}
+
+func (b *BadDecl) End() *token.Position {
+	return b.To
+}
+
+func (b *BadDecl) decl() {}
+func (b *BadDecl) String() string {
+	return ""
+}
