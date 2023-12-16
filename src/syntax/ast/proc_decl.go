@@ -35,6 +35,10 @@ func (p *ProcDecl) End() *token.Position {
 	panic("not implemented")
 }
 
+func (p *ProcDecl) Accept(vst Visitor) {
+	vst.VisitProcDecl(p)
+}
+
 func (p *ProcDecl) decl() {}
 
 func (p *ProcDecl) String() string {

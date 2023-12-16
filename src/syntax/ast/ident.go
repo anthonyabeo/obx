@@ -1,27 +1,39 @@
 package ast
 
-import "github.com/anthonyabeo/obx/src/syntax/token"
+import (
+	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/syntax/token"
+)
 
 type Ident struct {
 	NamePos  *token.Position
 	Name     string
 	Exported bool
+	EType    types.Type
 }
 
-func (i *Ident) Pos() *token.Position {
-	return i.NamePos
+func (id *Ident) Pos() *token.Position {
+	return id.NamePos
 }
 
-func (i *Ident) End() *token.Position {
+func (id *Ident) End() *token.Position {
 	return &token.Position{
-		Filename: i.NamePos.Filename,
-		Line:     i.NamePos.Line,
-		Column:   i.NamePos.Column + len(i.Name),
+		Filename: id.NamePos.Filename,
+		Line:     id.NamePos.Line,
+		Column:   id.NamePos.Column + len(id.Name),
 	}
 }
 
-func (i *Ident) String() string {
-	return i.Name
+func (id *Ident) String() string {
+	return id.Name
 }
 
-func (i *Ident) expr() {}
+func (id *Ident) expr() {}
+
+func (id *Ident) Accept(vst Visitor) {
+	vst.VisitIdentifier(id)
+}
+
+func (id *Ident) Type() types.Type {
+	return id.EType
+}

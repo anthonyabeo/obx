@@ -16,6 +16,10 @@ func (r *RepeatStmt) End() *token.Position {
 	panic("not implemented")
 }
 
+func (r *RepeatStmt) Accept(vst Visitor) {
+	vst.VisitRepeatStmt(r)
+}
+
 func (r *RepeatStmt) stmt() {}
 func (r *RepeatStmt) String() string {
 	return ""

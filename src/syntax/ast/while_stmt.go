@@ -17,6 +17,10 @@ func (w *WhileStmt) End() *token.Position {
 	panic("not implemented")
 }
 
+func (w *WhileStmt) Accept(vst Visitor) {
+	vst.VisitWhileStmt(w)
+}
+
 func (w *WhileStmt) stmt() {}
 func (w *WhileStmt) String() string {
 	return ""

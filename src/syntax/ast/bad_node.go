@@ -1,6 +1,9 @@
 package ast
 
-import "github.com/anthonyabeo/obx/src/syntax/token"
+import (
+	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/syntax/token"
+)
 
 // BadExpr
 // ------------------------------------------
@@ -15,6 +18,14 @@ func (b *BadExpr) Pos() *token.Position {
 
 func (b *BadExpr) End() *token.Position {
 	return b.To
+}
+
+func (b *BadExpr) Accept(vst Visitor) {
+	panic("unimplemented")
+}
+
+func (b *BadExpr) Type() types.Type {
+	return nil
 }
 
 func (b *BadExpr) expr() {}
@@ -37,6 +48,10 @@ func (b *BadStmt) End() *token.Position {
 	return b.To
 }
 
+func (b *BadStmt) Accept(vst Visitor) {
+	panic("unimplemented")
+}
+
 func (b *BadStmt) stmt() {}
 func (b *BadStmt) String() string {
 	return ""
@@ -55,6 +70,10 @@ func (b *BadDecl) Pos() *token.Position {
 
 func (b *BadDecl) End() *token.Position {
 	return b.To
+}
+
+func (b *BadDecl) Accept(vst Visitor) {
+	panic("unimplemented")
 }
 
 func (b *BadDecl) decl() {}

@@ -19,6 +19,10 @@ func (a *AssignStmt) End() *token.Position {
 	return a.RValue.End()
 }
 
+func (a *AssignStmt) Accept(vst Visitor) {
+	vst.VisitAssignStmt(a)
+}
+
 func (a *AssignStmt) stmt() {}
 
 func (a *AssignStmt) String() string {

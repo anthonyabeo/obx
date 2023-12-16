@@ -13,7 +13,10 @@ type Visitor interface {
 	VisitAssignStmt(*AssignStmt)
 	VisitReturnStmt(*ReturnStmt)
 	VisitProcCall(*ProcCall)
-
+	VisitRepeatStmt(*RepeatStmt)
+	VisitWhileStmt(*WhileStmt)
+	VisitLoopStmt(*LoopStmt)
+	
 	VisitProcDecl(*ProcDecl)
 	VisitVarDecl(*VarDecl)
 }

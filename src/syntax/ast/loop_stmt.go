@@ -15,5 +15,9 @@ func (l *LoopStmt) End() *token.Position {
 	panic("not implemented")
 }
 
+func (l *LoopStmt) Accept(vst Visitor) {
+	vst.VisitLoopStmt(l)
+}
+
 func (l *LoopStmt) stmt()          {}
 func (l *LoopStmt) String() string { return "" }

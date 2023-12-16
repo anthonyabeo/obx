@@ -25,6 +25,10 @@ func (r *ReturnStmt) End() (pos *token.Position) {
 	return
 }
 
+func (r *ReturnStmt) Accept(vst Visitor) {
+	vst.VisitReturnStmt(r)
+}
+
 func (r *ReturnStmt) stmt() {}
 
 func (r *ReturnStmt) String() string {

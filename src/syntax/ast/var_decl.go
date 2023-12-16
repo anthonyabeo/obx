@@ -19,6 +19,10 @@ func (v *VarDecl) End() *token.Position {
 	panic("not implemented")
 }
 
+func (v *VarDecl) Accept(vst Visitor) {
+	vst.VisitVarDecl(v)
+}
+
 func (v *VarDecl) decl() {}
 
 func (v *VarDecl) String() string {

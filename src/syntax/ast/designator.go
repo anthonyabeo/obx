@@ -1,11 +1,15 @@
 package ast
 
-import "github.com/anthonyabeo/obx/src/syntax/token"
+import (
+	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/syntax/token"
+)
 
 type Designator struct {
 	QIdentPos      *token.Position
 	QualifiedIdent Expression
 	Selector       Expression
+	EType          types.Type
 }
 
 func (d *Designator) Pos() *token.Position {
@@ -20,6 +24,14 @@ func (d *Designator) End() (pos *token.Position) {
 	}
 
 	return
+}
+
+func (d *Designator) Type() types.Type {
+	return d.EType
+}
+
+func (d *Designator) Accept(vst Visitor) {
+	vst.VisitDesignator(d)
 }
 
 func (d *Designator) expr() {}

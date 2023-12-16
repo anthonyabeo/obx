@@ -23,6 +23,10 @@ func (stmt *IfStmt) End() *token.Position {
 	panic("not implemented")
 }
 
+func (stmt *IfStmt) Accept(vst Visitor) {
+	vst.VisitIfStmt(stmt)
+}
+
 func (stmt *IfStmt) stmt() {}
 
 func (stmt *IfStmt) String() string {
