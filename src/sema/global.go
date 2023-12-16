@@ -26,7 +26,6 @@ func defPredeclaredTypes() {
 type builtinId int
 
 const (
-	// universe scope
 	_Assert builtinId = iota
 )
 
