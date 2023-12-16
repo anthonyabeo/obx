@@ -1,4 +1,4 @@
-package parser
+package lexer
 
 import "github.com/anthonyabeo/obx/src/syntax/token"
 
