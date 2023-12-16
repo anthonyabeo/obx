@@ -3,6 +3,7 @@ package parser
 import (
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -29,11 +30,11 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lexer := &Lexer{}
-	lexer.InitLexer(file, []byte(input))
+	lex := &lexer.Lexer{}
+	lex.InitLexer(file, []byte(input))
 
 	p := &Parser{}
-	p.InitParser(lexer)
+	p.InitParser(lex)
 
 	ob := p.Oberon()
 	if len(p.errors) > 0 {
@@ -79,11 +80,11 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lexer := &Lexer{}
-	lexer.InitLexer(file, []byte(input))
+	lex := &lexer.Lexer{}
+	lex.InitLexer(file, []byte(input))
 
 	p := &Parser{}
-	p.InitParser(lexer)
+	p.InitParser(lex)
 
 	ob := p.Oberon()
 	if len(p.errors) > 0 {

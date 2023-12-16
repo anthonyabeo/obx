@@ -2,12 +2,13 @@ package parser
 
 import (
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Parser struct {
-	errors ErrorList
-	lex    *Lexer
+	errors lexer.ErrorList
+	lex    *lexer.Lexer
 
 	// Next token
 	tok token.Token
@@ -18,7 +19,7 @@ type Parser struct {
 	syncCnt int             // number of parser.advance calls without progress
 }
 
-func (p *Parser) InitParser(lex *Lexer) {
+func (p *Parser) InitParser(lex *lexer.Lexer) {
 	p.lex = lex
 
 	p.next()
@@ -242,10 +243,10 @@ func (p *Parser) parseExpression() (expr ast.Expression) {
 	expr = p.parseSimpleExpression()
 
 	if p.relation() {
-		relExpr := &ast.BinaryExpr{OpPos: p.pos, X: expr, Op: p.tok}
+		relExpr := &ast.BinaryExpr{OpPos: p.pos, Left: expr, Op: p.tok}
 		p.next()
 
-		relExpr.Y = p.parseSimpleExpression()
+		relExpr.Right = p.parseSimpleExpression()
 		expr = relExpr
 	}
 
@@ -268,10 +269,10 @@ func (p *Parser) parseSimpleExpression() (expr ast.Expression) {
 	expr = p.parseTerm()
 
 	for p.addOp() {
-		binExpr := &ast.BinaryExpr{OpPos: p.pos, X: expr, Op: p.tok}
+		binExpr := &ast.BinaryExpr{OpPos: p.pos, Left: expr, Op: p.tok}
 		p.next()
 
-		binExpr.Y = p.parseTerm()
+		binExpr.Right = p.parseTerm()
 		expr = binExpr
 	}
 
@@ -298,10 +299,10 @@ func (p *Parser) parseTerm() (expr ast.Expression) {
 	expr = p.parseFactor()
 
 	for p.mulOp() {
-		binExpr := &ast.BinaryExpr{OpPos: p.pos, X: expr, Op: p.tok}
+		binExpr := &ast.BinaryExpr{OpPos: p.pos, Left: expr, Op: p.tok}
 		p.next()
 
-		binExpr.Y = p.parseFactor()
+		binExpr.Right = p.parseFactor()
 		expr = binExpr
 	}
 
