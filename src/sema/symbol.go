@@ -58,6 +58,10 @@ func NewVar(pos *token.Position, name string, typ types.Type, exp bool) *Variabl
 	return &Variable{symbol: symbol{nil, pos, name, typ, exp}}
 }
 
+func (v Variable) String() string {
+	return v.name
+}
+
 // A Procedure represents a declared procedure or concrete method. Its Type() is always a *Signature.
 // --------------------------------------------------------------------------------------------------
 type Procedure struct {
@@ -71,6 +75,10 @@ func NewProcedure(pos *token.Position, name string, sig *types.Signature, exp bo
 	}
 
 	return &Procedure{symbol{nil, pos, name, typ, exp}}
+}
+
+func (p *Procedure) String() string {
+	return ""
 }
 
 // A Builtin represents a built-in function. Builtins don't have a valid type.

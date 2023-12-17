@@ -10,6 +10,7 @@ var Typ = []*types.Basic{
 	types.Invalid: types.NewBasicType(types.Invalid, 0, "invalid type"),
 
 	types.Bool:  types.NewBasicType(types.Bool, types.IsBoolean, "bool"),
+	types.Int:   types.NewBasicType(types.Int, types.IsInteger, "integer"),
 	types.Int8:  types.NewBasicType(types.Int8, types.IsInteger, "int8"),
 	types.Int16: types.NewBasicType(types.Int16, types.IsInteger, "int16"),
 	types.Int32: types.NewBasicType(types.Int32, types.IsInteger, "int32"),
