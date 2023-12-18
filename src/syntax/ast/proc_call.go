@@ -4,7 +4,7 @@ import "github.com/anthonyabeo/obx/src/syntax/token"
 
 type ProcCall struct {
 	NamePos      *token.Position
-	ProcName     Expression
+	Dsg          *Designator
 	ActualParams []Expression
 }
 

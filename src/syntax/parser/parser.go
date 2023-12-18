@@ -93,7 +93,7 @@ func (p *Parser) parseModule() *ast.Module {
 		p.next()
 	}
 
-	for p.beginsImportOrDecl() {
+	for p.startsImportOrDecl() {
 		switch p.tok {
 		case token.IMPORT:
 		case token.VAR, token.TYPE, token.CONST, token.PROC, token.PROCEDURE:
@@ -120,9 +120,12 @@ func (p *Parser) parseModule() *ast.Module {
 	return mod
 }
 
-func (p *Parser) beginsImportOrDecl() bool {
-	return p.tok == token.IMPORT ||
-		p.tok == token.VAR ||
+func (p *Parser) startsImportOrDecl() bool {
+	return p.tok == token.IMPORT || p.startsDecl()
+}
+
+func (p *Parser) startsDecl() bool {
+	return p.tok == token.VAR ||
 		p.tok == token.TYPE ||
 		p.tok == token.CONST ||
 		p.tok == token.PROC ||
@@ -130,18 +133,20 @@ func (p *Parser) beginsImportOrDecl() bool {
 }
 
 func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
-	switch p.tok {
-	case token.VAR:
-		seq = append(seq, p.varDecl())
-	case token.TYPE:
-	case token.CONST:
-	case token.PROC, token.PROCEDURE:
-		seq = append(seq, p.parseProcDecl())
-	default:
-		pos := p.pos
-		p.errorExpected(pos, "declaration")
-		p.advance(declStart)
-		seq = append(seq, &ast.BadDecl{From: pos, To: p.pos})
+	for p.startsDecl() {
+		switch p.tok {
+		case token.VAR:
+			seq = append(seq, p.varDecl())
+		case token.TYPE:
+		case token.CONST:
+		case token.PROC, token.PROCEDURE:
+			seq = append(seq, p.parseProcDecl())
+		default:
+			pos := p.pos
+			p.errorExpected(pos, "declaration")
+			p.advance(declStart)
+			seq = append(seq, &ast.BadDecl{From: pos, To: p.pos})
+		}
 	}
 
 	return seq
@@ -639,7 +644,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 			p.next()
 			stmt = &ast.AssignStmt{LValue: dsg, RValue: p.parseExpression()}
 		case token.LPAREN:
-			stmt = &ast.ProcCall{ProcName: dsg, ActualParams: p.parseActualParameters()}
+			stmt = &ast.ProcCall{Dsg: dsg, ActualParams: p.parseActualParameters()}
 		default:
 			pos := p.pos
 			p.errorExpected(p.pos, ":= or (")
