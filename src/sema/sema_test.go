@@ -11,6 +11,8 @@ import (
 func TestTypeCheckMinimalProgram(t *testing.T) {
 	input := `
 module Main
+	var res: integer
+
 	proc fib(n : integer): integer
 		var a, b: integer 
 
