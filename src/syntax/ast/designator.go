@@ -36,5 +36,15 @@ func (d *Designator) Accept(vst Visitor) {
 
 func (d *Designator) expr() {}
 func (d *Designator) String() string {
-	return ""
+	s := d.QualifiedIdent.String()
+	//if d.Selector != nil {
+	//	switch  {
+	//	case token.PERIOD:
+	//	case token.CARET:
+	//	case token.LPAREN:
+	//	case token.LBRACK:
+	//	}
+	//}
+
+	return s
 }
