@@ -2,6 +2,7 @@ package sema
 
 import (
 	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -68,7 +69,7 @@ type Procedure struct {
 	symbol
 }
 
-func NewProcedure(pos *token.Position, name string, sig *types.Signature, exp bool) *Procedure {
+func NewProcedure(pos *token.Position, name string, sig *ast.Signature, exp bool) *Procedure {
 	var typ types.Type
 	if sig != nil {
 		typ = sig
@@ -92,7 +93,7 @@ func newBuiltin(id builtinId) *Builtin {
 	return &Builtin{symbol{name: predeclaredProcedures[id].name, typ: Typ[types.Invalid]}, id}
 }
 
-func (obj *Builtin) String() string { return "" }
+func (obj *Builtin) String() string { return obj.symbol.name }
 
 // A TypeName represents a name for a (defined or alias) type.
 // --------------------------------------------------------------------------------------------------

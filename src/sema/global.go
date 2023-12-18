@@ -10,11 +10,11 @@ var Typ = []*types.Basic{
 	types.Invalid: types.NewBasicType(types.Invalid, 0, "invalid type"),
 
 	types.Bool:  types.NewBasicType(types.Bool, types.IsBoolean, "bool"),
-	types.Int:   types.NewBasicType(types.Int, types.IsInteger, "integer"),
-	types.Int8:  types.NewBasicType(types.Int8, types.IsInteger, "int8"),
-	types.Int16: types.NewBasicType(types.Int16, types.IsInteger, "int16"),
-	types.Int32: types.NewBasicType(types.Int32, types.IsInteger, "int32"),
-	types.Int64: types.NewBasicType(types.Int64, types.IsInteger, "int64"),
+	types.Int:   types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer"),
+	types.Int8:  types.NewBasicType(types.Int8, types.IsInteger|types.IsNumeric, "int8"),
+	types.Int16: types.NewBasicType(types.Int16, types.IsInteger|types.IsNumeric, "int16"),
+	types.Int32: types.NewBasicType(types.Int32, types.IsInteger|types.IsNumeric, "int32"),
+	types.Int64: types.NewBasicType(types.Int64, types.IsInteger|types.IsNumeric, "int64"),
 }
 
 func defPredeclaredTypes() {
@@ -34,7 +34,7 @@ var predeclaredProcedures = [...]struct {
 	name  string
 	nargs int
 }{
-	_Assert: {"append", 1},
+	_Assert: {"assert", 1},
 }
 
 func defPredeclaredProcedures() {
