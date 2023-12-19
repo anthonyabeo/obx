@@ -269,7 +269,7 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 		v.error(decl.Pos(), fmt.Sprintf("name %s already declared at %v", obj.String(), obj.Pos()))
 	} else {
 		sig := ast.NewSignature(decl.Head.Rcv, decl.Head.FP)
-		v.env.Insert(NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Exported))
+		v.env.Insert(NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props()))
 	}
 
 	curEnv := v.env
@@ -286,7 +286,7 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 				v.error(decl.Pos(), fmt.Sprintf("parameter name %s already declared at %v", sym.String(), sym.Pos()))
 			} else {
 				Type := v.typeFromExpr(FP.Type)
-				v.env.Insert(NewVar(name.Pos(), name.Name, Type, name.Exported))
+				v.env.Insert(NewVar(name.Pos(), name.Name, Type, name.Props()))
 			}
 		}
 	}
@@ -311,9 +311,9 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 
 	for _, ident := range decl.IdentList {
 		if obj := v.env.Lookup(ident.Name); obj != nil {
-			v.error(decl.Pos(), fmt.Sprintf("variable name %s already declared at %v", obj.String(), obj.Pos()))
+			v.error(decl.Pos(), fmt.Sprintf("variable name '%s' already declared at '%v'", obj.String(), obj.Pos()))
 		} else {
-			v.env.Insert(NewVar(ident.Pos(), ident.Name, varDeclType, ident.Exported))
+			v.env.Insert(NewVar(ident.Pos(), ident.Name, varDeclType, ident.Props()))
 		}
 	}
 }
