@@ -9,11 +9,11 @@ import (
 // Symbol
 // ---------------------------------------
 type Symbol interface {
-	Parent() *Scope       // scope in which this object is declared; nil for methods and struct fields
-	Pos() *token.Position // position of object identifier in declaration
-	Name() string         // package local object name
-	Type() types.Type     // object type
-	Exported() bool       // reports whether the name ends with a + or -
+	Parent() *Scope        // scope in which this object is declared; nil for methods and struct fields
+	Pos() *token.Position  // position of object identifier in declaration
+	Name() string          // package local object name
+	Type() types.Type      // object type
+	Props() ast.IdentProps // reports whether the name ends with a + or -
 
 	// String returns a human-readable string of the object.
 	String() string
@@ -28,7 +28,7 @@ type symbol struct {
 	pos    *token.Position
 	name   string
 	typ    types.Type
-	exp    bool
+	props  ast.IdentProps
 }
 
 // Parent returns the scope in which the object is declared.
@@ -46,7 +46,7 @@ func (obj *symbol) Pos() *token.Position { return obj.pos }
 
 func (obj *symbol) setParent(parent *Scope) { obj.parent = parent }
 
-func (obj *symbol) Exported() bool { return obj.exp }
+func (obj *symbol) Props() ast.IdentProps { return obj.props }
 
 // A Variable represents a declared variable (including function parameters and results, and struct fields).
 // ----------------------------------------------------------------------------------------------------------
@@ -55,8 +55,8 @@ type Variable struct {
 }
 
 // NewVar returns a new variable.
-func NewVar(pos *token.Position, name string, typ types.Type, exp bool) *Variable {
-	return &Variable{symbol: symbol{nil, pos, name, typ, exp}}
+func NewVar(pos *token.Position, name string, typ types.Type, props ast.IdentProps) *Variable {
+	return &Variable{symbol: symbol{nil, pos, name, typ, props}}
 }
 
 func (v Variable) String() string {
@@ -69,13 +69,13 @@ type Procedure struct {
 	symbol
 }
 
-func NewProcedure(pos *token.Position, name string, sig *ast.Signature, exp bool) *Procedure {
+func NewProcedure(pos *token.Position, name string, sig *ast.Signature, props ast.IdentProps) *Procedure {
 	var typ types.Type
 	if sig != nil {
 		typ = sig
 	}
 
-	return &Procedure{symbol{nil, pos, name, typ, exp}}
+	return &Procedure{symbol{nil, pos, name, typ, props}}
 }
 
 func (p *Procedure) String() string {
@@ -101,8 +101,8 @@ type TypeName struct {
 	symbol
 }
 
-func NewTypeName(pos *token.Position, name string, typ types.Type) *TypeName {
-	return &TypeName{symbol{nil, pos, name, typ, false}}
+func NewTypeName(pos *token.Position, name string, typ types.Type, props ast.IdentProps) *TypeName {
+	return &TypeName{symbol{nil, pos, name, typ, props}}
 }
 
 func (obj *TypeName) String() string { return "" }

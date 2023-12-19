@@ -8,13 +8,15 @@ const (
 
 	// predeclared types
 	Bool
-	Int
 	Int8
 	Int16
 	Int32
 	Int64
+	Int
+	LInt
+	SInt
 	Real
-	LongReal
+	LReal
 
 	Uint8
 

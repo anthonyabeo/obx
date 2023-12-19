@@ -487,7 +487,11 @@ func (p *Parser) parseProcHeading() (head *ast.ProcHead) {
 func (p *Parser) parseIdentDef() *ast.Ident {
 	id := p.parseIdent()
 	if p.tok == token.STAR || p.tok == token.MINUS {
-		id.Exported = true
+		id.IProps |= ast.IsExported
+		if p.tok == token.MINUS {
+			id.IProps |= ast.IsReadOnly
+		}
+
 		p.next()
 	}
 
