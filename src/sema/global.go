@@ -2,6 +2,7 @@ package sema
 
 import (
 	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
 var Global *Scope
@@ -15,11 +16,17 @@ var Typ = []*types.Basic{
 	types.Int16: types.NewBasicType(types.Int16, types.IsInteger|types.IsNumeric, "int16"),
 	types.Int32: types.NewBasicType(types.Int32, types.IsInteger|types.IsNumeric, "int32"),
 	types.Int64: types.NewBasicType(types.Int64, types.IsInteger|types.IsNumeric, "int64"),
+	types.LInt:  types.NewBasicType(types.LInt, types.IsInteger|types.IsNumeric, "longint"),
+	types.SInt:  types.NewBasicType(types.SInt, types.IsInteger|types.IsNumeric, "shortint"),
+	types.Byte:  types.NewBasicType(types.Byte, types.IsInteger|types.IsNumeric, "byte"),
+
+	types.Real:  types.NewBasicType(types.Real, types.IsReal|types.IsNumeric, "real"),
+	types.LReal: types.NewBasicType(types.LReal, types.IsReal|types.IsNumeric, "longreal"),
 }
 
 func defPredeclaredTypes() {
 	for _, t := range Typ {
-		Global.Insert(NewTypeName(nil, t.Name(), t))
+		Global.Insert(NewTypeName(nil, t.Name(), t, ast.IsPredeclared))
 	}
 }
 
