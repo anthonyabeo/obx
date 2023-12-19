@@ -16,7 +16,15 @@ type Visitor interface {
 	VisitRepeatStmt(*RepeatStmt)
 	VisitWhileStmt(*WhileStmt)
 	VisitLoopStmt(*LoopStmt)
-	
+
 	VisitProcDecl(*ProcDecl)
 	VisitVarDecl(*VarDecl)
+
+	VisitBasicType(*BasicType)
+
+	VisitReceiver(*Receiver)
+	VisitProcHead(*ProcHead)
+	VisitProcBody(*ProcBody)
+	VisitFPSection(*FPSection)
+	VisitFormalParams(*FormalParams)
 }

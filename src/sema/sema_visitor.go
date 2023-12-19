@@ -157,14 +157,14 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 
 	// ensure that the ith argument is assignment-compatible with the ith formal parameter
 	for i := 0; i < sig.NumParams(); i++ {
-		if !v.AreAssignmentComp(v.typeFromExpr(sig.Params[i].Type), call.ActualParams[i].Type()) {
+		if !v.AreAssignmentComp(sig.Params[i].Type.Type(), call.ActualParams[i].Type()) {
 			msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
 				call.ActualParams[i], sig.Params[i].Name)
 			v.error(call.ActualParams[i].Pos(), msg)
 		}
 	}
 
-	call.EType = v.typeFromExpr(sig.ReturnType())
+	call.EType = sig.ReturnType().Type()
 }
 
 func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
@@ -267,7 +267,7 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 
 		// ensure that the ith argument is assignment-compatible with the ith formal parameter
 		for i := 0; i < sig.NumParams(); i++ {
-			if !v.AreAssignmentComp(v.typeFromExpr(sig.Params[i].Type), call.ActualParams[i].Type()) {
+			if !v.AreAssignmentComp(sig.Params[i].Type.Type(), call.ActualParams[i].Type()) {
 				msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
 					call.ActualParams[i], sig.Params[i].Name)
 				v.error(call.ActualParams[i].Pos(), msg)
@@ -318,73 +318,79 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 	// go into this scope while we are in processing the procedure
 	v.env = procScope
 
-	for _, FP := range decl.Head.FP.Params {
-		for _, name := range FP.Names {
-			if sym := v.env.Lookup(name.Name); sym != nil {
-				v.error(decl.Pos(), fmt.Sprintf("parameter name %s already declared at %v", sym.String(), sym.Pos()))
-			} else {
-				Type := v.typeFromExpr(FP.Type)
-				v.env.Insert(NewVar(name.Pos(), name.Name, Type, name.Props()))
-			}
-		}
-	}
+	decl.Head.Accept(v)
+	decl.Body.Accept(v)
 
-	for _, dec := range decl.Body.DeclSeq {
-		dec.Accept(v)
-	}
-
-	for _, stmt := range decl.Body.StmtSeq {
-		stmt.Accept(v)
-	}
-
-	// TODO check that all the paths in the body have a return statement that matches the
-	// procedure's return type
+	// TODO check that all the paths in the body have a return statement that matches the procedure's return type
 
 	// return the environment back to the previous env
 	v.env = curEnv
 }
 
 func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
-	var varDeclType = v.typeFromExpr(decl.Type)
+	decl.Type.Accept(v)
 
 	for _, ident := range decl.IdentList {
 		if obj := v.env.Lookup(ident.Name); obj != nil {
 			v.error(decl.Pos(), fmt.Sprintf("variable name '%s' already declared at '%v'", obj.String(), obj.Pos()))
 		} else {
-			v.env.Insert(NewVar(ident.Pos(), ident.Name, varDeclType, ident.Props()))
+			v.env.Insert(NewVar(ident.Pos(), ident.Name, decl.Type.Type(), ident.Props()))
 		}
 	}
 }
 
-func (v *Visitor) typeFromExpr(expr ast.Expression) types.Type {
-	var Type types.Type
-
-	switch typ := expr.(type) {
-	case *ast.Ident:
-		obj := v.env.Lookup(typ.Name)
-		if obj != nil {
-			vdt, ok := obj.Type().(types.Type)
-			if !ok {
-				v.error(obj.Pos(), fmt.Sprintf("%v is not a recognized data-type", typ.Name))
-			} else {
-				Type = vdt
-			}
-		}
-	case *ast.Designator:
-		switch t := typ.QualifiedIdent.(type) {
-		case *ast.Ident:
-			obj := v.env.Lookup(t.Name)
-			vdt, ok := obj.(types.Type)
-			if obj == nil || !ok {
-				v.error(obj.Pos(), fmt.Sprintf("%v is not a recognized data-type", t.Name))
-				return nil
-			}
-
-			Type = vdt
-		}
-		// case *ast.ArrayType:
-		// case *ast.RecordType
+func (v *Visitor) VisitBasicType(b *ast.BasicType) {
+	obj := v.env.Lookup(b.Name())
+	if obj == nil {
+		msg := fmt.Sprintf("")
+		v.error(b.Pos(), msg)
+		return
 	}
 
-	return Type
+	t, ok := obj.Type().(types.Type)
+	if !ok {
+		msg := fmt.Sprintf("")
+		v.error(b.Pos(), msg)
+	}
+
+	b.EType = t
+}
+
+func (v *Visitor) VisitReceiver(rcv *ast.Receiver) {
+	panic("not implemented")
+}
+
+func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
+	//head.Rcv.Accept(v)
+	head.FP.Accept(v)
+}
+
+func (v *Visitor) VisitProcBody(body *ast.ProcBody) {
+	for _, dec := range body.DeclSeq {
+		dec.Accept(v)
+	}
+
+	for _, stmt := range body.StmtSeq {
+		stmt.Accept(v)
+	}
+}
+
+func (v *Visitor) VisitFPSection(sec *ast.FPSection) {
+	sec.Type.Accept(v)
+
+	for _, name := range sec.Names {
+		if obj := v.env.Lookup(name.Name); obj != nil {
+			v.error(obj.Pos(), fmt.Sprintf("parameter name %s already declared at %v", obj.String(), obj.Pos()))
+		} else {
+			v.env.Insert(NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props()))
+		}
+	}
+}
+
+func (v *Visitor) VisitFormalParams(params *ast.FormalParams) {
+	for _, sec := range params.Params {
+		sec.Accept(v)
+	}
+
+	params.RetType.Accept(v)
 }
