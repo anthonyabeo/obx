@@ -64,29 +64,67 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 	expr.Left.Accept(v)
 	expr.Right.Accept(v)
 
-	leftType := expr.Left.Type()
-	rightType := expr.Right.Type()
+	left, _ := expr.Left.Type().(*types.Basic)
+	right, _ := expr.Right.Type().(*types.Basic)
 
 	switch expr.Op {
-	case token.PLUS, token.MINUS, token.STAR:
-		left := leftType.(*types.Basic)
-		right := rightType.(*types.Basic)
-
+	case token.PLUS, token.MINUS, token.STAR, token.QUOT:
 		if left.Info() != types.IsNumeric || right.Info() != types.IsNumeric {
-			v.error(expr.Pos(), fmt.Sprintf("cannot perform operation '%v' on non-numeric types, '%v' and '%v'",
-				expr.Op, expr.Left, expr.Right))
+			msg := fmt.Sprintf("cannot perform operation '%v' on non-numeric types, '%v' and '%v'", expr.Op, expr.Left, expr.Right)
+			v.error(expr.Pos(), msg)
+		}
+
+		if expr.Op == token.QUOT {
+			expr.EType = Typ[types.LReal]
+			return
 		}
 
 		if left.Kind() == types.Int && right.Kind() == types.Int {
-			if left.Kind() > right.Kind() {
-				expr.EType = leftType
-			} else {
-				expr.EType = rightType
+			if expr.EType = left; left.Kind() < right.Kind() {
+				expr.EType = right
 			}
 		}
-	case token.EQUAL, token.OR:
-		expr.EType = Typ[types.Bool]
+	case token.DIV, token.MOD:
+		if left.Info() != types.IsInteger || right.Info() != types.IsInteger {
+			msg := fmt.Sprintf("cannot perform operation '%v' on non-integer types, '%v' and '%v'", expr.Op, expr.Left, expr.Right)
+			v.error(expr.Pos(), msg)
+		}
 
+		if expr.EType = left; left.Kind() < right.Kind() {
+			expr.EType = right
+		}
+	case token.EQUAL, token.NEQ:
+		if left.Info() != types.IsNumeric /* && left.info() != IsEnum && IsChar && IsString && IsCharArray && IsBool && IsSet && IsPointer && IsProc && IsNil */ {
+			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Left)
+			v.error(expr.Left.Pos(), msg)
+		}
+
+		if right.Info() != types.IsNumeric /* && left.info() != IsEnum && IsChar && IsString && IsCharArray & IsBool && IsSet && IsPointer && IsProc && IsNil */ {
+			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Right)
+			v.error(expr.Right.Pos(), msg)
+		}
+
+		expr.EType = Typ[types.Bool]
+	case token.LESS, token.LEQ, token.GREAT, token.GEQ:
+		if left.Info() != types.IsNumeric /* && left.info() != IsEnum && IsChar && IsString && IsCharArray*/ {
+			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Left)
+			v.error(expr.Left.Pos(), msg)
+		}
+
+		if right.Info() != types.IsNumeric /* && left.info() != IsEnum && IsChar && IsString && IsCharArray*/ {
+			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Right)
+			v.error(expr.Right.Pos(), msg)
+		}
+
+		expr.EType = Typ[types.Bool]
+	case token.OR, token.AND:
+		expr.EType = Typ[types.Bool]
+	case token.NOT:
+		expr.EType = Typ[types.Bool]
+	case token.IN:
+		expr.EType = Typ[types.Bool]
+	case token.IS:
+		expr.EType = Typ[types.Bool]
 	}
 }
 

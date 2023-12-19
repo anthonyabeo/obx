@@ -20,8 +20,18 @@ var Typ = []*types.Basic{
 	types.LReal: types.NewBasicType(types.LReal, types.IsReal|types.IsNumeric, "longreal"),
 }
 
+var AliasTypes = []*types.Basic{
+	types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer"),
+	types.NewBasicType(types.SInt, types.IsInteger|types.IsNumeric, "shortint"),
+	types.NewBasicType(types.LInt, types.IsInteger|types.IsNumeric, "longtint"),
+}
+
 func defPredeclaredTypes() {
 	for _, t := range Typ {
+		Global.Insert(NewTypeName(nil, t.Name(), t, ast.IsPredeclared))
+	}
+
+	for _, t := range AliasTypes {
 		Global.Insert(NewTypeName(nil, t.Name(), t, ast.IsPredeclared))
 	}
 }
