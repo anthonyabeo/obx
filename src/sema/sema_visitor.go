@@ -21,6 +21,19 @@ func (v *Visitor) InitSemaVisitor(ast *ast.Oberon, env *Scope) {
 	v.env = env
 }
 
+func (v *Visitor) error(pos *token.Position, msg string) {
+	n := len(v.errors)
+	if n > 10 {
+		for _, err := range v.errors {
+			println(err.Error())
+		}
+
+		panic("too many errors")
+	}
+
+	v.errors.Append(pos, msg)
+}
+
 func (v *Visitor) VisitModule(name string) {
 	module := v.ast.Program[name]
 
@@ -36,7 +49,7 @@ func (v *Visitor) VisitModule(name string) {
 func (v *Visitor) VisitIdentifier(id *ast.Ident) {
 	obj := v.env.Lookup(id.Name)
 	if obj == nil {
-		v.errors.Append(id.Pos(), fmt.Sprintf("name %v is undecleared", id.Name))
+		v.error(id.Pos(), fmt.Sprintf("name %v is undecleared", id.Name))
 		return
 	}
 
@@ -60,7 +73,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 		right := rightType.(*types.Basic)
 
 		if left.Info() != types.IsNumeric || right.Info() != types.IsNumeric {
-			v.errors.Append(expr.Pos(), fmt.Sprintf("cannot perform operation '%v' on non-numeric types, '%v' and '%v'",
+			v.error(expr.Pos(), fmt.Sprintf("cannot perform operation '%v' on non-numeric types, '%v' and '%v'",
 				expr.Op, expr.Left, expr.Right))
 		}
 
@@ -96,12 +109,12 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 
 	sig, ok := call.Dsg.Type().(*ast.Signature)
 	if !ok {
-		v.errors.Append(call.Pos(), fmt.Sprintf("cannot call a non-procedure %v", call.Dsg.String()))
+		v.error(call.Pos(), fmt.Sprintf("cannot call a non-procedure %v", call.Dsg.String()))
 	}
 
 	// ensure that the number of arguments matches the number of formal parameters
 	if sig.NumParams() != len(call.ActualParams) {
-		v.errors.Append(call.Pos(), fmt.Sprintf("not enough arguments to function call '%v'", call.String()))
+		v.error(call.Pos(), fmt.Sprintf("not enough arguments to function call '%v'", call.String()))
 	}
 
 	// ensure that the ith argument is assignment-compatible with the ith formal parameter
@@ -109,7 +122,7 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 		if !v.AreAssignmentComp(v.typeFromExpr(sig.Params[i].Type), call.ActualParams[i].Type()) {
 			msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
 				call.ActualParams[i], sig.Params[i].Name)
-			v.errors.Append(call.ActualParams[i].Pos(), msg)
+			v.error(call.ActualParams[i].Pos(), msg)
 		}
 	}
 
@@ -136,7 +149,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 	stmt.BoolExpr.Accept(v)
 	if stmt.BoolExpr.Type() != Typ[types.Bool] {
 		msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", stmt.BoolExpr)
-		v.errors.Append(stmt.BoolExpr.Pos(), msg)
+		v.error(stmt.BoolExpr.Pos(), msg)
 	}
 
 	for _, s := range stmt.ThenPath {
@@ -147,7 +160,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 		elsif.BoolExpr.Accept(v)
 		if elsif.BoolExpr.Type() != Typ[types.Bool] {
 			msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", elsif.BoolExpr)
-			v.errors.Append(elsif.BoolExpr.Pos(), msg)
+			v.error(elsif.BoolExpr.Pos(), msg)
 		}
 
 		for _, s := range elsif.ThenPath {
@@ -165,7 +178,7 @@ func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 	stmt.RValue.Accept(v)
 
 	if !v.AreAssignmentComp(stmt.LValue.Type(), stmt.RValue.Type()) {
-		v.errors.Append(stmt.AssignPos, fmt.Sprintf("%v and %v are not assignment compatible", stmt.LValue, stmt.RValue))
+		v.error(stmt.AssignPos, fmt.Sprintf("%v and %v are not assignment compatible", stmt.LValue, stmt.RValue))
 	}
 }
 
@@ -206,12 +219,12 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 	if call.Dsg.Type() != Typ[types.Invalid] {
 		sig, ok := call.Dsg.Type().(*ast.Signature)
 		if !ok {
-			v.errors.Append(call.Pos(), fmt.Sprintf("cannot call a non-procedure %v", call.Dsg.String()))
+			v.error(call.Pos(), fmt.Sprintf("cannot call a non-procedure %v", call.Dsg.String()))
 		}
 
 		// ensure that the number of arguments matches the number of formal parameters
 		if sig.NumParams() != len(call.ActualParams) {
-			v.errors.Append(call.Pos(), fmt.Sprintf("not enough arguments to procedure call '%v'", call.String()))
+			v.error(call.Pos(), fmt.Sprintf("not enough arguments to procedure call '%v'", call.String()))
 		}
 
 		// ensure that the ith argument is assignment-compatible with the ith formal parameter
@@ -219,13 +232,13 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 			if !v.AreAssignmentComp(v.typeFromExpr(sig.Params[i].Type), call.ActualParams[i].Type()) {
 				msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
 					call.ActualParams[i], sig.Params[i].Name)
-				v.errors.Append(call.ActualParams[i].Pos(), msg)
+				v.error(call.ActualParams[i].Pos(), msg)
 			}
 		}
 	} else {
 		obj := v.env.Lookup(call.Dsg.String())
 		if obj == nil {
-			v.errors.Append(call.Pos(), fmt.Sprintf("unknown procedure '%v'", call.Dsg.String()))
+			v.error(call.Pos(), fmt.Sprintf("unknown procedure '%v'", call.Dsg.String()))
 		}
 
 		b := obj.(*Builtin)
@@ -238,14 +251,14 @@ func (v *Visitor) checkBuiltin(b *Builtin, call *ast.ProcCall) {
 	switch b.id {
 	case _Assert:
 		if proc.nargs != len(call.ActualParams) {
-			v.errors.Append(call.Pos(), fmt.Sprintf("not enough arguments to procedure call '%v'", call.String()))
+			v.error(call.Pos(), fmt.Sprintf("not enough arguments to procedure call '%v'", call.String()))
 		}
 
 		for i := 0; i < proc.nargs; i++ {
 			if !v.AreAssignmentComp(Typ[types.Bool], call.ActualParams[i].Type()) {
 				msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
 					call.ActualParams[i], Typ[types.Bool])
-				v.errors.Append(call.ActualParams[i].Pos(), msg)
+				v.error(call.ActualParams[i].Pos(), msg)
 			}
 		}
 	}
@@ -253,7 +266,7 @@ func (v *Visitor) checkBuiltin(b *Builtin, call *ast.ProcCall) {
 
 func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 	if obj := v.env.Lookup(decl.Head.Name.Name); obj != nil {
-		v.errors.Append(decl.Pos(), fmt.Sprintf("name %s already declared at %v", obj.String(), obj.Pos()))
+		v.error(decl.Pos(), fmt.Sprintf("name %s already declared at %v", obj.String(), obj.Pos()))
 	} else {
 		sig := ast.NewSignature(decl.Head.Rcv, decl.Head.FP)
 		v.env.Insert(NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Exported))
@@ -270,7 +283,7 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 	for _, FP := range decl.Head.FP.Params {
 		for _, name := range FP.Names {
 			if sym := v.env.Lookup(name.Name); sym != nil {
-				v.errors.Append(decl.Pos(), fmt.Sprintf("parameter name %s already declared at %v", sym.String(), sym.Pos()))
+				v.error(decl.Pos(), fmt.Sprintf("parameter name %s already declared at %v", sym.String(), sym.Pos()))
 			} else {
 				Type := v.typeFromExpr(FP.Type)
 				v.env.Insert(NewVar(name.Pos(), name.Name, Type, name.Exported))
@@ -298,7 +311,7 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 
 	for _, ident := range decl.IdentList {
 		if obj := v.env.Lookup(ident.Name); obj != nil {
-			v.errors.Append(decl.Pos(), fmt.Sprintf("variable name %s already declared at %v", obj.String(), obj.Pos()))
+			v.error(decl.Pos(), fmt.Sprintf("variable name %s already declared at %v", obj.String(), obj.Pos()))
 		} else {
 			v.env.Insert(NewVar(ident.Pos(), ident.Name, varDeclType, ident.Exported))
 		}
@@ -314,7 +327,7 @@ func (v *Visitor) typeFromExpr(expr ast.Expression) types.Type {
 		if obj != nil {
 			vdt, ok := obj.Type().(types.Type)
 			if !ok {
-				v.errors.Append(obj.Pos(), fmt.Sprintf("%v is not a recognized data-type", typ.Name))
+				v.error(obj.Pos(), fmt.Sprintf("%v is not a recognized data-type", typ.Name))
 			} else {
 				Type = vdt
 			}
@@ -325,7 +338,7 @@ func (v *Visitor) typeFromExpr(expr ast.Expression) types.Type {
 			obj := v.env.Lookup(t.Name)
 			vdt, ok := obj.(types.Type)
 			if obj == nil || !ok {
-				v.errors.Append(obj.Pos(), fmt.Sprintf("%v is not a recognized data-type", t.Name))
+				v.error(obj.Pos(), fmt.Sprintf("%v is not a recognized data-type", t.Name))
 				return nil
 			}
 
