@@ -29,7 +29,7 @@ func (p *Parser) error(pos *token.Position, msg string) {
 	n := len(p.errors)
 	if n > 10 {
 		for _, err := range p.errors {
-			println(err)
+			println(err.Error())
 		}
 
 		panic("too many errors")
@@ -412,7 +412,8 @@ func (p *Parser) mulOp() bool {
 }
 
 func (p *Parser) parseNamedType() ast.Expression {
-	return p.parseQualifiedIdent(nil)
+	typ := p.parseQualifiedIdent(nil)
+	return ast.NewBasicType(typ.String())
 }
 
 func (p *Parser) parseQualifiedIdent(id *ast.Ident) ast.Expression {
