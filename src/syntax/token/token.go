@@ -1,6 +1,9 @@
 package token
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+)
 
 type Token int
 
@@ -86,6 +89,7 @@ const (
 	QUOT
 	TILDE
 	HASH
+	ELLIPSIS
 
 	LPAREN
 	RPAREN
@@ -187,6 +191,7 @@ func init() {
 }
 
 func Lookup(ident string) Token {
+	ident = strings.ToLower(ident)
 	if tok, isKeyword := keywords[ident]; isKeyword {
 		return tok
 	}
