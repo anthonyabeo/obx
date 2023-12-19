@@ -81,13 +81,14 @@ const (
 	MINUS
 	STAR
 	EQUAL
+	NEQ
 	LESS
 	LEQ
 	GREAT
 	GEQ
 	AND
 	QUOT
-	TILDE
+	NOT
 	HASH
 	ELLIPSIS
 
@@ -118,6 +119,7 @@ var tokens = [...]string{
 	PLUS:     "+",
 	MINUS:    "-",
 	EQUAL:    "=",
+	NEQ:      "#",
 	STAR:     "*",
 	LESS:     "<",
 	LEQ:      "<=",
@@ -125,7 +127,7 @@ var tokens = [...]string{
 	GEQ:      ">=",
 	AND:      "&",
 	QUOT:     "/",
-	TILDE:    "~",
+	NOT:      "~",
 	ELLIPSIS: "..",
 
 	LPAREN:    "(",
@@ -140,7 +142,6 @@ var tokens = [...]string{
 	ASSIGN:    ":=",
 	PERIOD:    ".",
 	CARET:     "^",
-	HASH:      "#",
 
 	MODULE:     "module",
 	PROC:       "proc",

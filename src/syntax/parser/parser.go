@@ -321,7 +321,7 @@ func (p *Parser) parseTerm() (expr ast.Expression) {
 //	      | '~' factor
 func (p *Parser) parseFactor() (expr ast.Expression) {
 	switch p.tok {
-	case token.TILDE:
+	case token.NOT:
 	case token.LPAREN:
 		p.match(token.LPAREN)
 		expr = p.parseExpression()
@@ -347,7 +347,7 @@ func (p *Parser) parseFactor() (expr ast.Expression) {
 func (p *Parser) parseActualParameters() (list []ast.Expression) {
 	p.match(token.LPAREN)
 
-	if p.tok == token.PLUS || p.tok == token.MINUS || p.tok == token.TILDE || p.tok == token.LPAREN ||
+	if p.tok == token.PLUS || p.tok == token.MINUS || p.tok == token.NOT || p.tok == token.LPAREN ||
 		p.tok == token.IDENT || p.tok == token.INT /* or other literals */ {
 
 		list = p.parseExprList()
