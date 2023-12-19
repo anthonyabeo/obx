@@ -8,19 +8,17 @@ const (
 
 	// predeclared types
 	Bool
+	Byte
 	Int8
 	Int16
 	Int32
 	Int64
-	Int
-	LInt
-	SInt
 	Real
 	LReal
 
-	Uint8
-
-	Byte = Uint8
+	SInt = Int16
+	Int  = Int32
+	LInt = Int64
 )
 
 // BasicInfo is a set of flags describing properties of a basic type.

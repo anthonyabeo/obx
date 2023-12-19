@@ -11,15 +11,11 @@ var Typ = []*types.Basic{
 	types.Invalid: types.NewBasicType(types.Invalid, 0, "invalid type"),
 
 	types.Bool:  types.NewBasicType(types.Bool, types.IsBoolean, "bool"),
-	types.Int:   types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer"),
+	types.Byte:  types.NewBasicType(types.Byte, types.IsInteger|types.IsNumeric, "byte"),
 	types.Int8:  types.NewBasicType(types.Int8, types.IsInteger|types.IsNumeric, "int8"),
 	types.Int16: types.NewBasicType(types.Int16, types.IsInteger|types.IsNumeric, "int16"),
 	types.Int32: types.NewBasicType(types.Int32, types.IsInteger|types.IsNumeric, "int32"),
 	types.Int64: types.NewBasicType(types.Int64, types.IsInteger|types.IsNumeric, "int64"),
-	types.LInt:  types.NewBasicType(types.LInt, types.IsInteger|types.IsNumeric, "longint"),
-	types.SInt:  types.NewBasicType(types.SInt, types.IsInteger|types.IsNumeric, "shortint"),
-	types.Byte:  types.NewBasicType(types.Byte, types.IsInteger|types.IsNumeric, "byte"),
-
 	types.Real:  types.NewBasicType(types.Real, types.IsReal|types.IsNumeric, "real"),
 	types.LReal: types.NewBasicType(types.LReal, types.IsReal|types.IsNumeric, "longreal"),
 }
