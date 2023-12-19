@@ -46,7 +46,7 @@ end Main
 	if len(sema.errors) > 0 {
 		t.Error("found semantic errors")
 		for _, err := range sema.errors {
-			t.Log(err)
+			t.Log(err.Error())
 		}
 	}
 }
