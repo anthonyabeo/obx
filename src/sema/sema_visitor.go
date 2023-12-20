@@ -310,21 +310,20 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 		v.env.Insert(NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props()))
 	}
 
-	curEnv := v.env
+	parent := v.env
 
-	// create a new scope to accommodate the symbols in the procedure
-	procScope := NewScope(v.env, decl.Head.Name.Name)
-	// make this new procedure scope the current scope so that subsequent insertions of symbols will
-	// go into this scope while we are in processing the procedure
-	v.env = procScope
+	// create a new scope to accommodate the symbols in the procedure. Make this new scope
+	// the current scope (v.env) so that subsequent insertions of symbols will go into this
+	// scope while we are processing the procedure.
+	v.env = NewScope(v.env, decl.Head.Name.Name)
 
 	decl.Head.Accept(v)
 	decl.Body.Accept(v)
 
 	// TODO check that all the paths in the body have a return statement that matches the procedure's return type
 
-	// return the environment back to the previous env
-	v.env = curEnv
+	// revert the scope back to the parent
+	v.env = parent
 }
 
 func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
@@ -342,14 +341,14 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 func (v *Visitor) VisitBasicType(b *ast.BasicType) {
 	obj := v.env.Lookup(b.Name())
 	if obj == nil {
-		msg := fmt.Sprintf("")
+		msg := fmt.Sprintf("name '%v' is not declared and is not a predeclared type", b.Name())
 		v.error(b.Pos(), msg)
 		return
 	}
 
 	t, ok := obj.Type().(types.Type)
 	if !ok {
-		msg := fmt.Sprintf("")
+		msg := fmt.Sprintf("'%v' is not recognized as a type", b.Name())
 		v.error(b.Pos(), msg)
 	}
 
