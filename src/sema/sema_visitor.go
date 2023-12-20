@@ -168,8 +168,28 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 }
 
 func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
-	//TODO implement me
-	panic("implement me")
+	expr.X.Accept(v)
+
+	X, _ := expr.X.Type().(*types.Basic)
+
+	switch expr.Op {
+	case token.PLUS, token.MINUS:
+		if X.Info() != types.IsNumeric {
+			msg := fmt.Sprintf("'%v' must be numeric type", expr.X)
+			v.error(expr.X.Pos(), msg)
+			return
+		}
+
+		expr.EType = X
+	case token.NOT:
+		if X.Info() != types.IsBoolean {
+			msg := fmt.Sprintf("'%v' does not evaluate to Boolean type", expr.X)
+			v.error(expr.X.Pos(), msg)
+			return
+		}
+
+		expr.EType = Typ[types.Bool]
+	}
 }
 
 func (v *Visitor) VisitQualifiedIdent(id *ast.QualifiedIdent) {
