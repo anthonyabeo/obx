@@ -229,17 +229,45 @@ func (v *Visitor) AreAssignmentComp(left, right types.Type) bool {
 }
 
 func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
-	//TODO implement me
-	panic("implement me")
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
 }
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
-	//TODO implement me
-	panic("implement me")
+	stmt.BoolExpr.Accept(v)
+	if stmt.BoolExpr.Type() != Typ[types.Bool] {
+		msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", stmt.BoolExpr)
+		v.error(stmt.BoolExpr.Pos(), msg)
+	}
+
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
 }
 
 func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
-	panic("implement me")
+	stmt.BoolExpr.Accept(v)
+	if stmt.BoolExpr.Type() != Typ[types.Bool] {
+		msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", stmt.BoolExpr)
+		v.error(stmt.BoolExpr.Pos(), msg)
+	}
+
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
+
+	for _, elsif := range stmt.ElsIfs {
+		elsif.BoolExpr.Accept(v)
+		if elsif.BoolExpr.Type() != Typ[types.Bool] {
+			msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", elsif.BoolExpr)
+			v.error(elsif.BoolExpr.Pos(), msg)
+		}
+
+		for _, s := range elsif.ThenPath {
+			s.Accept(v)
+		}
+	}
 }
 
 func (v *Visitor) VisitReturnStmt(stmt *ast.ReturnStmt) {
