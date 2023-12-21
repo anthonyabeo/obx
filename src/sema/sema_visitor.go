@@ -57,13 +57,18 @@ func (v *Visitor) VisitIdentifier(id *ast.Ident) {
 }
 
 func (v *Visitor) VisitUInt(uInt *ast.UInt) {
-	uInt.EType = types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer")
+	// TODO Number literals are (unsigned) integer or real constants.
+	// TODO The type of an integer literal is the minimal type to which the constant value belongs
+	// TODO If a decimal or hexadecimal literal is specified with the suffix I (or i), then the type is INT32.
+	// TODO If a decimal or hexadecimal constant is specified with the suffix L (or l), then the type is INT64.
+	uInt.EType = Typ[types.Int]
 }
 
 func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 	expr.Left.Accept(v)
 	expr.Right.Accept(v)
 
+	// TODO the operands could be non-basic types.
 	left, _ := expr.Left.Type().(*types.Basic)
 	right, _ := expr.Right.Type().(*types.Basic)
 
@@ -441,3 +446,8 @@ func (v *Visitor) VisitFormalParams(params *ast.FormalParams) {
 
 	params.RetType.Accept(v)
 }
+
+func (v *Visitor) VisitDotOp(op *ast.DotOp)                  {}
+func (v *Visitor) VisitIndexOp(op *ast.IndexOp)              {}
+func (v *Visitor) VisitTypeGuard(guard *ast.TypeGuard)       {}
+func (v *Visitor) VisitPointerDeref(deref *ast.PointerDeref) {}

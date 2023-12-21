@@ -379,9 +379,20 @@ func (p *Parser) parseDesignator() (d *ast.Designator) {
 	//for p.tok == token.PERIOD || p.tok == token.LBRACK || p.tok == token.CARET || p.tok == token.LPAREN {
 	//	switch p.tok {
 	//	case token.PERIOD:
+	//		p.next()
+	//		d.Selector = &ast.DotOp{Field: p.parseIdent()}
 	//	case token.LBRACK:
+	//		p.next()
+	//		List := p.parseExprList()
+	//		p.next()
+	//		d.Selector = &ast.IndexOp{List: List}
 	//	case token.CARET:
+	//		d.Selector = &ast.PointerDeref{}
 	//	case token.LPAREN:
+	//		p.match(token.LPAREN)
+	//		Typ := p.parseQualifiedIdent(d.QualifiedIdent)
+	//		p.match(token.RPAREN)
+	//		d.Selector = &ast.TypeGuard{Typ: Typ}
 	//	}
 	//}
 
@@ -416,7 +427,7 @@ func (p *Parser) parseNamedType() ast.Expression {
 	return ast.NewBasicType(typ.String())
 }
 
-func (p *Parser) parseQualifiedIdent(id *ast.Ident) ast.Expression {
+func (p *Parser) parseQualifiedIdent(id ast.Expression) ast.Expression {
 	if id == nil {
 		id = p.parseIdent()
 	}

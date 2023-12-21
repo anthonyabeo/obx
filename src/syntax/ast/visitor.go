@@ -27,4 +27,9 @@ type Visitor interface {
 	VisitProcBody(*ProcBody)
 	VisitFPSection(*FPSection)
 	VisitFormalParams(*FormalParams)
+
+	VisitDotOp(*DotOp)
+	VisitIndexOp(*IndexOp)
+	VisitTypeGuard(*TypeGuard)
+	VisitPointerDeref(*PointerDeref)
 }
