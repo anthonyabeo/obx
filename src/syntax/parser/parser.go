@@ -656,7 +656,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 	case token.IDENT:
 		dsg := p.parseDesignator()
 		switch p.tok {
-		case token.ASSIGN:
+		case token.BECOMES:
 			p.next()
 			stmt = &ast.AssignStmt{LValue: dsg, RValue: p.parseExpression()}
 		case token.LPAREN:

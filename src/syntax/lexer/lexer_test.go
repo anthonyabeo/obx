@@ -169,7 +169,7 @@ end Main
 		{token.ELSE, "else"},
 
 		{token.IDENT, "a"},
-		{token.ASSIGN, ":="},
+		{token.BECOMES, ":="},
 		{token.IDENT, "fib"},
 		{token.LPAREN, "("},
 		{token.IDENT, "n"},
@@ -178,7 +178,7 @@ end Main
 		{token.RPAREN, ")"},
 
 		{token.IDENT, "b"},
-		{token.ASSIGN, ":="},
+		{token.BECOMES, ":="},
 		{token.IDENT, "fib"},
 		{token.LPAREN, "("},
 		{token.IDENT, "n"},
@@ -197,7 +197,7 @@ end Main
 
 		{token.BEGIN, "begin"},
 		{token.IDENT, "res"},
-		{token.ASSIGN, ":="},
+		{token.BECOMES, ":="},
 		{token.IDENT, "fib"},
 		{token.LPAREN, "("},
 		{token.INT, "21"},

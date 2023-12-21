@@ -101,7 +101,7 @@ const (
 	COMMA
 	COLON
 	SEMICOLON
-	ASSIGN
+	BECOMES
 	PERIOD
 	CARET
 
@@ -139,7 +139,7 @@ var tokens = [...]string{
 	COMMA:     ",",
 	COLON:     ":",
 	SEMICOLON: ";",
-	ASSIGN:    ":=",
+	BECOMES:   ":=",
 	PERIOD:    ".",
 	CARET:     "^",
 

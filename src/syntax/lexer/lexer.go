@@ -60,7 +60,7 @@ func (lex *Lexer) Lex() (tok token.Token, lit string, pos *token.Position) {
 		case ':':
 			if lex.ch == '=' {
 				lex.next()
-				return token.ASSIGN, ":=", pos
+				return token.BECOMES, ":=", pos
 			}
 
 			tok = token.COLON
