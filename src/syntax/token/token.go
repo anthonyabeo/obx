@@ -29,6 +29,10 @@ const (
 
 	IDENT // main
 	INT   // 12345
+	REAL
+	CHAR
+	STRING
+	HEXSTR
 
 	literal_end
 
