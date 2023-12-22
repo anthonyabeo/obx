@@ -106,3 +106,16 @@ func NewTypeName(pos *token.Position, name string, typ types.Type, props ast.Ide
 }
 
 func (obj *TypeName) String() string { return "" }
+
+// A Const represents a constant declaration or the value of an enumeration
+// --------------------------------------------------------------------------------------------------
+type Const struct {
+	symbol
+	value ast.Expression
+}
+
+func NewConst(pos *token.Position, name string, typ types.Type, props ast.IdentProps, value ast.Expression) *Const {
+	return &Const{symbol{nil, pos, name, typ, props}, value}
+}
+
+func (c *Const) String() string { panic("not implemented") }

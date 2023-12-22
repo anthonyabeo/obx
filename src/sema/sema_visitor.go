@@ -407,6 +407,17 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 	}
 }
 
+func (v *Visitor) VisitConstDecl(decl *ast.ConstDecl) {
+	decl.Value.Accept(v)
+
+	if obj := v.env.Lookup(decl.Name.Name); obj != nil {
+		msg := fmt.Sprintf("name '%s' already declared at '%v'", obj.String(), obj.Pos())
+		v.error(decl.Pos(), msg)
+	} else {
+		v.env.Insert(NewConst(decl.Name.NamePos, decl.Name.Name, decl.Value.Type(), decl.Name.Props(), decl.Value))
+	}
+}
+
 func (v *Visitor) VisitBasicType(b *ast.BasicType) {
 	obj := v.env.Lookup(b.Name())
 	if obj == nil {
