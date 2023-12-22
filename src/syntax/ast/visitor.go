@@ -2,12 +2,13 @@ package ast
 
 type Visitor interface {
 	VisitIdentifier(*Ident)
-	VisitUInt(*UInt)
 	VisitBinaryExpr(*BinaryExpr)
 	VisitDesignator(*Designator)
 	VisitFuncCall(*FuncCall)
 	VisitUnaryExpr(*UnaryExpr)
 	VisitQualifiedIdent(*QualifiedIdent)
+	VisitSet(*Set)
+	VisitBasicLit(*BasicLit)
 
 	VisitIfStmt(*IfStmt)
 	VisitAssignStmt(*AssignStmt)

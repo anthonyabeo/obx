@@ -56,12 +56,22 @@ func (v *Visitor) VisitIdentifier(id *ast.Ident) {
 	id.EType = obj.Type()
 }
 
-func (v *Visitor) VisitUInt(uInt *ast.UInt) {
-	// TODO Number literals are (unsigned) integer or real constants.
-	// TODO The type of an integer literal is the minimal type to which the constant value belongs
-	// TODO If a decimal or hexadecimal literal is specified with the suffix I (or i), then the type is INT32.
-	// TODO If a decimal or hexadecimal constant is specified with the suffix L (or l), then the type is INT64.
-	uInt.EType = Typ[types.Int]
+func (v *Visitor) VisitBasicLit(b *ast.BasicLit) {
+	switch b.Kind {
+	case token.INT:
+		// TODO Number literals are (unsigned) integer or real constants.
+		// TODO The type of an integer literal is the minimal type to which the constant value belongs
+		// TODO If a decimal or hexadecimal literal is specified with the suffix I (or i), then the type is INT32.
+		// TODO If a decimal or hexadecimal constant is specified with the suffix L (or l), then the type is INT64.
+		b.EType = Typ[types.Int]
+	case token.REAL:
+	case token.STRING:
+	case token.HEXSTR:
+	}
+}
+
+func (v *Visitor) VisitSet(s *ast.Set) {
+
 }
 
 func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
@@ -163,8 +173,8 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 	// ensure that the ith argument is assignment-compatible with the ith formal parameter
 	for i := 0; i < sig.NumParams(); i++ {
 		if !v.AreAssignmentComp(sig.Params[i].Type.Type(), call.ActualParams[i].Type()) {
-			msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
-				call.ActualParams[i], sig.Params[i].Name)
+			msg := fmt.Sprintf("argument '%v' (of type '%v') does not match the corresponding parameter type '%v'",
+				call.ActualParams[i], call.ActualParams[i].Type(), sig.Params[i].Type.Type())
 			v.error(call.ActualParams[i].Pos(), msg)
 		}
 	}
@@ -248,6 +258,12 @@ func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 func (v *Visitor) AreAssignmentComp(left, right types.Type) bool {
 	if left.String() == right.String() {
 		return true
+	}
+
+	l, _ := left.(*types.Basic)
+	r, _ := right.(*types.Basic)
+	if l.Info() == types.IsNumeric && r.Info() == types.IsNumeric {
+		return l.Kind() >= r.Kind()
 	}
 
 	return false
