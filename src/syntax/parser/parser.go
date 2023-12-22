@@ -314,24 +314,23 @@ func (p *Parser) parseTerm() (expr ast.Expression) {
 	return
 }
 
-// factor = literal
-//
-//		  | designator [ActualParameters]
-//	      | '(' expression ')'
-//	      | '~' factor
+// factor = literal | designator [ActualParameters] | '(' expression ')' | '~' factor
 func (p *Parser) parseFactor() (expr ast.Expression) {
 	switch p.tok {
 	case token.NOT:
+		pos := p.pos
+		p.next()
+		expr = &ast.UnaryExpr{OpPos: pos, Op: token.NOT, X: p.parseFactor()}
 	case token.LPAREN:
 		p.match(token.LPAREN)
 		expr = p.parseExpression()
 		p.match(token.RPAREN)
-	case token.IDENT: // designator [ActualParameters]
+	case token.IDENT:
 		expr = p.parseDesignator()
 		if p.tok == token.LPAREN {
 			expr = &ast.FuncCall{Dsg: expr, ActualParams: p.parseActualParameters()}
 		}
-	case token.INT: // literal = number | string | hexstring | hexchar | NIL | TRUE | FALSE | set
+	case token.INT, token.REAL, token.STRING, token.HEXSTR, token.CHAR, token.NIL, token.TRUE, token.FALSE, token.LBRACE:
 		expr = p.parseLiteral()
 	default:
 		pos := p.pos
@@ -399,14 +398,50 @@ func (p *Parser) parseDesignator() (d *ast.Designator) {
 	return
 }
 
+// literal = number | string | hexstring | hexchar | NIL | TRUE | FALSE | set
 func (p *Parser) parseLiteral() (lit ast.Expression) {
 	switch p.tok {
-	case token.INT:
-		lit = &ast.UInt{LitPos: p.pos, Value: p.lit}
+	case token.INT, token.REAL, token.STRING, token.HEXSTR, token.CHAR:
+		lit = &ast.BasicLit{ValuePos: p.pos, Kind: p.tok, Value: p.lit}
 		p.next()
+	case token.TRUE, token.FALSE:
+	case token.NIL:
+	case token.LBRACE:
+		p.match(token.LBRACE)
+		set := &ast.Set{}
+
+		if p.exprStart() {
+			set.Elem = append(set.Elem, p.parseExpression())
+			for p.tok == token.COMMA {
+				p.next()
+				set.Elem = append(set.Elem, p.parseExpression())
+			}
+		}
+
+		p.match(token.RBRACE)
+
+		lit = set
 	}
 
 	return
+}
+
+func (p *Parser) exprStart() bool {
+	return p.tok == token.LPAREN ||
+		p.tok == token.PLUS ||
+		p.tok == token.MINUS ||
+		p.tok == token.IDENT ||
+		p.tok == token.TRUE ||
+		p.tok == token.FALSE ||
+		p.tok == token.NIL ||
+		p.tok == token.LBRACE ||
+		p.tok == token.STRING ||
+		p.tok == token.HEXSTR ||
+		p.tok == token.CHAR ||
+		p.tok == token.INT ||
+		p.tok == token.REAL ||
+		p.tok == token.NOT
+
 }
 
 func (p *Parser) addOp() bool {

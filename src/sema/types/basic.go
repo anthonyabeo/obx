@@ -58,4 +58,4 @@ func (b *Basic) Info() BasicInfo { return b.info }
 func (b *Basic) Name() string { return b.name }
 
 func (b *Basic) Underlying() Type { return b }
-func (b *Basic) String() string   { return "" }
+func (b *Basic) String() string   { return b.name }
