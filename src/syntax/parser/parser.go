@@ -136,9 +136,10 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 	for p.startsDecl() {
 		switch p.tok {
 		case token.VAR:
-			seq = append(seq, p.varDecl())
+			seq = append(seq, p.parseVarDecl())
 		case token.TYPE:
 		case token.CONST:
+			seq = append(seq, p.parseConstDecl())
 		case token.PROC, token.PROCEDURE:
 			seq = append(seq, p.parseProcDecl())
 		default:
@@ -152,8 +153,21 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 	return seq
 }
 
+// ConstDeclaration = identdef '=' ConstExpression
+func (p *Parser) parseConstDecl() *ast.ConstDecl {
+	c := &ast.ConstDecl{Const: p.pos}
+
+	p.match(token.CONST)
+
+	c.Name = p.parseIdentDef()
+	p.match(token.EQUAL)
+	c.Value = p.parseExpression()
+
+	return c
+}
+
 // VariableDeclaration = IdentList ':' type
-func (p *Parser) varDecl() (v *ast.VarDecl) {
+func (p *Parser) parseVarDecl() (v *ast.VarDecl) {
 	v = &ast.VarDecl{Var: p.pos}
 
 	p.match(token.VAR)
