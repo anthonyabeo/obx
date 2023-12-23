@@ -500,7 +500,10 @@ func (v *Visitor) VisitFormalParams(params *ast.FormalParams) {
 	params.RetType.Accept(v)
 }
 
-func (v *Visitor) VisitDotOp(op *ast.DotOp)                  {}
-func (v *Visitor) VisitIndexOp(op *ast.IndexOp)              {}
-func (v *Visitor) VisitTypeGuard(guard *ast.TypeGuard)       {}
+func (v *Visitor) VisitDotOp(op *ast.DotOp) {}
+
+func (v *Visitor) VisitIndexOp(op *ast.IndexOp) {}
+
+func (v *Visitor) VisitTypeGuard(guard *ast.TypeGuard) {}
+
 func (v *Visitor) VisitPointerDeref(deref *ast.PointerDeref) {}
