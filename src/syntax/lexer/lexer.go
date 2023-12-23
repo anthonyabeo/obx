@@ -77,6 +77,12 @@ func (lex *Lexer) Lex() (tok token.Token, lit string, pos *token.Position) {
 		case '>':
 			tok = token.GREAT
 			lit = ">"
+		case '[':
+			tok = token.LBRACK
+			lit = "["
+		case ']':
+			tok = token.RBRACK
+			lit = "]"
 		default:
 			tok = token.ILLEGAL
 			lit = string(ch)
