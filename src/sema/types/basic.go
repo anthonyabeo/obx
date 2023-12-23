@@ -9,8 +9,10 @@ const (
 	// predeclared types
 	Bool
 	Byte
+	Char
 	Int8
 	Int16
+	WChar
 	Int32
 	Int64
 	Real
@@ -31,10 +33,13 @@ const (
 	IsUnsigned
 	IsReal
 	IsString
+	IsChar
+	IsWChar
+	IsSet
 
 	IsOrdered   = IsInteger | IsReal | IsString
 	IsNumeric   = IsInteger | IsReal
-	IsConstType = IsBoolean | IsNumeric | IsString
+	IsConstType = IsBoolean | IsNumeric | IsString | IsChar | IsWChar | IsSet
 )
 
 // A Basic represents a basic type.

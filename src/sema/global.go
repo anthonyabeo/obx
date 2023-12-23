@@ -18,6 +18,8 @@ var Typ = []*types.Basic{
 	types.Int64: types.NewBasicType(types.Int64, types.IsInteger|types.IsNumeric, "int64"),
 	types.Real:  types.NewBasicType(types.Real, types.IsReal|types.IsNumeric, "real"),
 	types.LReal: types.NewBasicType(types.LReal, types.IsReal|types.IsNumeric, "longreal"),
+	types.Char:  types.NewBasicType(types.Char, types.IsChar, "char"),
+	types.WChar: types.NewBasicType(types.WChar, types.IsWChar, "wchar"),
 }
 
 var AliasTypes = []*types.Basic{
