@@ -458,7 +458,7 @@ func (v *Visitor) VisitArrayType(a *ast.ArrayType) {
 
 	a.ElemType.Accept(v)
 
-	a.EType = types.NewArray(a.ElemType.Type(), Len)
+	a.EType = NewArray(a.ElemType.Type(), Len)
 }
 
 func (v *Visitor) VisitReceiver(rcv *ast.Receiver) {
