@@ -418,6 +418,16 @@ func (v *Visitor) VisitConstDecl(decl *ast.ConstDecl) {
 	}
 }
 
+func (v *Visitor) VisitTypeDecl(decl *ast.TypeDecl) {
+	decl.DenotedType.Accept(v)
+	if obj := v.env.Lookup(decl.Name.Name); obj != nil {
+		msg := fmt.Sprintf("name '%s' already declared at '%v'", obj.String(), obj.Pos())
+		v.error(decl.Pos(), msg)
+	} else {
+		v.env.Insert(NewTypeName(decl.Type, decl.Name.Name, decl.DenotedType.Type(), decl.Name.Props()))
+	}
+}
+
 func (v *Visitor) VisitBasicType(b *ast.BasicType) {
 	obj := v.env.Lookup(b.Name())
 	if obj == nil {

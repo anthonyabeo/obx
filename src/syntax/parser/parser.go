@@ -138,6 +138,7 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 		case token.VAR:
 			seq = append(seq, p.parseVarDecl())
 		case token.TYPE:
+			seq = append(seq, p.parseTypeDecl())
 		case token.CONST:
 			seq = append(seq, p.parseConstDecl())
 		case token.PROC, token.PROCEDURE:
@@ -151,6 +152,18 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 	}
 
 	return seq
+}
+
+// TypeDeclaration = identdef '=' type
+func (p *Parser) parseTypeDecl() *ast.TypeDecl {
+	t := &ast.TypeDecl{Type: p.pos}
+
+	p.match(token.TYPE)
+	t.Name = p.parseIdentDef()
+	p.match(token.EQUAL)
+	t.DenotedType = p.parseType()
+
+	return t
 }
 
 // ConstDeclaration = identdef '=' ConstExpression

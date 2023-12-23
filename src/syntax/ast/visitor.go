@@ -21,7 +21,8 @@ type Visitor interface {
 	VisitProcDecl(*ProcDecl)
 	VisitVarDecl(*VarDecl)
 	VisitConstDecl(*ConstDecl)
-	
+	VisitTypeDecl(*TypeDecl)
+
 	VisitBasicType(*BasicType)
 
 	VisitReceiver(*Receiver)
