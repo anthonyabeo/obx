@@ -7,6 +7,43 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
+func TestParseTypeDeclaration(t *testing.T) {
+	input := `
+module Main
+  type a = array 10, N of integer
+  type b = array of char
+  type c = [N][M] T
+end Main
+`
+
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := &lexer.Lexer{}
+	lex.InitLexer(file, []byte(input))
+
+	p := &Parser{}
+	p.InitParser(lex)
+
+	ob := p.Oberon()
+	if len(p.errors) > 0 {
+		t.Error("found parse errors")
+		for _, err := range p.errors {
+			t.Log(err)
+		}
+	}
+
+	mainMod := ob.Program["Main"]
+	if mainMod.BeginName.Name != mainMod.EndName.Name {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			mainMod.BeginName, mainMod.EndName)
+	}
+
+	if len(mainMod.DeclSeq) != 3 {
+		t.Errorf("expected 1 declaration in '%v' module, found %d",
+			mainMod.BeginName, len(mainMod.DeclSeq))
+	}
+
+}
+
 func TestParseOberonMinimalProgram(t *testing.T) {
 	input := `
 module Main

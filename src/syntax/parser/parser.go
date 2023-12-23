@@ -210,7 +210,42 @@ func (p *Parser) parseIdentOrType() ast.Expression {
 	case token.IDENT:
 		typ := p.parseNamedType()
 		return typ
+	case token.LBRACK:
+		pos := p.pos
+		p.next()
+
+		ll := &ast.LenList{}
+		if p.tok == token.VAR || p.exprStart() {
+			if p.tok == token.VAR {
+				ll.Modifier = p.tok
+				p.next()
+			}
+
+			ll.List = p.parseExprList()
+		}
+
+		p.match(token.RBRACK)
+		typ := p.parseType()
+
+		return ast.NewArray(pos, ll, typ)
 	case token.ARRAY:
+		pos := p.pos
+		p.next()
+
+		ll := &ast.LenList{}
+		if p.tok == token.VAR || p.exprStart() {
+			if p.tok == token.VAR {
+				ll.Modifier = p.tok
+				p.next()
+			}
+
+			ll.List = p.parseExprList()
+		}
+
+		p.match(token.OF)
+
+		return ast.NewArray(pos, ll, p.parseType())
+
 	case token.RECORD:
 	case token.PROCEDURE:
 	case token.POINTER, token.CARET:
