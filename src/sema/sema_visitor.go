@@ -445,6 +445,22 @@ func (v *Visitor) VisitBasicType(b *ast.BasicType) {
 	b.EType = t
 }
 
+func (v *Visitor) VisitArrayType(a *ast.ArrayType) {
+	var Len ast.Expression
+	if a.LenList != nil {
+		for _, index := range a.LenList.List {
+			index.Accept(v)
+		}
+
+		Len = a.LenList.List[0]
+
+	}
+
+	a.ElemType.Accept(v)
+
+	a.EType = types.NewArray(a.ElemType.Type(), Len)
+}
+
 func (v *Visitor) VisitReceiver(rcv *ast.Receiver) {
 	panic("not implemented")
 }

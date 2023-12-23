@@ -24,6 +24,7 @@ type Visitor interface {
 	VisitTypeDecl(*TypeDecl)
 
 	VisitBasicType(*BasicType)
+	VisitArrayType(*ArrayType)
 
 	VisitReceiver(*Receiver)
 	VisitProcHead(*ProcHead)

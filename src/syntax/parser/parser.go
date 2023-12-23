@@ -214,8 +214,9 @@ func (p *Parser) parseIdentOrType() ast.Expression {
 		pos := p.pos
 		p.next()
 
-		ll := &ast.LenList{}
+		var ll *ast.LenList
 		if p.tok == token.VAR || p.exprStart() {
+			ll = new(ast.LenList)
 			if p.tok == token.VAR {
 				ll.Modifier = p.tok
 				p.next()
@@ -232,8 +233,9 @@ func (p *Parser) parseIdentOrType() ast.Expression {
 		pos := p.pos
 		p.next()
 
-		ll := &ast.LenList{}
+		var ll *ast.LenList
 		if p.tok == token.VAR || p.exprStart() {
+			ll = new(ast.LenList)
 			if p.tok == token.VAR {
 				ll.Modifier = p.tok
 				p.next()
