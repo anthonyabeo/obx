@@ -66,7 +66,7 @@ func (v *Visitor) VisitBasicLit(b *ast.BasicLit) {
 		b.EType = Typ[types.Int]
 	case token.REAL:
 	case token.STRING:
-	case token.HEXSTR:
+	case token.HEXSTRING:
 	}
 }
 
@@ -315,6 +315,16 @@ func (v *Visitor) VisitReturnStmt(stmt *ast.ReturnStmt) {
 	if stmt.Value != nil {
 		stmt.Value.Accept(v)
 	}
+}
+
+func (v *Visitor) VisitCaseStmt(stmt *ast.CaseStmt) {
+	// TODO not implemented
+	panic("not implemented")
+}
+
+func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
+	// TODO not implemented
+	panic("not implemented")
 }
 
 func (v *Visitor) VisitProcCall(call *ast.ProcCall) {

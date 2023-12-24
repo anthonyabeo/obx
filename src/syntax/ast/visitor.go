@@ -17,6 +17,8 @@ type Visitor interface {
 	VisitRepeatStmt(*RepeatStmt)
 	VisitWhileStmt(*WhileStmt)
 	VisitLoopStmt(*LoopStmt)
+	VisitCaseStmt(*CaseStmt)
+	VisitForStmt(*ForStmt)
 
 	VisitProcDecl(*ProcDecl)
 	VisitVarDecl(*VarDecl)
