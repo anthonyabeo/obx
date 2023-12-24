@@ -32,7 +32,7 @@ const (
 	REAL
 	CHAR
 	STRING
-	HEXSTR
+	HEXSTRING
 
 	literal_end
 
@@ -94,7 +94,7 @@ const (
 	QUOT
 	NOT
 	HASH
-	ELLIPSIS
+	RANGE
 
 	LPAREN
 	RPAREN
@@ -108,6 +108,7 @@ const (
 	BECOMES
 	PERIOD
 	CARET
+	BAR
 
 	operator_end
 )
@@ -117,22 +118,26 @@ var tokens = [...]string{
 	EOF:     "EOF",
 	COMMENT: "COMMENT",
 
-	IDENT: "IDENT",
-	INT:   "INT",
+	IDENT:     "IDENT",
+	INT:       "INT",
+	REAL:      "REAL",
+	CHAR:      "CHAR",
+	STRING:    "STRING",
+	HEXSTRING: "HEXSTRING",
 
-	PLUS:     "+",
-	MINUS:    "-",
-	EQUAL:    "=",
-	NEQ:      "#",
-	STAR:     "*",
-	LESS:     "<",
-	LEQ:      "<=",
-	GREAT:    ">",
-	GEQ:      ">=",
-	AND:      "&",
-	QUOT:     "/",
-	NOT:      "~",
-	ELLIPSIS: "..",
+	PLUS:  "+",
+	MINUS: "-",
+	EQUAL: "=",
+	NEQ:   "#",
+	STAR:  "*",
+	LESS:  "<",
+	LEQ:   "<=",
+	GREAT: ">",
+	GEQ:   ">=",
+	AND:   "&",
+	QUOT:  "/",
+	NOT:   "~",
+	RANGE: "..",
 
 	LPAREN:    "(",
 	RPAREN:    ")",
@@ -146,6 +151,7 @@ var tokens = [...]string{
 	BECOMES:   ":=",
 	PERIOD:    ".",
 	CARET:     "^",
+	BAR:       "|",
 
 	MODULE:     "module",
 	PROC:       "proc",
