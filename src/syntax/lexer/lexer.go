@@ -45,6 +45,14 @@ func (lex *Lexer) Lex() (tok token.Token, lit string, pos *token.Position) {
 		switch ch {
 		case eof:
 			tok = token.EOF
+		case '.':
+			if lex.ch == '.' {
+				lex.next()
+				return token.RANGE, "..", pos
+			}
+
+			tok = token.PERIOD
+			lit = "."
 		case ',':
 			tok = token.COMMA
 			lit = ","
@@ -83,6 +91,13 @@ func (lex *Lexer) Lex() (tok token.Token, lit string, pos *token.Position) {
 		case ']':
 			tok = token.RBRACK
 			lit = "]"
+		case '|':
+			tok = token.BAR
+			lit = "|"
+		case '\'', '"':
+			lit = lex.readString(ch)
+			tok = token.STRING
+			lex.next()
 		default:
 			tok = token.ILLEGAL
 			lit = string(ch)
@@ -109,11 +124,27 @@ func (lex *Lexer) identifier() string {
 
 func (lex *Lexer) number() (token.Token, string) {
 	pos := lex.offset
-	for lex.isDigit(lex.ch) {
+	for lex.isDigit(lex.ch) || lex.isHexDigit(lex.ch) {
 		lex.next()
 	}
 
+	if lex.ch == 'X' || lex.ch == 'x' {
+		lex.next()
+		return token.CHAR, string(lex.src[pos : lex.offset-1])
+	}
+
 	return token.INT, string(lex.src[pos:lex.offset])
+}
+
+func (lex *Lexer) readString(open rune) string {
+	pos := lex.offset
+	//open := rune(lex.src[pos])
+	//lex.next()
+	for lex.ch != open /*'"' && lex.ch != '\''*/ {
+		lex.next()
+	}
+
+	return string(lex.src[pos:lex.offset])
 }
 
 func (lex *Lexer) isDigit(ch rune) bool {
