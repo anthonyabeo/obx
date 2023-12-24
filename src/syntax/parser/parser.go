@@ -382,7 +382,7 @@ func (p *Parser) parseFactor() (expr ast.Expression) {
 		if p.tok == token.LPAREN {
 			expr = &ast.FuncCall{Dsg: expr, ActualParams: p.parseActualParameters()}
 		}
-	case token.INT, token.REAL, token.STRING, token.HEXSTR, token.CHAR, token.NIL, token.TRUE, token.FALSE, token.LBRACE:
+	case token.INT, token.REAL, token.STRING, token.HEXSTRING, token.CHAR, token.NIL, token.TRUE, token.FALSE, token.LBRACE:
 		expr = p.parseLiteral()
 	default:
 		pos := p.pos
@@ -398,9 +398,7 @@ func (p *Parser) parseFactor() (expr ast.Expression) {
 func (p *Parser) parseActualParameters() (list []ast.Expression) {
 	p.match(token.LPAREN)
 
-	if p.tok == token.PLUS || p.tok == token.MINUS || p.tok == token.NOT || p.tok == token.LPAREN ||
-		p.tok == token.IDENT || p.tok == token.INT /* or other literals */ {
-
+	if p.exprStart() {
 		list = p.parseExprList()
 	}
 
@@ -453,7 +451,7 @@ func (p *Parser) parseDesignator() (d *ast.Designator) {
 // literal = number | string | hexstring | hexchar | NIL | TRUE | FALSE | set
 func (p *Parser) parseLiteral() (lit ast.Expression) {
 	switch p.tok {
-	case token.INT, token.REAL, token.STRING, token.HEXSTR, token.CHAR:
+	case token.INT, token.REAL, token.STRING, token.HEXSTRING, token.CHAR:
 		lit = &ast.BasicLit{ValuePos: p.pos, Kind: p.tok, Value: p.lit}
 		p.next()
 	case token.TRUE, token.FALSE:
@@ -488,7 +486,7 @@ func (p *Parser) exprStart() bool {
 		p.tok == token.NIL ||
 		p.tok == token.LBRACE ||
 		p.tok == token.STRING ||
-		p.tok == token.HEXSTR ||
+		p.tok == token.HEXSTRING ||
 		p.tok == token.CHAR ||
 		p.tok == token.INT ||
 		p.tok == token.REAL ||
@@ -734,6 +732,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 	case token.FOR:
 	case token.WITH:
 	case token.CASE:
+		stmt = p.parseCaseStmt()
 	case token.RETURN:
 		stmt = p.parseReturnStmt()
 	case token.WHILE:
@@ -844,4 +843,59 @@ func (p *Parser) parseIfStmt() (stmt *ast.IfStmt) {
 	p.match(token.END)
 
 	return
+}
+
+// CaseStatement = CASE expression OF ['|'] Case { '|' Case } [ ELSE StatementSequence ] END
+func (p *Parser) parseCaseStmt() (stmt *ast.CaseStmt) {
+	stmt = &ast.CaseStmt{Case: p.pos}
+
+	p.match(token.CASE)
+
+	stmt.Expr = p.parseExpression()
+	p.match(token.OF)
+
+	if p.tok == token.BAR {
+		p.next()
+	}
+
+	stmt.Cases = append(stmt.Cases, p.parseCase())
+	for p.tok == token.BAR {
+		p.next()
+		stmt.Cases = append(stmt.Cases, p.parseCase())
+	}
+
+	if p.tok == token.ELSE {
+		p.next()
+		stmt.Else = p.parseStatementSeq()
+	}
+
+	p.match(token.END)
+
+	return
+}
+
+func (p *Parser) parseCase() *ast.Case {
+	c := &ast.Case{}
+
+	c.CaseLabelList = append(c.CaseLabelList, p.parseLabelRange())
+	for p.tok == token.COMMA {
+		p.next()
+		c.CaseLabelList = append(c.CaseLabelList, p.parseLabelRange())
+	}
+
+	p.match(token.COLON)
+
+	c.StmtSeq = p.parseStatementSeq()
+
+	return c
+}
+
+func (p *Parser) parseLabelRange() *ast.LabelRange {
+	r := &ast.LabelRange{Begin: p.parseExpression()}
+	if p.tok == token.RANGE {
+		p.next()
+		r.End = p.parseExpression()
+	}
+
+	return r
 }

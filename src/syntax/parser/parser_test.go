@@ -7,6 +7,41 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
+func TestParseCaseStatement(t *testing.T) {
+	input := `module Main
+
+begin
+    case ch of
+      "A" .. "Z": ReadIdentifier()
+    | "0" .. "9": ReadNumber()
+    | "'", '"': ReadString()
+    else SpecialCharacter()
+    end
+end Main`
+
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := &lexer.Lexer{}
+	lex.InitLexer(file, []byte(input))
+
+	p := &Parser{}
+	p.InitParser(lex)
+
+	ob := p.Oberon()
+	if len(p.errors) > 0 {
+		t.Error("found parse errors")
+		for _, err := range p.errors {
+			t.Log(err)
+		}
+	}
+
+	mainMod := ob.Program["Main"]
+	if mainMod.BeginName.Name != mainMod.EndName.Name {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			mainMod.BeginName, mainMod.EndName)
+	}
+
+}
+
 func TestParseTypeDeclaration(t *testing.T) {
 	input := `
 module Main
