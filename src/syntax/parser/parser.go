@@ -727,6 +727,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 	case token.LOOP:
 		stmt = p.parseLoopStmt()
 	case token.EXIT:
+		stmt = p.parseExitStatement()
 	case token.IF:
 		stmt = p.parseIfStmt()
 	case token.FOR:
@@ -922,4 +923,12 @@ func (p *Parser) parseForStatement() (stmt *ast.ForStmt) {
 	p.match(token.END)
 
 	return
+}
+
+// ExitStatement = EXIT
+func (p *Parser) parseExitStatement() *ast.ExitStmt {
+	stmt := &ast.ExitStmt{Exit: p.pos}
+	p.match(token.EXIT)
+
+	return stmt
 }

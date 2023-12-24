@@ -327,6 +327,11 @@ func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
 	panic("not implemented")
 }
 
+func (v *Visitor) VisitExitStmt(stmt *ast.ExitStmt) {
+	// TODO not implemented
+	panic("not implemented")
+}
+
 func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 	call.Dsg.Accept(v)
 	for _, param := range call.ActualParams {

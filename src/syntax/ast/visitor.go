@@ -19,6 +19,7 @@ type Visitor interface {
 	VisitLoopStmt(*LoopStmt)
 	VisitCaseStmt(*CaseStmt)
 	VisitForStmt(*ForStmt)
+	VisitExitStmt(*ExitStmt)
 
 	VisitProcDecl(*ProcDecl)
 	VisitVarDecl(*VarDecl)
