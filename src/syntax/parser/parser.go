@@ -730,6 +730,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 	case token.IF:
 		stmt = p.parseIfStmt()
 	case token.FOR:
+		stmt = p.parseForStatement()
 	case token.WITH:
 	case token.CASE:
 		stmt = p.parseCaseStmt()
@@ -898,4 +899,27 @@ func (p *Parser) parseLabelRange() *ast.LabelRange {
 	}
 
 	return r
+}
+
+// ForStatement = FOR ident ':=' expression TO expression [BY ConstExpression] DO StatementSequence END
+func (p *Parser) parseForStatement() (stmt *ast.ForStmt) {
+	stmt = &ast.ForStmt{For: p.pos}
+
+	stmt.CtlVar = p.parseIdent()
+	p.match(token.BECOMES)
+	stmt.InitVal = p.parseExpression()
+	p.match(token.TO)
+	stmt.FinalVal = p.parseExpression()
+
+	if p.tok == token.BY {
+		p.next()
+		stmt.By = p.parseExpression()
+	}
+
+	p.match(token.DO)
+
+	stmt.StmtSeq = p.parseStatementSeq()
+	p.match(token.END)
+
+	return
 }
