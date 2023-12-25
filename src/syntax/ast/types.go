@@ -5,12 +5,33 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
-// An ArrayType represents an array type AST node.
-type ArrayType struct {
-	Array    *token.Position
-	LenList  *LenList
-	ElemType Expression
-	EType    types.Type
+type (
+	BasicType struct {
+		name string // e.g. integer, bool
+
+		EType types.Type
+	}
+
+	ArrayType struct {
+		Array    *token.Position
+		LenList  *LenList
+		ElemType Expression
+		EType    types.Type
+	}
+)
+
+func NewBasicType(name string) *BasicType {
+	return &BasicType{name: name}
+}
+
+func (b *BasicType) Name() string         { return b.name }
+func (b *BasicType) Pos() *token.Position { panic("not implemented") }
+func (b *BasicType) End() *token.Position { panic("not implemented") }
+func (b *BasicType) expr()                {}
+func (b *BasicType) Type() types.Type     { return b.EType }
+func (b *BasicType) String() string       { return b.name }
+func (b *BasicType) Accept(vst Visitor) {
+	vst.VisitBasicType(b)
 }
 
 func NewArray(pos *token.Position, lenList *LenList, elem Expression) *ArrayType {
