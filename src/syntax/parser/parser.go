@@ -727,12 +727,13 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 	case token.LOOP:
 		stmt = p.parseLoopStmt()
 	case token.EXIT:
-		stmt = p.parseExitStatement()
+		stmt = p.parseExitStmt()
 	case token.IF:
 		stmt = p.parseIfStmt()
 	case token.FOR:
-		stmt = p.parseForStatement()
+		stmt = p.parseForStmt()
 	case token.WITH:
+		stmt = p.parseWithStmt()
 	case token.CASE:
 		stmt = p.parseCaseStmt()
 	case token.RETURN:
@@ -903,7 +904,7 @@ func (p *Parser) parseLabelRange() *ast.LabelRange {
 }
 
 // ForStatement = FOR ident ':=' expression TO expression [BY ConstExpression] DO StatementSequence END
-func (p *Parser) parseForStatement() (stmt *ast.ForStmt) {
+func (p *Parser) parseForStmt() (stmt *ast.ForStmt) {
 	stmt = &ast.ForStmt{For: p.pos}
 
 	stmt.CtlVar = p.parseIdent()
@@ -926,9 +927,41 @@ func (p *Parser) parseForStatement() (stmt *ast.ForStmt) {
 }
 
 // ExitStatement = EXIT
-func (p *Parser) parseExitStatement() *ast.ExitStmt {
+func (p *Parser) parseExitStmt() *ast.ExitStmt {
 	stmt := &ast.ExitStmt{Exit: p.pos}
 	p.match(token.EXIT)
 
 	return stmt
+}
+
+// WithStatement = WITH ['|'] Guard DO StatementSequence { '|' Guard DO StatementSequence} [ ELSE StatementSequence ] END
+// Guard         = qualident ':' qualident
+func (p *Parser) parseWithStmt() *ast.WithStmt {
+	stmt := &ast.WithStmt{With: p.pos}
+
+	p.match(token.WITH)
+
+	if p.tok == token.BAR {
+		p.next()
+	}
+
+	stmt.Arms = append(stmt.Arms, p.parseGuard())
+	for p.tok == token.BAR {
+		p.next()
+		stmt.Arms = append(stmt.Arms, p.parseGuard())
+	}
+
+	if p.tok == token.ELSE {
+		stmt.Else = p.parseStatementSeq()
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseGuard() *ast.Guard {
+	grd := &ast.Guard{Expr: p.parseQualifiedIdent(nil), Type: p.parseQualifiedIdent(nil)}
+	p.match(token.DO)
+	grd.StmtSeq = p.parseStatementSeq()
+
+	return grd
 }
