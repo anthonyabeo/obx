@@ -95,6 +95,11 @@ type (
 		Begin Expression
 		End   Expression
 	}
+
+	BadStmt struct {
+		From *token.Position
+		To   *token.Position
+	}
 )
 
 func (stmt *ForStmt) stmt()                {}
@@ -171,3 +176,9 @@ func (stmt *CaseStmt) End() *token.Position { panic("not implemented") }
 func (stmt *CaseStmt) Accept(vst Visitor)   { vst.VisitCaseStmt(stmt) }
 func (stmt *CaseStmt) stmt()                {}
 func (stmt *CaseStmt) String() string       { panic("not implemented") }
+
+func (b *BadStmt) Pos() *token.Position { return b.From }
+func (b *BadStmt) End() *token.Position { return b.To }
+func (b *BadStmt) Accept(vst Visitor)   { panic("not implemented") }
+func (b *BadStmt) stmt()                {}
+func (b *BadStmt) String() string       { panic("not implemented") }

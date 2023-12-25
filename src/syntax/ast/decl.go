@@ -62,6 +62,11 @@ type (
 		Var  *Ident
 		Type *Ident
 	}
+
+	BadDecl struct {
+		From *token.Position
+		To   *token.Position
+	}
 )
 
 func (v *VarDecl) decl()   {}
@@ -108,3 +113,9 @@ func (p *ProcDecl) Accept(vst Visitor)     { vst.VisitProcDecl(p) }
 func (sec *FPSection) Accept(vst Visitor)  { vst.VisitFPSection(sec) }
 func (p *FormalParams) Accept(vst Visitor) { vst.VisitFormalParams(p) }
 func (r *Receiver) Accept(vst Visitor)     { vst.VisitReceiver(r) }
+
+func (b *BadDecl) Pos() *token.Position { return b.From }
+func (b *BadDecl) End() *token.Position { return b.To }
+func (b *BadDecl) Accept(vst Visitor)   { panic("unimplemented") }
+func (b *BadDecl) decl()                {}
+func (b *BadDecl) String() string       { panic("unimplemented") }
