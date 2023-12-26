@@ -504,6 +504,7 @@ func (p *Parser) mulOp() bool {
 	return p.tok == token.STAR ||
 		p.tok == token.QUOT ||
 		p.tok == token.DIV ||
+		p.tok == token.MOD ||
 		p.tok == token.AND
 }
 

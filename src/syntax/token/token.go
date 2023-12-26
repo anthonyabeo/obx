@@ -34,6 +34,13 @@ const (
 	STRING
 	HEXSTRING
 
+	BYTE
+	INT8
+	INT16
+	INT32
+	INT64
+	LONGREAL
+
 	literal_end
 
 	keyword_beg
@@ -124,6 +131,12 @@ var tokens = [...]string{
 	CHAR:      "CHAR",
 	STRING:    "STRING",
 	HEXSTRING: "HEXSTRING",
+	BYTE:      "BYTE",
+	INT8:      "INT8",
+	INT16:     "INT16",
+	INT32:     "INT32",
+	INT64:     "INT64",
+	LONGREAL:  "LONGREAL",
 
 	PLUS:  "+",
 	MINUS: "-",
