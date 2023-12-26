@@ -59,11 +59,17 @@ func (v *Visitor) VisitIdentifier(id *ast.Ident) {
 func (v *Visitor) VisitBasicLit(b *ast.BasicLit) {
 	switch b.Kind {
 	case token.INT:
-		// TODO Number literals are (unsigned) integer or real constants.
-		// TODO The type of an integer literal is the minimal type to which the constant value belongs
-		// TODO If a decimal or hexadecimal literal is specified with the suffix I (or i), then the type is INT32.
-		// TODO If a decimal or hexadecimal constant is specified with the suffix L (or l), then the type is INT64.
 		b.EType = Typ[types.Int]
+	case token.BYTE:
+		b.EType = Typ[types.Byte]
+	case token.INT8:
+		b.EType = Typ[types.Int8]
+	case token.INT16:
+		b.EType = Typ[types.Int16]
+	case token.INT32:
+		b.EType = Typ[types.Int32]
+	case token.INT64:
+		b.EType = Typ[types.Int64]
 	case token.REAL:
 	case token.STRING:
 	case token.HEXSTRING:
@@ -94,11 +100,10 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			return
 		}
 
-		if left.Kind() == types.Int && right.Kind() == types.Int {
-			if expr.EType = left; left.Kind() < right.Kind() {
-				expr.EType = right
-			}
+		if expr.EType = left; left.Kind() < right.Kind() {
+			expr.EType = right
 		}
+
 	case token.DIV, token.MOD:
 		if left.Info() != types.IsInteger || right.Info() != types.IsInteger {
 			msg := fmt.Sprintf("cannot perform operation '%v' on non-integer types, '%v' and '%v'", expr.Op, expr.Left, expr.Right)
