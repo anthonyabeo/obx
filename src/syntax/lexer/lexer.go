@@ -2,6 +2,7 @@ package lexer
 
 import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
+	"strconv"
 )
 
 const eof = -1
@@ -122,25 +123,100 @@ func (lex *Lexer) identifier() string {
 	return string(lex.src[pos:lex.offset])
 }
 
-func (lex *Lexer) number() (token.Token, string) {
+func (lex *Lexer) number() (tok token.Token, lit string) {
 	pos := lex.offset
 	for lex.isDigit(lex.ch) || lex.isHexDigit(lex.ch) {
 		lex.next()
 	}
 
+	// CHAR
 	if lex.ch == 'X' || lex.ch == 'x' {
 		lex.next()
 		return token.CHAR, string(lex.src[pos : lex.offset-1])
 	}
 
-	return token.INT, string(lex.src[pos:lex.offset])
+	// INT64
+	if lex.ch == 'L' || lex.ch == 'l' {
+		lex.next()
+		return token.INT64, string(lex.src[pos : lex.offset-1])
+	}
+
+	// INT32
+	if lex.ch == 'I' || lex.ch == 'i' {
+		lex.next()
+		return token.INT32, string(lex.src[pos : lex.offset-1])
+	}
+
+	// REAL
+	if lex.ch == '.' {
+		lex.next()
+		for lex.isDigit(lex.ch) {
+			lex.next()
+		}
+
+		var typ = token.REAL
+		if lex.ch == 'E' || lex.ch == 'e' || lex.ch == 'D' || lex.ch == 'd' {
+			typ = token.LONGREAL
+			lex.next()
+		}
+
+		if lex.ch == 'S' || lex.ch == 's' {
+			typ = token.REAL
+			lex.next()
+		}
+
+		if lex.ch == '+' || lex.ch == '-' {
+			lex.next()
+		}
+
+		for lex.isDigit(lex.ch) {
+			lex.next()
+		}
+
+		return typ, string(lex.src[pos:lex.offset])
+	}
+
+	var (
+		i    int64
+		err  error
+		base = 10
+	)
+
+	// DECIMAL & HEX
+	if lex.ch == 'H' || lex.ch == 'h' {
+		base = 16
+	}
+
+	lit = string(lex.src[pos:lex.offset])
+	i, err = strconv.ParseInt(lit, base, 64)
+	if err != nil {
+		return token.ILLEGAL, lit
+	}
+
+	if base == 16 {
+		lex.next()
+		lit = string(lex.src[pos:lex.offset])
+	}
+
+	switch {
+	case 0 <= i && i <= 255:
+		tok = token.BYTE
+	case -128 <= i && i <= 127:
+		tok = token.INT8
+	case -32768 <= i && i <= 32767:
+		tok = token.INT16
+	case -2147483648 <= i && i <= 2147483647:
+		tok = token.INT32
+	case -9223372036854775808 <= i && i < 9223372036854775807:
+		tok = token.INT64
+	}
+
+	return tok, lit
 }
 
 func (lex *Lexer) readString(open rune) string {
 	pos := lex.offset
-	//open := rune(lex.src[pos])
-	//lex.next()
-	for lex.ch != open /*'"' && lex.ch != '\''*/ {
+	for lex.ch != open {
 		lex.next()
 	}
 
@@ -152,7 +228,7 @@ func (lex *Lexer) isDigit(ch rune) bool {
 }
 
 func (lex *Lexer) isHexDigit(ch rune) bool {
-	return lex.isDigit(ch) || 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z'
+	return lex.isDigit(ch) || 'a' <= ch && ch <= 'f' || 'A' <= ch && ch <= 'F'
 }
 
 func (lex *Lexer) startsIdent(ch rune) bool {
@@ -180,6 +256,9 @@ func (lex *Lexer) next() {
 		}
 
 		r, w := rune(lex.src[lex.rdOffset]), 1
+		if r == '\t' {
+			w = 4
+		}
 
 		lex.rdOffset += w
 		lex.ch = r

@@ -7,6 +7,55 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
+func TestLexingNumbers(t *testing.T) {
+	input := `1234
+0dh
+0DH
+12.3
+4.567e8 
+4.567E8
+0.57712566d-6    
+0.57712566D-6
+1234I
+1234i
+8393L
+492000003l
+`
+
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lexer := Lexer{}
+	lexer.InitLexer(file, []byte(input))
+
+	tests := []struct {
+		kind token.Token
+		lit  string
+	}{
+		{token.INT16, "1234"},
+		{token.BYTE, "0dh"},
+		{token.BYTE, "0DH"},
+		{token.REAL, "12.3"},
+		{token.LONGREAL, "4.567e8"},
+		{token.LONGREAL, "4.567E8"},
+		{token.LONGREAL, "0.57712566d-6"},
+		{token.LONGREAL, "0.57712566D-6"},
+		{token.INT32, "1234"},
+		{token.INT32, "1234"},
+		{token.INT64, "8393"},
+		{token.INT64, "492000003"},
+	}
+
+	for _, tt := range tests {
+		tok, lit, _ := lexer.Lex()
+		if tok != tt.kind {
+			t.Errorf("lex.Lex(). Expected token kind = %v, Got %v", tt.kind, tok)
+		}
+
+		if lit != tt.lit {
+			t.Errorf("lex.Lex(). Expected token literal = %v, Got %v", tt.lit, lit)
+		}
+	}
+}
+
 func TestLexingWithTokenPositions(t *testing.T) {
 	input := `module Main
 begin
