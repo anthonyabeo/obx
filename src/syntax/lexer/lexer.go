@@ -1,6 +1,7 @@
 package lexer
 
 import (
+	"bytes"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"strconv"
 )
@@ -98,6 +99,10 @@ func (lex *Lexer) Lex() (tok token.Token, lit string, pos *token.Position) {
 		case '\'', '"':
 			lit = lex.readString(ch)
 			tok = token.STRING
+			lex.next()
+		case '$':
+			lit = lex.readHexString()
+			tok = token.HEXSTRING
 			lex.next()
 		default:
 			tok = token.ILLEGAL
@@ -223,6 +228,19 @@ func (lex *Lexer) readString(open rune) string {
 	return string(lex.src[pos:lex.offset])
 }
 
+func (lex *Lexer) readHexString() string {
+	var b bytes.Buffer
+	for lex.ch != '$' {
+		if lex.isHexDigit(lex.ch) {
+			b.WriteRune(lex.ch)
+		}
+
+		lex.next()
+	}
+
+	return b.String()
+}
+
 func (lex *Lexer) isDigit(ch rune) bool {
 	return '0' <= ch && ch <= '9'
 }
@@ -256,9 +274,6 @@ func (lex *Lexer) next() {
 		}
 
 		r, w := rune(lex.src[lex.rdOffset]), 1
-		if r == '\t' {
-			w = 4
-		}
 
 		lex.rdOffset += w
 		lex.ch = r

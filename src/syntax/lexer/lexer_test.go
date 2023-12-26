@@ -7,6 +7,38 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
+func TestLexingHexStrings(t *testing.T) {
+	input := `
+const arrow = $0F0F 0060 0070 0038 001C 000E 0007 8003
+			   C101 E300 7700 3F00 1F00 3F00 7F00 FF00$
+`
+
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lexer := Lexer{}
+	lexer.InitLexer(file, []byte(input))
+
+	tests := []struct {
+		kind token.Token
+		lit  string
+	}{
+		{token.CONST, "const"},
+		{token.IDENT, "arrow"},
+		{token.EQUAL, "="},
+		{token.HEXSTRING, "0F0F006000700038001C000E00078003C101E30077003F001F003F007F00FF00"},
+	}
+
+	for _, tt := range tests {
+		tok, lit, _ := lexer.Lex()
+		if tok != tt.kind {
+			t.Errorf("lex.Lex(). Expected token kind = %v, Got %v", tt.kind, tok)
+		}
+
+		if lit != tt.lit {
+			t.Errorf("lex.Lex(). Expected token literal = %v, Got %v", tt.lit, lit)
+		}
+	}
+}
+
 func TestLexingNumbers(t *testing.T) {
 	input := `1234
 0dh
@@ -202,13 +234,13 @@ end Main
 		{token.LPAREN, "("},
 		{token.IDENT, "n"},
 		{token.EQUAL, "="},
-		{token.INT, "0"},
+		{token.BYTE, "0"},
 		{token.RPAREN, ")"},
 		{token.OR, "or"},
 		{token.LPAREN, "("},
 		{token.IDENT, "n"},
 		{token.EQUAL, "="},
-		{token.INT, "1"},
+		{token.BYTE, "1"},
 		{token.RPAREN, ")"},
 		{token.THEN, "then"},
 
@@ -223,7 +255,7 @@ end Main
 		{token.LPAREN, "("},
 		{token.IDENT, "n"},
 		{token.MINUS, "-"},
-		{token.INT, "1"},
+		{token.BYTE, "1"},
 		{token.RPAREN, ")"},
 
 		{token.IDENT, "b"},
@@ -232,7 +264,7 @@ end Main
 		{token.LPAREN, "("},
 		{token.IDENT, "n"},
 		{token.MINUS, "-"},
-		{token.INT, "2"},
+		{token.BYTE, "2"},
 		{token.RPAREN, ")"},
 
 		{token.RETURN, "return"},
@@ -249,14 +281,14 @@ end Main
 		{token.BECOMES, ":="},
 		{token.IDENT, "fib"},
 		{token.LPAREN, "("},
-		{token.INT, "21"},
+		{token.BYTE, "21"},
 		{token.RPAREN, ")"},
 
 		{token.IDENT, "assert"},
 		{token.LPAREN, "("},
 		{token.IDENT, "res"},
 		{token.EQUAL, "="},
-		{token.INT, "10946"},
+		{token.INT16, "10946"},
 		{token.RPAREN, ")"},
 
 		{token.END, "end"},
