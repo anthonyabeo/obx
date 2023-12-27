@@ -486,6 +486,14 @@ func (v *Visitor) VisitArrayType(a *ast.ArrayType) {
 	a.EType = NewArray(a.ElemType.Type(), Len)
 }
 
+func (v *Visitor) VisitProcType(p *ast.ProcType) {
+
+}
+
+func (v *Visitor) VisitPointerType(p *ast.PointerType) {
+
+}
+
 func (v *Visitor) VisitReceiver(rcv *ast.Receiver) {
 	panic("not implemented")
 }
@@ -509,8 +517,14 @@ func (v *Visitor) VisitFPSection(sec *ast.FPSection) {
 	sec.Type.Accept(v)
 
 	for _, name := range sec.Names {
-		if obj := v.env.Lookup(name.Name); obj != nil {
+		obj := v.env.Lookup(name.Name)
+		if obj != nil {
 			v.error(obj.Pos(), fmt.Sprintf("parameter name %s already declared at %v", obj.String(), obj.Pos()))
+			continue
+		}
+
+		if sec.Mod == token.IN {
+			v.env.Insert(NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil))
 		} else {
 			v.env.Insert(NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props()))
 		}

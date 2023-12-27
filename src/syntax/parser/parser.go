@@ -282,10 +282,33 @@ func (p *Parser) parseBasicOrStructType() ast.Expression {
 		p.match(token.OF)
 
 		return ast.NewArray(pos, ll, p.parseType())
-
 	case token.RECORD:
-	case token.PROCEDURE:
+	case token.PROCEDURE, token.PROC:
+		proc := &ast.ProcType{Proc: p.pos}
+		p.next()
+
+		if p.tok == token.LPAREN {
+			p.next()
+			if p.tok == token.POINTER || p.tok == token.CARET {
+				p.next()
+			}
+
+			p.match(token.RPAREN)
+		}
+
+		if p.tok == token.LPAREN {
+			proc.FP = p.parseFormalParameters()
+		}
 	case token.POINTER, token.CARET:
+		ptr := &ast.PointerType{Ptr: p.pos}
+		tok := p.tok
+
+		p.next()
+		if tok == token.POINTER {
+			p.match(token.TO)
+		}
+
+		ptr.Base = p.parseType()
 	case token.LPAREN:
 	}
 
