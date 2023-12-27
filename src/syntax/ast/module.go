@@ -2,7 +2,7 @@ package ast
 
 type Module struct {
 	BeginName, EndName *Ident
-	//ImportList []*Import
-	DeclSeq []Declaration
-	StmtSeq []Statement
+	ImportList         []*Import
+	DeclSeq            []Declaration
+	StmtSeq            []Statement
 }
