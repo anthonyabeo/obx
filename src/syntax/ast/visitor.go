@@ -22,6 +22,7 @@ type Visitor interface {
 	VisitExitStmt(*ExitStmt)
 	VisitWithStmt(*WithStmt)
 
+	VisitImport(*Import)
 	VisitProcDecl(*ProcDecl)
 	VisitVarDecl(*VarDecl)
 	VisitConstDecl(*ConstDecl)

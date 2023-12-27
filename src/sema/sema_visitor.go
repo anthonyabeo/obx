@@ -532,3 +532,7 @@ func (v *Visitor) VisitIndexOp(op *ast.IndexOp) {}
 func (v *Visitor) VisitTypeGuard(guard *ast.TypeGuard) {}
 
 func (v *Visitor) VisitPointerDeref(deref *ast.PointerDeref) {}
+
+func (v *Visitor) VisitImport(imp *ast.Import) {
+
+}
