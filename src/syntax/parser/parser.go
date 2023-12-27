@@ -96,6 +96,18 @@ func (p *Parser) parseModule() *ast.Module {
 	for p.startsImportOrDecl() {
 		switch p.tok {
 		case token.IMPORT:
+			p.next()
+
+			mod.ImportList = append(mod.ImportList, p.parseImport())
+			for p.tok == token.COMMA {
+				p.next()
+				mod.ImportList = append(mod.ImportList, p.parseImport())
+			}
+
+			if p.tok == token.SEMICOLON {
+				p.next()
+			}
+
 		case token.VAR, token.TYPE, token.CONST, token.PROC, token.PROCEDURE:
 			mod.DeclSeq = p.parseDeclarationSeq()
 		default:
@@ -118,6 +130,41 @@ func (p *Parser) parseModule() *ast.Module {
 	}
 
 	return mod
+}
+
+// import = [ ident ':=' ] ImportPath ident [ MetaActuals ]
+// ImportPath = { ident '.' }
+func (p *Parser) parseImport() *ast.Import {
+	imp := &ast.Import{Import: p.pos}
+	if p.tok == token.IDENT {
+		imp.Alias = p.parseIdent()
+		p.match(token.BECOMES)
+	}
+
+	for p.tok == token.IDENT {
+		imp.ImportPath = append(imp.ImportPath, p.parseIdent())
+		p.match(token.PERIOD)
+	}
+
+	p.match(token.IDENT)
+	imp.Name = p.parseIdent()
+
+	if p.tok == token.LPAREN {
+		p.next()
+		imp.Meta = append(imp.Meta, p.parseExpression())
+
+		for p.tok == token.COMMA || p.exprStart() {
+			if p.tok == token.COMMA {
+				p.next()
+			}
+
+			imp.Meta = append(imp.Meta, p.parseExpression())
+		}
+
+		p.match(token.RPAREN)
+	}
+
+	return imp
 }
 
 func (p *Parser) startsImportOrDecl() bool {
@@ -193,7 +240,7 @@ func (p *Parser) parseVarDecl() (v *ast.VarDecl) {
 }
 
 func (p *Parser) parseType() ast.Expression {
-	typ := p.parseIdentOrType()
+	typ := p.parseBasicOrStructType()
 
 	if typ == nil {
 		pos := p.pos
@@ -205,7 +252,7 @@ func (p *Parser) parseType() ast.Expression {
 	return typ
 }
 
-func (p *Parser) parseIdentOrType() ast.Expression {
+func (p *Parser) parseBasicOrStructType() ast.Expression {
 	switch p.tok {
 	case token.IDENT:
 		typ := p.parseNamedType()

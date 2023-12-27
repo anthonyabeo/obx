@@ -2,8 +2,9 @@ package lexer
 
 import (
 	"bytes"
-	"github.com/anthonyabeo/obx/src/syntax/token"
 	"strconv"
+
+	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 const eof = -1
