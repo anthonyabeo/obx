@@ -335,6 +335,20 @@ func (p *Parser) parseBasicOrStructType() ast.Expression {
 
 		return ptr
 	case token.LPAREN:
+		enum := &ast.EnumType{Enum: p.pos}
+		p.next()
+
+		enum.Consts = append(enum.Consts, p.parseIdent())
+		for p.tok == token.COMMA || p.tok == token.IDENT {
+			if p.tok == token.COMMA {
+				p.next()
+			}
+			enum.Consts = append(enum.Consts, p.parseIdent())
+		}
+
+		p.match(token.RPAREN)
+
+		return enum
 	}
 
 	return nil

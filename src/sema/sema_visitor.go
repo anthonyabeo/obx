@@ -498,6 +498,10 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 
 }
 
+func (v *Visitor) VisitEnumType(e *ast.EnumType) {
+
+}
+
 func (v *Visitor) VisitReceiver(rcv *ast.Receiver) {
 	panic("not implemented")
 }

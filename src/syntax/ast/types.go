@@ -42,6 +42,12 @@ type (
 		IdList []*Ident
 		Type   Expression
 	}
+
+	EnumType struct {
+		Enum   *token.Position
+		Consts []*Ident
+		EType  types.Type
+	}
 )
 
 func NewBasicType(name string) *BasicType {
@@ -92,3 +98,10 @@ func (r *RecordType) End() *token.Position { panic("not implemented") }
 func (r *RecordType) String() string       { panic("not implemented") }
 func (r *RecordType) Type() types.Type     { return r.EType }
 func (r *RecordType) Accept(vst Visitor)   { vst.VisitRecordType(r) }
+
+func (e *EnumType) expr()                {}
+func (e *EnumType) Pos() *token.Position { return e.Enum }
+func (e *EnumType) End() *token.Position { panic("not implemented") }
+func (e *EnumType) String() string       { panic("not implemented") }
+func (e *EnumType) Type() types.Type     { return e.EType }
+func (e *EnumType) Accept(vst Visitor)   { vst.VisitEnumType(e) }

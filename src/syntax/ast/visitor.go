@@ -33,6 +33,7 @@ type Visitor interface {
 	VisitPointerType(*PointerType)
 	VisitProcType(*ProcType)
 	VisitRecordType(*RecordType)
+	VisitEnumType(*EnumType)
 
 	VisitReceiver(*Receiver)
 	VisitProcHead(*ProcHead)
