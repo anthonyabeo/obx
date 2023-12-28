@@ -239,24 +239,10 @@ func (p *Parser) parseVarDecl() (v *ast.VarDecl) {
 	return
 }
 
-func (p *Parser) parseType() ast.Expression {
-	typ := p.parseBasicOrStructType()
-
-	if typ == nil {
-		pos := p.pos
-		p.errorExpected(pos, "type")
-		p.advance(exprEnd)
-		return &ast.BadExpr{From: pos, To: p.pos}
-	}
-
-	return typ
-}
-
-func (p *Parser) parseBasicOrStructType() ast.Expression {
+func (p *Parser) parseType() (typ ast.Expression) {
 	switch p.tok {
 	case token.IDENT:
-		typ := p.parseNamedType()
-		return typ
+		typ = p.parseNamedType()
 	case token.ARRAY, token.LBRACK:
 		pos := p.pos
 		p.next()
@@ -281,7 +267,7 @@ func (p *Parser) parseBasicOrStructType() ast.Expression {
 
 		p.match(token.OF)
 
-		return ast.NewArray(pos, ll, p.parseType())
+		typ = ast.NewArray(pos, ll, p.parseType())
 	case token.RECORD:
 		rec := &ast.RecordType{Record: p.pos}
 
@@ -303,7 +289,7 @@ func (p *Parser) parseBasicOrStructType() ast.Expression {
 			}
 		}
 
-		return rec
+		typ = rec
 	case token.PROCEDURE, token.PROC:
 		proc := &ast.ProcType{Proc: p.pos}
 		p.next()
@@ -321,7 +307,7 @@ func (p *Parser) parseBasicOrStructType() ast.Expression {
 			proc.FP = p.parseFormalParameters()
 		}
 
-		return proc
+		typ = proc
 	case token.POINTER, token.CARET:
 		ptr := &ast.PointerType{Ptr: p.pos}
 		tok := p.tok
@@ -333,7 +319,7 @@ func (p *Parser) parseBasicOrStructType() ast.Expression {
 
 		ptr.Base = p.parseType()
 
-		return ptr
+		typ = ptr
 	case token.LPAREN:
 		enum := &ast.EnumType{Enum: p.pos}
 		p.next()
@@ -348,10 +334,15 @@ func (p *Parser) parseBasicOrStructType() ast.Expression {
 
 		p.match(token.RPAREN)
 
-		return enum
+		typ = enum
+	default:
+		pos := p.pos
+		p.errorExpected(pos, "type")
+		p.advance(exprEnd)
+		return &ast.BadExpr{From: pos, To: p.pos}
 	}
 
-	return nil
+	return
 }
 
 func (p *Parser) fieldList() *ast.FieldList {
