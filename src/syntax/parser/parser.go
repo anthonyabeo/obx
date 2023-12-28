@@ -283,6 +283,27 @@ func (p *Parser) parseBasicOrStructType() ast.Expression {
 
 		return ast.NewArray(pos, ll, p.parseType())
 	case token.RECORD:
+		rec := &ast.RecordType{Record: p.pos}
+
+		p.match(token.RECORD)
+
+		if p.tok == token.LPAREN {
+			p.next()
+			rec.BaseType = p.parseNamedType()
+			p.match(token.RPAREN)
+		}
+
+		if p.tok == token.IDENT {
+			rec.Fields = append(rec.Fields, p.fieldList())
+			for p.tok == token.SEMICOLON || p.tok == token.IDENT {
+				if p.tok == token.SEMICOLON {
+					p.next()
+				}
+				rec.Fields = append(rec.Fields, p.fieldList())
+			}
+		}
+
+		return rec
 	case token.PROCEDURE, token.PROC:
 		proc := &ast.ProcType{Proc: p.pos}
 		p.next()
@@ -299,6 +320,8 @@ func (p *Parser) parseBasicOrStructType() ast.Expression {
 		if p.tok == token.LPAREN {
 			proc.FP = p.parseFormalParameters()
 		}
+
+		return proc
 	case token.POINTER, token.CARET:
 		ptr := &ast.PointerType{Ptr: p.pos}
 		tok := p.tok
@@ -309,10 +332,22 @@ func (p *Parser) parseBasicOrStructType() ast.Expression {
 		}
 
 		ptr.Base = p.parseType()
+
+		return ptr
 	case token.LPAREN:
 	}
 
 	return nil
+}
+
+func (p *Parser) fieldList() *ast.FieldList {
+	fl := &ast.FieldList{}
+
+	fl.IdList = p.parseIdentList()
+	p.match(token.COLON)
+	fl.Type = p.parseType()
+
+	return fl
 }
 
 // advance consumes tokens until the current token p.tok

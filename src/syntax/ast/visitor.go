@@ -32,6 +32,7 @@ type Visitor interface {
 	VisitArrayType(*ArrayType)
 	VisitPointerType(*PointerType)
 	VisitProcType(*ProcType)
+	VisitRecordType(*RecordType)
 
 	VisitReceiver(*Receiver)
 	VisitProcHead(*ProcHead)

@@ -30,6 +30,18 @@ type (
 		Base  Expression
 		EType types.Type
 	}
+
+	RecordType struct {
+		Record   *token.Position
+		BaseType Expression
+		Fields   []*FieldList
+		EType    types.Type
+	}
+
+	FieldList struct {
+		IdList []*Ident
+		Type   Expression
+	}
 )
 
 func NewBasicType(name string) *BasicType {
@@ -65,6 +77,7 @@ func (p *ProcType) Pos() *token.Position { panic("not implemented") }
 func (p *ProcType) End() *token.Position { panic("not implemented") }
 func (p *ProcType) String() string       { panic("not implemented") }
 func (p *ProcType) Type() types.Type     { return p.EType }
+func (p *ProcType) Accept(vst Visitor)   { vst.VisitProcType(p) }
 
 func (p *PointerType) expr()                {}
 func (p *PointerType) Pos() *token.Position { panic("not implemented") }
@@ -72,3 +85,10 @@ func (p *PointerType) End() *token.Position { panic("not implemented") }
 func (p *PointerType) String() string       { panic("not implemented") }
 func (p *PointerType) Type() types.Type     { return p.EType }
 func (p *PointerType) Accept(vst Visitor)   { vst.VisitPointerType(p) }
+
+func (r *RecordType) expr()                {}
+func (r *RecordType) Pos() *token.Position { panic("not implemented") }
+func (r *RecordType) End() *token.Position { panic("not implemented") }
+func (r *RecordType) String() string       { panic("not implemented") }
+func (r *RecordType) Type() types.Type     { return r.EType }
+func (r *RecordType) Accept(vst Visitor)   { vst.VisitRecordType(r) }

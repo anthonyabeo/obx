@@ -494,6 +494,10 @@ func (v *Visitor) VisitPointerType(p *ast.PointerType) {
 
 }
 
+func (v *Visitor) VisitRecordType(r *ast.RecordType) {
+
+}
+
 func (v *Visitor) VisitReceiver(rcv *ast.Receiver) {
 	panic("not implemented")
 }
