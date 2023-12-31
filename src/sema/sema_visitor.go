@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -77,7 +78,8 @@ func (v *Visitor) VisitBasicLit(b *ast.BasicLit) {
 }
 
 func (v *Visitor) VisitSet(s *ast.Set) {
-
+	// TODO not implemented
+	panic("not implemented")
 }
 
 func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
@@ -487,22 +489,43 @@ func (v *Visitor) VisitArrayType(a *ast.ArrayType) {
 }
 
 func (v *Visitor) VisitProcType(p *ast.ProcType) {
-
+	// TODO not implemented
+	panic("not implemented")
 }
 
 func (v *Visitor) VisitPointerType(p *ast.PointerType) {
-
+	// TODO not implemented
+	panic("not implemented")
 }
 
 func (v *Visitor) VisitRecordType(r *ast.RecordType) {
-
+	// TODO not implemented
+	panic("not implemented")
 }
 
 func (v *Visitor) VisitEnumType(e *ast.EnumType) {
+	typ := NewEnumType(e.Consts)
 
+	for i, c := range e.Consts {
+		if obj := v.env.Lookup(c.Name); obj != nil {
+			msg := fmt.Sprintf("name '%s' already declared at '%v'", c.Name, obj.Pos())
+			v.error(c.NamePos, msg)
+		} else {
+			value := &ast.BasicLit{
+				Kind:  token.INT,
+				Value: strconv.Itoa(i),
+				EType: types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer"),
+			}
+
+			v.env.Insert(NewConst(c.NamePos, c.Name, typ, c.Props(), value))
+		}
+	}
+
+	e.EType = typ
 }
 
 func (v *Visitor) VisitReceiver(rcv *ast.Receiver) {
+	// TODO not implemented
 	panic("not implemented")
 }
 
@@ -547,14 +570,27 @@ func (v *Visitor) VisitFormalParams(params *ast.FormalParams) {
 	params.RetType.Accept(v)
 }
 
-func (v *Visitor) VisitDotOp(op *ast.DotOp) {}
+func (v *Visitor) VisitDotOp(op *ast.DotOp) {
+	// TODO not implemented
+	panic("not implemented")
+}
 
-func (v *Visitor) VisitIndexOp(op *ast.IndexOp) {}
+func (v *Visitor) VisitIndexOp(op *ast.IndexOp) {
+	// TODO not implemented
+	panic("not implemented")
+}
 
-func (v *Visitor) VisitTypeGuard(guard *ast.TypeGuard) {}
+func (v *Visitor) VisitTypeGuard(guard *ast.TypeGuard) {
+	// TODO not implemented
+	panic("not implemented")
+}
 
-func (v *Visitor) VisitPointerDeref(deref *ast.PointerDeref) {}
+func (v *Visitor) VisitPointerDeref(deref *ast.PointerDeref) {
+	// TODO not implemented
+	panic("not implemented")
+}
 
 func (v *Visitor) VisitImport(imp *ast.Import) {
-
+	// TODO not implemented
+	panic("not implemented")
 }
