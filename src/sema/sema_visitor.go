@@ -330,8 +330,43 @@ func (v *Visitor) VisitCaseStmt(stmt *ast.CaseStmt) {
 }
 
 func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
-	// TODO not implemented
-	panic("not implemented")
+	stmt.CtlVar.Accept(v)
+	stmt.InitVal.Accept(v)
+	stmt.FinalVal.Accept(v)
+	if stmt.By != nil {
+		stmt.By.Accept(v)
+	} else {
+		stmt.By = &ast.BasicLit{
+			Kind:  token.INT,
+			Value: "1",
+			EType: types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer"),
+		}
+	}
+
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
+
+	// check that the control variable is of integer or enum type
+	if stmt.CtlVar.Type() != Typ[types.Int] {
+		msg := fmt.Sprintf("for-loop control variable '%v' must be of integer or enum type. It is a '%v' type",
+			stmt.CtlVar.Name, stmt.CtlVar.Type())
+		v.error(stmt.CtlVar.NamePos, msg)
+	}
+
+	// check that ctrlID is compatible to initValue and finalValue
+	if !v.AreAssignmentComp(stmt.CtlVar.Type(), stmt.InitVal.Type()) {
+		msg := fmt.Sprintf("control variable '%s' (of type '%s'), cannot be initialized with initial value of type '%s'",
+			stmt.CtlVar.Name, stmt.CtlVar.Type(), stmt.InitVal.Type())
+		v.error(stmt.CtlVar.NamePos, msg)
+	}
+
+	if !v.AreAssignmentComp(stmt.CtlVar.Type(), stmt.FinalVal.Type()) {
+		msg := fmt.Sprintf("control variable '%s' (of type '%s'), and final loop value '%s' (of type '%s')",
+			stmt.CtlVar.Name, stmt.CtlVar.Type(), stmt.FinalVal, stmt.FinalVal.Type())
+		v.error(stmt.CtlVar.NamePos, msg)
+	}
+
 }
 
 func (v *Visitor) VisitExitStmt(stmt *ast.ExitStmt) {
