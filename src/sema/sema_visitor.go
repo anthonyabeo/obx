@@ -369,9 +369,8 @@ func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
 
 }
 
-func (v *Visitor) VisitExitStmt(stmt *ast.ExitStmt) {
-	// TODO not implemented
-	panic("not implemented")
+func (v *Visitor) VisitExitStmt(*ast.ExitStmt) {
+	return
 }
 
 func (v *Visitor) VisitWithStmt(stmt *ast.WithStmt) {
