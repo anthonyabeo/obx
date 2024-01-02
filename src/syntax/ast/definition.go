@@ -1,7 +1,11 @@
 package ast
 
+import "github.com/anthonyabeo/obx/src/syntax/token"
+
 type Definition struct {
-	BeginName, EndName *Ident
-	//ImportList []*Import
-	DeclSeq []Declaration
+	Def        *token.Position
+	BeginName  *Ident
+	EndName    *Ident
+	ImportList []*Import
+	DeclSeq    []Declaration
 }
