@@ -3,7 +3,7 @@ package ast
 import "github.com/anthonyabeo/obx/src/syntax/token"
 
 type Import struct {
-	Import     *token.Position
+	ImpNamePos *token.Position
 	Alias      *Ident
 	Name       *Ident
 	ImportPath []*Ident
