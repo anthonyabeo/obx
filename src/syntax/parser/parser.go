@@ -132,6 +132,35 @@ func (p *Parser) parseModule() *ast.Module {
 	return mod
 }
 
+// definition   = DEFINITION ident [';']  [ ImportList ] DeclarationSequence2 END ident ['.']
+func (p *Parser) parseDefinition() *ast.Definition {
+	def := &ast.Definition{Def: p.pos}
+
+	p.match(token.DEFINITION)
+	def.BeginName = p.parseIdent()
+	if p.tok == token.SEMICOLON {
+		p.next()
+	}
+
+	if p.tok == token.IMPORT {
+		def.ImportList = p.parseImportList()
+	}
+
+	for p.startsDecl() {
+		def.DeclSeq = p.parseDeclarationSeq()
+	}
+
+	p.match(token.END)
+
+	def.EndName = p.parseIdent()
+	if p.tok == token.PERIOD {
+		p.next()
+	}
+
+	return def
+
+}
+
 // ImportList = IMPORT import { [','] import } [';']
 func (p *Parser) parseImportList() []*ast.Import {
 	var list []*ast.Import
