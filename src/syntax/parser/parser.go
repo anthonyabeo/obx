@@ -132,10 +132,31 @@ func (p *Parser) parseModule() *ast.Module {
 	return mod
 }
 
+// ImportList = IMPORT import { [','] import } [';']
+func (p *Parser) parseImportList() []*ast.Import {
+	var list []*ast.Import
+
+	p.match(token.IMPORT)
+	list = append(list, p.parseImport())
+	for p.tok == token.COMMA || p.tok == token.IDENT {
+		if p.tok == token.COMMA {
+			p.next()
+		}
+
+		list = append(list, p.parseImport())
+	}
+
+	if p.tok == token.SEMICOLON {
+		p.next()
+	}
+
+	return list
+}
+
 // import = [ ident ':=' ] ImportPath ident [ MetaActuals ]
 // ImportPath = { ident '.' }
 func (p *Parser) parseImport() *ast.Import {
-	imp := &ast.Import{Import: p.pos}
+	imp := &ast.Import{ImpNamePos: p.pos}
 	if p.tok == token.IDENT {
 		imp.Alias = p.parseIdent()
 		p.match(token.BECOMES)
