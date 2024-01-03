@@ -128,22 +128,35 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 
 		expr.EType = Typ[types.Bool]
 	case token.LESS, token.LEQ, token.GREAT, token.GEQ:
-		if left.Info() != types.IsNumeric /* && left.info() != IsEnum && IsChar && IsString && IsCharArray*/ {
+		if left.Info() != types.IsNumeric /*&& left.Info() != types.IsEnum*/ && left.Info() != types.IsChar && left.Info() != types.IsString /*&& IsCharArray */ {
 			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Left)
 			v.error(expr.Left.Pos(), msg)
 		}
 
-		if right.Info() != types.IsNumeric /* && left.info() != IsEnum && IsChar && IsString && IsCharArray*/ {
+		if right.Info() != types.IsNumeric && right.Info() != types.IsChar && right.Info() != types.IsString /* && IsEnum && IsCharArray*/ {
 			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Right)
 			v.error(expr.Right.Pos(), msg)
 		}
 
 		expr.EType = Typ[types.Bool]
 	case token.OR, token.AND:
-		expr.EType = Typ[types.Bool]
-	case token.NOT:
+		if left.Info() != types.IsBoolean && right.Info() != types.IsBoolean {
+			msg := fmt.Sprintf("both operands of a '%v' operation must be boolean", expr.Op)
+			v.error(expr.OpPos, msg)
+		}
+
 		expr.EType = Typ[types.Bool]
 	case token.IN:
+		if left.Info() != types.IsInteger {
+			msg := fmt.Sprintf("the key for an IN operation must be an integer")
+			v.error(expr.Left.Pos(), msg)
+		}
+
+		if right.Info() != types.IsSet {
+			msg := fmt.Sprintf("IN operation expects the a set, got '%v'", expr.Right.Type())
+			v.error(expr.Right.Pos(), msg)
+		}
+
 		expr.EType = Typ[types.Bool]
 	case token.IS:
 		expr.EType = Typ[types.Bool]
