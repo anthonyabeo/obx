@@ -1,4 +1,4 @@
-package translate
+package ir
 
 type Opcode int
 
@@ -26,6 +26,7 @@ const (
 type Instruction interface {
 	Opcode() Opcode
 	Kind() InstrKind
+	String() string
 }
 
 type OperandKind int
@@ -41,4 +42,8 @@ const (
 type Operand struct {
 	Name string
 	Kind OperandKind
+}
+
+func CreateOperand(name string, kind OperandKind) *Operand {
+	return &Operand{Name: name, Kind: kind}
 }
