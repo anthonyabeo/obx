@@ -1,4 +1,4 @@
-package codegen
+package translate
 
 type Opcode int
 
@@ -38,7 +38,7 @@ const (
 	Label
 )
 
-type Operand interface {
-	Name() string
-	Kind() OperandKind
+type Operand struct {
+	Name string
+	Kind OperandKind
 }
