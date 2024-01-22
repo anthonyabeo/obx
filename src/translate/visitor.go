@@ -3,11 +3,14 @@ package translate
 import (
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/translate/ir"
 )
 
 type Visitor struct {
+	errors lexer.ErrorList
+
 	Instr []ir.Instruction
 
 	ast *ast.Oberon
@@ -17,6 +20,20 @@ type Visitor struct {
 func NewVisitor(ast *ast.Oberon, env *sema.Scope) *Visitor {
 	return &Visitor{ast: ast, env: env}
 }
+
+func (v *Visitor) error(pos *token.Position, msg string) {
+	n := len(v.errors)
+	if n > 10 {
+		for _, err := range v.errors {
+			println(err.Error())
+		}
+
+		panic("too many errors")
+	}
+
+	v.errors.Append(pos, msg)
+}
+
 func (v *Visitor) VisitModule(name string) {
 	module := v.ast.Program[name]
 
