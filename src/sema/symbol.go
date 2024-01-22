@@ -13,6 +13,7 @@ type Symbol interface {
 	Pos() *token.Position  // position of object identifier in declaration
 	Name() string          // package local object name
 	Type() types.Type      // object type
+	Offset() int           // offset of this symbol from the base address of its parent data area
 	Props() ast.IdentProps // reports whether the name ends with a + or -
 
 	// String returns a human-readable string of the object.
@@ -29,24 +30,25 @@ type symbol struct {
 	name   string
 	typ    types.Type
 	props  ast.IdentProps
+	offset int
 }
 
 // Parent returns the scope in which the object is declared.
 // The result is nil for methods and struct fields.
-func (obj *symbol) Parent() *Scope { return obj.parent }
+func (sym *symbol) Parent() *Scope { return sym.parent }
 
 // Name returns the object's (package-local, unqualified) name.
-func (obj *symbol) Name() string { return obj.name }
+func (sym *symbol) Name() string { return sym.name }
 
 // Type returns the object's type.
-func (obj *symbol) Type() types.Type { return obj.typ }
+func (sym *symbol) Type() types.Type { return sym.typ }
 
 // Pos returns the declaration position of the object's identifier.
-func (obj *symbol) Pos() *token.Position { return obj.pos }
+func (sym *symbol) Pos() *token.Position { return sym.pos }
 
-func (obj *symbol) setParent(parent *Scope) { obj.parent = parent }
+func (sym *symbol) setParent(parent *Scope) { sym.parent = parent }
 
-func (obj *symbol) Props() ast.IdentProps { return obj.props }
+func (sym *symbol) Props() ast.IdentProps { return sym.props }
 
 // A Variable represents a declared variable (including function parameters and results, and struct fields).
 // ----------------------------------------------------------------------------------------------------------
@@ -55,13 +57,15 @@ type Variable struct {
 }
 
 // NewVar returns a new variable.
-func NewVar(pos *token.Position, name string, typ types.Type, props ast.IdentProps) *Variable {
-	return &Variable{symbol: symbol{nil, pos, name, typ, props}}
+func NewVar(pos *token.Position, name string, typ types.Type, props ast.IdentProps, offset int) *Variable {
+	return &Variable{symbol: symbol{nil, pos, name, typ, props, offset}}
 }
 
 func (v Variable) String() string {
 	return v.name
 }
+
+func (v Variable) Offset() int { return v.symbol.offset }
 
 // A Procedure represents a declared procedure or concrete method. Its Type() is always a *Signature.
 // --------------------------------------------------------------------------------------------------
@@ -69,18 +73,20 @@ type Procedure struct {
 	symbol
 }
 
-func NewProcedure(pos *token.Position, name string, sig *ast.Signature, props ast.IdentProps) *Procedure {
+func NewProcedure(pos *token.Position, name string, sig *ast.Signature, props ast.IdentProps, offset int) *Procedure {
 	var typ types.Type
 	if sig != nil {
 		typ = sig
 	}
 
-	return &Procedure{symbol{nil, pos, name, typ, props}}
+	return &Procedure{symbol{nil, pos, name, typ, props, offset}}
 }
 
 func (p *Procedure) String() string {
 	return ""
 }
+
+func (p *Procedure) Offset() int { return p.symbol.offset }
 
 // A Builtin represents a built-in function. Builtins don't have a valid type.
 // --------------------------------------------------------------------------------------------------
@@ -95,17 +101,21 @@ func newBuiltin(id builtinId) *Builtin {
 
 func (obj *Builtin) String() string { return obj.symbol.name }
 
+func (obj *Builtin) Offset() int { return obj.symbol.offset }
+
 // A TypeName represents a name for a (defined or alias) type.
 // --------------------------------------------------------------------------------------------------
 type TypeName struct {
 	symbol
 }
 
-func NewTypeName(pos *token.Position, name string, typ types.Type, props ast.IdentProps) *TypeName {
-	return &TypeName{symbol{nil, pos, name, typ, props}}
+func NewTypeName(pos *token.Position, name string, typ types.Type, props ast.IdentProps, offset int) *TypeName {
+	return &TypeName{symbol{nil, pos, name, typ, props, offset}}
 }
 
 func (obj *TypeName) String() string { return "" }
+
+func (obj *TypeName) Offset() int { return obj.symbol.offset }
 
 // A Const represents a constant declaration or the value of an enumeration
 // --------------------------------------------------------------------------------------------------
@@ -114,8 +124,10 @@ type Const struct {
 	value ast.Expression
 }
 
-func NewConst(pos *token.Position, name string, typ types.Type, props ast.IdentProps, value ast.Expression) *Const {
-	return &Const{symbol{nil, pos, name, typ, props}, value}
+func NewConst(pos *token.Position, name string, typ types.Type, props ast.IdentProps, value ast.Expression, offset int) *Const {
+	return &Const{symbol{nil, pos, name, typ, props, offset}, value}
 }
 
 func (c *Const) String() string { panic("not implemented") }
+
+func (c *Const) Offset() int { return c.symbol.offset }
