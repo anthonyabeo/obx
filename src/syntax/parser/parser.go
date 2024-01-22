@@ -289,7 +289,7 @@ func (p *Parser) parseVarDecl() (v *ast.VarDecl) {
 	return
 }
 
-func (p *Parser) parseType() (typ ast.Expression) {
+func (p *Parser) parseType() (typ ast.Type) {
 	switch p.tok {
 	case token.IDENT:
 		typ = p.parseNamedType()
@@ -389,7 +389,7 @@ func (p *Parser) parseType() (typ ast.Expression) {
 		pos := p.pos
 		p.errorExpected(pos, "type")
 		p.advance(exprEnd)
-		return &ast.BadExpr{From: pos, To: p.pos}
+		return &ast.BadType{From: pos, To: p.pos}
 	}
 
 	return
@@ -674,7 +674,7 @@ func (p *Parser) mulOp() bool {
 		p.tok == token.AND
 }
 
-func (p *Parser) parseNamedType() ast.Expression {
+func (p *Parser) parseNamedType() ast.Type {
 	typ := p.parseQualifiedIdent(nil)
 	return ast.NewBasicType(typ.String())
 }
