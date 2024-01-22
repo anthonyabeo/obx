@@ -29,3 +29,8 @@ type Declaration interface {
 	Node
 	decl()
 }
+
+type Type interface {
+	Expression
+	Width() int
+}
