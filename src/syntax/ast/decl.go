@@ -10,7 +10,7 @@ type (
 	VarDecl struct {
 		Var       *token.Position
 		IdentList []*Ident
-		Type      Expression
+		Type      Type
 	}
 
 	ConstDecl struct {
@@ -22,7 +22,7 @@ type (
 	TypeDecl struct {
 		Type        *token.Position
 		Name        *Ident
-		DenotedType Expression
+		DenotedType Type
 	}
 
 	// ProcDecl
@@ -49,12 +49,12 @@ type (
 	FPSection struct {
 		Mod   token.Token
 		Names []*Ident
-		Type  Expression
+		Type  Type
 	}
 
 	FormalParams struct {
 		Params  []*FPSection
-		RetType Expression
+		RetType Type
 	}
 
 	Receiver struct {
