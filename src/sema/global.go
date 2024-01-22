@@ -5,6 +5,7 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
+var offset = 0
 var Global *Scope
 
 var Typ = []*types.Basic{
@@ -30,11 +31,13 @@ var AliasTypes = []*types.Basic{
 
 func defPredeclaredTypes() {
 	for _, t := range Typ {
-		Global.Insert(NewTypeName(nil, t.Name(), t, ast.IsPredeclared))
+		Global.Insert(NewTypeName(nil, t.Name(), t, ast.IsPredeclared, offset))
+		offset += 1
 	}
 
 	for _, t := range AliasTypes {
-		Global.Insert(NewTypeName(nil, t.Name(), t, ast.IsPredeclared))
+		Global.Insert(NewTypeName(nil, t.Name(), t, ast.IsPredeclared, offset))
+		offset += 1
 	}
 }
 

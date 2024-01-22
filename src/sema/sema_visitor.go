@@ -11,6 +11,7 @@ import (
 )
 
 type Visitor struct {
+	offset int
 	errors lexer.ErrorList
 
 	ast *ast.Oberon
@@ -450,7 +451,8 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 		v.error(decl.Pos(), fmt.Sprintf("name %s already declared at %v", obj.String(), obj.Pos()))
 	} else {
 		sig := ast.NewSignature(decl.Head.Rcv, decl.Head.FP)
-		v.env.Insert(NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props()))
+		v.env.Insert(NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props(), v.offset))
+		// v.offset += ?
 	}
 
 	parent := v.env
@@ -476,7 +478,8 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 		if obj := v.env.Lookup(ident.Name); obj != nil {
 			v.error(decl.Pos(), fmt.Sprintf("variable name '%s' already declared at '%v'", obj.String(), obj.Pos()))
 		} else {
-			v.env.Insert(NewVar(ident.Pos(), ident.Name, decl.Type.Type(), ident.Props()))
+			v.env.Insert(NewVar(ident.Pos(), ident.Name, decl.Type.Type(), ident.Props(), v.offset))
+			v.offset += decl.Type.Width()
 		}
 	}
 }
@@ -488,7 +491,8 @@ func (v *Visitor) VisitConstDecl(decl *ast.ConstDecl) {
 		msg := fmt.Sprintf("name '%s' already declared at '%v'", obj.String(), obj.Pos())
 		v.error(decl.Pos(), msg)
 	} else {
-		v.env.Insert(NewConst(decl.Name.NamePos, decl.Name.Name, decl.Value.Type(), decl.Name.Props(), decl.Value))
+		v.env.Insert(NewConst(decl.Name.NamePos, decl.Name.Name, decl.Value.Type(), decl.Name.Props(), decl.Value, v.offset))
+		// v.offset += decl.Value?
 	}
 }
 
@@ -498,7 +502,8 @@ func (v *Visitor) VisitTypeDecl(decl *ast.TypeDecl) {
 		msg := fmt.Sprintf("name '%s' already declared at '%v'", obj.String(), obj.Pos())
 		v.error(decl.Pos(), msg)
 	} else {
-		v.env.Insert(NewTypeName(decl.Type, decl.Name.Name, decl.DenotedType.Type(), decl.Name.Props()))
+		v.env.Insert(NewTypeName(decl.Type, decl.Name.Name, decl.DenotedType.Type(), decl.Name.Props(), v.offset))
+		// v.offset += ?
 	}
 }
 
@@ -564,7 +569,8 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 				EType: types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer"),
 			}
 
-			v.env.Insert(NewConst(c.NamePos, c.Name, typ, c.Props(), value))
+			v.env.Insert(NewConst(c.NamePos, c.Name, typ, c.Props(), value, v.offset))
+			// v.offset += ?
 		}
 	}
 
@@ -602,9 +608,11 @@ func (v *Visitor) VisitFPSection(sec *ast.FPSection) {
 		}
 
 		if sec.Mod == token.IN {
-			v.env.Insert(NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil))
+			v.env.Insert(NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
+			// v.offset += ?
 		} else {
-			v.env.Insert(NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props()))
+			v.env.Insert(NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
+			v.offset += sec.Type.Width()
 		}
 	}
 }
