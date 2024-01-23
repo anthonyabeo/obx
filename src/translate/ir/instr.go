@@ -1,5 +1,25 @@
 package ir
 
+import (
+	"fmt"
+	"strings"
+)
+
+type InstrKind int
+
+const (
+	Error InstrKind = iota
+
+	Labeled
+	CtrlFlow
+	Normal
+)
+
+type Instruction interface {
+	Opcode() Opcode
+	Kind() InstrKind
+	String() string
+}
 type LabeledInstr struct {
 	label string
 	instr []Instruction
@@ -28,17 +48,28 @@ func (l LabeledInstr) String() string { panic("not implemented") }
 type NormalInstr struct {
 	op     Opcode
 	srcOps []Operand
-	resOps []Operand
+	dstOps []Operand
 }
 
-func CreateNormalInstr(op Opcode) *NormalInstr {
-	return &NormalInstr{op: op}
+func CreateNormalInstr(op Opcode, src, dst []Operand) *NormalInstr {
+	return &NormalInstr{op: op, srcOps: src, dstOps: dst}
 }
 func (n NormalInstr) Opcode() Opcode { return n.op }
 
 func (n NormalInstr) Kind() InstrKind { return Normal }
 
-func (n NormalInstr) String() string { panic("not implement") }
+func (n NormalInstr) String() string {
+	var src, dst []string
+	for _, op := range n.srcOps {
+		src = append(src, op.String())
+	}
+
+	for _, op := range n.dstOps {
+		dst = append(dst, op.String())
+	}
+
+	return fmt.Sprintf("%s %s => %s", n.op, strings.Join(src, ", "), strings.Join(dst, ", "))
+}
 
 // CtlFlowInstr used to change the flow of control in the program.
 // ----------------------------------------------------------------

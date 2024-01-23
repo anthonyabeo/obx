@@ -2,6 +2,16 @@ package ir
 
 type Opcode int
 
+func (op Opcode) String() string {
+	return opcodes[op]
+}
+
+var opcodes = [...]string{
+	Add: "add",
+
+	Load: "load",
+}
+
 const (
 	Invalid Opcode = iota
 
@@ -11,39 +21,6 @@ const (
 	Div
 	LShift
 	RShift
+
+	Load
 )
-
-type InstrKind int
-
-const (
-	Error InstrKind = iota
-
-	Labeled
-	CtrlFlow
-	Normal
-)
-
-type Instruction interface {
-	Opcode() Opcode
-	Kind() InstrKind
-	String() string
-}
-
-type OperandKind int
-
-const (
-	Err OperandKind = iota
-
-	Register
-	Number
-	Label
-)
-
-type Operand struct {
-	Name string
-	Kind OperandKind
-}
-
-func CreateOperand(name string, kind OperandKind) *Operand {
-	return &Operand{Name: name, Kind: kind}
-}
