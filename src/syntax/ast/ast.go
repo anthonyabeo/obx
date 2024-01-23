@@ -2,6 +2,7 @@ package ast
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/translate/ir"
 
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -23,6 +24,7 @@ type Expression interface {
 	Node
 	expr()
 	Type() types.Type
+	Operand() ir.Operand
 }
 
 type Declaration interface {
@@ -31,6 +33,7 @@ type Declaration interface {
 }
 
 type Type interface {
-	Expression
+	Node
+	Type() types.Type
 	Width() int
 }

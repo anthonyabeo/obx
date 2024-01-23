@@ -14,7 +14,7 @@ func NewSignature(rcv *Receiver, params *FormalParams) (sig *Signature) {
 	return
 }
 
-func (t *Signature) ReturnType() Expression {
+func (t *Signature) ReturnType() Type {
 	return t.fp.RetType
 }
 
@@ -37,5 +37,5 @@ func (t *Signature) String() string         { return "" }
 // ----------------
 type DesugParam struct {
 	Name *Ident
-	Type Expression
+	Type Type
 }

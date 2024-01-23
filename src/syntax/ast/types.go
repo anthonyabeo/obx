@@ -15,7 +15,7 @@ type (
 	ArrayType struct {
 		Array    *token.Position
 		LenList  *LenList
-		ElemType Expression
+		ElemType Type
 		EType    types.Type
 	}
 
@@ -27,20 +27,20 @@ type (
 
 	PointerType struct {
 		Ptr   *token.Position
-		Base  Expression
+		Base  Type
 		EType types.Type
 	}
 
 	RecordType struct {
 		Record   *token.Position
-		BaseType Expression
+		BaseType Type
 		Fields   []*FieldList
 		EType    types.Type
 	}
 
 	FieldList struct {
 		IdList []*Ident
-		Type   Expression
+		Type   Type
 	}
 
 	EnumType struct {
@@ -62,7 +62,6 @@ func NewBasicType(name string) *BasicType {
 func (b *BasicType) Name() string         { return b.name }
 func (b *BasicType) Pos() *token.Position { panic("not implemented") }
 func (b *BasicType) End() *token.Position { panic("not implemented") }
-func (b *BasicType) expr()                {}
 func (b *BasicType) Type() types.Type     { return b.EType }
 func (b *BasicType) String() string       { return b.name }
 func (b *BasicType) Accept(vst Visitor)   { vst.VisitBasicType(b) }
@@ -75,11 +74,10 @@ func (b *BasicType) Width() int {
 	}
 }
 
-func NewArray(pos *token.Position, lenList *LenList, elem Expression) *ArrayType {
+func NewArray(pos *token.Position, lenList *LenList, elem Type) *ArrayType {
 	return &ArrayType{Array: pos, LenList: lenList, ElemType: elem}
 }
 
-func (a *ArrayType) expr()                {}
 func (a *ArrayType) Pos() *token.Position { return a.Array }
 func (a *ArrayType) End() *token.Position { return a.ElemType.End() }
 func (a *ArrayType) String() string       { panic("not implemented") }
@@ -92,7 +90,6 @@ type LenList struct {
 	List     []Expression
 }
 
-func (p *ProcType) expr()                {}
 func (p *ProcType) Pos() *token.Position { panic("not implemented") }
 func (p *ProcType) End() *token.Position { panic("not implemented") }
 func (p *ProcType) String() string       { panic("not implemented") }
@@ -100,7 +97,6 @@ func (p *ProcType) Type() types.Type     { return p.EType }
 func (p *ProcType) Accept(vst Visitor)   { vst.VisitProcType(p) }
 func (p *ProcType) Width() int           { panic("implement me") }
 
-func (p *PointerType) expr()                {}
 func (p *PointerType) Pos() *token.Position { panic("not implemented") }
 func (p *PointerType) End() *token.Position { panic("not implemented") }
 func (p *PointerType) String() string       { panic("not implemented") }
@@ -108,7 +104,6 @@ func (p *PointerType) Type() types.Type     { return p.EType }
 func (p *PointerType) Accept(vst Visitor)   { vst.VisitPointerType(p) }
 func (p *PointerType) Width() int           { panic("implement me") }
 
-func (r *RecordType) expr()                {}
 func (r *RecordType) Pos() *token.Position { panic("not implemented") }
 func (r *RecordType) End() *token.Position { panic("not implemented") }
 func (r *RecordType) String() string       { panic("not implemented") }
@@ -116,7 +111,6 @@ func (r *RecordType) Type() types.Type     { return r.EType }
 func (r *RecordType) Accept(vst Visitor)   { vst.VisitRecordType(r) }
 func (r *RecordType) Width() int           { panic("implement me") }
 
-func (e *EnumType) expr()                {}
 func (e *EnumType) Pos() *token.Position { return e.Enum }
 func (e *EnumType) End() *token.Position { panic("not implemented") }
 func (e *EnumType) String() string       { panic("not implemented") }
