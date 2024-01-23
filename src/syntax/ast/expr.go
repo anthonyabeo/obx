@@ -6,6 +6,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/token"
+	"github.com/anthonyabeo/obx/src/translate/ir"
 )
 
 // IdentProps is a set of flags denoting the properties of an identifier
@@ -24,6 +25,7 @@ type (
 		Kind     token.Token     // token.INT, token.REAL, token.HEXCHAR, or token.STRING
 		Value    string          // literal string; e.g. 42, 0x7f, 3.14, 1e-9, 2.4i, 'a', '\x7f', "foo" or `\m\n\o`
 		EType    types.Type
+		IOperand ir.Operand
 	}
 
 	BinaryExpr struct {
@@ -40,10 +42,11 @@ type (
 	}
 
 	Ident struct {
-		NamePos *token.Position
-		Name    string
-		IProps  IdentProps
-		EType   types.Type
+		NamePos  *token.Position
+		Name     string
+		IProps   IdentProps
+		EType    types.Type
+		IOperand ir.Operand
 	}
 
 	QualifiedIdent struct {
@@ -83,6 +86,7 @@ func (b *BasicLit) End() *token.Position { panic("not implemented") }
 func (b *BasicLit) String() string       { return b.Value }
 func (b *BasicLit) Accept(vst Visitor)   { vst.VisitBasicLit(b) }
 func (b *BasicLit) Type() types.Type     { return b.EType }
+func (b *BasicLit) Operand() ir.Operand  { return b.IOperand }
 
 func (b *BinaryExpr) expr()                {}
 func (b *BinaryExpr) Pos() *token.Position { return b.OpPos }
@@ -90,6 +94,7 @@ func (b *BinaryExpr) End() *token.Position { return b.Right.End() }
 func (b *BinaryExpr) String() string       { return fmt.Sprintf("%v %v %v", b.Left, b.Op, b.Right) }
 func (b *BinaryExpr) Type() types.Type     { return b.EType }
 func (b *BinaryExpr) Accept(vst Visitor)   { vst.VisitBinaryExpr(b) }
+func (b *BinaryExpr) Operand() ir.Operand  { panic("not implemented") }
 
 func (f *FuncCall) Pos() *token.Position { return f.Dsg.Pos() }
 func (f *FuncCall) End() (pos *token.Position) {
@@ -104,10 +109,11 @@ func (f *FuncCall) End() (pos *token.Position) {
 
 	return
 }
-func (f *FuncCall) Type() types.Type   { return f.EType }
-func (f *FuncCall) Accept(vst Visitor) { vst.VisitFuncCall(f) }
-func (f *FuncCall) expr()              {}
-func (f *FuncCall) String() string     { panic("not implemented") }
+func (f *FuncCall) Type() types.Type    { return f.EType }
+func (f *FuncCall) Accept(vst Visitor)  { vst.VisitFuncCall(f) }
+func (f *FuncCall) expr()               {}
+func (f *FuncCall) String() string      { panic("not implemented") }
+func (f *FuncCall) Operand() ir.Operand { panic("not implemented") }
 
 func (id *Ident) Pos() *token.Position { return id.NamePos }
 func (id *Ident) End() *token.Position {
@@ -117,11 +123,12 @@ func (id *Ident) End() *token.Position {
 		Column:   id.NamePos.Column + len(id.Name),
 	}
 }
-func (id *Ident) String() string     { return id.Name }
-func (id *Ident) expr()              {}
-func (id *Ident) Accept(vst Visitor) { vst.VisitIdentifier(id) }
-func (id *Ident) Props() IdentProps  { return id.IProps }
-func (id *Ident) Type() types.Type   { return id.EType }
+func (id *Ident) String() string      { return id.Name }
+func (id *Ident) expr()               {}
+func (id *Ident) Accept(vst Visitor)  { vst.VisitIdentifier(id) }
+func (id *Ident) Props() IdentProps   { return id.IProps }
+func (id *Ident) Type() types.Type    { return id.EType }
+func (id *Ident) Operand() ir.Operand { panic("not implemented") }
 
 func (q *QualifiedIdent) Pos() *token.Position { return q.X.Pos() }
 func (q *QualifiedIdent) End() *token.Position { panic("not implemented") }
@@ -129,6 +136,7 @@ func (q *QualifiedIdent) Type() types.Type     { return q.EType }
 func (q *QualifiedIdent) Accept(vst Visitor)   { vst.VisitQualifiedIdent(q) }
 func (q *QualifiedIdent) expr()                {}
 func (q *QualifiedIdent) String() string       { return fmt.Sprintf("%v.%v", q.X, q.Sel) }
+func (q *QualifiedIdent) Operand() ir.Operand  { panic("not implemented") }
 
 func (s *Set) expr()                {}
 func (s *Set) String() string       { panic("not implement") }
@@ -136,6 +144,7 @@ func (s *Set) Pos() *token.Position { panic("not implemented") }
 func (s *Set) End() *token.Position { panic("not implemented") }
 func (s *Set) Accept(vst Visitor)   { vst.VisitSet(s) }
 func (s *Set) Type() types.Type     { return s.EType }
+func (s *Set) Operand() ir.Operand  { panic("not implemented") }
 
 func (u *UnaryExpr) Pos() *token.Position { return u.OpPos }
 func (u *UnaryExpr) End() *token.Position { return u.X.End() }
@@ -143,6 +152,7 @@ func (u *UnaryExpr) Type() types.Type     { return u.EType }
 func (u *UnaryExpr) Accept(vst Visitor)   { vst.VisitUnaryExpr(u) }
 func (u *UnaryExpr) expr()                {}
 func (u *UnaryExpr) String() string       { return fmt.Sprintf("%v%v", u.Op, u.X) }
+func (u *UnaryExpr) Operand() ir.Operand  { panic("not implemented") }
 
 func (d *Designator) Pos() *token.Position { return d.QIdentPos }
 func (d *Designator) End() (pos *token.Position) {
@@ -169,6 +179,7 @@ func (d *Designator) String() string {
 
 	return s
 }
+func (d *Designator) Operand() ir.Operand { panic("not implemented") }
 
 func (b *BadExpr) Pos() *token.Position { return b.From }
 func (b *BadExpr) End() *token.Position { return b.To }
@@ -176,6 +187,7 @@ func (b *BadExpr) Accept(vst Visitor)   { panic("not implemented") }
 func (b *BadExpr) Type() types.Type     { return nil }
 func (b *BadExpr) expr()                {}
 func (b *BadExpr) String() string       { panic("not implemented") }
+func (b *BadExpr) Operand() ir.Operand  { panic("not implemented") }
 
 // Selectors
 // ---------------------
@@ -199,6 +211,7 @@ func (d *DotOp) Type() types.Type     { return d.EType }
 func (d *DotOp) Accept(vst Visitor)   { vst.VisitDotOp(d) }
 func (d *DotOp) expr()                {}
 func (d *DotOp) sel()                 {}
+func (d *DotOp) Operand() ir.Operand  { panic("not implemented") }
 
 // IndexOp
 // ---------------------
@@ -217,10 +230,11 @@ func (id *IndexOp) String() string {
 
 	return fmt.Sprintf("[%v]", strings.Join(list, ","))
 }
-func (id *IndexOp) Type() types.Type   { return id.EType }
-func (id *IndexOp) Accept(vst Visitor) { vst.VisitIndexOp(id) }
-func (id *IndexOp) expr()              {}
-func (id *IndexOp) sel()               {}
+func (id *IndexOp) Type() types.Type    { return id.EType }
+func (id *IndexOp) Accept(vst Visitor)  { vst.VisitIndexOp(id) }
+func (id *IndexOp) expr()               {}
+func (id *IndexOp) sel()                {}
+func (id *IndexOp) Operand() ir.Operand { panic("not implemented") }
 
 // TypeGuard
 // ---------------------
@@ -236,6 +250,7 @@ func (t *TypeGuard) Type() types.Type     { return t.EType }
 func (t *TypeGuard) Accept(vst Visitor)   { vst.VisitTypeGuard(t) }
 func (t *TypeGuard) expr()                {}
 func (t *TypeGuard) sel()                 {}
+func (t *TypeGuard) Operand() ir.Operand  { panic("not implemented") }
 
 // PointerDeref
 // ---------------------
@@ -250,3 +265,4 @@ func (deref *PointerDeref) Type() types.Type     { return deref.EType }
 func (deref *PointerDeref) Accept(vst Visitor)   { vst.VisitPointerDeref(deref) }
 func (deref *PointerDeref) expr()                {}
 func (deref *PointerDeref) sel()                 {}
+func (deref *PointerDeref) Operand() ir.Operand  { panic("not implemented") }
