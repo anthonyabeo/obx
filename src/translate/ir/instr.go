@@ -84,3 +84,43 @@ func (c CtlFlowInstr) Opcode() Opcode { return c.op }
 func (c CtlFlowInstr) Kind() InstrKind { return CtrlFlow }
 
 func (c CtlFlowInstr) String() string { panic("not implemented") }
+
+// CallInstr ...
+// --------------------
+type CallInstr struct {
+	Proc string
+	Args []Operand
+}
+
+func (c CallInstr) Opcode() Opcode {
+	return call
+}
+
+func (c CallInstr) Kind() InstrKind {
+	return Normal
+}
+
+func (c CallInstr) String() string {
+	var args []string
+	for _, op := range c.Args {
+		args = append(args, op.String())
+	}
+
+	return fmt.Sprintf("call %s(%s)", c.Proc, strings.Join(args, ", "))
+}
+
+// CmpInstr ...
+// --------------------------
+type CmpInstr struct {
+	Cond   Opcode
+	X, Y   Operand
+	Result Operand
+}
+
+func (c CmpInstr) Opcode() Opcode { return c.Cond }
+
+func (c CmpInstr) Kind() InstrKind { return Normal }
+
+func (c CmpInstr) String() string {
+	return fmt.Sprintf("cmp %s %s %s => %s", c.Cond, c.X, c.Y, c.Result)
+}
