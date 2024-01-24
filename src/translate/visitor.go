@@ -1,16 +1,16 @@
 package translate
 
 import (
+	"strconv"
+
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
-	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/translate/ir"
 )
 
 type Visitor struct {
-	errors lexer.ErrorList
-
+	tmp   int
 	Instr []ir.Instruction
 
 	ast *ast.Oberon
@@ -21,44 +21,66 @@ func NewVisitor(ast *ast.Oberon, env *sema.Scope) *Visitor {
 	return &Visitor{ast: ast, env: env}
 }
 
-func (v *Visitor) error(pos *token.Position, msg string) {
-	n := len(v.errors)
-	if n > 10 {
-		for _, err := range v.errors {
-			println(err.Error())
-		}
+func (v *Visitor) nextTemp() string {
+	tmp := strconv.Itoa(v.tmp)
+	v.tmp += 1
 
-		panic("too many errors")
-	}
-
-	v.errors.Append(pos, msg)
+	return tmp
 }
 
 func (v *Visitor) VisitModule(name string) {
 	module := v.ast.Program[name]
 
-	for _, decl := range module.DeclSeq {
-		decl.Accept(v)
-	}
+	//for _, decl := range module.DeclSeq {
+	//	decl.Accept(v)
+	//}
 
 	for _, stmt := range module.StmtSeq {
 		stmt.Accept(v)
 	}
 }
 
-func (v *Visitor) VisitIdentifier(ident *ast.Ident) {
-	//TODO implement me
-	panic("implement me")
+func (v *Visitor) VisitIdentifier(id *ast.Ident) {
+	sym := v.env.Lookup(id.Name)
+	id.IOperand = ir.Register{
+		Name:   sym.Name(),
+		Offset: sym.Offset(),
+		Type:   sym.Type(),
+		//Attr:   sym.Props(),
+		OpKind: ir.KRegister,
+	}
 }
 
 func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
-	//TODO implement me
-	panic("implement me")
+	expr.Left.Accept(v)
+	expr.Right.Accept(v)
+
+	tmp := v.nextTemp()
+
+	var instr ir.Instruction
+
+	switch expr.Op {
+	case token.PLUS:
+		src := []ir.Operand{expr.Left.Operand(), expr.Right.Operand()}
+		dst := []ir.Operand{ir.Register{Name: tmp, OpKind: ir.KRegister}}
+
+		instr = ir.CreateNormalInstr(ir.Add, src, dst)
+	case token.EQUAL:
+		instr = ir.CmpInstr{
+			Cond:   ir.Eq,
+			X:      expr.Left.Operand(),
+			Y:      expr.Right.Operand(),
+			Result: ir.Register{Name: tmp, OpKind: ir.KRegister},
+		}
+	}
+
+	expr.IOperand = ir.Register{Name: tmp, OpKind: ir.KRegister}
+	v.Instr = append(v.Instr, instr)
 }
 
-func (v *Visitor) VisitDesignator(designator *ast.Designator) {
-	//TODO implement me
-	panic("implement me")
+func (v *Visitor) VisitDesignator(d *ast.Designator) {
+	d.QualifiedIdent.Accept(v)
+	d.IOperand = d.QualifiedIdent.Operand()
 }
 
 func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
@@ -83,8 +105,11 @@ func (v *Visitor) VisitSet(set *ast.Set) {
 
 func (v *Visitor) VisitBasicLit(lit *ast.BasicLit) {
 	switch lit.Kind {
-	case token.INT:
-
+	case token.INT, token.INT8, token.INT16, token.INT32, token.INT64, token.BYTE:
+		lit.IOperand = ir.Number{
+			Value:  lit.Value,
+			OpKind: ir.KNumber,
+		}
 	}
 }
 
@@ -94,8 +119,13 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 }
 
 func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
-	//TODO implement me
-	panic("implement me")
+	stmt.LValue.Accept(v)
+	stmt.RValue.Accept(v)
+
+	src := []ir.Operand{stmt.RValue.Operand()}
+	dst := []ir.Operand{stmt.LValue.Operand()}
+
+	v.Instr = append(v.Instr, ir.CreateNormalInstr(ir.Load, src, dst))
 }
 
 func (v *Visitor) VisitReturnStmt(stmt *ast.ReturnStmt) {
@@ -104,8 +134,14 @@ func (v *Visitor) VisitReturnStmt(stmt *ast.ReturnStmt) {
 }
 
 func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
-	//TODO implement me
-	panic("implement me")
+	var args []ir.Operand
+	for _, arg := range call.ActualParams {
+		arg.Accept(v)
+		args = append(args, arg.Operand())
+
+	}
+
+	v.Instr = append(v.Instr, ir.CallInstr{Proc: call.Dsg.String(), Args: args})
 }
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
