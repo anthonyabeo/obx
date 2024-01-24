@@ -33,6 +33,7 @@ type (
 		Left, Right Expression  // operands
 		Op          token.Token // operator
 		EType       types.Type
+		IOperand    ir.Operand
 	}
 
 	FuncCall struct {
@@ -50,9 +51,10 @@ type (
 	}
 
 	QualifiedIdent struct {
-		X     Expression
-		Sel   *Ident
-		EType types.Type
+		X        Expression
+		Sel      *Ident
+		EType    types.Type
+		IOperand ir.Operand
 	}
 
 	Set struct {
@@ -72,6 +74,7 @@ type (
 		QualifiedIdent Expression
 		Selector       Selector
 		EType          types.Type
+		IOperand       ir.Operand
 	}
 
 	BadExpr struct {
@@ -94,7 +97,7 @@ func (b *BinaryExpr) End() *token.Position { return b.Right.End() }
 func (b *BinaryExpr) String() string       { return fmt.Sprintf("%v %v %v", b.Left, b.Op, b.Right) }
 func (b *BinaryExpr) Type() types.Type     { return b.EType }
 func (b *BinaryExpr) Accept(vst Visitor)   { vst.VisitBinaryExpr(b) }
-func (b *BinaryExpr) Operand() ir.Operand  { panic("not implemented") }
+func (b *BinaryExpr) Operand() ir.Operand  { return b.IOperand }
 
 func (f *FuncCall) Pos() *token.Position { return f.Dsg.Pos() }
 func (f *FuncCall) End() (pos *token.Position) {
@@ -128,7 +131,7 @@ func (id *Ident) expr()               {}
 func (id *Ident) Accept(vst Visitor)  { vst.VisitIdentifier(id) }
 func (id *Ident) Props() IdentProps   { return id.IProps }
 func (id *Ident) Type() types.Type    { return id.EType }
-func (id *Ident) Operand() ir.Operand { panic("not implemented") }
+func (id *Ident) Operand() ir.Operand { return id.IOperand }
 
 func (q *QualifiedIdent) Pos() *token.Position { return q.X.Pos() }
 func (q *QualifiedIdent) End() *token.Position { panic("not implemented") }
@@ -179,7 +182,7 @@ func (d *Designator) String() string {
 
 	return s
 }
-func (d *Designator) Operand() ir.Operand { panic("not implemented") }
+func (d *Designator) Operand() ir.Operand { return d.IOperand }
 
 func (b *BadExpr) Pos() *token.Position { return b.From }
 func (b *BadExpr) End() *token.Position { return b.To }

@@ -2,6 +2,7 @@ package ir
 
 import (
 	"fmt"
+
 	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
@@ -21,10 +22,6 @@ type Operand interface {
 	Kind() OperandKind
 }
 
-//func CreateOperand(name string, kind OperandKind) *Operand {
-//	return &Operand{Name: name, Kind: kind}
-//}
-
 // Register ...
 // ---------------------------------------------
 type Register struct {
@@ -34,7 +31,6 @@ type Register struct {
 	//Attr   ast.IdentProps
 
 	OpKind OperandKind
-	//Obj    sema.Symbol
 }
 
 func (r Register) Id() string {
@@ -46,7 +42,7 @@ func (r Register) Kind() OperandKind {
 }
 
 func (r Register) String() string {
-	return fmt.Sprintf("r%s", r.Name)
+	return fmt.Sprintf("R%s", r.Name)
 }
 
 // Number ...
