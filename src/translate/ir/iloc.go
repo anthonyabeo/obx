@@ -10,6 +10,10 @@ var opcodes = [...]string{
 	Add: "add",
 
 	Load: "load",
+	
+	Eq: "eq",
+	Lt: "lt",
+	Gt: "gt",
 }
 
 const (
@@ -23,4 +27,10 @@ const (
 	RShift
 
 	Load
+
+	call
+
+	Eq
+	Lt
+	Gt
 )
