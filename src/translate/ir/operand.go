@@ -42,7 +42,7 @@ func (r Register) Kind() OperandKind {
 }
 
 func (r Register) String() string {
-	return fmt.Sprintf("R%s", r.Name)
+	return "%" + r.Name
 }
 
 // Number ...
