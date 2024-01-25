@@ -1,6 +1,7 @@
 package translate
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/anthonyabeo/obx/src/sema"
@@ -130,11 +131,7 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 
 	}
 
-	v.Instr = append(v.Instr, ir.CallInstr{
-		Result: ir.Register{Name: v.nextTemp(), OpKind: ir.KRegister},
-		Proc:   call.Dsg.String(),
-		Args:   args,
-	})
+	v.Instr = append(v.Instr, ir.CreateCall(call.Dsg.String(), args, fmt.Sprintf("%s_call", call.Dsg.String())))
 }
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {

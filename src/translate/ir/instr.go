@@ -17,10 +17,10 @@ type Instruction interface {
 // CallInstr ...
 // --------------------
 type CallInstr struct {
-	op     Opcode
-	Proc   string
-	Args   []Operand
-	Result Operand
+	op   Opcode
+	proc string
+	args []Operand
+	res  Operand
 }
 
 func (c CallInstr) IsTerm() bool     { return termop_begin < c.op && c.op < termop_end }
@@ -32,11 +32,25 @@ func (c CallInstr) Opcode() Opcode { return c.op }
 
 func (c CallInstr) String() string {
 	var args []string
-	for _, op := range c.Args {
+	for _, op := range c.args {
 		args = append(args, op.String())
 	}
 
-	return fmt.Sprintf("%s = call %s(%s)", c.Result, c.Proc, strings.Join(args, ", "))
+	return fmt.Sprintf("%s = call %s(%s)", c.res, c.proc, strings.Join(args, ", "))
+}
+
+func CreateCall(fun string, args []Operand, name string) *CallInstr {
+	if name == "" {
+		// TODO Make next temp more global?
+		// name = tmp
+
+	}
+
+	return &CallInstr{
+		res:  Register{Name: name, OpKind: KRegister},
+		proc: fun,
+		args: args,
+	}
 }
 
 // CmpInstr ...
