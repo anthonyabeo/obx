@@ -61,17 +61,24 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 
 	switch expr.Op {
 	case token.PLUS:
-		src := []ir.Operand{expr.Left.Operand(), expr.Right.Operand()}
-		dst := []ir.Operand{ir.Register{Name: tmp, OpKind: ir.KRegister}}
+		//src := []ir.Operand{expr.Left.Operand(), expr.Right.Operand()}
+		//dst := []ir.Operand{ir.Register{Name: tmp, OpKind: ir.KRegister}}
 
-		instr = ir.CreateNormalInstr(ir.Add, src, dst)
+		//instr = ir.CreateNormalInstr(ir.Add, src, dst)
+		//instr = ir.BinaryOp{
+		//	Left:   expr.Left.Operand(),
+		//	Right:  expr.Right.Operand(),
+		//	Result: ir.Register{Name: tmp, OpKind: ir.KRegister},
+		//}
+		instr = ir.CreateAdd(expr.Left.Operand(), expr.Right.Operand(), tmp)
 	case token.EQUAL:
-		instr = ir.CmpInstr{
-			Cond:   ir.Eq,
-			X:      expr.Left.Operand(),
-			Y:      expr.Right.Operand(),
-			Result: ir.Register{Name: tmp, OpKind: ir.KRegister},
-		}
+		//instr = ir.CmpInstr{
+		//	Cond:   ir.Eq,
+		//	X:      expr.Left.Operand(),
+		//	Y:      expr.Right.Operand(),
+		//	Result: ir.Register{Name: tmp, OpKind: ir.KRegister},
+		//}
+		instr = ir.CreateCmp(ir.Eq, expr.Left.Operand(), expr.Right.Operand(), tmp)
 	}
 
 	expr.IOperand = ir.Register{Name: tmp, OpKind: ir.KRegister}
@@ -122,10 +129,11 @@ func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 	stmt.LValue.Accept(v)
 	stmt.RValue.Accept(v)
 
-	src := []ir.Operand{stmt.RValue.Operand()}
-	dst := []ir.Operand{stmt.LValue.Operand()}
+	//src := []ir.Operand{stmt.RValue.Operand()}
+	//dst := []ir.Operand{stmt.LValue.Operand()}
 
-	v.Instr = append(v.Instr, ir.CreateNormalInstr(ir.Load, src, dst))
+	//v.Instr = append(v.Instr, ir.CreateNormalInstr(ir.Load, src, dst))
+	v.Instr = append(v.Instr, ir.CreateStore(stmt.RValue.Operand(), stmt.LValue.Operand()))
 }
 
 func (v *Visitor) VisitReturnStmt(stmt *ast.ReturnStmt) {
@@ -141,7 +149,11 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 
 	}
 
-	v.Instr = append(v.Instr, ir.CallInstr{Proc: call.Dsg.String(), Args: args})
+	v.Instr = append(v.Instr, ir.CallInstr{
+		Result: ir.Register{Name: v.nextTemp(), OpKind: ir.KRegister},
+		Proc:   call.Dsg.String(),
+		Args:   args,
+	})
 }
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
