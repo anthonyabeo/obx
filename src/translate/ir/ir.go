@@ -1,5 +1,7 @@
 package ir
 
+import "strconv"
+
 type Opcode int
 
 func (op Opcode) String() string {
@@ -57,3 +59,24 @@ const (
 	Ret
 	termop_end
 )
+
+type Type interface {
+	String() string
+}
+
+type Value interface {
+	Type() Type
+	Name() string
+	SetName(string)
+	HasName() bool
+	String() string
+}
+
+var tmp = 0
+
+func NextTemp() string {
+	t := strconv.Itoa(tmp)
+	tmp += 1
+
+	return t
+}
