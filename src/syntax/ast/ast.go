@@ -24,7 +24,7 @@ type Expression interface {
 	Node
 	expr()
 	Type() types.Type
-	Operand() ir.Operand
+	Value() ir.Value
 }
 
 type Declaration interface {

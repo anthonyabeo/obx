@@ -612,7 +612,7 @@ func (p *Parser) parseDesignator() (d *ast.Designator) {
 func (p *Parser) parseLiteral() (lit ast.Expression) {
 	switch p.tok {
 	case token.INT, token.BYTE, token.INT8, token.INT16, token.INT32, token.INT64, token.REAL, token.LONGREAL, token.STRING, token.HEXSTRING, token.CHAR:
-		lit = &ast.BasicLit{ValuePos: p.pos, Kind: p.tok, Value: p.lit}
+		lit = &ast.BasicLit{ValuePos: p.pos, Kind: p.tok, Val: p.lit}
 		p.next()
 	case token.TRUE, token.FALSE:
 	case token.NIL:

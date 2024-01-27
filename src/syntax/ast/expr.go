@@ -23,9 +23,9 @@ type (
 	BasicLit struct {
 		ValuePos *token.Position // literal position
 		Kind     token.Token     // token.INT, token.REAL, token.HEXCHAR, or token.STRING
-		Value    string          // literal string; e.g. 42, 0x7f, 3.14, 1e-9, 2.4i, 'a', '\x7f', "foo" or `\m\n\o`
+		Val      string          // literal string; e.g. 42, 0x7f, 3.14, 1e-9, 2.4i, 'a', '\x7f', "foo" or `\m\n\o`
 		EType    types.Type
-		IOperand ir.Operand
+		IRValue  ir.Value
 	}
 
 	BinaryExpr struct {
@@ -33,40 +33,43 @@ type (
 		Left, Right Expression  // operands
 		Op          token.Token // operator
 		EType       types.Type
-		IOperand    ir.Operand
+		IRValue     ir.Value
 	}
 
 	FuncCall struct {
 		Dsg          Expression
 		ActualParams []Expression
 		EType        types.Type
+		IRValue      ir.Value
 	}
 
 	Ident struct {
-		NamePos  *token.Position
-		Name     string
-		IProps   IdentProps
-		EType    types.Type
-		IOperand ir.Operand
+		NamePos *token.Position
+		Name    string
+		IProps  IdentProps
+		EType   types.Type
+		IRValue ir.Value
 	}
 
 	QualifiedIdent struct {
-		X        Expression
-		Sel      *Ident
-		EType    types.Type
-		IOperand ir.Operand
+		X       Expression
+		Sel     *Ident
+		EType   types.Type
+		IRValue ir.Value
 	}
 
 	Set struct {
-		Elem  []Expression
-		EType types.Type
+		Elem    []Expression
+		EType   types.Type
+		IRValue ir.Value
 	}
 
 	UnaryExpr struct {
-		OpPos *token.Position
-		Op    token.Token
-		X     Expression
-		EType types.Type
+		OpPos   *token.Position
+		Op      token.Token
+		X       Expression
+		EType   types.Type
+		IRValue ir.Value
 	}
 
 	Designator struct {
@@ -74,7 +77,7 @@ type (
 		QualifiedIdent Expression
 		Selector       Selector
 		EType          types.Type
-		IOperand       ir.Operand
+		IRValue        ir.Value
 	}
 
 	BadExpr struct {
@@ -86,10 +89,10 @@ type (
 func (b *BasicLit) expr()                {}
 func (b *BasicLit) Pos() *token.Position { return b.ValuePos }
 func (b *BasicLit) End() *token.Position { panic("not implemented") }
-func (b *BasicLit) String() string       { return b.Value }
+func (b *BasicLit) String() string       { return b.Val }
 func (b *BasicLit) Accept(vst Visitor)   { vst.VisitBasicLit(b) }
 func (b *BasicLit) Type() types.Type     { return b.EType }
-func (b *BasicLit) Operand() ir.Operand  { return b.IOperand }
+func (b *BasicLit) Value() ir.Value      { return b.IRValue }
 
 func (b *BinaryExpr) expr()                {}
 func (b *BinaryExpr) Pos() *token.Position { return b.OpPos }
@@ -97,7 +100,7 @@ func (b *BinaryExpr) End() *token.Position { return b.Right.End() }
 func (b *BinaryExpr) String() string       { return fmt.Sprintf("%v %v %v", b.Left, b.Op, b.Right) }
 func (b *BinaryExpr) Type() types.Type     { return b.EType }
 func (b *BinaryExpr) Accept(vst Visitor)   { vst.VisitBinaryExpr(b) }
-func (b *BinaryExpr) Operand() ir.Operand  { return b.IOperand }
+func (b *BinaryExpr) Value() ir.Value      { return b.IRValue }
 
 func (f *FuncCall) Pos() *token.Position { return f.Dsg.Pos() }
 func (f *FuncCall) End() (pos *token.Position) {
@@ -112,11 +115,11 @@ func (f *FuncCall) End() (pos *token.Position) {
 
 	return
 }
-func (f *FuncCall) Type() types.Type    { return f.EType }
-func (f *FuncCall) Accept(vst Visitor)  { vst.VisitFuncCall(f) }
-func (f *FuncCall) expr()               {}
-func (f *FuncCall) String() string      { panic("not implemented") }
-func (f *FuncCall) Operand() ir.Operand { panic("not implemented") }
+func (f *FuncCall) Type() types.Type   { return f.EType }
+func (f *FuncCall) Accept(vst Visitor) { vst.VisitFuncCall(f) }
+func (f *FuncCall) expr()              {}
+func (f *FuncCall) String() string     { panic("not implemented") }
+func (f *FuncCall) Value() ir.Value    { return f.IRValue }
 
 func (id *Ident) Pos() *token.Position { return id.NamePos }
 func (id *Ident) End() *token.Position {
@@ -126,12 +129,12 @@ func (id *Ident) End() *token.Position {
 		Column:   id.NamePos.Column + len(id.Name),
 	}
 }
-func (id *Ident) String() string      { return id.Name }
-func (id *Ident) expr()               {}
-func (id *Ident) Accept(vst Visitor)  { vst.VisitIdentifier(id) }
-func (id *Ident) Props() IdentProps   { return id.IProps }
-func (id *Ident) Type() types.Type    { return id.EType }
-func (id *Ident) Operand() ir.Operand { return id.IOperand }
+func (id *Ident) String() string     { return id.Name }
+func (id *Ident) expr()              {}
+func (id *Ident) Accept(vst Visitor) { vst.VisitIdentifier(id) }
+func (id *Ident) Props() IdentProps  { return id.IProps }
+func (id *Ident) Type() types.Type   { return id.EType }
+func (id *Ident) Value() ir.Value    { return id.IRValue }
 
 func (q *QualifiedIdent) Pos() *token.Position { return q.X.Pos() }
 func (q *QualifiedIdent) End() *token.Position { panic("not implemented") }
@@ -139,7 +142,7 @@ func (q *QualifiedIdent) Type() types.Type     { return q.EType }
 func (q *QualifiedIdent) Accept(vst Visitor)   { vst.VisitQualifiedIdent(q) }
 func (q *QualifiedIdent) expr()                {}
 func (q *QualifiedIdent) String() string       { return fmt.Sprintf("%v.%v", q.X, q.Sel) }
-func (q *QualifiedIdent) Operand() ir.Operand  { panic("not implemented") }
+func (q *QualifiedIdent) Value() ir.Value      { return q.IRValue }
 
 func (s *Set) expr()                {}
 func (s *Set) String() string       { panic("not implement") }
@@ -147,7 +150,7 @@ func (s *Set) Pos() *token.Position { panic("not implemented") }
 func (s *Set) End() *token.Position { panic("not implemented") }
 func (s *Set) Accept(vst Visitor)   { vst.VisitSet(s) }
 func (s *Set) Type() types.Type     { return s.EType }
-func (s *Set) Operand() ir.Operand  { panic("not implemented") }
+func (s *Set) Value() ir.Value      { return s.IRValue }
 
 func (u *UnaryExpr) Pos() *token.Position { return u.OpPos }
 func (u *UnaryExpr) End() *token.Position { return u.X.End() }
@@ -155,7 +158,7 @@ func (u *UnaryExpr) Type() types.Type     { return u.EType }
 func (u *UnaryExpr) Accept(vst Visitor)   { vst.VisitUnaryExpr(u) }
 func (u *UnaryExpr) expr()                {}
 func (u *UnaryExpr) String() string       { return fmt.Sprintf("%v%v", u.Op, u.X) }
-func (u *UnaryExpr) Operand() ir.Operand  { panic("not implemented") }
+func (u *UnaryExpr) Value() ir.Value      { return u.IRValue }
 
 func (d *Designator) Pos() *token.Position { return d.QIdentPos }
 func (d *Designator) End() (pos *token.Position) {
@@ -182,7 +185,8 @@ func (d *Designator) String() string {
 
 	return s
 }
-func (d *Designator) Operand() ir.Operand { return d.IOperand }
+
+func (d *Designator) Value() ir.Value { return d.IRValue }
 
 func (b *BadExpr) Pos() *token.Position { return b.From }
 func (b *BadExpr) End() *token.Position { return b.To }
@@ -190,7 +194,7 @@ func (b *BadExpr) Accept(vst Visitor)   { panic("not implemented") }
 func (b *BadExpr) Type() types.Type     { return nil }
 func (b *BadExpr) expr()                {}
 func (b *BadExpr) String() string       { panic("not implemented") }
-func (b *BadExpr) Operand() ir.Operand  { panic("not implemented") }
+func (b *BadExpr) Value() ir.Value      { return nil }
 
 // Selectors
 // ---------------------
@@ -203,8 +207,9 @@ type Selector interface {
 // DotOp
 // ---------------------
 type DotOp struct {
-	Field *Ident
-	EType types.Type
+	Field   *Ident
+	EType   types.Type
+	IRValue ir.Value
 }
 
 func (d *DotOp) Pos() *token.Position { return d.Field.Pos() }
@@ -214,13 +219,14 @@ func (d *DotOp) Type() types.Type     { return d.EType }
 func (d *DotOp) Accept(vst Visitor)   { vst.VisitDotOp(d) }
 func (d *DotOp) expr()                {}
 func (d *DotOp) sel()                 {}
-func (d *DotOp) Operand() ir.Operand  { panic("not implemented") }
+func (d *DotOp) Value() ir.Value      { return d.IRValue }
 
 // IndexOp
 // ---------------------
 type IndexOp struct {
-	List  []Expression
-	EType types.Type
+	List    []Expression
+	EType   types.Type
+	IRValue ir.Value
 }
 
 func (id *IndexOp) Pos() *token.Position { panic("not implement") }
@@ -233,17 +239,18 @@ func (id *IndexOp) String() string {
 
 	return fmt.Sprintf("[%v]", strings.Join(list, ","))
 }
-func (id *IndexOp) Type() types.Type    { return id.EType }
-func (id *IndexOp) Accept(vst Visitor)  { vst.VisitIndexOp(id) }
-func (id *IndexOp) expr()               {}
-func (id *IndexOp) sel()                {}
-func (id *IndexOp) Operand() ir.Operand { panic("not implemented") }
+func (id *IndexOp) Type() types.Type   { return id.EType }
+func (id *IndexOp) Accept(vst Visitor) { vst.VisitIndexOp(id) }
+func (id *IndexOp) expr()              {}
+func (id *IndexOp) sel()               {}
+func (id *IndexOp) Value() ir.Value    { return id.IRValue }
 
 // TypeGuard
 // ---------------------
 type TypeGuard struct {
-	Typ   Expression
-	EType types.Type
+	Typ     Expression
+	EType   types.Type
+	IRValue ir.Value
 }
 
 func (t *TypeGuard) Pos() *token.Position { panic("not implement") }
@@ -253,12 +260,13 @@ func (t *TypeGuard) Type() types.Type     { return t.EType }
 func (t *TypeGuard) Accept(vst Visitor)   { vst.VisitTypeGuard(t) }
 func (t *TypeGuard) expr()                {}
 func (t *TypeGuard) sel()                 {}
-func (t *TypeGuard) Operand() ir.Operand  { panic("not implemented") }
+func (t *TypeGuard) Value() ir.Value      { return t.IRValue }
 
 // PointerDeref
 // ---------------------
 type PointerDeref struct {
-	EType types.Type
+	EType   types.Type
+	IRValue ir.Value
 }
 
 func (deref *PointerDeref) Pos() *token.Position { panic("not implement") }
@@ -268,4 +276,4 @@ func (deref *PointerDeref) Type() types.Type     { return deref.EType }
 func (deref *PointerDeref) Accept(vst Visitor)   { vst.VisitPointerDeref(deref) }
 func (deref *PointerDeref) expr()                {}
 func (deref *PointerDeref) sel()                 {}
-func (deref *PointerDeref) Operand() ir.Operand  { panic("not implemented") }
+func (deref *PointerDeref) Value() ir.Value      { return deref.IRValue }
