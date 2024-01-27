@@ -21,11 +21,11 @@ type CallInstr struct {
 	op   Opcode
 	proc string
 	args []Value
-	typ  Type
+	ty   Type
 	name string
 }
 
-func (c CallInstr) Type() Type          { return c.typ }
+func (c CallInstr) Type() Type          { return c.ty }
 func (c CallInstr) Name() string        { return c.name }
 func (c CallInstr) SetName(name string) { c.name = name }
 func (c CallInstr) HasName() bool       { return c.name != "" }
@@ -38,14 +38,19 @@ func (c CallInstr) Opcode() Opcode      { return c.op }
 func (c CallInstr) String() string {
 	var args []string
 	for _, op := range c.args {
-		args = append(args, op.String())
+		args = append(args, fmt.Sprintf("%s %s", op.Type(), op.Name()))
 	}
 
-	return fmt.Sprintf("%s = call %s %s(%s)", c.typ, c.name, c.proc, strings.Join(args, ", "))
+	return fmt.Sprintf("%s = call %s %s(%s)", c.name, c.ty, c.proc, strings.Join(args, ", "))
 }
 
 func CreateCall(typ Type, fun string, args []Value, name string) *CallInstr {
-	return &CallInstr{typ: typ, proc: fun, args: args, name: name}
+	if name == "" {
+		name = NextTemp()
+	}
+
+	name = "%" + name
+	return &CallInstr{ty: typ, proc: fun, args: args, name: name}
 }
 
 // CmpInstr ...
@@ -53,11 +58,11 @@ func CreateCall(typ Type, fun string, args []Value, name string) *CallInstr {
 type CmpInstr struct {
 	cond Opcode
 	x, y Value
-	typ  Type
+	ty   Type
 	name string
 }
 
-func (c CmpInstr) Type() Type          { return c.typ }
+func (c CmpInstr) Type() Type          { return c.ty }
 func (c CmpInstr) Name() string        { return c.name }
 func (c CmpInstr) SetName(name string) { c.name = name }
 func (c CmpInstr) HasName() bool       { return c.name != "" }
@@ -69,24 +74,30 @@ func (c CmpInstr) IsMemOp() bool       { return memop_begin < c.cond && c.cond <
 func (c CmpInstr) Opcode() Opcode { return c.cond }
 
 func (c CmpInstr) String() string {
-	return fmt.Sprintf("%s = cmp %s %s %s, %s", c.name, c.cond, c.typ, c.x, c.y)
+	return fmt.Sprintf("%s = cmp %s %s %s, %s", c.name, c.cond, c.ty, c.x.Name(), c.y.Name())
 }
 
-func CreateCmp(cond Opcode, left, right Value, name string) *CmpInstr {
-	return &CmpInstr{cond: cond, x: left, y: right, name: name}
+func CreateCmp(ty Type, cond Opcode, x, y Value, name string) *CmpInstr {
+	if name == "" {
+		name = NextTemp()
+	}
+
+	name = "%" + name
+
+	return &CmpInstr{cond, x, y, ty, name}
 }
 
 // BinaryOp ...
 // --------------------
 type BinaryOp struct {
-	op    Opcode
-	left  Value
-	right Value
-	typ   Type
-	name  string
+	op     Opcode
+	left   Value
+	right  Value
+	evalTy Type
+	name   string
 }
 
-func (b BinaryOp) Type() Type          { return b.typ }
+func (b BinaryOp) Type() Type          { return b.evalTy }
 func (b BinaryOp) Name() string        { return b.name }
 func (b BinaryOp) SetName(name string) { b.name = name }
 func (b BinaryOp) HasName() bool       { return b.name != "" }
@@ -96,11 +107,17 @@ func (b BinaryOp) IsBinaryOp() bool    { return binop_begin < b.op && b.op < bin
 func (b BinaryOp) IsOtherOp() bool     { return other_op_begin < b.op && b.op < other_op_end }
 func (b BinaryOp) IsMemOp() bool       { return memop_begin < b.op && b.op < memop_end }
 func (b BinaryOp) String() string {
-	return fmt.Sprintf("%s = %s %s %s, %s", b.name, b.op, b.typ, b.left, b.right)
+	return fmt.Sprintf("%s = %s %s %s, %s", b.name, b.op, b.evalTy, b.left.Name(), b.right.Name())
 }
 
-func CreateAdd(typ Type, left, right Value, name string) *BinaryOp {
-	return &BinaryOp{typ: typ, op: Add, left: left, right: right, name: name}
+func CreateAdd(ty Type, left, right Value, name string) *BinaryOp {
+	if name == "" {
+		name = NextTemp()
+	}
+
+	name = "%" + name
+
+	return &BinaryOp{evalTy: ty, op: Add, left: left, right: right, name: name}
 }
 
 // LoadInst ...
@@ -167,13 +184,13 @@ func (s StoreInst) String() string {
 	if s.value.HasName() {
 		valueStr = fmt.Sprintf("%s %s", s.value.Type(), s.value.Name())
 	} else {
-		valueStr = fmt.Sprintf("%s %s", s.value.Type(), "%"+tmp)
+		valueStr = fmt.Sprintf("%s %%%s", s.value.Type(), tmp)
 	}
 
 	if s.dst.HasName() {
 		dstStr = fmt.Sprintf("%s %s", s.dst.Type(), s.dst.Name())
 	} else {
-		dstStr = fmt.Sprintf("%s %s", s.dst.Type(), "%"+tmp)
+		dstStr = fmt.Sprintf("%s %%%s", s.dst.Type(), tmp)
 	}
 
 	return fmt.Sprintf("store %s, %s", valueStr, dstStr)
@@ -193,8 +210,22 @@ type AllocaInst struct {
 	op      Opcode
 	numElem int
 	align   int
-	typ     Type
+	allocTy Type
+	evalTy  Type
 	name    string
+}
+
+func CreateAlloca(ty Type, numElems int, align int, name string) *AllocaInst {
+	alloc := &AllocaInst{op: Alloca, allocTy: ty, numElem: 1, name: name, evalTy: CreatePointerType(ty)}
+	if numElems > 1 {
+		alloc.numElem = numElems
+	}
+
+	if align > (1 << 32) {
+		alloc.align = 1 << 32
+	}
+
+	return alloc
 }
 
 func (a AllocaInst) Opcode() Opcode      { return a.op }
@@ -202,18 +233,18 @@ func (a AllocaInst) IsTerm() bool        { return termop_begin < a.op && a.op < 
 func (a AllocaInst) IsBinaryOp() bool    { return binop_begin < a.op && a.op < binop_end }
 func (a AllocaInst) IsMemOp() bool       { return memop_begin < a.op && a.op < memop_end }
 func (a AllocaInst) IsOtherOp() bool     { return other_op_begin < a.op && a.op < other_op_end }
-func (a AllocaInst) Type() Type          { return a.typ }
-func (a AllocaInst) Name() string        { return a.name }
+func (a AllocaInst) Type() Type          { return a.evalTy }
+func (a AllocaInst) Name() string        { return "%" + a.name }
 func (a AllocaInst) SetName(name string) { a.name = name }
 func (a AllocaInst) HasName() bool       { return a.name != "" }
 func (a AllocaInst) String() string {
-	s := fmt.Sprintf("%s = alloca %s", a.name, a.typ)
+	s := fmt.Sprintf("%%%s = alloca %s", a.name, a.allocTy)
 	if a.numElem > 1 {
-		s += fmt.Sprintf(", i32 %s", a.numElem)
+		s += fmt.Sprintf(", i32 %d", a.numElem)
 	}
 
 	if a.align > 0 && a.align < (1<<32) {
-		s += fmt.Sprintf(", align %s", a.align)
+		s += fmt.Sprintf(", align %d", a.align)
 	}
 
 	return s
