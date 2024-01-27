@@ -1,25 +1,26 @@
 package translate
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/anthonyabeo/obx/src/sema"
+	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/translate/ir"
 )
 
 type Visitor struct {
-	tmp   int
-	Instr []ir.Instruction
+	tmp           int
+	Instr         []ir.Instruction
+	irSymbolTable map[string]*ir.AllocaInst
 
 	ast *ast.Oberon
 	env *sema.Scope
 }
 
 func NewVisitor(ast *ast.Oberon, env *sema.Scope) *Visitor {
-	return &Visitor{ast: ast, env: env}
+	return &Visitor{ast: ast, env: env, irSymbolTable: make(map[string]*ir.AllocaInst)}
 }
 
 func (v *Visitor) nextTemp() string {
@@ -29,12 +30,31 @@ func (v *Visitor) nextTemp() string {
 	return tmp
 }
 
+func (v *Visitor) getLLVMType(t types.Type) ir.Type {
+	var ty ir.Type
+
+	switch t := t.(type) {
+	case *types.Basic:
+		switch t.Kind() {
+		case types.Int8:
+		case types.Int16:
+		case types.Int32:
+			ty = ir.CreateIntegerType(32)
+		case types.Int64:
+		}
+	default:
+
+	}
+
+	return ty
+}
+
 func (v *Visitor) VisitModule(name string) {
 	module := v.ast.Program[name]
 
-	//for _, decl := range module.DeclSeq {
-	//	decl.Accept(v)
-	//}
+	for _, decl := range module.DeclSeq {
+		decl.Accept(v)
+	}
 
 	for _, stmt := range module.StmtSeq {
 		stmt.Accept(v)
@@ -42,38 +62,34 @@ func (v *Visitor) VisitModule(name string) {
 }
 
 func (v *Visitor) VisitIdentifier(id *ast.Ident) {
-	sym := v.env.Lookup(id.Name)
-	id.IOperand = ir.Register{
-		Name:   sym.Name(),
-		Offset: sym.Offset(),
-		Type:   sym.Type(),
-		//Attr:   sym.Props(),
-		OpKind: ir.KRegister,
+	alloc, found := v.irSymbolTable[id.Name]
+	if !found {
+		panic("")
 	}
+
+	id.IRValue = alloc
 }
 
 func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 	expr.Left.Accept(v)
 	expr.Right.Accept(v)
 
-	tmp := v.nextTemp()
-
 	var instr ir.Instruction
 
 	switch expr.Op {
 	case token.PLUS:
-		instr = ir.CreateAdd(expr.Left.Operand(), expr.Right.Operand(), tmp)
+		instr = ir.CreateAdd(v.getLLVMType(expr.EType), expr.Left.Value(), expr.Right.Value(), "")
 	case token.EQUAL:
-		instr = ir.CreateCmp(ir.Eq, expr.Left.Operand(), expr.Right.Operand(), tmp)
+		instr = ir.CreateCmp(expr.Left.Value().Type(), ir.Eq, expr.Left.Value(), expr.Right.Value(), "")
 	}
 
-	expr.IOperand = ir.Register{Name: tmp, OpKind: ir.KRegister}
+	expr.IRValue = instr
 	v.Instr = append(v.Instr, instr)
 }
 
 func (v *Visitor) VisitDesignator(d *ast.Designator) {
 	d.QualifiedIdent.Accept(v)
-	d.IOperand = d.QualifiedIdent.Operand()
+	d.IRValue = d.QualifiedIdent.Value()
 }
 
 func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
@@ -97,13 +113,25 @@ func (v *Visitor) VisitSet(set *ast.Set) {
 }
 
 func (v *Visitor) VisitBasicLit(lit *ast.BasicLit) {
+	var numBits uint
+
 	switch lit.Kind {
-	case token.INT, token.INT8, token.INT16, token.INT32, token.INT64, token.BYTE:
-		lit.IOperand = ir.Number{
-			Value:  lit.Value,
-			OpKind: ir.KNumber,
-		}
+	case token.INT:
+	case token.INT8, token.BYTE:
+		numBits = 8
+	case token.INT16:
+		numBits = 16
+	case token.INT32:
+		numBits = 32
+	case token.INT64:
+		numBits = 64
 	}
+
+	val, err := strconv.ParseUint(lit.Val, 10, 64)
+	if err != nil {
+		// TODO handle this error
+	}
+	lit.IRValue = ir.NewConstantInt(ir.CreateIntegerType(numBits), numBits, val, false, "")
 }
 
 func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
@@ -115,7 +143,7 @@ func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 	stmt.LValue.Accept(v)
 	stmt.RValue.Accept(v)
 
-	v.Instr = append(v.Instr, ir.CreateStore(stmt.RValue.Operand(), stmt.LValue.Operand()))
+	v.Instr = append(v.Instr, ir.CreateStore(stmt.RValue.Value(), stmt.LValue.Value()))
 }
 
 func (v *Visitor) VisitReturnStmt(stmt *ast.ReturnStmt) {
@@ -124,14 +152,14 @@ func (v *Visitor) VisitReturnStmt(stmt *ast.ReturnStmt) {
 }
 
 func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
-	var args []ir.Operand
+	var args []ir.Value
 	for _, arg := range call.ActualParams {
 		arg.Accept(v)
-		args = append(args, arg.Operand())
+		args = append(args, arg.Value())
 
 	}
 
-	v.Instr = append(v.Instr, ir.CreateCall(call.Dsg.String(), args, fmt.Sprintf("%s_call", call.Dsg.String())))
+	v.Instr = append(v.Instr, ir.CreateCall(ir.GetVoidType(), call.Dsg.String(), args, ""))
 }
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
@@ -180,8 +208,14 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 }
 
 func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
-	//TODO implement me
-	panic("implement me")
+
+	for _, dcl := range decl.IdentList {
+		obj := v.env.Lookup(dcl.Name)
+
+		alloc := ir.CreateAlloca(v.getLLVMType(decl.Type.Type()), 1, 4, obj.Name())
+		v.irSymbolTable[dcl.Name] = alloc
+		v.Instr = append(v.Instr, alloc)
+	}
 }
 
 func (v *Visitor) VisitConstDecl(decl *ast.ConstDecl) {
