@@ -352,7 +352,7 @@ func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
 	} else {
 		stmt.By = &ast.BasicLit{
 			Kind:  token.INT,
-			Value: "1",
+			Val:   "1",
 			EType: types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer"),
 		}
 	}
@@ -565,7 +565,7 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 		} else {
 			value := &ast.BasicLit{
 				Kind:  token.INT,
-				Value: strconv.Itoa(i),
+				Val:   strconv.Itoa(i),
 				EType: types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer"),
 			}
 
