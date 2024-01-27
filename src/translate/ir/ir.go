@@ -14,8 +14,9 @@ var opcodes = [...]string{
 	Mul: "mul",
 	Div: "div",
 
-	Load:  "load",
-	Store: "store",
+	Alloca: "alloca",
+	Load:   "load",
+	Store:  "store",
 
 	Eq: "eq",
 	Lt: "lt",
@@ -38,7 +39,7 @@ const (
 	binop_end
 
 	memop_begin
-
+	Alloca
 	Load
 	Store
 
@@ -59,10 +60,6 @@ const (
 	Ret
 	termop_end
 )
-
-type Type interface {
-	String() string
-}
 
 type Value interface {
 	Type() Type
