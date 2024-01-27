@@ -5,14 +5,30 @@ type Type interface {
 	llvmType()
 }
 
-var LLVMVoidType *VoidType
+var (
+	LLVMVoidType *VoidType
+
+	Int8Type  *Int8
+	Int32Type *Int32
+)
 
 func init() {
 	LLVMVoidType = &VoidType{}
+
+	Int8Type = &Int8{numBits: 8}
+	Int32Type = &Int32{numBits: 32}
 }
 
 func GetVoidType() *VoidType {
 	return LLVMVoidType
+}
+
+func GetInt32Type() *Int32 {
+	return Int32Type
+}
+
+func GetInt8Type() *Int8 {
+	return Int8Type
 }
 
 // IntegerType ...
@@ -26,10 +42,10 @@ func CreateIntegerType(numBits uint) IntegerType {
 	switch numBits {
 	case 1:
 	case 8:
-		return &Int8{numBits}
+		return Int8Type
 	case 16:
 	case 32:
-		return &Int32{numBits}
+		return Int32Type
 	case 64:
 
 	}
