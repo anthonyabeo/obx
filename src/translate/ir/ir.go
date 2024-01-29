@@ -77,3 +77,13 @@ func NextTemp() string {
 
 	return t
 }
+
+// GlobalValue denotes the base type of Global Variables and Functions
+// ----------------------
+type GlobalValue interface {
+	Value
+	Constant
+	HasInternalLinkage() bool
+	HasExternalLinkage() bool
+	// Parent() *Module
+}
