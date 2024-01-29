@@ -83,3 +83,27 @@ func (p VoidType) String() string {
 }
 
 func (VoidType) llvmType() {}
+
+// FunctionType ...
+// ---------------------
+type FunctionType struct {
+	varArgs bool
+	retType Type
+	args    []Argument
+}
+
+func (f FunctionType) IsVarArg() bool      { return f.varArgs }
+func (f FunctionType) NumArgs() int        { return len(f.args) }
+func (f FunctionType) ArgType(i uint) Type { return f.args[i].Type() }
+func (f FunctionType) ReturnType() Type    { return f.retType }
+func (f FunctionType) String() string      { panic("implement me") }
+func (FunctionType) llvmType()             {}
+
+// LabelType ...
+// ---------------------
+type LabelType struct {
+	name string
+}
+
+func (l LabelType) String() string { return l.name }
+func (l LabelType) llvmType()      {}
