@@ -1,6 +1,7 @@
 package translate
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/anthonyabeo/obx/src/sema"
@@ -37,9 +38,10 @@ func (v *Visitor) getLLVMType(t types.Type) ir.Type {
 	case *types.Basic:
 		switch t.Kind() {
 		case types.Int8:
+			ty = ir.GetInt8Type()
 		case types.Int16:
 		case types.Int32:
-			ty = ir.CreateIntegerType(32)
+			ty = ir.GetInt32Type()
 		case types.Int64:
 		}
 	default:
@@ -64,7 +66,7 @@ func (v *Visitor) VisitModule(name string) {
 func (v *Visitor) VisitIdentifier(id *ast.Ident) {
 	alloc, found := v.irSymbolTable[id.Name]
 	if !found {
-		panic("")
+		panic(fmt.Sprintf("memory allocation for name '%s' not found", id.Name))
 	}
 
 	id.IRValue = alloc
