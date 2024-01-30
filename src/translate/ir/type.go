@@ -90,14 +90,22 @@ func (Void) String() string { return "void" }
 // ---------------------
 type FunctionType struct {
 	varArgs bool
-	retType Type
+	retTy   Type
 	args    []Argument
+}
+
+func CreateFunctionType(args []Argument, retTy Type, varArgs bool) *FunctionType {
+	return &FunctionType{
+		varArgs,
+		retTy,
+		args,
+	}
 }
 
 func (f FunctionType) IsVarArg() bool      { return f.varArgs }
 func (f FunctionType) NumArgs() int        { return len(f.args) }
 func (f FunctionType) ArgType(i uint) Type { return f.args[i].Type() }
-func (f FunctionType) ReturnType() Type    { return f.retType }
+func (f FunctionType) ReturnType() Type    { return f.retTy }
 func (f FunctionType) String() string      { panic("implement me") }
 func (FunctionType) ty()                   {}
 
