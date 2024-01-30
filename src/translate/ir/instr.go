@@ -249,3 +249,45 @@ func (a AllocaInst) String() string {
 
 	return s
 }
+
+// ReturnInst ...
+// ---------------------
+type ReturnInst struct {
+	op    Opcode
+	ty    Type
+	value Value
+}
+
+func CreateRet(ty Type, value Value) *ReturnInst {
+	return &ReturnInst{
+		op:    Ret,
+		ty:    ty,
+		value: value,
+	}
+}
+
+func CreateRetVoid() *ReturnInst {
+	return &ReturnInst{
+		op: Ret,
+		ty: VoidType,
+	}
+}
+
+func (r ReturnInst) Type() Type       { return r.ty }
+func (r ReturnInst) Name() string     { return "" }
+func (r ReturnInst) SetName(s string) {}
+func (r ReturnInst) HasName() bool    { return false }
+func (r ReturnInst) String() string {
+	s := fmt.Sprintf("%s %s", r.op, r.ty)
+	if r.value != nil {
+		s += r.value.Name()
+	}
+
+	return s
+}
+
+func (r ReturnInst) Opcode() Opcode   { return r.op }
+func (r ReturnInst) IsTerm() bool     { return termop_begin < r.op && r.op < termop_end }
+func (r ReturnInst) IsBinaryOp() bool { return binop_begin < r.op && r.op < binop_end }
+func (r ReturnInst) IsMemOp() bool    { return memop_begin < r.op && r.op < memop_end }
+func (r ReturnInst) IsOtherOp() bool  { return other_op_begin < r.op && r.op < other_op_end }
