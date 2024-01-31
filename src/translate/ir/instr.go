@@ -56,25 +56,25 @@ func CreateCall(typ Type, fun string, args []Value, name string) *CallInstr {
 // CmpInstr ...
 // --------------------------
 type CmpInstr struct {
-	cond Opcode
-	x, y Value
-	ty   Type
-	name string
+	pred   Opcode
+	x, y   Value
+	evalTy Type
+	name   string
 }
 
-func (c CmpInstr) Type() Type          { return c.ty }
+func (c CmpInstr) Type() Type          { return c.evalTy }
 func (c CmpInstr) Name() string        { return c.name }
 func (c CmpInstr) SetName(name string) { c.name = name }
 func (c CmpInstr) HasName() bool       { return c.name != "" }
-func (c CmpInstr) IsTerm() bool        { return termop_begin < c.cond && c.cond < termop_end }
-func (c CmpInstr) IsBinaryOp() bool    { return binop_begin < c.cond && c.cond < binop_end }
-func (c CmpInstr) IsOtherOp() bool     { return other_op_begin < c.cond && c.cond < other_op_end }
-func (c CmpInstr) IsMemOp() bool       { return memop_begin < c.cond && c.cond < memop_end }
+func (c CmpInstr) IsTerm() bool        { return termop_begin < c.pred && c.pred < termop_end }
+func (c CmpInstr) IsBinaryOp() bool    { return binop_begin < c.pred && c.pred < binop_end }
+func (c CmpInstr) IsOtherOp() bool     { return other_op_begin < c.pred && c.pred < other_op_end }
+func (c CmpInstr) IsMemOp() bool       { return memop_begin < c.pred && c.pred < memop_end }
 
-func (c CmpInstr) Opcode() Opcode { return c.cond }
+func (c CmpInstr) Opcode() Opcode { return c.pred }
 
 func (c CmpInstr) String() string {
-	return fmt.Sprintf("%s = cmp %s %s %s, %s", c.name, c.cond, c.ty, c.x.Name(), c.y.Name())
+	return fmt.Sprintf("%s = cmp %s %s %s, %s", c.name, c.pred, c.evalTy, c.x.Name(), c.y.Name())
 }
 
 func CreateCmp(ty Type, cond Opcode, x, y Value, name string) *CmpInstr {
