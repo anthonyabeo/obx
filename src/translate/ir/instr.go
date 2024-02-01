@@ -59,6 +59,7 @@ type ICmpInstr struct {
 	pred   Opcode
 	x, y   Value
 	evalTy Type
+	opdTy  Type
 	name   string
 }
 
@@ -74,7 +75,7 @@ func (c ICmpInstr) IsMemOp() bool       { return memop_begin < c.pred && c.pred 
 func (c ICmpInstr) Opcode() Opcode { return c.pred }
 
 func (c ICmpInstr) String() string {
-	return fmt.Sprintf("%s = icmp %s %s %s, %s", c.name, c.pred, c.evalTy, c.x.Name(), c.y.Name())
+	return fmt.Sprintf("%s = icmp %s %s %s, %s", c.name, c.pred, c.opdTy, c.x.Name(), c.y.Name())
 }
 
 func CreateICmp(ty Type, cond Opcode, x, y Value, name string) *ICmpInstr {
@@ -84,7 +85,7 @@ func CreateICmp(ty Type, cond Opcode, x, y Value, name string) *ICmpInstr {
 
 	name = "%" + name
 
-	return &ICmpInstr{cond, x, y, ty, name}
+	return &ICmpInstr{cond, x, y, Int1Type, ty, name}
 }
 
 // BinaryOp ...
