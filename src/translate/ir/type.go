@@ -12,6 +12,7 @@ type Type interface {
 var (
 	VoidType *Void
 
+	Int1Type  *Int1
 	Int8Type  *Int8
 	Int32Type *Int32
 )
@@ -19,6 +20,7 @@ var (
 func init() {
 	VoidType = &Void{}
 
+	Int1Type = &Int1{numBits: 1}
 	Int8Type = &Int8{numBits: 8}
 	Int32Type = &Int32{numBits: 32}
 }
@@ -37,6 +39,7 @@ type IntegerType interface {
 func CreateIntegerType(numBits uint) IntegerType {
 	switch numBits {
 	case 1:
+		return Int1Type
 	case 8:
 		return Int8Type
 	case 16:
@@ -48,6 +51,20 @@ func CreateIntegerType(numBits uint) IntegerType {
 
 	return nil
 }
+
+// Int1 ...
+// ----------------------
+type Int1 struct {
+	numBits uint
+}
+
+func (Int1) IsIntegerTy() bool { return true }
+func (Int1) IsPtrTy() bool     { return false }
+func (Int1) IsFuncTy() bool    { return false }
+func (Int1) IsVoidTy() bool    { return false }
+func (Int1) ty()               {}
+func (Int1) String() string    { return "i1" }
+func (i Int1) BitWidth() uint  { return i.numBits }
 
 // Int32 ...
 // ----------------------
