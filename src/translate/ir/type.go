@@ -3,6 +3,10 @@ package ir
 type Type interface {
 	String() string
 	ty()
+	IsIntegerTy() bool
+	IsPtrTy() bool
+	IsFuncTy() bool
+	IsVoidTy() bool
 }
 
 var (
@@ -51,9 +55,13 @@ type Int32 struct {
 	numBits uint
 }
 
-func (Int32) ty()              {}
-func (Int32) String() string   { return "i32" }
-func (i Int32) BitWidth() uint { return i.numBits }
+func (Int32) IsIntegerTy() bool { return true }
+func (Int32) IsPtrTy() bool     { return false }
+func (Int32) IsFuncTy() bool    { return false }
+func (Int32) IsVoidTy() bool    { return false }
+func (Int32) ty()               {}
+func (Int32) String() string    { return "i32" }
+func (i Int32) BitWidth() uint  { return i.numBits }
 
 // Int8 ...
 // ----------------------
@@ -61,19 +69,27 @@ type Int8 struct {
 	numBits uint
 }
 
-func (Int8) ty()              {}
-func (Int8) String() string   { return "i8" }
-func (i Int8) BitWidth() uint { return i.numBits }
+func (Int8) IsIntegerTy() bool { return true }
+func (Int8) IsPtrTy() bool     { return false }
+func (Int8) IsFuncTy() bool    { return false }
+func (Int8) IsVoidTy() bool    { return false }
+func (Int8) ty()               {}
+func (Int8) String() string    { return "i8" }
+func (i Int8) BitWidth() uint  { return i.numBits }
 
 // PointerType ...
 // --------------------
 type PointerType struct {
-	elemType Type
+	elemTy Type
 }
 
-func (PointerType) ty()              {}
-func (PointerType) String() string   { return "ptr" }
-func (p PointerType) ElemType() Type { return p.elemType }
+func (PointerType) IsIntegerTy() bool { return false }
+func (PointerType) IsPtrTy() bool     { return true }
+func (PointerType) IsFuncTy() bool    { return false }
+func (PointerType) IsVoidTy() bool    { return false }
+func (PointerType) ty()               {}
+func (PointerType) String() string    { return "ptr" }
+func (p PointerType) ElemType() Type  { return p.elemTy }
 
 func CreatePointerType(ty Type) *PointerType {
 	return &PointerType{ty}
@@ -83,8 +99,12 @@ func CreatePointerType(ty Type) *PointerType {
 // ---------------
 type Void struct{}
 
-func (Void) ty()            {}
-func (Void) String() string { return "void" }
+func (Void) IsIntegerTy() bool { return false }
+func (Void) IsPtrTy() bool     { return false }
+func (Void) IsFuncTy() bool    { return false }
+func (Void) IsVoidTy() bool    { return true }
+func (Void) ty()               {}
+func (Void) String() string    { return "void" }
 
 // FunctionType ...
 // ---------------------
@@ -108,6 +128,10 @@ func (f FunctionType) ArgType(i uint) Type { return f.args[i].Type() }
 func (f FunctionType) ReturnType() Type    { return f.retTy }
 func (f FunctionType) String() string      { panic("implement me") }
 func (FunctionType) ty()                   {}
+func (FunctionType) IsIntegerTy() bool     { return false }
+func (FunctionType) IsPtrTy() bool         { return false }
+func (FunctionType) IsFuncTy() bool        { return true }
+func (FunctionType) IsVoidTy() bool        { return false }
 
 // LabelType ...
 // ---------------------
@@ -115,5 +139,9 @@ type LabelType struct {
 	name string
 }
 
-func (l LabelType) String() string { return l.name }
-func (l LabelType) ty()            {}
+func (LabelType) IsIntegerTy() bool { return false }
+func (LabelType) IsPtrTy() bool     { return false }
+func (LabelType) IsFuncTy() bool    { return false }
+func (LabelType) IsVoidTy() bool    { return false }
+func (l LabelType) String() string  { return l.name }
+func (LabelType) ty()               {}
