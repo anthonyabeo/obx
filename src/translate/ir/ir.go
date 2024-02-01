@@ -18,11 +18,16 @@ var opcodes = [...]string{
 	Load:   "load",
 	Store:  "store",
 
-	Eq: "eq",
-	Lt: "lt",
-	Gt: "gt",
-	Le: "le",
-	Ge: "gte",
+	Eq:  "eq",
+	Ne:  "ne",
+	UGt: "ugt",
+	UGe: "uge",
+	ULt: "ult",
+	ULe: "ule",
+	SGt: "sgt",
+	SGe: "sge",
+	SLt: "slt",
+	SLe: "sle",
 
 	Br:  "br",
 	Ret: "ret",
@@ -50,10 +55,15 @@ const (
 	other_op_end
 
 	Eq
-	Lt
-	Gt
-	Le
-	Ge
+	Ne
+	UGt
+	UGe
+	ULt
+	ULe
+	SGt
+	SGe
+	SLt
+	SLe
 
 	termop_begin
 	Br
