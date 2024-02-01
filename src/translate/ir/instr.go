@@ -53,38 +53,38 @@ func CreateCall(typ Type, fun string, args []Value, name string) *CallInstr {
 	return &CallInstr{ty: typ, proc: fun, args: args, name: name}
 }
 
-// CmpInstr ...
+// ICmpInstr ...
 // --------------------------
-type CmpInstr struct {
+type ICmpInstr struct {
 	pred   Opcode
 	x, y   Value
 	evalTy Type
 	name   string
 }
 
-func (c CmpInstr) Type() Type          { return c.evalTy }
-func (c CmpInstr) Name() string        { return c.name }
-func (c CmpInstr) SetName(name string) { c.name = name }
-func (c CmpInstr) HasName() bool       { return c.name != "" }
-func (c CmpInstr) IsTerm() bool        { return termop_begin < c.pred && c.pred < termop_end }
-func (c CmpInstr) IsBinaryOp() bool    { return binop_begin < c.pred && c.pred < binop_end }
-func (c CmpInstr) IsOtherOp() bool     { return other_op_begin < c.pred && c.pred < other_op_end }
-func (c CmpInstr) IsMemOp() bool       { return memop_begin < c.pred && c.pred < memop_end }
+func (c ICmpInstr) Type() Type          { return c.evalTy }
+func (c ICmpInstr) Name() string        { return c.name }
+func (c ICmpInstr) SetName(name string) { c.name = name }
+func (c ICmpInstr) HasName() bool       { return c.name != "" }
+func (c ICmpInstr) IsTerm() bool        { return termop_begin < c.pred && c.pred < termop_end }
+func (c ICmpInstr) IsBinaryOp() bool    { return binop_begin < c.pred && c.pred < binop_end }
+func (c ICmpInstr) IsOtherOp() bool     { return other_op_begin < c.pred && c.pred < other_op_end }
+func (c ICmpInstr) IsMemOp() bool       { return memop_begin < c.pred && c.pred < memop_end }
 
-func (c CmpInstr) Opcode() Opcode { return c.pred }
+func (c ICmpInstr) Opcode() Opcode { return c.pred }
 
-func (c CmpInstr) String() string {
-	return fmt.Sprintf("%s = cmp %s %s %s, %s", c.name, c.pred, c.evalTy, c.x.Name(), c.y.Name())
+func (c ICmpInstr) String() string {
+	return fmt.Sprintf("%s = icmp %s %s %s, %s", c.name, c.pred, c.evalTy, c.x.Name(), c.y.Name())
 }
 
-func CreateCmp(ty Type, cond Opcode, x, y Value, name string) *CmpInstr {
+func CreateICmp(ty Type, cond Opcode, x, y Value, name string) *ICmpInstr {
 	if name == "" {
 		name = NextTemp()
 	}
 
 	name = "%" + name
 
-	return &CmpInstr{cond, x, y, ty, name}
+	return &ICmpInstr{cond, x, y, ty, name}
 }
 
 // BinaryOp ...
@@ -280,7 +280,7 @@ func (r ReturnInst) HasName() bool    { return false }
 func (r ReturnInst) String() string {
 	s := fmt.Sprintf("%s %s", r.op, r.ty)
 	if r.value != nil {
-		s += r.value.Name()
+		s += " " + r.value.Name()
 	}
 
 	return s
