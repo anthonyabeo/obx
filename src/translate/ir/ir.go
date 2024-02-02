@@ -18,6 +18,8 @@ var opcodes = [...]string{
 	Load:   "load",
 	Store:  "store",
 
+	Call: "call",
+
 	Eq:  "eq",
 	Ne:  "ne",
 	UGt: "ugt",
@@ -51,7 +53,7 @@ const (
 	memop_end
 
 	other_op_begin
-	call
+	Call
 	other_op_end
 
 	Eq
