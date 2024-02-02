@@ -8,24 +8,32 @@ import (
 type Instruction interface {
 	Value
 	Opcode() Opcode
+
 	IsTerm() bool
 	IsBinaryOp() bool
 	IsMemOp() bool
 	IsOtherOp() bool
+
+	// Module() *Module
+	// Parent() *BasicBlock
+	// Function() *Function
+	// InsertBefore(Instruction)
+	// InsertAfter(Instruction)
+
 	String() string
 }
 
 // CallInstr ...
 // --------------------
 type CallInstr struct {
-	op   Opcode
-	proc string
-	args []Value
-	ty   Type
-	name string
+	op     Opcode
+	callee Value
+	args   []Value
+	fty    *FunctionType
+	name   string
 }
 
-func (c CallInstr) Type() Type          { return c.ty }
+func (c CallInstr) Type() Type          { return c.fty }
 func (c CallInstr) Name() string        { return c.name }
 func (c CallInstr) SetName(name string) { c.name = name }
 func (c CallInstr) HasName() bool       { return c.name != "" }
@@ -41,16 +49,16 @@ func (c CallInstr) String() string {
 		args = append(args, fmt.Sprintf("%s %s", op.Type(), op.Name()))
 	}
 
-	return fmt.Sprintf("%s = call %s %s(%s)", c.name, c.ty, c.proc, strings.Join(args, ", "))
+	return fmt.Sprintf("%s = call %s %s(%s)", c.name, c.fty.retTy, c.callee.Name(), strings.Join(args, ", "))
 }
 
-func CreateCall(typ Type, fun string, args []Value, name string) *CallInstr {
+func CreateCall(fty *FunctionType, callee Value, args []Value, name string) *CallInstr {
 	if name == "" {
 		name = NextTemp()
 	}
 
 	name = "%" + name
-	return &CallInstr{ty: typ, proc: fun, args: args, name: name}
+	return &CallInstr{Call, callee, args, fty, name}
 }
 
 // ICmpInstr ...
@@ -139,7 +147,6 @@ func (l LoadInst) IsTerm() bool        { return termop_begin < l.op && l.op < te
 func (l LoadInst) IsBinaryOp() bool    { return binop_begin < l.op && l.op < binop_end }
 func (l LoadInst) IsOtherOp() bool     { return other_op_begin < l.op && l.op < other_op_end }
 func (l LoadInst) IsMemOp() bool       { return memop_begin < l.op && l.op < memop_end }
-
 func (l LoadInst) String() string {
 	var srcStr string
 
@@ -173,7 +180,6 @@ func (s StoreInst) IsTerm() bool     { return termop_begin < s.op && s.op < term
 func (s StoreInst) IsBinaryOp() bool { return binop_begin < s.op && s.op < binop_end }
 func (s StoreInst) IsOtherOp() bool  { return other_op_begin < s.op && s.op < other_op_end }
 func (s StoreInst) IsMemOp() bool    { return memop_begin < s.op && s.op < memop_end }
-
 func (s StoreInst) String() string {
 	var (
 		valueStr string
@@ -286,7 +292,6 @@ func (r ReturnInst) String() string {
 
 	return s
 }
-
 func (r ReturnInst) Opcode() Opcode   { return r.op }
 func (r ReturnInst) IsTerm() bool     { return termop_begin < r.op && r.op < termop_end }
 func (r ReturnInst) IsBinaryOp() bool { return binop_begin < r.op && r.op < binop_end }

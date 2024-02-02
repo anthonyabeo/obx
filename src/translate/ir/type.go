@@ -25,10 +25,6 @@ func init() {
 	Int32Type = &Int32{numBits: 32}
 }
 
-func GetVoidType() *Void   { return VoidType }
-func GetInt32Type() *Int32 { return Int32Type }
-func GetInt8Type() *Int8   { return Int8Type }
-
 // IntegerType ...
 // ----------------------
 type IntegerType interface {
@@ -128,10 +124,10 @@ func (Void) String() string    { return "void" }
 type FunctionType struct {
 	varArgs bool
 	retTy   Type
-	args    []Argument
+	args    []Type
 }
 
-func CreateFunctionType(args []Argument, retTy Type, varArgs bool) *FunctionType {
+func CreateFunctionType(args []Type, retTy Type, varArgs bool) *FunctionType {
 	return &FunctionType{
 		varArgs,
 		retTy,
@@ -141,7 +137,7 @@ func CreateFunctionType(args []Argument, retTy Type, varArgs bool) *FunctionType
 
 func (f FunctionType) IsVarArg() bool      { return f.varArgs }
 func (f FunctionType) NumArgs() int        { return len(f.args) }
-func (f FunctionType) ArgType(i uint) Type { return f.args[i].Type() }
+func (f FunctionType) ArgType(i uint) Type { return f.args[i] }
 func (f FunctionType) ReturnType() Type    { return f.retTy }
 func (f FunctionType) String() string      { panic("implement me") }
 func (FunctionType) ty()                   {}
