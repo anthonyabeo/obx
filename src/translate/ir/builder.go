@@ -134,3 +134,17 @@ func (b *Builder) CreateCmp(pred Opcode, lhs, rhs Value, name string) Value {
 
 	return icmp
 }
+
+func (b *Builder) CreateAlloca(ty Type, name string) *AllocaInst {
+	alloc := CreateAlloca(ty, 1, 0, name)
+	b.BB.instr.PushBack(alloc)
+
+	return alloc
+}
+
+func (b *Builder) CreateCall(fty *FunctionType, callee Value, args []Value, name string) *CallInstr {
+	call := CreateCall(fty, callee, args, name)
+	b.BB.instr.PushBack(call)
+
+	return call
+}
