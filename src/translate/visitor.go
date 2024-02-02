@@ -13,15 +13,22 @@ import (
 
 type Visitor struct {
 	tmp           int
-	Instr         []ir.Instruction
+	Instr         []ir.Value
 	irSymbolTable map[string]*ir.AllocaInst
+	builder       *ir.Builder
+	module        *ir.Module
 
 	ast *ast.Oberon
 	env *sema.Scope
 }
 
 func NewVisitor(ast *ast.Oberon, env *sema.Scope) *Visitor {
-	return &Visitor{ast: ast, env: env, irSymbolTable: make(map[string]*ir.AllocaInst)}
+	return &Visitor{
+		ast:           ast,
+		env:           env,
+		irSymbolTable: make(map[string]*ir.AllocaInst),
+		builder:       ir.NewBuilder(),
+	}
 }
 
 func (v *Visitor) nextTemp() string {
@@ -38,10 +45,10 @@ func (v *Visitor) getLLVMType(t types.Type) ir.Type {
 	case *types.Basic:
 		switch t.Kind() {
 		case types.Int8:
-			ty = ir.GetInt8Type()
+			ty = ir.Int8Type
 		case types.Int16:
 		case types.Int32:
-			ty = ir.GetInt32Type()
+			ty = ir.Int32Type
 		case types.Int64:
 		}
 	default:
@@ -52,8 +59,18 @@ func (v *Visitor) getLLVMType(t types.Type) ir.Type {
 }
 
 func (v *Visitor) VisitModule(name string) {
-	module := v.ast.Program[name]
+	Main := ir.CreateFunction(
+		ir.CreateFunctionType([]ir.Type{}, ir.Int32Type, true),
+		ir.Internal,
+		"main",
+	)
 
+	EntryBB := ir.CreateBasicBlock("entry", Main)
+	Main.AddNewBlock("entry", EntryBB, []string{}, []string{})
+
+	v.builder.SetInsertPoint(EntryBB)
+
+	module := v.ast.Program[name]
 	for _, decl := range module.DeclSeq {
 		decl.Accept(v)
 	}
@@ -61,6 +78,9 @@ func (v *Visitor) VisitModule(name string) {
 	for _, stmt := range module.StmtSeq {
 		stmt.Accept(v)
 	}
+
+	ret := v.builder.CreateRet(ir.NewConstantInt(ir.Int32Type, 0, true, ""))
+	v.Instr = append(v.Instr, ret)
 }
 
 func (v *Visitor) VisitIdentifier(id *ast.Ident) {
@@ -76,13 +96,13 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 	expr.Left.Accept(v)
 	expr.Right.Accept(v)
 
-	var instr ir.Instruction
+	var instr ir.Value
 
 	switch expr.Op {
 	case token.PLUS:
-		instr = ir.CreateAdd(v.getLLVMType(expr.EType), expr.Left.Value(), expr.Right.Value(), "")
+		instr = v.builder.CreateAdd(expr.Left.Value(), expr.Right.Value(), "")
 	case token.EQUAL:
-		instr = ir.CreateCmp(expr.Left.Value().Type(), ir.Eq, expr.Left.Value(), expr.Right.Value(), "")
+		instr = v.builder.CreateCmp(ir.Eq, expr.Left.Value(), expr.Right.Value(), "")
 	}
 
 	expr.IRValue = instr
@@ -119,6 +139,7 @@ func (v *Visitor) VisitBasicLit(lit *ast.BasicLit) {
 
 	switch lit.Kind {
 	case token.INT:
+		numBits = 32
 	case token.INT8, token.BYTE:
 		numBits = 8
 	case token.INT16:
@@ -131,9 +152,9 @@ func (v *Visitor) VisitBasicLit(lit *ast.BasicLit) {
 
 	val, err := strconv.ParseUint(lit.Val, 10, 64)
 	if err != nil {
-		// TODO handle this error
+		panic(fmt.Sprintf("[internal] unable to parse %s", lit.Val))
 	}
-	lit.IRValue = ir.NewConstantInt(ir.CreateIntegerType(numBits), numBits, val, false, "")
+	lit.IRValue = ir.NewConstantInt(ir.CreateIntegerType(numBits), val, false, "")
 }
 
 func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
@@ -154,14 +175,25 @@ func (v *Visitor) VisitReturnStmt(stmt *ast.ReturnStmt) {
 }
 
 func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
-	var args []ir.Value
+	var (
+		args  []ir.Value
+		fArgs []ir.Type
+	)
+
 	for _, arg := range call.ActualParams {
 		arg.Accept(v)
 		args = append(args, arg.Value())
 
+		fArgs = append(fArgs, arg.Value().Type())
 	}
 
-	v.Instr = append(v.Instr, ir.CreateCall(ir.GetVoidType(), call.Dsg.String(), args, ""))
+	Call := v.builder.CreateCall(
+		ir.CreateFunctionType(fArgs, ir.VoidType, false),
+		v.module.GetFunction(call.Dsg.String()), args,
+		call.Dsg.String(),
+	)
+
+	v.Instr = append(v.Instr, Call)
 }
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
@@ -210,11 +242,10 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 }
 
 func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
-
 	for _, dcl := range decl.IdentList {
 		obj := v.env.Lookup(dcl.Name)
 
-		alloc := ir.CreateAlloca(v.getLLVMType(decl.Type.Type()), 1, 4, obj.Name())
+		alloc := v.builder.CreateAlloca(v.getLLVMType(decl.Type.Type()), obj.Name())
 		v.irSymbolTable[dcl.Name] = alloc
 		v.Instr = append(v.Instr, alloc)
 	}
