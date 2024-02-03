@@ -148,3 +148,10 @@ func (b *Builder) CreateCall(fty *FunctionType, callee Value, args []Value, name
 
 	return call
 }
+
+func (b *Builder) CreateStore(Val, Dst Value) *StoreInst {
+	store := CreateStore(Val, Dst)
+	b.BB.instr.PushBack(store)
+
+	return store
+}
