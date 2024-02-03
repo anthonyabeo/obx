@@ -12,8 +12,8 @@ import (
 )
 
 type Visitor struct {
-	tmp           int
-	Instr         []ir.Value
+	tmp int
+
 	irSymbolTable map[string]*ir.AllocaInst
 	builder       *ir.Builder
 	module        *ir.Module
@@ -58,11 +58,14 @@ func (v *Visitor) getLLVMType(t types.Type) ir.Type {
 	return ty
 }
 
-func (v *Visitor) VisitModule(name string) {
+func (v *Visitor) VisitModule(name string) *ir.Module {
+	v.module = ir.NewModule(name)
+
 	Main := ir.CreateFunction(
 		ir.CreateFunctionType([]ir.Type{}, ir.Int32Type, true),
 		ir.Internal,
 		"main",
+		v.module,
 	)
 
 	EntryBB := ir.CreateBasicBlock("entry", Main)
@@ -79,8 +82,9 @@ func (v *Visitor) VisitModule(name string) {
 		stmt.Accept(v)
 	}
 
-	ret := v.builder.CreateRet(ir.NewConstantInt(ir.Int32Type, 0, true, ""))
-	v.Instr = append(v.Instr, ret)
+	v.builder.CreateRet(ir.NewConstantInt(ir.Int32Type, 0, true, ""))
+
+	return v.module
 }
 
 func (v *Visitor) VisitIdentifier(id *ast.Ident) {
@@ -106,7 +110,6 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 	}
 
 	expr.IRValue = instr
-	v.Instr = append(v.Instr, instr)
 }
 
 func (v *Visitor) VisitDesignator(d *ast.Designator) {
@@ -166,7 +169,7 @@ func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 	stmt.LValue.Accept(v)
 	stmt.RValue.Accept(v)
 
-	v.Instr = append(v.Instr, ir.CreateStore(stmt.RValue.Value(), stmt.LValue.Value()))
+	v.builder.CreateStore(stmt.RValue.Value(), stmt.LValue.Value())
 }
 
 func (v *Visitor) VisitReturnStmt(stmt *ast.ReturnStmt) {
@@ -187,13 +190,11 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 		fArgs = append(fArgs, arg.Value().Type())
 	}
 
-	Call := v.builder.CreateCall(
+	v.builder.CreateCall(
 		ir.CreateFunctionType(fArgs, ir.VoidType, false),
 		v.module.GetFunction(call.Dsg.String()), args,
 		call.Dsg.String(),
 	)
-
-	v.Instr = append(v.Instr, Call)
 }
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
@@ -247,7 +248,6 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 
 		alloc := v.builder.CreateAlloca(v.getLLVMType(decl.Type.Type()), obj.Name())
 		v.irSymbolTable[dcl.Name] = alloc
-		v.Instr = append(v.Instr, alloc)
 	}
 }
 

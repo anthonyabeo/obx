@@ -36,17 +36,25 @@ end Main
 	sema_vst := &sema.Visitor{}
 	sema_vst.InitSemaVisitor(ob, scp)
 	sema_vst.VisitModule("Main")
-	//if len(sema.errors) > 0 {
-	//	t.Error("found semantic errors")
-	//	for _, err := range sema.errors {
-	//		t.Log(err.Error())
-	//	}
-	//}
 
 	cgen := NewVisitor(ob, scp)
-	cgen.VisitModule("Main")
+	module := cgen.VisitModule("Main")
 
-	for _, instr := range cgen.Instr {
-		fmt.Println(instr)
+	Main := module.GetFunction("main")
+	blks := Main.Blocks()
+	for name, BB := range blks {
+		fmt.Print(fmt.Sprintf("%s:\n\t", name))
+		l := BB.Instr()
+		for inst := l.Front(); inst != nil; {
+			if inst.Next() != nil {
+				fmt.Print(fmt.Sprintf("%s\n\t", inst.Value))
+			} else {
+				fmt.Print(fmt.Sprintf("%s\n", inst.Value))
+			}
+
+			inst = inst.Next()
+		}
 	}
+
+	fmt.Println("foo")
 }
