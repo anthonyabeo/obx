@@ -62,9 +62,9 @@ func TestLexingNumbers(t *testing.T) {
 		kind token.Token
 		lit  string
 	}{
-		{token.INT16, "1234"},
-		{token.BYTE, "0dh"},
-		{token.BYTE, "0DH"},
+		{token.INT, "1234"},
+		{token.INT, "0dh"},
+		{token.INT, "0DH"},
 		{token.REAL, "12.3"},
 		{token.LONGREAL, "4.567e8"},
 		{token.LONGREAL, "4.567E8"},
@@ -234,13 +234,13 @@ end Main
 		{token.LPAREN, "("},
 		{token.IDENT, "n"},
 		{token.EQUAL, "="},
-		{token.BYTE, "0"},
+		{token.INT, "0"},
 		{token.RPAREN, ")"},
 		{token.OR, "or"},
 		{token.LPAREN, "("},
 		{token.IDENT, "n"},
 		{token.EQUAL, "="},
-		{token.BYTE, "1"},
+		{token.INT, "1"},
 		{token.RPAREN, ")"},
 		{token.THEN, "then"},
 
@@ -255,7 +255,7 @@ end Main
 		{token.LPAREN, "("},
 		{token.IDENT, "n"},
 		{token.MINUS, "-"},
-		{token.BYTE, "1"},
+		{token.INT, "1"},
 		{token.RPAREN, ")"},
 
 		{token.IDENT, "b"},
@@ -264,7 +264,7 @@ end Main
 		{token.LPAREN, "("},
 		{token.IDENT, "n"},
 		{token.MINUS, "-"},
-		{token.BYTE, "2"},
+		{token.INT, "2"},
 		{token.RPAREN, ")"},
 
 		{token.RETURN, "return"},
@@ -281,14 +281,14 @@ end Main
 		{token.BECOMES, ":="},
 		{token.IDENT, "fib"},
 		{token.LPAREN, "("},
-		{token.BYTE, "21"},
+		{token.INT, "21"},
 		{token.RPAREN, ")"},
 
 		{token.IDENT, "assert"},
 		{token.LPAREN, "("},
 		{token.IDENT, "res"},
 		{token.EQUAL, "="},
-		{token.INT16, "10946"},
+		{token.INT, "10946"},
 		{token.RPAREN, ")"},
 
 		{token.END, "end"},

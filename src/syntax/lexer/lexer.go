@@ -183,7 +183,7 @@ func (lex *Lexer) number() (tok token.Token, lit string) {
 	}
 
 	var (
-		i    int64
+		//i    int64
 		err  error
 		base = 10
 	)
@@ -194,7 +194,7 @@ func (lex *Lexer) number() (tok token.Token, lit string) {
 	}
 
 	lit = string(lex.src[pos:lex.offset])
-	i, err = strconv.ParseInt(lit, base, 64)
+	_, err = strconv.ParseInt(lit, base, 64)
 	if err != nil {
 		return token.ILLEGAL, lit
 	}
@@ -204,18 +204,19 @@ func (lex *Lexer) number() (tok token.Token, lit string) {
 		lit = string(lex.src[pos:lex.offset])
 	}
 
-	switch {
-	case 0 <= i && i <= 255:
-		tok = token.BYTE
-	case -128 <= i && i <= 127:
-		tok = token.INT8
-	case -32768 <= i && i <= 32767:
-		tok = token.INT16
-	case -2147483648 <= i && i <= 2147483647:
-		tok = token.INT32
-	case -9223372036854775808 <= i && i < 9223372036854775807:
-		tok = token.INT64
-	}
+	//switch {
+	//case 0 <= i && i <= 255:
+	//	tok = token.BYTE
+	//case -128 <= i && i <= 127:
+	//	tok = token.INT8
+	//case -32768 <= i && i <= 32767:
+	//	tok = token.INT16
+	//case -2147483648 <= i && i <= 2147483647:
+	//	tok = token.INT32
+	//case -9223372036854775808 <= i && i < 9223372036854775807:
+	//	tok = token.INT64
+	//}
+	tok = token.INT
 
 	return tok, lit
 }
