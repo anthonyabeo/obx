@@ -155,3 +155,10 @@ func (b *Builder) CreateStore(Val, Dst Value) *StoreInst {
 
 	return store
 }
+
+func (b *Builder) CreateLoad(ty Type, ptr Value, name string) *LoadInst {
+	load := CreateLoad(ty, ptr, name)
+	b.BB.instr.PushBack(load)
+
+	return load
+}
