@@ -56,8 +56,8 @@ func CreateCall(fty *FunctionType, callee Value, args []Value, name string) *Cal
 	if name == "" {
 		name = NextTemp()
 	}
-
 	name = "%" + name
+
 	return &CallInstr{Call, callee, args, fty, name}
 }
 
@@ -90,7 +90,6 @@ func CreateICmp(ty Type, cond Opcode, x, y Value, name string) *ICmpInstr {
 	if name == "" {
 		name = NextTemp()
 	}
-
 	name = "%" + name
 
 	return &ICmpInstr{cond, x, y, Int1Type, ty, name}
@@ -123,7 +122,6 @@ func CreateAdd(ty Type, left, right Value, name string) *BinaryOp {
 	if name == "" {
 		name = NextTemp()
 	}
-
 	name = "%" + name
 
 	return &BinaryOp{evalTy: ty, op: Add, left: left, right: right, name: name}
@@ -133,7 +131,7 @@ func CreateAdd(ty Type, left, right Value, name string) *BinaryOp {
 // ----------------
 type LoadInst struct {
 	op   Opcode
-	src  Value
+	ptr  Value
 	typ  Type
 	name string
 }
@@ -148,19 +146,17 @@ func (l LoadInst) IsBinaryOp() bool    { return binop_begin < l.op && l.op < bin
 func (l LoadInst) IsOtherOp() bool     { return other_op_begin < l.op && l.op < other_op_end }
 func (l LoadInst) IsMemOp() bool       { return memop_begin < l.op && l.op < memop_end }
 func (l LoadInst) String() string {
-	var srcStr string
-
-	if l.src.HasName() {
-		srcStr = fmt.Sprintf("%s %s", l.src.Type(), l.src.Name())
-	} else {
-		srcStr = fmt.Sprintf("%s %s", l.src.Type(), "%"+NextTemp())
-	}
-
+	srcStr := fmt.Sprintf("%s %s", l.ptr.Type(), l.ptr.Name())
 	return fmt.Sprintf("%s = load %s, %s", l.name, l.typ, srcStr)
 }
 
 func CreateLoad(typ Type, src Value, name string) *LoadInst {
-	return &LoadInst{typ: typ, op: Load, src: src, name: name}
+	if name == "" {
+		name = NextTemp()
+	}
+	name = "%" + name
+
+	return &LoadInst{typ: typ, op: Load, ptr: src, name: name}
 }
 
 // StoreInst ...
@@ -181,24 +177,8 @@ func (s StoreInst) IsBinaryOp() bool { return binop_begin < s.op && s.op < binop
 func (s StoreInst) IsOtherOp() bool  { return other_op_begin < s.op && s.op < other_op_end }
 func (s StoreInst) IsMemOp() bool    { return memop_begin < s.op && s.op < memop_end }
 func (s StoreInst) String() string {
-	var (
-		valueStr string
-		dstStr   string
-	)
-
-	tmp := NextTemp()
-
-	if s.value.HasName() {
-		valueStr = fmt.Sprintf("%s %s", s.value.Type(), s.value.Name())
-	} else {
-		valueStr = fmt.Sprintf("%s %%%s", s.value.Type(), tmp)
-	}
-
-	if s.dst.HasName() {
-		dstStr = fmt.Sprintf("%s %s", s.dst.Type(), s.dst.Name())
-	} else {
-		dstStr = fmt.Sprintf("%s %%%s", s.dst.Type(), tmp)
-	}
+	valueStr := fmt.Sprintf("%s %s", s.value.Type(), s.value.Name())
+	dstStr := fmt.Sprintf("%s %s", s.dst.Type(), s.dst.Name())
 
 	return fmt.Sprintf("store %s, %s", valueStr, dstStr)
 }
@@ -223,6 +203,11 @@ type AllocaInst struct {
 }
 
 func CreateAlloca(ty Type, numElems int, align int, name string) *AllocaInst {
+	if name == "" {
+		name = NextTemp()
+	}
+	name = "%" + name
+
 	alloc := &AllocaInst{op: Alloca, allocTy: ty, numElem: 1, name: name, evalTy: CreatePointerType(ty)}
 	if numElems > 1 {
 		alloc.numElem = numElems
@@ -241,11 +226,11 @@ func (a AllocaInst) IsBinaryOp() bool    { return binop_begin < a.op && a.op < b
 func (a AllocaInst) IsMemOp() bool       { return memop_begin < a.op && a.op < memop_end }
 func (a AllocaInst) IsOtherOp() bool     { return other_op_begin < a.op && a.op < other_op_end }
 func (a AllocaInst) Type() Type          { return a.evalTy }
-func (a AllocaInst) Name() string        { return "%" + a.name }
+func (a AllocaInst) Name() string        { return a.name }
 func (a AllocaInst) SetName(name string) { a.name = name }
 func (a AllocaInst) HasName() bool       { return a.name != "" }
 func (a AllocaInst) String() string {
-	s := fmt.Sprintf("%%%s = alloca %s", a.name, a.allocTy)
+	s := fmt.Sprintf("%s = alloca %s", a.name, a.allocTy)
 	if a.numElem > 1 {
 		s += fmt.Sprintf(", i32 %d", a.numElem)
 	}
@@ -256,6 +241,7 @@ func (a AllocaInst) String() string {
 
 	return s
 }
+func (a AllocaInst) AllocatedTy() Type { return a.allocTy }
 
 // ReturnInst ...
 // ---------------------
