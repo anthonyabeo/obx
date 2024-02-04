@@ -101,9 +101,8 @@ type BasicBlock struct {
 	ty     *LabelType
 	parent *Function
 	instr  list.List
-
-	suc  []*BasicBlock
-	pred []*BasicBlock
+	succ   BasicBlockListType
+	pred   BasicBlockListType
 }
 
 func CreateBasicBlock(name string, parent *Function) *BasicBlock {
@@ -112,6 +111,8 @@ func CreateBasicBlock(name string, parent *Function) *BasicBlock {
 		ty:     &LabelType{name: name},
 		parent: parent,
 		instr:  list.List{},
+		succ:   BasicBlockListType{},
+		pred:   BasicBlockListType{},
 	}
 }
 
@@ -122,9 +123,14 @@ func (b BasicBlock) HasName() bool       { return b.name != "" }
 func (b BasicBlock) String() string      { panic("implement me") }
 func (b BasicBlock) Parent() *Function   { return b.parent }
 func (b BasicBlock) AddSuccessors(successors ...*BasicBlock) {
-	b.suc = append(b.suc, successors...)
+	for _, BB := range successors {
+		b.succ[BB.name] = BB
+	}
 }
 func (b BasicBlock) AddPredecessors(predecessors ...*BasicBlock) {
-	b.pred = append(b.pred, predecessors...)
+	for _, BB := range predecessors {
+		b.succ[BB.name] = BB
+	}
 }
+
 func (b BasicBlock) Instr() list.List { return b.instr }
