@@ -93,7 +93,7 @@ func (v *Visitor) VisitIdentifier(id *ast.Ident) {
 		panic(fmt.Sprintf("memory allocation for name '%s' not found", id.Name))
 	}
 
-	id.IRValue = alloc
+	id.IRValue = v.builder.CreateLoad(alloc.AllocatedTy(), alloc, "")
 }
 
 func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
@@ -166,7 +166,16 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 }
 
 func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
-	stmt.LValue.Accept(v)
+	lv := &LValueVisitor{Visitor{
+		tmp:           0,
+		irSymbolTable: v.irSymbolTable,
+		builder:       v.builder,
+		module:        v.module,
+		ast:           v.ast,
+		env:           v.env,
+	}}
+
+	stmt.LValue.Accept(lv)
 	stmt.RValue.Accept(v)
 
 	v.builder.CreateStore(stmt.RValue.Value(), stmt.LValue.Value())
