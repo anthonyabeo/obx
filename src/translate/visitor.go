@@ -12,9 +12,8 @@ import (
 )
 
 type Visitor struct {
-	irSymbolTable map[string]*ir.AllocaInst
-	builder       *ir.Builder
-	module        *ir.Module
+	builder *ir.Builder
+	module  *ir.Module
 
 	ast *ast.Oberon
 	env *sema.Scope
@@ -22,10 +21,9 @@ type Visitor struct {
 
 func NewVisitor(ast *ast.Oberon, env *sema.Scope) *Visitor {
 	return &Visitor{
-		ast:           ast,
-		env:           env,
-		irSymbolTable: make(map[string]*ir.AllocaInst),
-		builder:       ir.NewBuilder(),
+		ast:     ast,
+		env:     env,
+		builder: ir.NewBuilder(),
 	}
 }
 
@@ -79,8 +77,8 @@ func (v *Visitor) VisitModule(name string) *ir.Module {
 }
 
 func (v *Visitor) VisitIdentifier(id *ast.Ident) {
-	alloc, found := v.irSymbolTable[id.Name]
-	if !found {
+	alloc := v.env.Lookup(id.Name).Alloca()
+	if alloc == nil {
 		panic(fmt.Sprintf("stack allocation for name '%s' not found", id.Name))
 	}
 
@@ -158,11 +156,10 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 
 func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 	lv := &LValueVisitor{Visitor{
-		irSymbolTable: v.irSymbolTable,
-		builder:       v.builder,
-		module:        v.module,
-		ast:           v.ast,
-		env:           v.env,
+		builder: v.builder,
+		module:  v.module,
+		ast:     v.ast,
+		env:     v.env,
 	}}
 
 	stmt.LValue.Accept(lv)
@@ -246,7 +243,7 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 		obj := v.env.Lookup(dcl.Name)
 
 		alloc := v.builder.CreateAlloca(v.IRType(decl.Type.Type()), obj.Name())
-		v.irSymbolTable[dcl.Name] = alloc
+		obj.SetAlloca(alloc)
 	}
 }
 

@@ -2,6 +2,7 @@ package translate
 
 import (
 	"fmt"
+
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
@@ -11,8 +12,8 @@ type LValueVisitor struct {
 }
 
 func (l *LValueVisitor) VisitIdentifier(id *ast.Ident) {
-	alloc, found := l.irSymbolTable[id.Name]
-	if !found {
+	alloc := l.env.Lookup(id.Name).Alloca()
+	if alloc == nil {
 		panic(fmt.Sprintf("stack allocation for name '%s' not found", id.Name))
 	}
 
