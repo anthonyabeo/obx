@@ -36,4 +36,5 @@ type Type interface {
 	Node
 	Type() types.Type
 	Width() int
+	IRType() ir.Type
 }
