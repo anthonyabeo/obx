@@ -27,26 +27,6 @@ func NewVisitor(ast *ast.Oberon, env *sema.Scope) *Visitor {
 	}
 }
 
-func (v *Visitor) IRType(t types.Type) ir.Type {
-	var ty ir.Type
-
-	switch t := t.(type) {
-	case *types.Basic:
-		switch t.Kind() {
-		case types.Int8:
-			ty = ir.Int8Type
-		case types.Int16:
-		case types.Int32:
-			ty = ir.Int32Type
-		case types.Int64:
-		}
-	default:
-
-	}
-
-	return ty
-}
-
 func (v *Visitor) VisitModule(name string) *ir.Module {
 	v.module = ir.NewModule(name)
 
@@ -237,10 +217,12 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 }
 
 func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
+	decl.Type.Accept(v)
+
 	for _, dcl := range decl.IdentList {
 		obj := v.env.Lookup(dcl.Name)
 
-		alloc := v.builder.CreateAlloca(v.IRType(decl.Type.Type()), obj.Name())
+		alloc := v.builder.CreateAlloca(decl.Type.IRType(), obj.Name())
 		obj.SetAlloca(alloc)
 	}
 }
@@ -255,9 +237,24 @@ func (v *Visitor) VisitTypeDecl(decl *ast.TypeDecl) {
 	panic("implement me")
 }
 
-func (v *Visitor) VisitBasicType(basicType *ast.BasicType) {
-	//TODO implement me
-	panic("implement me")
+func (v *Visitor) VisitBasicType(t *ast.BasicType) {
+	var ty ir.Type
+
+	switch t := t.EType.(type) {
+	case *types.Basic:
+		switch t.Kind() {
+		case types.Int8:
+			ty = ir.Int8Type
+		case types.Int16:
+		case types.Int32:
+			ty = ir.Int32Type
+		case types.Int64:
+		}
+	default:
+
+	}
+
+	t.IRTy = ty
 }
 
 func (v *Visitor) VisitArrayType(arrayType *ast.ArrayType) {
