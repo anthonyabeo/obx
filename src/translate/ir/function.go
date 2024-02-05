@@ -2,7 +2,6 @@ package ir
 
 import (
 	"container/list"
-	"fmt"
 )
 
 type LinkageKind int
@@ -18,28 +17,9 @@ type BasicBlockListType map[string]*BasicBlock
 
 // AddNewBasicBlock adds a new BasicBlock and updates the successors
 // and predecessors accordingly to maintain the CFG.
-func (bb BasicBlockListType) AddNewBasicBlock(BBName string, BB *BasicBlock, Successors, Predecessors []string) {
-	for _, s := range Successors {
-		blk, found := bb[s]
-		if !found {
-			panic(fmt.Sprintf("[internal]: Basic Block named '%s' does not exist", s))
-		}
+func (bb BasicBlockListType) AddNewBasicBlock(BBName string, BB *BasicBlock) { bb[BBName] = BB }
 
-		BB.AddSuccessors(blk)
-	}
-
-	for _, pred := range Predecessors {
-		blk, found := bb[pred]
-		if !found {
-			panic(fmt.Sprintf("[internal]: Basic Block named '%s' does not exist", pred))
-		}
-
-		BB.AddPredecessors(blk)
-	}
-
-	bb[BBName] = BB
-}
-
+// Block returns a block using its name or nil if not such block exists
 func (bb BasicBlockListType) Block(name string) *BasicBlock { return bb[name] }
 
 // Function ...
@@ -57,17 +37,14 @@ func CreateFunction(ty *FunctionType, link LinkageKind, name string, module *Mod
 	return F
 }
 
-func (f Function) Type() Type               { return f.ty }
-func (f Function) Name() string             { return f.name }
-func (f Function) SetName(name string)      { f.name = name }
-func (f Function) HasName() bool            { return f.name != "" }
-func (f Function) String() string           { panic("implement me") }
-func (f Function) HasInternalLinkage() bool { return f.link == Internal }
-func (f Function) HasExternalLinkage() bool { return f.link == External }
-func (f Function) EntryBlock() *BasicBlock  { return f.blocks.Block("entry") }
-func (f Function) AddNewBlock(name string, BB *BasicBlock, Successors, Predecessors []string) {
-	f.blocks.AddNewBasicBlock(name, BB, Successors, Predecessors)
-}
+func (f Function) Type() Type                 { return f.ty }
+func (f Function) Name() string               { return f.name }
+func (f Function) SetName(name string)        { f.name = name }
+func (f Function) HasName() bool              { return f.name != "" }
+func (f Function) String() string             { panic("implement me") }
+func (f Function) HasInternalLinkage() bool   { return f.link == Internal }
+func (f Function) HasExternalLinkage() bool   { return f.link == External }
+func (f Function) EntryBlock() *BasicBlock    { return f.blocks.Block("entry") }
 func (f Function) Blocks() BasicBlockListType { return f.blocks }
 func (f Function) SymbolTable()               {}
 
@@ -106,7 +83,7 @@ type BasicBlock struct {
 }
 
 func CreateBasicBlock(name string, parent *Function) *BasicBlock {
-	return &BasicBlock{
+	blk := &BasicBlock{
 		name:   name,
 		ty:     &LabelType{name: name},
 		parent: parent,
@@ -114,6 +91,10 @@ func CreateBasicBlock(name string, parent *Function) *BasicBlock {
 		succ:   BasicBlockListType{},
 		pred:   BasicBlockListType{},
 	}
+
+	parent.blocks.AddNewBasicBlock(name, blk)
+
+	return blk
 }
 
 func (b BasicBlock) Type() Type          { return b.ty }

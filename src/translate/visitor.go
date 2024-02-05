@@ -58,8 +58,6 @@ func (v *Visitor) VisitModule(name string) *ir.Module {
 	)
 
 	EntryBB := ir.CreateBasicBlock("entry", Main)
-	Main.AddNewBlock("entry", EntryBB, []string{}, []string{})
-
 	v.builder.SetInsertPoint(EntryBB)
 
 	module := v.ast.Program[name]
