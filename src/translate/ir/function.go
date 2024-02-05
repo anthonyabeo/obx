@@ -132,5 +132,4 @@ func (b BasicBlock) AddPredecessors(predecessors ...*BasicBlock) {
 		b.succ[BB.name] = BB
 	}
 }
-
 func (b BasicBlock) Instr() list.List { return b.instr }

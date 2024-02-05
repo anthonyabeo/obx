@@ -12,8 +12,6 @@ import (
 )
 
 type Visitor struct {
-	tmp int
-
 	irSymbolTable map[string]*ir.AllocaInst
 	builder       *ir.Builder
 	module        *ir.Module
@@ -31,14 +29,7 @@ func NewVisitor(ast *ast.Oberon, env *sema.Scope) *Visitor {
 	}
 }
 
-func (v *Visitor) nextTemp() string {
-	tmp := strconv.Itoa(v.tmp)
-	v.tmp += 1
-
-	return tmp
-}
-
-func (v *Visitor) getLLVMType(t types.Type) ir.Type {
+func (v *Visitor) IRType(t types.Type) ir.Type {
 	var ty ir.Type
 
 	switch t := t.(type) {
@@ -90,7 +81,7 @@ func (v *Visitor) VisitModule(name string) *ir.Module {
 func (v *Visitor) VisitIdentifier(id *ast.Ident) {
 	alloc, found := v.irSymbolTable[id.Name]
 	if !found {
-		panic(fmt.Sprintf("memory allocation for name '%s' not found", id.Name))
+		panic(fmt.Sprintf("stack allocation for name '%s' not found", id.Name))
 	}
 
 	id.IRValue = v.builder.CreateLoad(alloc.AllocatedTy(), alloc, "")
@@ -167,7 +158,6 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 
 func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 	lv := &LValueVisitor{Visitor{
-		tmp:           0,
 		irSymbolTable: v.irSymbolTable,
 		builder:       v.builder,
 		module:        v.module,
@@ -255,7 +245,7 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 	for _, dcl := range decl.IdentList {
 		obj := v.env.Lookup(dcl.Name)
 
-		alloc := v.builder.CreateAlloca(v.getLLVMType(decl.Type.Type()), obj.Name())
+		alloc := v.builder.CreateAlloca(v.IRType(decl.Type.Type()), obj.Name())
 		v.irSymbolTable[dcl.Name] = alloc
 	}
 }

@@ -13,7 +13,7 @@ type LValueVisitor struct {
 func (l *LValueVisitor) VisitIdentifier(id *ast.Ident) {
 	alloc, found := l.irSymbolTable[id.Name]
 	if !found {
-		panic(fmt.Sprintf("memory allocation for name '%s' not found", id.Name))
+		panic(fmt.Sprintf("stack allocation for name '%s' not found", id.Name))
 	}
 
 	id.IRValue = alloc

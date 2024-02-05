@@ -42,7 +42,6 @@ func (c CallInstr) IsBinaryOp() bool    { return binop_end < c.op && c.op < bino
 func (c CallInstr) IsOtherOp() bool     { return other_op_begin < c.op && c.op < other_op_end }
 func (c CallInstr) IsMemOp() bool       { return memop_begin < c.op && c.op < memop_end }
 func (c CallInstr) Opcode() Opcode      { return c.op }
-
 func (c CallInstr) String() string {
 	var args []string
 	for _, op := range c.args {
@@ -79,9 +78,7 @@ func (c ICmpInstr) IsTerm() bool        { return termop_begin < c.pred && c.pred
 func (c ICmpInstr) IsBinaryOp() bool    { return binop_begin < c.pred && c.pred < binop_end }
 func (c ICmpInstr) IsOtherOp() bool     { return other_op_begin < c.pred && c.pred < other_op_end }
 func (c ICmpInstr) IsMemOp() bool       { return memop_begin < c.pred && c.pred < memop_end }
-
-func (c ICmpInstr) Opcode() Opcode { return c.pred }
-
+func (c ICmpInstr) Opcode() Opcode      { return c.pred }
 func (c ICmpInstr) String() string {
 	return fmt.Sprintf("%s = icmp %s %s %s, %s", c.name, c.pred, c.opdTy, c.x.Name(), c.y.Name())
 }
