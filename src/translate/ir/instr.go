@@ -292,7 +292,7 @@ type BranchInst struct {
 	numSucc int
 }
 
-func CreateBranchInst(cond Value, ifTrue, ifFalse *BasicBlock) *BranchInst {
+func CreateCondBrInst(cond Value, ifTrue, ifFalse *BasicBlock) *BranchInst {
 	return &BranchInst{
 		Br,
 		cond,
