@@ -31,7 +31,7 @@ func (v *Visitor) VisitModule(name string) *ir.Module {
 	v.module = ir.NewModule(name)
 
 	Main := ir.CreateFunction(
-		ir.CreateFunctionType([]ir.Type{}, ir.Int32Type, true),
+		ir.CreateFunctionType([]ir.Type{}, ir.Int32Type, false),
 		ir.Internal,
 		"main",
 		v.module,
@@ -74,6 +74,8 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 		instr = v.builder.CreateAdd(expr.Left.Value(), expr.Right.Value(), "")
 	case token.EQUAL:
 		instr = v.builder.CreateCmp(ir.Eq, expr.Left.Value(), expr.Right.Value(), "")
+	case token.LESS:
+		instr = v.builder.CreateCmp(ir.ULe, expr.Left.Value(), expr.Right.Value(), "")
 	}
 
 	expr.IRValue = instr
@@ -177,8 +179,27 @@ func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
 }
 
 func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
-	//TODO implement me
-	panic("implement me")
+	stmt.BoolExpr.Accept(v)
+
+	Function := v.builder.InsertPoint().Parent()
+	BodyBB := ir.CreateBasicBlock("while_body", Function)
+	ContBB := ir.CreateBasicBlock("cont", Function)
+
+	v.builder.CreateCondBr(stmt.BoolExpr.Value(), BodyBB, ContBB)
+
+	v.builder.SetInsertPoint(BodyBB)
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
+
+	// TODO generate IR for the Else-If part
+
+	stmt.BoolExpr.Accept(v)
+
+	BodyBB = v.builder.InsertPoint()
+	v.builder.CreateCondBr(stmt.BoolExpr.Value(), BodyBB, ContBB)
+
+	v.builder.SetInsertPoint(ContBB)
 }
 
 func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
