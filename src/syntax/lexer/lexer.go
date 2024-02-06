@@ -86,8 +86,24 @@ func (lex *Lexer) Lex() (tok token.Token, lit string, pos *token.Position) {
 			tok = token.PLUS
 			lit = "+"
 		case '>':
+			if lex.ch == '=' {
+				lex.next()
+				return token.GEQ, ">=", pos
+			}
+
 			tok = token.GREAT
 			lit = ">"
+		case '<':
+			if lex.ch == '=' {
+				lex.next()
+				return token.LEQ, "<=", pos
+			}
+
+			tok = token.LESS
+			lit = "<"
+		case '#':
+			tok = token.NEQ
+			lit = "#"
 		case '[':
 			tok = token.LBRACK
 			lit = "["
