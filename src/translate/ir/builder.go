@@ -162,3 +162,10 @@ func (b *Builder) CreateLoad(ty Type, ptr Value, name string) *LoadInst {
 
 	return load
 }
+
+func (b *Builder) CreateCondBr(cond Value, ifTrue, ifFalse *BasicBlock) *BranchInst {
+	br := CreateBranchInst(cond, ifTrue, ifFalse)
+	b.BB.instr.PushBack(br)
+
+	return br
+}

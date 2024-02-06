@@ -280,3 +280,59 @@ func (r ReturnInst) IsTerm() bool     { return termop_begin < r.op && r.op < ter
 func (r ReturnInst) IsBinaryOp() bool { return binop_begin < r.op && r.op < binop_end }
 func (r ReturnInst) IsMemOp() bool    { return memop_begin < r.op && r.op < memop_end }
 func (r ReturnInst) IsOtherOp() bool  { return other_op_begin < r.op && r.op < other_op_end }
+
+// BranchInst ...
+// ---------------------
+type BranchInst struct {
+	op      Opcode
+	cond    Value
+	ifTrue  *BasicBlock
+	ifFalse *BasicBlock
+
+	numSucc int
+}
+
+func CreateBranchInst(cond Value, ifTrue, ifFalse *BasicBlock) *BranchInst {
+	return &BranchInst{
+		Br,
+		cond,
+		ifTrue,
+		ifFalse,
+		2,
+	}
+}
+
+func CreateBr(dst *BasicBlock) *BranchInst {
+	return &BranchInst{
+		Br,
+		nil,
+		dst,
+		nil,
+		1,
+	}
+}
+
+func (b BranchInst) Type() Type               { return nil }
+func (b BranchInst) Name() string             { return "" }
+func (b BranchInst) SetName(string)           {}
+func (b BranchInst) HasName() bool            { return false }
+func (b BranchInst) Opcode() Opcode           { return b.op }
+func (b BranchInst) IsTerm() bool             { return termop_begin < b.op && b.op < termop_end }
+func (b BranchInst) IsBinaryOp() bool         { return binop_begin < b.op && b.op < binop_end }
+func (b BranchInst) IsMemOp() bool            { return memop_begin < b.op && b.op < memop_end }
+func (b BranchInst) IsOtherOp() bool          { return other_op_begin < b.op && b.op < other_op_end }
+func (b BranchInst) NumSuccessors() int       { return b.numSucc }
+func (b BranchInst) IsConditional() bool      { return b.cond != nil }
+func (b BranchInst) SetSuccessor(*BasicBlock) {}
+func (b BranchInst) SetCond(cond Value)       { b.cond = cond }
+func (b BranchInst) Cond() Value              { return b.cond }
+func (b BranchInst) String() string {
+	var s string
+	if b.IsConditional() {
+		s = fmt.Sprintf("br %s %s, label %s, label %s", b.cond.Type(), b.cond.Name(), b.ifTrue.name, b.ifFalse.name)
+	} else {
+		s = fmt.Sprintf("br label %s", b.ifTrue.name)
+	}
+
+	return s
+}
