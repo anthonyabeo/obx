@@ -83,6 +83,11 @@ type BasicBlock struct {
 }
 
 func CreateBasicBlock(name string, parent *Function) *BasicBlock {
+	if name == "" {
+		name = NextTemp()
+	}
+	name = "%" + name
+
 	blk := &BasicBlock{
 		name:   name,
 		ty:     &LabelType{name: name},
