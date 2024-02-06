@@ -508,7 +508,7 @@ func (p *Parser) relation() bool {
 		p.tok == token.GEQ ||
 		p.tok == token.IN ||
 		p.tok == token.IS ||
-		p.tok == token.HASH
+		p.tok == token.NEQ
 }
 
 // term = factor {MulOperator factor}

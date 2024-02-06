@@ -100,7 +100,6 @@ const (
 	AND
 	QUOT
 	NOT
-	HASH
 	RANGE
 
 	LPAREN
