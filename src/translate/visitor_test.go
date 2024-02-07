@@ -41,22 +41,7 @@ end Main
 	module := cgen.VisitModule("Main")
 
 	Main := module.GetFunction("main")
-	blks := Main.Blocks()
-	for name, BB := range blks {
-		fmt.Print(fmt.Sprintf("%s:\n\t", name))
-		l := BB.Instr()
-		for inst := l.Front(); inst != nil; {
-			if inst.Next() != nil {
-				fmt.Print(fmt.Sprintf("%s\n\t", inst.Value))
-			} else {
-				fmt.Print(fmt.Sprintf("%s\n\n", inst.Value))
-			}
-
-			inst = inst.Next()
-		}
-	}
-
-	fmt.Println("foo")
+	fmt.Println(Main)
 }
 
 func TestIRCodegenBasicWhileLoop(t *testing.T) {
@@ -96,21 +81,5 @@ end Main
 	module := cgen.VisitModule("Main")
 
 	Main := module.GetFunction("main")
-
-	blks := Main.Blocks()
-	for name, BB := range blks {
-		fmt.Print(fmt.Sprintf("%s:\n\t", name))
-		l := BB.Instr()
-		for inst := l.Front(); inst != nil; {
-			if inst.Next() != nil {
-				fmt.Print(fmt.Sprintf("%s\n\t", inst.Value))
-			} else {
-				fmt.Print(fmt.Sprintf("%s\n\n", inst.Value))
-			}
-
-			inst = inst.Next()
-		}
-	}
-
-	fmt.Println("foo")
+	fmt.Println(Main)
 }
