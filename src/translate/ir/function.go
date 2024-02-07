@@ -1,7 +1,9 @@
 package ir
 
 import (
+	"bytes"
 	"container/list"
+	"fmt"
 )
 
 type LinkageKind int
@@ -37,11 +39,22 @@ func CreateFunction(ty *FunctionType, link LinkageKind, name string, module *Mod
 	return F
 }
 
-func (f Function) Type() Type                 { return f.ty }
-func (f Function) Name() string               { return f.name }
-func (f Function) SetName(name string)        { f.name = name }
-func (f Function) HasName() bool              { return f.name != "" }
-func (f Function) String() string             { panic("implement me") }
+func (f Function) Type() Type          { return f.ty }
+func (f Function) Name() string        { return f.name }
+func (f Function) SetName(name string) { f.name = name }
+func (f Function) HasName() bool       { return f.name != "" }
+func (f Function) String() string {
+	buf := &bytes.Buffer{}
+
+	buf.WriteString(fmt.Sprintf("define %s @%s() {\n", f.ty.retTy, f.name))
+
+	entry := f.EntryBlock()
+	bfs(entry, buf)
+
+	buf.WriteString("}")
+
+	return buf.String()
+}
 func (f Function) HasInternalLinkage() bool   { return f.link == Internal }
 func (f Function) HasExternalLinkage() bool   { return f.link == External }
 func (f Function) EntryBlock() *BasicBlock    { return f.blocks.Block("entry") }
@@ -85,8 +98,8 @@ type BasicBlock struct {
 func CreateBasicBlock(name string, parent *Function) *BasicBlock {
 	if name == "" {
 		name = NextTemp()
+		name = "%" + name
 	}
-	name = "%" + name
 
 	blk := &BasicBlock{
 		name:   name,
@@ -106,8 +119,23 @@ func (b BasicBlock) Type() Type          { return b.ty }
 func (b BasicBlock) Name() string        { return b.name }
 func (b BasicBlock) SetName(name string) { b.name = name }
 func (b BasicBlock) HasName() bool       { return b.name != "" }
-func (b BasicBlock) String() string      { panic("implement me") }
-func (b BasicBlock) Parent() *Function   { return b.parent }
+func (b BasicBlock) String() string {
+	s := fmt.Sprintf("%s:\n\t", b.name)
+
+	l := b.instr
+	for inst := l.Front(); inst != nil; {
+		if inst.Next() != nil {
+			s += fmt.Sprintf("%s\n\t", inst.Value)
+		} else {
+			s += fmt.Sprintf("%s\n\n", inst.Value)
+		}
+
+		inst = inst.Next()
+	}
+
+	return s
+}
+func (b BasicBlock) Parent() *Function { return b.parent }
 func (b BasicBlock) AddSuccessors(successors ...*BasicBlock) {
 	for _, BB := range successors {
 		b.succ[BB.name] = BB
