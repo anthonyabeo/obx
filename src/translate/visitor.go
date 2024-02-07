@@ -181,9 +181,9 @@ func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
 func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 	stmt.BoolExpr.Accept(v)
 
-	Function := v.builder.InsertPoint().Parent()
-	BodyBB := ir.CreateBasicBlock("while_body", Function)
-	ContBB := ir.CreateBasicBlock("cont", Function)
+	BB := v.builder.InsertPoint()
+	BodyBB := ir.CreateBasicBlock("while.body", BB.Parent())
+	ContBB := ir.CreateBasicBlock("cont", BB.Parent())
 
 	v.builder.CreateCondBr(stmt.BoolExpr.Value(), BodyBB, ContBB)
 
@@ -200,6 +200,14 @@ func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 	v.builder.CreateCondBr(stmt.BoolExpr.Value(), BodyBB, ContBB)
 
 	v.builder.SetInsertPoint(ContBB)
+
+	// Update CFG Edges
+	BodyBB.AddPredecessors(BB, BodyBB)
+	BodyBB.AddSuccessors(ContBB, BodyBB)
+
+	ContBB.AddPredecessors(BB, BodyBB)
+
+	BB.AddSuccessors(BodyBB, ContBB)
 }
 
 func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
