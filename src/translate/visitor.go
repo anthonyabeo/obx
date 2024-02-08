@@ -207,35 +207,47 @@ func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
 }
 
 func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
-	stmt.BoolExpr.Accept(v)
-
 	BB := v.builder.InsertPoint()
-	BodyBB := ir.CreateBasicBlock("while.body", BB.Parent())
+
+	Loop := ir.CreateBasicBlock("loop", BB.Parent())
+	IfThen := ir.CreateBasicBlock("if.then", BB.Parent())
+	IfElse := ir.CreateBasicBlock("if.else", BB.Parent())
 	ContBB := ir.CreateBasicBlock("cont", BB.Parent())
 
-	v.builder.CreateCondBr(stmt.BoolExpr.Value(), BodyBB, ContBB)
+	v.builder.SetInsertPoint(Loop)
+	stmt.BoolExpr.Accept(v)
+	v.builder.CreateCondBr(stmt.BoolExpr.Value(), IfThen, IfElse)
 
-	v.builder.SetInsertPoint(BodyBB)
+	// generate code for the 'True' path. The process may change
+	// the insert basic block. so we should set it back to IfThen
+	// before creating the unconditional branch instruction
+	v.builder.SetInsertPoint(IfThen)
 	for _, s := range stmt.StmtSeq {
 		s.Accept(v)
 	}
+	v.builder.SetInsertPoint(IfThen)
+	v.builder.CreateBr(Loop)
 
-	// TODO generate IR for the Else-If part
-
-	stmt.BoolExpr.Accept(v)
-
-	BodyBB = v.builder.InsertPoint()
-	v.builder.CreateCondBr(stmt.BoolExpr.Value(), BodyBB, ContBB)
+	// 'Else' branch
+	v.builder.SetInsertPoint(IfElse)
+	v.builder.CreateBr(ContBB)
 
 	v.builder.SetInsertPoint(ContBB)
+	// TODO generate IR for the Else-If part
 
 	// Update CFG Edges
-	BodyBB.AddPredecessors(BB, BodyBB)
-	BodyBB.AddSuccessors(ContBB, BodyBB)
+	Loop.AddPredecessors(BB, Loop)
+	Loop.AddSuccessors(IfThen, IfElse)
 
-	ContBB.AddPredecessors(BB, BodyBB)
+	IfThen.AddPredecessors(Loop)
+	IfThen.AddSuccessors(Loop)
 
-	BB.AddSuccessors(BodyBB, ContBB)
+	IfElse.AddPredecessors(Loop)
+	IfElse.AddSuccessors(ContBB)
+
+	ContBB.AddPredecessors(IfElse)
+
+	BB.AddSuccessors(Loop)
 }
 
 func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
