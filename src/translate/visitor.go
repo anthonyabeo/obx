@@ -76,6 +76,8 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 		instr = v.builder.CreateCmp(ir.Eq, expr.Left.Value(), expr.Right.Value(), "")
 	case token.LESS:
 		instr = v.builder.CreateCmp(ir.ULe, expr.Left.Value(), expr.Right.Value(), "")
+	case token.GEQ:
+		instr = v.builder.CreateCmp(ir.UGe, expr.Left.Value(), expr.Right.Value(), "")
 	}
 
 	expr.IRValue = instr
@@ -174,8 +176,34 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 }
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
-	//TODO implement me
-	panic("implement me")
+	BB := v.builder.InsertPoint()
+	BodyBB := ir.CreateBasicBlock("repeat.body", BB.Parent())
+	ContBB := ir.CreateBasicBlock("cont", BB.Parent())
+
+	// jump into and start executing the loop body
+	v.builder.CreateBr(BodyBB)
+
+	// generate code for the body under the 'repeat.body' label
+	v.builder.SetInsertPoint(BodyBB)
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
+
+	v.builder.SetInsertPoint(BodyBB)
+
+	// generate conditional branch to regulate loop
+	stmt.BoolExpr.Accept(v)
+	v.builder.CreateCondBr(stmt.BoolExpr.Value(), BodyBB, ContBB)
+
+	v.builder.SetInsertPoint(ContBB)
+
+	// Update CFG Edges
+	BodyBB.AddPredecessors(BB, BodyBB)
+	BodyBB.AddSuccessors(ContBB, BodyBB)
+
+	ContBB.AddPredecessors(BodyBB)
+
+	BB.AddSuccessors(BodyBB)
 }
 
 func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
