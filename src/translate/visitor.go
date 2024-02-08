@@ -78,6 +78,10 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 		instr = v.builder.CreateCmp(ir.ULe, expr.Left.Value(), expr.Right.Value(), "")
 	case token.GEQ:
 		instr = v.builder.CreateCmp(ir.UGe, expr.Left.Value(), expr.Right.Value(), "")
+	case token.GREAT:
+		instr = v.builder.CreateCmp(ir.UGt, expr.Left.Value(), expr.Right.Value(), "")
+	case token.NEQ:
+		instr = v.builder.CreateCmp(ir.Ne, expr.Left.Value(), expr.Right.Value(), "")
 	}
 
 	expr.IRValue = instr
@@ -214,6 +218,8 @@ func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 	IfElse := ir.CreateBasicBlock("if.else", BB.Parent())
 	ContBB := ir.CreateBasicBlock("cont", BB.Parent())
 
+	v.builder.CreateBr(Loop)
+
 	v.builder.SetInsertPoint(Loop)
 	stmt.BoolExpr.Accept(v)
 	v.builder.CreateCondBr(stmt.BoolExpr.Value(), IfThen, IfElse)
@@ -228,26 +234,61 @@ func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 	v.builder.SetInsertPoint(IfThen)
 	v.builder.CreateBr(Loop)
 
-	// 'Else' branch
-	v.builder.SetInsertPoint(IfElse)
-	v.builder.CreateBr(ContBB)
-
-	v.builder.SetInsertPoint(ContBB)
-	// TODO generate IR for the Else-If part
-
 	// Update CFG Edges
-	Loop.AddPredecessors(BB, Loop)
+	BB.AddSuccessors(Loop)
+
+	Loop.AddPredecessors(BB, IfThen)
 	Loop.AddSuccessors(IfThen, IfElse)
 
 	IfThen.AddPredecessors(Loop)
 	IfThen.AddSuccessors(Loop)
 
 	IfElse.AddPredecessors(Loop)
-	IfElse.AddSuccessors(ContBB)
 
+	if len(stmt.ElsIfs) > 0 {
+		v.builder.SetInsertPoint(IfElse)
+		for i, elif := range stmt.ElsIfs {
+			ElifThen := ir.CreateBasicBlock(fmt.Sprintf("elif.then.%d", i), BB.Parent())
+			ElifElse := ir.CreateBasicBlock(fmt.Sprintf("elif.else.%d", i), BB.Parent())
+
+			elif.BoolExpr.Accept(v)
+			v.builder.CreateCondBr(elif.BoolExpr.Value(), ElifThen, ElifElse)
+
+			v.builder.SetInsertPoint(ElifThen)
+			for _, s := range elif.ThenPath {
+				s.Accept(v)
+			}
+			v.builder.SetInsertPoint(ElifThen)
+			v.builder.CreateBr(Loop)
+
+			if i == len(stmt.ElsIfs)-1 {
+				v.builder.SetInsertPoint(ElifElse)
+				v.builder.CreateBr(ContBB)
+			}
+
+			// Update CFG Edges
+			ElifThen.AddPredecessors(IfElse)
+			ElifThen.AddSuccessors(Loop)
+
+			ElifElse.AddPredecessors(IfElse)
+
+			IfElse.AddSuccessors(ElifThen)
+			IfElse.AddSuccessors(ElifElse)
+
+			Loop.AddPredecessors(ElifThen)
+
+			IfElse = ElifElse
+			v.builder.SetInsertPoint(IfElse)
+		}
+	} else {
+		v.builder.SetInsertPoint(IfElse)
+		v.builder.CreateBr(ContBB)
+	}
+
+	IfElse.AddSuccessors(ContBB)
 	ContBB.AddPredecessors(IfElse)
 
-	BB.AddSuccessors(Loop)
+	v.builder.SetInsertPoint(ContBB)
 }
 
 func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
