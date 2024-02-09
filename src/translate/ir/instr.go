@@ -322,16 +322,17 @@ func (b BranchInst) IsBinaryOp() bool         { return binop_begin < b.op && b.o
 func (b BranchInst) IsMemOp() bool            { return memop_begin < b.op && b.op < memop_end }
 func (b BranchInst) IsOtherOp() bool          { return other_op_begin < b.op && b.op < other_op_end }
 func (b BranchInst) NumSuccessors() int       { return b.numSucc }
-func (b BranchInst) IsConditional() bool      { return b.cond != nil }
+func (b BranchInst) IsConditional() bool      { return b.cond != nil && b.numSucc == 2 }
 func (b BranchInst) SetSuccessor(*BasicBlock) {}
 func (b BranchInst) SetCond(cond Value)       { b.cond = cond }
 func (b BranchInst) Cond() Value              { return b.cond }
 func (b BranchInst) String() string {
 	var s string
+
 	if b.IsConditional() {
-		s = fmt.Sprintf("br %s %s, label %s, label %s", b.cond.Type(), b.cond.Name(), b.ifTrue.name, b.ifFalse.name)
+		s = fmt.Sprintf("br %s %s, label %%%s, label %%%s", b.cond.Type(), b.cond.Name(), b.ifTrue.name, b.ifFalse.name)
 	} else {
-		s = fmt.Sprintf("br label %s", b.ifTrue.name)
+		s = fmt.Sprintf("br label %%%s", b.ifTrue.name)
 	}
 
 	return s

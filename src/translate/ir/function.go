@@ -98,7 +98,6 @@ type BasicBlock struct {
 func CreateBasicBlock(name string, parent *Function) *BasicBlock {
 	if name == "" {
 		name = NextTemp()
-		name = "%" + name
 	}
 
 	blk := &BasicBlock{
@@ -120,7 +119,7 @@ func (b BasicBlock) Name() string        { return b.name }
 func (b BasicBlock) SetName(name string) { b.name = name }
 func (b BasicBlock) HasName() bool       { return b.name != "" }
 func (b BasicBlock) String() string {
-	s := fmt.Sprintf("%s:\n\t", b.name)
+	s := fmt.Sprintf("%%%s:\n\t", b.name)
 
 	l := b.instr
 	for inst := l.Front(); inst != nil; {
