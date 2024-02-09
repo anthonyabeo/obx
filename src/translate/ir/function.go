@@ -47,19 +47,20 @@ func (f Function) String() string {
 	buf := &bytes.Buffer{}
 
 	buf.WriteString(fmt.Sprintf("define %s @%s() {\n", f.ty.retTy, f.name))
-
-	entry := f.EntryBlock()
-	bfs(entry, buf)
-
+	for _, bb := range f.Blocks() {
+		buf.WriteString(bb.String())
+	}
 	buf.WriteString("}")
 
 	return buf.String()
 }
-func (f Function) HasInternalLinkage() bool   { return f.link == Internal }
-func (f Function) HasExternalLinkage() bool   { return f.link == External }
-func (f Function) EntryBlock() *BasicBlock    { return f.blocks.Block("entry") }
-func (f Function) Blocks() BasicBlockListType { return f.blocks }
-func (f Function) SymbolTable()               {}
+func (f Function) HasInternalLinkage() bool { return f.link == Internal }
+func (f Function) HasExternalLinkage() bool { return f.link == External }
+func (f Function) EntryBlock() *BasicBlock  { return f.blocks.Block("entry") }
+func (f Function) Blocks() []*BasicBlock {
+	return trvQueue(f.blocks.Block("entry"))
+}
+func (f Function) SymbolTable() {}
 
 // Argument ...
 // ---------------------
