@@ -292,7 +292,7 @@ func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 }
 
 func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
-	//TODO implement me
+	//TODO See VisitExitStmt for an idea
 	panic("implement me")
 }
 
@@ -307,8 +307,14 @@ func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
 }
 
 func (v *Visitor) VisitExitStmt(stmt *ast.ExitStmt) {
-	//TODO implement me
-	panic("implement me")
+	// TODO Possible Implementation
+	// --------------------------------
+	// Assumption: Each Statement can be decorated with the BasicBlock
+	// of the innermost loop it belongs to, if any.
+	//
+	// Therefore, the ast.ExitStmt can get the parent function of this
+	// basic block and find the 'cont' BasicBlock. Then create a branch
+	// instruction to this 'cont' block.
 }
 
 func (v *Visitor) VisitWithStmt(stmt *ast.WithStmt) {
