@@ -176,3 +176,10 @@ func (b *Builder) CreateBr(dst *BasicBlock) *BranchInst {
 
 	return br
 }
+
+func (b *Builder) CreatePHI(ty Type, numIncomingValues uint, name string) *PHINode {
+	phi := CreatePHINode(ty, numIncomingValues, name)
+	b.BB.instr.PushBack(phi)
+
+	return phi
+}
