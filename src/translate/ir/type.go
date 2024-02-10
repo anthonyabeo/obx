@@ -13,8 +13,10 @@ var (
 	VoidType *Void
 
 	Int1Type  *Int1
+	Int16Type *Int16
 	Int8Type  *Int8
 	Int32Type *Int32
+	Int64Type *Int64
 )
 
 func init() {
@@ -22,7 +24,9 @@ func init() {
 
 	Int1Type = &Int1{numBits: 1}
 	Int8Type = &Int8{numBits: 8}
+	Int16Type = &Int16{numBits: 16}
 	Int32Type = &Int32{numBits: 32}
+	Int64Type = &Int64{numBits: 64}
 }
 
 // IntegerType ...
@@ -39,9 +43,11 @@ func CreateIntegerType(numBits uint) IntegerType {
 	case 8:
 		return Int8Type
 	case 16:
+		return Int16Type
 	case 32:
 		return Int32Type
 	case 64:
+		return Int64Type
 
 	}
 
@@ -89,6 +95,34 @@ func (Int8) IsVoidTy() bool    { return false }
 func (Int8) ty()               {}
 func (Int8) String() string    { return "i8" }
 func (i Int8) BitWidth() uint  { return i.numBits }
+
+// Int64 ...
+// ----------------------
+type Int64 struct {
+	numBits uint
+}
+
+func (Int64) IsIntegerTy() bool { return true }
+func (Int64) IsPtrTy() bool     { return false }
+func (Int64) IsFuncTy() bool    { return false }
+func (Int64) IsVoidTy() bool    { return false }
+func (Int64) ty()               {}
+func (Int64) String() string    { return "i64" }
+func (i Int64) BitWidth() uint  { return i.numBits }
+
+// Int16 ...
+// ----------------------
+type Int16 struct {
+	numBits uint
+}
+
+func (Int16) IsIntegerTy() bool { return true }
+func (Int16) IsPtrTy() bool     { return false }
+func (Int16) IsFuncTy() bool    { return false }
+func (Int16) IsVoidTy() bool    { return false }
+func (Int16) ty()               {}
+func (Int16) String() string    { return "i16" }
+func (i Int16) BitWidth() uint  { return i.numBits }
 
 // PointerType ...
 // --------------------
