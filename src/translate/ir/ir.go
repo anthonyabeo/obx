@@ -54,6 +54,7 @@ const (
 
 	other_op_begin
 	Call
+	Phi
 	other_op_end
 
 	Eq
