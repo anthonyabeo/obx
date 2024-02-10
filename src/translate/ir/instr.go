@@ -337,3 +337,49 @@ func (b BranchInst) String() string {
 
 	return s
 }
+
+// PHINode ...
+// ---------------------
+type PHINode struct {
+	op               Opcode
+	ty               Type
+	name             string
+	incoming         []PHINodeIncoming
+	numIncomingPaths uint
+}
+
+func CreatePHINode(ty Type, numIncomingPaths uint, name string) *PHINode {
+	if name == "" {
+		name = NextTemp()
+	}
+	name = "%" + name
+
+	return &PHINode{
+		op:               Phi,
+		ty:               ty,
+		name:             name,
+		numIncomingPaths: numIncomingPaths,
+	}
+}
+
+func (phi PHINode) Type() Type          { return phi.ty }
+func (phi PHINode) Name() string        { return phi.name }
+func (phi PHINode) SetName(name string) { phi.name = name }
+func (phi PHINode) HasName() bool       { return phi.name != "" }
+func (phi PHINode) String() string {
+	//TODO implement me
+	panic("implement me")
+}
+func (phi PHINode) Opcode() Opcode   { return phi.op }
+func (phi PHINode) IsTerm() bool     { return termop_begin < phi.op && phi.op < termop_end }
+func (phi PHINode) IsBinaryOp() bool { return binop_begin < phi.op && phi.op < binop_end }
+func (phi PHINode) IsMemOp() bool    { return memop_begin < phi.op && phi.op < memop_end }
+func (phi PHINode) IsOtherOp() bool  { return other_op_begin < phi.op && phi.op < other_op_end }
+func (phi PHINode) AddIncoming(v Value, blk *BasicBlock) {
+	phi.incoming = append(phi.incoming, PHINodeIncoming{v, blk})
+}
+
+type PHINodeIncoming struct {
+	V   Value
+	Blk *BasicBlock
+}
