@@ -136,8 +136,46 @@ func (v *Visitor) VisitBasicLit(lit *ast.BasicLit) {
 }
 
 func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
-	//TODO implement me
-	panic("implement me")
+	var ElseBB *ir.BasicBlock
+
+	stmt.BoolExpr.Accept(v)
+
+	BB := v.builder.InsertPoint()
+
+	ThenBB := ir.CreateBasicBlock("if.then", BB.Parent())
+	ContBB := ir.CreateBasicBlock("cont", BB.Parent())
+	if len(stmt.ElsePath) > 0 {
+		ElseBB = ir.CreateBasicBlock("if.else", BB.Parent())
+		v.builder.CreateCondBr(stmt.BoolExpr.Value(), ThenBB, ElseBB)
+	} else {
+		v.builder.CreateCondBr(stmt.BoolExpr.Value(), ThenBB, ContBB)
+	}
+
+	// emit code for the 'True' path
+	v.builder.SetInsertPoint(ThenBB)
+	for _, s := range stmt.ThenPath {
+		s.Accept(v)
+	}
+	ThenBB = v.builder.InsertPoint()
+	v.builder.CreateBr(ContBB)
+
+	// emit code for the 'False' path if it exists
+	if len(stmt.ElsePath) > 0 {
+		v.builder.SetInsertPoint(ElseBB)
+		for _, s := range stmt.ElsePath {
+			s.Accept(v)
+		}
+		ElseBB = v.builder.InsertPoint()
+		v.builder.CreateBr(ContBB)
+	}
+
+	// emit code for 'cont' block
+	v.builder.SetInsertPoint(ContBB)
+
+	// Update edges in CFG
+	ContBB.AddPredecessors(ThenBB, ElseBB)
+	ThenBB.AddSuccessors(ContBB)
+	ElseBB.AddSuccessors(ContBB)
 }
 
 func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
