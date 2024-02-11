@@ -362,24 +362,32 @@ func CreatePHINode(ty Type, numIncomingPaths uint, name string) *PHINode {
 	}
 }
 
-func (phi PHINode) Type() Type          { return phi.ty }
-func (phi PHINode) Name() string        { return phi.name }
-func (phi PHINode) SetName(name string) { phi.name = name }
-func (phi PHINode) HasName() bool       { return phi.name != "" }
-func (phi PHINode) String() string {
-	//TODO implement me
-	panic("implement me")
+func (phi *PHINode) Type() Type          { return phi.ty }
+func (phi *PHINode) Name() string        { return phi.name }
+func (phi *PHINode) SetName(name string) { phi.name = name }
+func (phi *PHINode) HasName() bool       { return phi.name != "" }
+func (phi *PHINode) String() string {
+	var incs []string
+	for _, inc := range phi.incoming {
+		incs = append(incs, inc.String())
+	}
+
+	return fmt.Sprintf("%s = phi %s %s", phi.name, phi.ty, strings.Join(incs, ", "))
 }
-func (phi PHINode) Opcode() Opcode   { return phi.op }
-func (phi PHINode) IsTerm() bool     { return termop_begin < phi.op && phi.op < termop_end }
-func (phi PHINode) IsBinaryOp() bool { return binop_begin < phi.op && phi.op < binop_end }
-func (phi PHINode) IsMemOp() bool    { return memop_begin < phi.op && phi.op < memop_end }
-func (phi PHINode) IsOtherOp() bool  { return other_op_begin < phi.op && phi.op < other_op_end }
-func (phi PHINode) AddIncoming(v Value, blk *BasicBlock) {
+func (phi *PHINode) Opcode() Opcode   { return phi.op }
+func (phi *PHINode) IsTerm() bool     { return termop_begin < phi.op && phi.op < termop_end }
+func (phi *PHINode) IsBinaryOp() bool { return binop_begin < phi.op && phi.op < binop_end }
+func (phi *PHINode) IsMemOp() bool    { return memop_begin < phi.op && phi.op < memop_end }
+func (phi *PHINode) IsOtherOp() bool  { return other_op_begin < phi.op && phi.op < other_op_end }
+func (phi *PHINode) AddIncoming(v Value, blk *BasicBlock) {
 	phi.incoming = append(phi.incoming, PHINodeIncoming{v, blk})
 }
 
 type PHINodeIncoming struct {
 	V   Value
 	Blk *BasicBlock
+}
+
+func (p PHINodeIncoming) String() string {
+	return fmt.Sprintf("[ %s, %%%s ]", p.V.Name(), p.Blk.name)
 }

@@ -98,5 +98,5 @@ type GlobalValue interface {
 	Constant
 	HasInternalLinkage() bool
 	HasExternalLinkage() bool
-	// Parent() *Module
+	Parent() *Module
 }

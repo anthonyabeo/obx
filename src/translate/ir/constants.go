@@ -20,8 +20,7 @@ type ConstantInt struct {
 	name   string
 }
 
-func (c ConstantInt) String() string { return fmt.Sprintf("%s %d", c.Type(), c.value) }
-
+func (c ConstantInt) String() string      { return fmt.Sprintf("%s %d", c.Type(), c.value) }
 func (c ConstantInt) Type() Type          { return c.ty }
 func (c ConstantInt) Name() string        { return c.name }
 func (c ConstantInt) SetName(name string) { c.name = name }
