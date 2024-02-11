@@ -10,8 +10,8 @@ func NewBuilder() *Builder {
 	return &Builder{}
 }
 
-// InsertPoint returns the current BasicBlock where instructions are inserted
-func (b *Builder) InsertPoint() *BasicBlock { return b.BB }
+// GetInsertBlock returns the current BasicBlock where instructions are inserted
+func (b *Builder) GetInsertBlock() *BasicBlock { return b.BB }
 
 // SetInsertPoint updates the current BasicBlock to BB
 func (b *Builder) SetInsertPoint(BB *BasicBlock) { b.BB = BB }

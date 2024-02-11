@@ -140,7 +140,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 
 	stmt.BoolExpr.Accept(v)
 
-	BB := v.builder.InsertPoint()
+	BB := v.builder.GetInsertBlock()
 
 	ThenBB := ir.CreateBasicBlock("if.then", BB.Parent())
 	ContBB := ir.CreateBasicBlock("cont", BB.Parent())
@@ -156,7 +156,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 	for _, s := range stmt.ThenPath {
 		s.Accept(v)
 	}
-	ThenBB = v.builder.InsertPoint()
+	ThenBB = v.builder.GetInsertBlock()
 	v.builder.CreateBr(ContBB)
 
 	// emit code for the 'False' path if it exists
@@ -165,7 +165,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 		for _, s := range stmt.ElsePath {
 			s.Accept(v)
 		}
-		ElseBB = v.builder.InsertPoint()
+		ElseBB = v.builder.GetInsertBlock()
 		v.builder.CreateBr(ContBB)
 	}
 
@@ -218,7 +218,7 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 }
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
-	BB := v.builder.InsertPoint()
+	BB := v.builder.GetInsertBlock()
 	BodyBB := ir.CreateBasicBlock("repeat.body", BB.Parent())
 	ContBB := ir.CreateBasicBlock("cont", BB.Parent())
 
@@ -249,7 +249,7 @@ func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
 }
 
 func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
-	BB := v.builder.InsertPoint()
+	BB := v.builder.GetInsertBlock()
 
 	Loop := ir.CreateBasicBlock("loop", BB.Parent())
 	IfThen := ir.CreateBasicBlock("if.then", BB.Parent())
