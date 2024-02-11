@@ -167,12 +167,16 @@ func (b *Builder) CreateCondBr(cond Value, ifTrue, ifFalse *BasicBlock) *BranchI
 	br := CreateCondBrInst(cond, ifTrue, ifFalse)
 	b.BB.instr.PushBack(br)
 
+	b.BB.AddSuccessors(ifTrue, ifFalse)
+
 	return br
 }
 
 func (b *Builder) CreateBr(dst *BasicBlock) *BranchInst {
 	br := CreateBr(dst)
 	b.BB.instr.PushBack(br)
+
+	b.BB.AddSuccessors(dst)
 
 	return br
 }
