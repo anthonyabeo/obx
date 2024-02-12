@@ -484,6 +484,9 @@ func (p *Parser) parseSimpleExpression() (expr ast.Expression) {
 	}
 
 	expr = p.parseTerm()
+	if sign != token.ILLEGAL {
+		expr = &ast.UnaryExpr{OpPos: pos, Op: sign, X: expr}
+	}
 
 	for p.addOp() {
 		binExpr := &ast.BinaryExpr{OpPos: p.pos, Left: expr, Op: p.tok}
@@ -491,10 +494,6 @@ func (p *Parser) parseSimpleExpression() (expr ast.Expression) {
 
 		binExpr.Right = p.parseTerm()
 		expr = binExpr
-	}
-
-	if sign != token.ILLEGAL {
-		expr = &ast.UnaryExpr{OpPos: pos, Op: sign, X: expr}
 	}
 
 	return
