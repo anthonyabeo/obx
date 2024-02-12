@@ -136,7 +136,10 @@ func (v *Visitor) VisitBasicLit(lit *ast.BasicLit) {
 }
 
 func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
-	var ElseBB *ir.BasicBlock
+	var (
+		ElseBB  *ir.BasicBlock
+		ElsifBB *ir.BasicBlock
+	)
 
 	stmt.BoolExpr.Accept(v)
 
@@ -144,11 +147,32 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 
 	ThenBB := ir.CreateBasicBlock("if.then", BB.Parent())
 	ContBB := ir.CreateBasicBlock("cont", BB.Parent())
-	if len(stmt.ElsePath) > 0 {
+
+	// if-then only. No else or elsif paths
+	if len(stmt.ElsePath) == 0 && len(stmt.ElseIfBranches) == 0 {
+		v.builder.CreateCondBr(stmt.BoolExpr.Value(), ThenBB, ContBB)
+	}
+
+	// if-then-elif-else. elif and else paths exist.
+	// create basic blocks for both paths. set the false path of
+	// conditional branch to the elif basic-block
+	if len(stmt.ElsePath) > 0 && len(stmt.ElseIfBranches) > 0 {
+		ElseBB = ir.CreateBasicBlock("if.else", BB.Parent())
+		ElsifBB = ir.CreateBasicBlock("elsif", BB.Parent())
+
+		v.builder.CreateCondBr(stmt.BoolExpr.Value(), ThenBB, ElsifBB)
+	}
+
+	// no elsif path. but else path exist
+	if len(stmt.ElsePath) > 0 && len(stmt.ElseIfBranches) == 0 {
 		ElseBB = ir.CreateBasicBlock("if.else", BB.Parent())
 		v.builder.CreateCondBr(stmt.BoolExpr.Value(), ThenBB, ElseBB)
-	} else {
-		v.builder.CreateCondBr(stmt.BoolExpr.Value(), ThenBB, ContBB)
+	}
+
+	// at least one elsif path, but no else path
+	if len(stmt.ElseIfBranches) > 0 && len(stmt.ElsePath) == 0 {
+		ElsifBB = ir.CreateBasicBlock("elsif", BB.Parent())
+		v.builder.CreateCondBr(stmt.BoolExpr.Value(), ThenBB, ElsifBB)
 	}
 
 	// emit code for the 'True' path
@@ -159,6 +183,45 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 	ThenBB = v.builder.GetInsertBlock()
 	v.builder.CreateBr(ContBB)
 
+	// emit code for the 'elsif' branches
+	if len(stmt.ElseIfBranches) > 0 {
+		v.builder.SetInsertPoint(ElsifBB)
+
+		for i, elif := range stmt.ElseIfBranches {
+			ElifThen := ir.CreateBasicBlock(fmt.Sprintf("elif.then.%d", i), BB.Parent())
+			ElifElse := ir.CreateBasicBlock(fmt.Sprintf("elif.else.%d", i), BB.Parent())
+
+			elif.BoolExpr.Accept(v)
+			v.builder.CreateCondBr(elif.BoolExpr.Value(), ElifThen, ElifElse)
+
+			// emit code for the ith, elif branch
+			// unconditionally branch to 'cont' BasicBlock
+			v.builder.SetInsertPoint(ElifThen)
+			for _, s := range elif.ThenPath {
+				s.Accept(v)
+			}
+			ElifThen = v.builder.GetInsertBlock()
+			v.builder.CreateBr(ContBB)
+
+			ElsifBB = ElifElse
+			v.builder.SetInsertPoint(ElsifBB)
+
+			// we've reached the last elif-branch and there is no else-branch
+			if (i == len(stmt.ElseIfBranches)-1) && len(stmt.ElsePath) == 0 {
+				v.builder.CreateBr(ContBB)
+
+				ContBB.AddPredecessors(ElifElse)
+			}
+
+			// we've reached the last elif-branch and there exists an else-branch
+			if (i == len(stmt.ElseIfBranches)-1) && len(stmt.ElsePath) > 0 {
+				v.builder.CreateBr(ElseBB)
+
+				ElseBB.AddPredecessors(ElifElse)
+			}
+		}
+	}
+
 	// emit code for the 'False' path if it exists
 	if len(stmt.ElsePath) > 0 {
 		v.builder.SetInsertPoint(ElseBB)
@@ -167,15 +230,16 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 		}
 		ElseBB = v.builder.GetInsertBlock()
 		v.builder.CreateBr(ContBB)
+
+		// Update edges in CFG
+		ContBB.AddPredecessors(ThenBB, ElseBB)
+		ElseBB.AddSuccessors(ContBB)
 	}
 
-	// emit code for 'cont' block
 	v.builder.SetInsertPoint(ContBB)
 
 	// Update edges in CFG
-	ContBB.AddPredecessors(ThenBB, ElseBB)
 	ThenBB.AddSuccessors(ContBB)
-	ElseBB.AddSuccessors(ContBB)
 }
 
 func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
