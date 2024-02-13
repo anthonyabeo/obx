@@ -69,6 +69,59 @@ func (b *Builder) CreateAdd(lhs, rhs Value, name string) Value {
 	return add
 }
 
+func (b *Builder) CreateSub(lhs, rhs Value, name string) Value {
+	var (
+		ResTy Type
+		LHSTy Type = lhs.Type()
+		RHSTy Type = rhs.Type()
+	)
+
+	// lhs != integer-type && lhs != pointer-type && lhs != vector<integer-type>
+	if !LHSTy.IsIntegerTy() && !LHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
+		msg := fmt.Sprintf("[internal] expected operand '%s' to be an integer or pointer type. Got '%s'", lhs, LHSTy)
+		panic(msg)
+	}
+
+	// rhs != integer-type && rhs != pointer-type && rhs != vector<integer-type>
+	if !RHSTy.IsIntegerTy() && !RHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
+		msg := fmt.Sprintf("[internal] expected operand '%s' to be an integer or pointer type. Got '%s'", rhs, RHSTy)
+		panic(msg)
+	}
+
+	if (LHSTy.IsPtrTy() && RHSTy.IsPtrTy()) || (LHSTy.IsIntegerTy() && RHSTy.IsIntegerTy()) {
+		if LHSTy.IsIntegerTy() {
+			ResTy = LHSTy
+		} else {
+			ResTy = LHSTy.(*PointerType).elemTy
+		}
+	} else {
+		if LHSTy.IsPtrTy() {
+			ptr, _ := LHSTy.(*PointerType)
+			if ptr.elemTy != RHSTy {
+				msg := fmt.Sprintf("[internal] cannot subtract operands of type '%s' and '%s'", ptr.elemTy, RHSTy)
+				panic(msg)
+			}
+
+			ResTy = RHSTy
+		}
+
+		if RHSTy.IsPtrTy() {
+			ptr, _ := RHSTy.(*PointerType)
+			if ptr.elemTy != LHSTy {
+				msg := fmt.Sprintf("[internal] cannot subtract operands of type '%s' and '%s'", ptr.elemTy, LHSTy)
+				panic(msg)
+			}
+
+			ResTy = LHSTy
+		}
+	}
+
+	sub := CreateSub(ResTy, lhs, rhs, name)
+	b.BB.instr.PushBack(sub)
+
+	return sub
+}
+
 func (b *Builder) CreateRet(v Value) *ReturnInst {
 	ret := CreateRet(v.Type(), v)
 	b.BB.instr.PushBack(ret)
@@ -186,4 +239,11 @@ func (b *Builder) CreatePHI(ty Type, numIncomingValues uint, name string) *PHINo
 	b.BB.instr.PushBack(phi)
 
 	return phi
+}
+
+func (b *Builder) CreateNeg(v Value, name string) Value {
+	neg := b.CreateSub(GetNullValue(v.Type()), v, name)
+	b.BB.instr.PushBack(neg)
+
+	return neg
 }
