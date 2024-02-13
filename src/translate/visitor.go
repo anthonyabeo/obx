@@ -480,9 +480,9 @@ func (v *Visitor) VisitArrayType(arrayType *ast.ArrayType) {
 	panic("implement me")
 }
 
-func (v *Visitor) VisitPointerType(pointerType *ast.PointerType) {
-	//TODO implement me
-	panic("implement me")
+func (v *Visitor) VisitPointerType(ty *ast.PointerType) {
+	ty.Base.Accept(v)
+	ty.IRTy = ir.CreatePointerType(ty.Base.IRType())
 }
 
 func (v *Visitor) VisitProcType(procType *ast.ProcType) {
