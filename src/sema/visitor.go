@@ -75,6 +75,8 @@ func (v *Visitor) VisitBasicLit(b *ast.BasicLit) {
 	case token.REAL:
 	case token.STRING:
 	case token.HEXSTRING:
+	case token.TRUE, token.FALSE:
+		b.EType = Typ[types.Bool]
 	}
 }
 
