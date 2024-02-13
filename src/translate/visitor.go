@@ -98,8 +98,18 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 }
 
 func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
-	//TODO implement me
-	panic("implement me")
+	expr.X.Accept(v)
+
+	switch expr.Op {
+	case token.MINUS:
+		expr.IRValue = v.builder.CreateNeg(expr.X.Value(), "")
+	case token.NOT:
+		expr.IRValue = v.builder.CreateNot(expr.X.Value(), "")
+	case token.PLUS:
+		expr.IRValue = expr.X.Value()
+	default:
+		panic(fmt.Sprintf("[internal] invalid unary operator '%s'", expr.Op))
+	}
 }
 
 func (v *Visitor) VisitQualifiedIdent(ident *ast.QualifiedIdent) {
