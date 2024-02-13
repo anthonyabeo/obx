@@ -33,3 +33,12 @@ func NewConstantInt(ty Type, value uint64, signed bool, name string) *ConstantIn
 
 	return &ConstantInt{value, signed, ty, name}
 }
+
+func GetNullValue(ty Type) Value {
+	switch {
+	case ty.IsIntegerTy():
+		return NewConstantInt(ty, 0, false, "")
+	default:
+		panic(fmt.Sprintf("[internal] invalid IR type '%s'", ty))
+	}
+}
