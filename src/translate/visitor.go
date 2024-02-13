@@ -126,13 +126,15 @@ func (v *Visitor) VisitBasicLit(lit *ast.BasicLit) {
 		numBits = 32
 	case token.INT64:
 		numBits = 64
+	case token.TRUE, token.FALSE:
+		numBits = 1
 	}
 
 	val, err := strconv.ParseUint(lit.Val, 10, 64)
 	if err != nil {
 		panic(fmt.Sprintf("[internal] unable to parse %s", lit.Val))
 	}
-	lit.IRValue = ir.NewConstantInt(ir.CreateIntegerType(numBits), val, false, "")
+	lit.IRValue = ir.NewConstantInt(ir.GetIntegerType(numBits), val, false, "")
 }
 
 func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
