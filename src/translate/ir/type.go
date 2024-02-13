@@ -1,5 +1,7 @@
 package ir
 
+import "fmt"
+
 type Type interface {
 	String() string
 	ty()
@@ -36,7 +38,7 @@ type IntegerType interface {
 	BitWidth() uint
 }
 
-func CreateIntegerType(numBits uint) IntegerType {
+func GetIntegerType(numBits uint) IntegerType {
 	switch numBits {
 	case 1:
 		return Int1Type
@@ -48,10 +50,9 @@ func CreateIntegerType(numBits uint) IntegerType {
 		return Int32Type
 	case 64:
 		return Int64Type
-
+	default:
+		panic(fmt.Sprintf("cannot integer type with bit-width of size'%d'", numBits))
 	}
-
-	return nil
 }
 
 // Int1 ...
