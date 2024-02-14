@@ -31,12 +31,12 @@ var AliasTypes = []*types.Basic{
 
 func defPredeclaredTypes() {
 	for _, t := range Typ {
-		Global.Insert(NewTypeName(nil, t.Name(), t, ast.IsPredeclared, offset))
+		Global.Insert(NewTypeName(nil, t.Name(), t, ast.Predeclared, offset))
 		offset += 1
 	}
 
 	for _, t := range AliasTypes {
-		Global.Insert(NewTypeName(nil, t.Name(), t, ast.IsPredeclared, offset))
+		Global.Insert(NewTypeName(nil, t.Name(), t, ast.Predeclared, offset))
 		offset += 1
 	}
 }

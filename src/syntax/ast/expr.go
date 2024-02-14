@@ -14,9 +14,9 @@ type IdentProps int
 
 // Properties of an identifier
 const (
-	IsExported IdentProps = 1 << iota
-	IsReadOnly
-	IsPredeclared
+	Exported IdentProps = 1 << iota
+	ReadOnly
+	Predeclared
 )
 
 type (
