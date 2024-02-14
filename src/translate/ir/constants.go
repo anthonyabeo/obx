@@ -2,6 +2,7 @@ package ir
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 )
 
@@ -38,6 +39,18 @@ func GetNullValue(ty Type) Value {
 	switch {
 	case ty.IsIntegerTy():
 		return NewConstantInt(ty, 0, false, "")
+	default:
+		panic(fmt.Sprintf("[internal] invalid IR type '%s'", ty))
+	}
+}
+
+func GetAllOnesValue(ty Type) Value {
+	switch {
+	case ty.IsIntegerTy():
+		bw := ty.(IntegerType).BitWidth()
+		allOnes := uint64(math.Pow(2, float64(bw)) - 1.0)
+
+		return NewConstantInt(ty, allOnes, false, "")
 	default:
 		panic(fmt.Sprintf("[internal] invalid IR type '%s'", ty))
 	}
