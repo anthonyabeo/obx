@@ -18,7 +18,15 @@ var opcodes = [...]string{
 	Load:   "load",
 	Store:  "store",
 
+	Xor:  "xor",
+	Or:   "or",
+	And:  "and",
+	Shl:  "shl",
+	LShr: "lshl",
+	AShr: "ashr",
+
 	Call: "call",
+	Phi:  "phi",
 
 	Eq:  "eq",
 	Ne:  "ne",
@@ -49,8 +57,16 @@ const (
 	Alloca
 	Load
 	Store
-
 	memop_end
+
+	bit_binop_begin
+	Xor
+	Or
+	And
+	Shl
+	LShr
+	AShr
+	bit_binop_end
 
 	other_op_begin
 	Call
