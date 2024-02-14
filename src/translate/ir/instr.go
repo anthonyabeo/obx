@@ -13,7 +13,7 @@ type Instruction interface {
 	IsBinaryOp() bool
 	IsMemOp() bool
 	IsOtherOp() bool
-
+	IsBitBinOp() bool
 	// Module() *Module
 	// Parent() *BasicBlock
 	// Function() *Function
@@ -41,6 +41,7 @@ func (c CallInstr) IsTerm() bool        { return termop_begin < c.op && c.op < t
 func (c CallInstr) IsBinaryOp() bool    { return binop_end < c.op && c.op < binop_end }
 func (c CallInstr) IsOtherOp() bool     { return other_op_begin < c.op && c.op < other_op_end }
 func (c CallInstr) IsMemOp() bool       { return memop_begin < c.op && c.op < memop_end }
+func (c CallInstr) IsBitBinOp() bool    { return bit_binop_begin < c.op && c.op < bit_binop_end }
 func (c CallInstr) Opcode() Opcode      { return c.op }
 func (c CallInstr) String() string {
 	var args []string
@@ -78,6 +79,7 @@ func (c ICmpInstr) IsTerm() bool        { return termop_begin < c.pred && c.pred
 func (c ICmpInstr) IsBinaryOp() bool    { return binop_begin < c.pred && c.pred < binop_end }
 func (c ICmpInstr) IsOtherOp() bool     { return other_op_begin < c.pred && c.pred < other_op_end }
 func (c ICmpInstr) IsMemOp() bool       { return memop_begin < c.pred && c.pred < memop_end }
+func (c ICmpInstr) IsBitBinOp() bool    { return bit_binop_begin < c.pred && c.pred < bit_binop_end }
 func (c ICmpInstr) Opcode() Opcode      { return c.pred }
 func (c ICmpInstr) String() string {
 	return fmt.Sprintf("%s = icmp %s %s %s, %s", c.name, c.pred, c.opdTy, c.x.Name(), c.y.Name())
@@ -111,6 +113,7 @@ func (b BinaryOp) IsTerm() bool        { return termop_begin < b.op && b.op < te
 func (b BinaryOp) IsBinaryOp() bool    { return binop_begin < b.op && b.op < binop_end }
 func (b BinaryOp) IsOtherOp() bool     { return other_op_begin < b.op && b.op < other_op_end }
 func (b BinaryOp) IsMemOp() bool       { return memop_begin < b.op && b.op < memop_end }
+func (b BinaryOp) IsBitBinOp() bool    { return bit_binop_begin < b.op && b.op < bit_binop_end }
 func (b BinaryOp) String() string {
 	return fmt.Sprintf("%s = %s %s %s, %s", b.name, b.op, b.evalTy, b.left.Name(), b.right.Name())
 }
@@ -122,6 +125,24 @@ func CreateAdd(ty Type, left, right Value, name string) *BinaryOp {
 	name = "%" + name
 
 	return &BinaryOp{evalTy: ty, op: Add, left: left, right: right, name: name}
+}
+
+func CreateSub(ty Type, left, right Value, name string) *BinaryOp {
+	if name == "" {
+		name = NextTemp()
+	}
+	name = "%" + name
+
+	return &BinaryOp{evalTy: ty, op: Sub, left: left, right: right, name: name}
+}
+
+func CreateXOR(ty Type, left, right Value, name string) *BinaryOp {
+	if name == "" {
+		name = NextTemp()
+	}
+	name = "%" + name
+
+	return &BinaryOp{evalTy: ty, op: Xor, left: left, right: right, name: name}
 }
 
 // LoadInst ...
@@ -142,6 +163,7 @@ func (l LoadInst) IsTerm() bool        { return termop_begin < l.op && l.op < te
 func (l LoadInst) IsBinaryOp() bool    { return binop_begin < l.op && l.op < binop_end }
 func (l LoadInst) IsOtherOp() bool     { return other_op_begin < l.op && l.op < other_op_end }
 func (l LoadInst) IsMemOp() bool       { return memop_begin < l.op && l.op < memop_end }
+func (l LoadInst) IsBitBinOp() bool    { return bit_binop_begin < l.op && l.op < bit_binop_end }
 func (l LoadInst) String() string {
 	srcStr := fmt.Sprintf("%s %s", l.ptr.Type(), l.ptr.Name())
 	return fmt.Sprintf("%s = load %s, %s", l.name, l.typ, srcStr)
@@ -173,6 +195,7 @@ func (s StoreInst) IsTerm() bool     { return termop_begin < s.op && s.op < term
 func (s StoreInst) IsBinaryOp() bool { return binop_begin < s.op && s.op < binop_end }
 func (s StoreInst) IsOtherOp() bool  { return other_op_begin < s.op && s.op < other_op_end }
 func (s StoreInst) IsMemOp() bool    { return memop_begin < s.op && s.op < memop_end }
+func (s StoreInst) IsBitBinOp() bool { return bit_binop_begin < s.op && s.op < bit_binop_end }
 func (s StoreInst) String() string {
 	valueStr := fmt.Sprintf("%s %s", s.value.Type(), s.value.Name())
 	dstStr := fmt.Sprintf("%s %s", s.dst.Type(), s.dst.Name())
@@ -222,6 +245,7 @@ func (a AllocaInst) IsTerm() bool        { return termop_begin < a.op && a.op < 
 func (a AllocaInst) IsBinaryOp() bool    { return binop_begin < a.op && a.op < binop_end }
 func (a AllocaInst) IsMemOp() bool       { return memop_begin < a.op && a.op < memop_end }
 func (a AllocaInst) IsOtherOp() bool     { return other_op_begin < a.op && a.op < other_op_end }
+func (a AllocaInst) IsBitBinOp() bool    { return bit_binop_begin < a.op && a.op < bit_binop_end }
 func (a AllocaInst) Type() Type          { return a.evalTy }
 func (a AllocaInst) Name() string        { return a.name }
 func (a AllocaInst) SetName(name string) { a.name = name }
@@ -280,6 +304,7 @@ func (r ReturnInst) IsTerm() bool     { return termop_begin < r.op && r.op < ter
 func (r ReturnInst) IsBinaryOp() bool { return binop_begin < r.op && r.op < binop_end }
 func (r ReturnInst) IsMemOp() bool    { return memop_begin < r.op && r.op < memop_end }
 func (r ReturnInst) IsOtherOp() bool  { return other_op_begin < r.op && r.op < other_op_end }
+func (r ReturnInst) IsBitBinOp() bool { return bit_binop_begin < r.op && r.op < bit_binop_end }
 
 // BranchInst ...
 // ---------------------
@@ -321,6 +346,7 @@ func (b BranchInst) IsTerm() bool             { return termop_begin < b.op && b.
 func (b BranchInst) IsBinaryOp() bool         { return binop_begin < b.op && b.op < binop_end }
 func (b BranchInst) IsMemOp() bool            { return memop_begin < b.op && b.op < memop_end }
 func (b BranchInst) IsOtherOp() bool          { return other_op_begin < b.op && b.op < other_op_end }
+func (b BranchInst) IsBitBinOp() bool         { return bit_binop_begin < b.op && b.op < bit_binop_end }
 func (b BranchInst) NumSuccessors() int       { return b.numSucc }
 func (b BranchInst) IsConditional() bool      { return b.cond != nil && b.numSucc == 2 }
 func (b BranchInst) SetSuccessor(*BasicBlock) {}
@@ -379,6 +405,7 @@ func (phi *PHINode) IsTerm() bool     { return termop_begin < phi.op && phi.op <
 func (phi *PHINode) IsBinaryOp() bool { return binop_begin < phi.op && phi.op < binop_end }
 func (phi *PHINode) IsMemOp() bool    { return memop_begin < phi.op && phi.op < memop_end }
 func (phi *PHINode) IsOtherOp() bool  { return other_op_begin < phi.op && phi.op < other_op_end }
+func (phi *PHINode) IsBitBinOp() bool { return bit_binop_begin < phi.op && phi.op < bit_binop_end }
 func (phi *PHINode) AddIncoming(v Value, blk *BasicBlock) {
 	phi.incoming = append(phi.incoming, PHINodeIncoming{v, blk})
 }
