@@ -122,6 +122,34 @@ func (b *Builder) CreateSub(lhs, rhs Value, name string) Value {
 	return sub
 }
 
+func (b *Builder) CreateXOR(lhs, rhs Value, name string) Value {
+	var (
+		ResTy Type
+		LHSTy Type = lhs.Type()
+		RHSTy Type = rhs.Type()
+	)
+
+	// lhs != integer-type && lhs != vector<integer-type>
+	if !LHSTy.IsIntegerTy() /* && !LHS.IsVecTy() */ {
+		msg := fmt.Sprintf("[internal] expected operand '%s' to be an integer or integer vector type. Got '%s'",
+			lhs, LHSTy)
+		panic(msg)
+	}
+
+	// rhs != integer-type && rhs != vector<integer-type>
+	if !RHSTy.IsIntegerTy() /* && !LHS.IsVecTy() */ {
+		msg := fmt.Sprintf("[internal] expected operand '%s' to be an integer or pointer type. Got '%s'", rhs, RHSTy)
+		panic(msg)
+	}
+
+	ResTy = LHSTy
+
+	xor := CreateXOR(ResTy, lhs, rhs, name)
+	b.BB.instr.PushBack(xor)
+
+	return xor
+}
+
 func (b *Builder) CreateRet(v Value) *ReturnInst {
 	ret := CreateRet(v.Type(), v)
 	b.BB.instr.PushBack(ret)
@@ -246,4 +274,11 @@ func (b *Builder) CreateNeg(v Value, name string) Value {
 	b.BB.instr.PushBack(neg)
 
 	return neg
+}
+
+func (b *Builder) CreateNot(v Value, name string) Value {
+	not := b.CreateXOR(v, GetAllOnesValue(v.Type()), name)
+	b.BB.instr.PushBack(not)
+
+	return not
 }
