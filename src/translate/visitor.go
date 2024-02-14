@@ -487,7 +487,7 @@ func (v *Visitor) VisitBasicType(t *ast.BasicType) {
 	t.IRTy = ty
 }
 
-func (v *Visitor) VisitArrayType(arrayType *ast.ArrayType) {
+func (v *Visitor) VisitArrayType(ty *ast.ArrayType) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -497,22 +497,22 @@ func (v *Visitor) VisitPointerType(ty *ast.PointerType) {
 	ty.IRTy = ir.CreatePointerType(ty.Base.IRType())
 }
 
-func (v *Visitor) VisitProcType(procType *ast.ProcType) {
+func (v *Visitor) VisitProcType(ty *ast.ProcType) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v *Visitor) VisitRecordType(recordType *ast.RecordType) {
+func (v *Visitor) VisitRecordType(ty *ast.RecordType) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v *Visitor) VisitEnumType(enumType *ast.EnumType) {
+func (v *Visitor) VisitEnumType(ty *ast.EnumType) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v *Visitor) VisitReceiver(receiver *ast.Receiver) {
+func (v *Visitor) VisitReceiver(rcv *ast.Receiver) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -537,22 +537,22 @@ func (v *Visitor) VisitFormalParams(params *ast.FormalParams) {
 	panic("implement me")
 }
 
-func (v *Visitor) VisitDotOp(op *ast.DotOp) {
+func (v *Visitor) VisitDotOp(dot *ast.DotOp) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v *Visitor) VisitIndexOp(op *ast.IndexOp) {
+func (v *Visitor) VisitIndexOp(idx *ast.IndexOp) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v *Visitor) VisitTypeGuard(guard *ast.TypeGuard) {
+func (v *Visitor) VisitTypeGuard(grd *ast.TypeGuard) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v *Visitor) VisitPointerDeref(deref *ast.PointerDeref) {
+func (v *Visitor) VisitPointerDeref(drf *ast.PointerDeref) {
 	//TODO implement me
 	panic("implement me")
 }

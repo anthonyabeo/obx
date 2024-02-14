@@ -41,6 +41,8 @@ const (
 	INT64
 	LONGREAL
 
+	NIL
+
 	literal_end
 
 	keyword_beg
@@ -80,7 +82,6 @@ const (
 	FALSE
 	BY
 	MOD
-	NIL
 	OF
 	TO
 

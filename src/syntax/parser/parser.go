@@ -541,7 +541,10 @@ func (p *Parser) parseFactor() (expr ast.Expression) {
 		if p.tok == token.LPAREN {
 			expr = &ast.FuncCall{Dsg: expr, ActualParams: p.parseActualParameters()}
 		}
-	case token.INT, token.BYTE, token.INT8, token.INT16, token.INT32, token.INT64, token.REAL, token.LONGREAL, token.STRING, token.HEXSTRING, token.CHAR, token.NIL, token.TRUE, token.FALSE, token.LBRACE:
+	case token.INT, token.BYTE, token.INT8, token.INT16, token.INT32, token.INT64,
+		token.REAL, token.LONGREAL, token.STRING, token.HEXSTRING, token.CHAR,
+		token.NIL, token.TRUE, token.FALSE, token.LBRACE:
+
 		expr = p.parseLiteral()
 	default:
 		pos := p.pos
