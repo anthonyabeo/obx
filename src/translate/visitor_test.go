@@ -289,3 +289,45 @@ end Main
 	Main := module.GetFunction("main")
 	fmt.Println(Main)
 }
+
+func TestIRCodegenIfThenElsifWithNoElse(t *testing.T) {
+	input := `
+module Main
+	var a, b, max: integer
+
+begin
+	a := 5
+    b := 10
+	
+	if a > b then
+		max := a
+	elsif a = b then
+		max := 15
+	elsif a # b then
+		max := 42
+	end
+
+    assert(max = 10)
+end Main
+`
+
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := &lexer.Lexer{}
+	lex.InitLexer(file, []byte(input))
+
+	p := &parser.Parser{}
+	p.InitParser(lex)
+	ob := p.Oberon()
+
+	scp := sema.NewScope(sema.Global, "Main")
+
+	sema_vst := &sema.Visitor{}
+	sema_vst.InitSemaVisitor(ob, scp)
+	sema_vst.VisitModule("Main")
+
+	cgen := NewVisitor(ob, scp)
+	module := cgen.VisitModule("Main")
+
+	Main := module.GetFunction("main")
+	fmt.Println(Main)
+}
