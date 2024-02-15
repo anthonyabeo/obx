@@ -919,13 +919,8 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 		case token.BECOMES:
 			p.next()
 			stmt = &ast.AssignStmt{LValue: dsg, RValue: p.parseExpression()}
-		case token.LPAREN:
-			stmt = &ast.ProcCall{Dsg: dsg, ActualParams: p.parseActualParameters()}
 		default:
-			pos := p.pos
-			p.errorExpected(p.pos, ":= or (")
-			p.advance(exprEnd)
-			stmt = &ast.BadStmt{From: pos, To: p.pos}
+			stmt = &ast.ProcCall{Dsg: dsg, ActualParams: p.parseActualParameters()}
 		}
 	default:
 		pos := p.pos

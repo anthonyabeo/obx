@@ -248,7 +248,7 @@ func (id *IndexOp) Value() ir.Value    { return id.IRValue }
 // TypeGuard
 // ---------------------
 type TypeGuard struct {
-	Typ     Expression
+	Ty      Expression
 	EType   types.Type
 	IRValue ir.Value
 }
