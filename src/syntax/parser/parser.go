@@ -985,7 +985,9 @@ func (p *Parser) parseReturnStmt() (stmt *ast.ReturnStmt) {
 	stmt = &ast.ReturnStmt{Return: p.pos}
 
 	p.match(token.RETURN)
-	stmt.Value = p.parseExpression()
+	if p.exprStart() {
+		stmt.Value = p.parseExpression()
+	}
 
 	return
 }
