@@ -93,8 +93,20 @@ func (v *Visitor) VisitDesignator(d *ast.Designator) {
 }
 
 func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
-	//TODO implement me
-	panic("implement me")
+	var args []ir.Value
+
+	for _, arg := range call.ActualParams {
+		arg.Accept(v)
+		args = append(args, arg.Value())
+	}
+
+	F := v.module.GetFunction(call.Dsg.String())
+	if F == nil {
+		panic(fmt.Sprintf("[internal] undeclared function '%s'", call.Dsg.String()))
+	}
+
+	fty := F.Type().(*ir.FunctionType)
+	call.IRValue = v.builder.CreateCall(fty, F, args, "")
 }
 
 func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
