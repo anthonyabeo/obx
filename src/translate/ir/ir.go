@@ -1,6 +1,9 @@
 package ir
 
-import "strconv"
+import (
+	"container/list"
+	"strconv"
+)
 
 type Opcode int
 
@@ -96,6 +99,14 @@ type Value interface {
 	SetName(string)
 	HasName() bool
 	String() string
+	NumUses() int
+}
+
+type User interface {
+	Value
+	NumOperands() int
+	Operand(int) Value
+	OperandList() *list.List
 }
 
 var tmp = 0

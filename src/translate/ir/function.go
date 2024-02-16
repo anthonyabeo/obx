@@ -32,6 +32,8 @@ type Function struct {
 	ty     *FunctionType
 	blocks BasicBlockListType
 	module *Module
+
+	useList *list.List
 }
 
 func CreateFunction(ty *FunctionType, link LinkageKind, name string, module *Module) *Function {
@@ -39,10 +41,15 @@ func CreateFunction(ty *FunctionType, link LinkageKind, name string, module *Mod
 	return F
 }
 
-func (f Function) Type() Type          { return f.ty }
-func (f Function) Name() string        { return f.name }
-func (f Function) SetName(name string) { f.name = name }
-func (f Function) HasName() bool       { return f.name != "" }
+func (f Function) NumOperands() int        { return f.useList.Len() }
+func (f Function) Operand(int) Value       { panic("[internal] functions have no operands") }
+func (f Function) OperandList() *list.List { return f.useList }
+func (f Function) Parent() *Module         { return f.module }
+func (f Function) NumUses() int            { return f.useList.Len() }
+func (f Function) Type() Type              { return f.ty }
+func (f Function) Name() string            { return f.name }
+func (f Function) SetName(name string)     { f.name = name }
+func (f Function) HasName() bool           { return f.name != "" }
 func (f Function) String() string {
 	buf := &bytes.Buffer{}
 
@@ -58,7 +65,7 @@ func (f Function) HasInternalLinkage() bool { return f.link == Internal }
 func (f Function) HasExternalLinkage() bool { return f.link == External }
 func (f Function) EntryBlock() *BasicBlock  { return f.blocks.Block("entry") }
 func (f Function) Blocks() []*BasicBlock {
-	return trvQueue(f.blocks.Block("entry"))
+	return TrvQueue(f.blocks.Block("entry"))
 }
 func (f Function) SymbolTable() {}
 

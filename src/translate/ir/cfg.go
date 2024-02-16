@@ -1,6 +1,6 @@
 package ir
 
-func trvQueue(entry *BasicBlock) (list []*BasicBlock) {
+func TrvQueue(entry *BasicBlock) (list []*BasicBlock) {
 	visited := make(map[string]bool, 0)
 
 	q := make([]*BasicBlock, 0)

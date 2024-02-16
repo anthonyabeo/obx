@@ -1,5 +1,7 @@
 package ir
 
+import "container/list"
+
 type ValueSymbolTable map[string]Value
 
 type Module struct {
@@ -17,12 +19,16 @@ func (m *Module) GetOrInsertFunction(name string, ty *FunctionType, link Linkage
 		return F
 	}
 
+	uses := list.New()
+	uses.Init()
+
 	f := &Function{
 		name,
 		link,
 		ty,
 		BasicBlockListType{},
 		m,
+		uses,
 	}
 
 	m.env[name] = f
