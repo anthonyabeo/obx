@@ -113,6 +113,12 @@ func (lex *Lexer) Lex() (tok token.Token, lit string, pos *token.Position) {
 		case '|':
 			tok = token.BAR
 			lit = "|"
+		case '{':
+			tok = token.LBRACE
+			lit = "{"
+		case '}':
+			tok = token.RBRACE
+			lit = "}"
 		case '\'', '"':
 			lit = lex.readString(ch)
 			tok = token.STRING

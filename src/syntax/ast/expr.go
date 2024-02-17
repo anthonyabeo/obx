@@ -185,7 +185,6 @@ func (d *Designator) String() string {
 
 	return s
 }
-
 func (d *Designator) Value() ir.Value { return d.IRValue }
 
 func (b *BadExpr) Pos() *token.Position { return b.From }
