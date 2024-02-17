@@ -581,31 +581,34 @@ func (p *Parser) parseExprList() (list []ast.Expression) {
 }
 
 // designator = qualident {selector}
-// selector = '.' ident | '[' ExpList ']' | '^' | '(' qualident ')'
-func (p *Parser) parseDesignator() (d *ast.Designator) {
-	d = &ast.Designator{QIdentPos: p.pos}
+// selector = '.' ident | '[' ExpList ']' | '^' | '{' qualident '}'
+func (p *Parser) parseDesignator() (dsg *ast.Designator) {
+	dsg = &ast.Designator{QIdentPos: p.pos, QualifiedIdent: p.parseQualifiedIdent(nil)}
 
-	d.QualifiedIdent = p.parseQualifiedIdent(nil)
+	expr := dsg.QualifiedIdent
 
-	//for p.tok == token.PERIOD || p.tok == token.LBRACK || p.tok == token.CARET || p.tok == token.LPAREN {
-	//	switch p.tok {
-	//	case token.PERIOD:
-	//		p.next()
-	//		d.Selector = &ast.DotOp{Field: p.parseIdent()}
-	//	case token.LBRACK:
-	//		p.next()
-	//		List := p.parseExprList()
-	//		p.next()
-	//		d.Selector = &ast.IndexOp{List: List}
-	//	case token.CARET:
-	//		d.Selector = &ast.PointerDeref{}
-	//	case token.LPAREN:
-	//		p.match(token.LPAREN)
-	//		Typ := p.parseQualifiedIdent(d.QualifiedIdent)
-	//		p.match(token.RPAREN)
-	//		d.Selector = &ast.TypeGuard{Typ: Typ}
-	//	}
-	//}
+	for p.tok == token.PERIOD || p.tok == token.LBRACK || p.tok == token.CARET || p.tok == token.LBRACE {
+		dsg = &ast.Designator{QIdentPos: p.pos, QualifiedIdent: expr}
+
+		switch p.tok {
+		case token.PERIOD:
+			p.next()
+			dsg.Selector = &ast.DotOp{Field: p.parseIdent()}
+		case token.LBRACK:
+			p.next()
+			List := p.parseExprList()
+			p.next()
+			dsg.Selector = &ast.IndexOp{List: List}
+		case token.CARET:
+			dsg.Selector = &ast.PointerDeref{}
+		case token.LBRACE:
+			p.match(token.LBRACE)
+			dsg.Selector = &ast.TypeGuard{Ty: p.parseQualifiedIdent(nil)}
+			p.match(token.RBRACE)
+		}
+
+		expr = dsg
+	}
 
 	return
 }
@@ -917,9 +920,10 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 		dsg := p.parseDesignator()
 		switch p.tok {
 		case token.BECOMES:
+			pos := p.pos
 			p.next()
-			stmt = &ast.AssignStmt{LValue: dsg, RValue: p.parseExpression()}
-		default:
+			stmt = &ast.AssignStmt{AssignPos: pos, LValue: dsg, RValue: p.parseExpression()}
+		case token.LPAREN:
 			stmt = &ast.ProcCall{Dsg: dsg, ActualParams: p.parseActualParameters()}
 		}
 	default:
