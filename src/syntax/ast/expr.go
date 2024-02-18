@@ -199,19 +199,7 @@ func (d *Designator) expr()              {}
 func (d *Designator) String() string {
 	s := d.QualifiedIdent.String()
 	if d.Selector != nil {
-		switch sel := d.Selector.(type) {
-		case *DotOp:
-			s += fmt.Sprintf(".%s", sel.Field)
-		case *IndexOp:
-			var indices []string
-			for _, e := range sel.List {
-				indices = append(indices, e.String())
-			}
-
-			s += fmt.Sprintf("[%s]", strings.Join(indices, ", "))
-		case *TypeGuard:
-		case *PointerDeref:
-		}
+		s += d.Selector.String()
 	}
 
 	return s
@@ -285,25 +273,25 @@ type TypeGuard struct {
 
 func (t *TypeGuard) Pos() *token.Position { panic("not implement") }
 func (t *TypeGuard) End() *token.Position { panic("not implement") }
-func (t *TypeGuard) String() string       { panic("not implement") }
+func (t *TypeGuard) String() string       { return fmt.Sprintf("{%s}", t.Ty) }
 func (t *TypeGuard) Type() types.Type     { return t.EType }
 func (t *TypeGuard) Accept(vst Visitor)   { vst.VisitTypeGuard(t) }
 func (t *TypeGuard) expr()                {}
 func (t *TypeGuard) sel()                 {}
 func (t *TypeGuard) Value() ir.Value      { return t.IRValue }
 
-// PointerDeref
+// PtrDref
 // ---------------------
-type PointerDeref struct {
+type PtrDref struct {
 	EType   types.Type
 	IRValue ir.Value
 }
 
-func (deref *PointerDeref) Pos() *token.Position { panic("not implement") }
-func (deref *PointerDeref) End() *token.Position { panic("not implement") }
-func (deref *PointerDeref) String() string       { panic("not implement") }
-func (deref *PointerDeref) Type() types.Type     { return deref.EType }
-func (deref *PointerDeref) Accept(vst Visitor)   { vst.VisitPointerDeref(deref) }
-func (deref *PointerDeref) expr()                {}
-func (deref *PointerDeref) sel()                 {}
-func (deref *PointerDeref) Value() ir.Value      { return deref.IRValue }
+func (deref *PtrDref) Pos() *token.Position { panic("not implement") }
+func (deref *PtrDref) End() *token.Position { panic("not implement") }
+func (deref *PtrDref) String() string       { panic("not implement") }
+func (deref *PtrDref) Type() types.Type     { return deref.EType }
+func (deref *PtrDref) Accept(vst Visitor)   { vst.VisitPointerDeref(deref) }
+func (deref *PtrDref) expr()                {}
+func (deref *PtrDref) sel()                 {}
+func (deref *PtrDref) Value() ir.Value      { return deref.IRValue }

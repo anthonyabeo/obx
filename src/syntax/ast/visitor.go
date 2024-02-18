@@ -45,5 +45,5 @@ type Visitor interface {
 	VisitDotOp(*DotOp)
 	VisitIndexOp(*IndexOp)
 	VisitTypeGuard(*TypeGuard)
-	VisitPointerDeref(*PointerDeref)
+	VisitPointerDeref(*PtrDref)
 }

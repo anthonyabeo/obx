@@ -600,7 +600,7 @@ func (p *Parser) parseDesignator() (dsg *ast.Designator) {
 			p.next()
 			dsg.Selector = &ast.IndexOp{List: List}
 		case token.CARET:
-			dsg.Selector = &ast.PointerDeref{}
+			dsg.Selector = &ast.PtrDref{}
 		case token.LBRACE:
 			p.match(token.LBRACE)
 			dsg.Selector = &ast.TypeGuard{Ty: p.parseQualifiedIdent()}
