@@ -583,12 +583,12 @@ func (p *Parser) parseExprList() (list []ast.Expression) {
 // designator = qualident {selector}
 // selector = '.' ident | '[' ExpList ']' | '^' | '{' qualident '}'
 func (p *Parser) parseDesignator() (dsg *ast.Designator) {
-	dsg = &ast.Designator{QIdentPos: p.pos, QualifiedIdent: p.parseQualifiedIdent(nil)}
+	dsg = &ast.Designator{QPos: p.pos, QualifiedIdent: p.parseQualifiedIdent()}
 
 	expr := dsg.QualifiedIdent
 
 	for p.tok == token.PERIOD || p.tok == token.LBRACK || p.tok == token.CARET || p.tok == token.LBRACE {
-		dsg = &ast.Designator{QIdentPos: p.pos, QualifiedIdent: expr}
+		dsg = &ast.Designator{QPos: p.pos, QualifiedIdent: expr}
 
 		switch p.tok {
 		case token.PERIOD:
@@ -603,7 +603,7 @@ func (p *Parser) parseDesignator() (dsg *ast.Designator) {
 			dsg.Selector = &ast.PointerDeref{}
 		case token.LBRACE:
 			p.match(token.LBRACE)
-			dsg.Selector = &ast.TypeGuard{Ty: p.parseQualifiedIdent(nil)}
+			dsg.Selector = &ast.TypeGuard{Ty: p.parseQualifiedIdent()}
 			p.match(token.RBRACE)
 		}
 
@@ -628,10 +628,10 @@ func (p *Parser) parseLiteral() (lit ast.Expression) {
 		set := &ast.Set{}
 
 		if p.exprStart() {
-			set.Elem = append(set.Elem, p.parseExpression())
+			set.Elem = append(set.Elem, p.parseSetElem())
 			for p.tok == token.COMMA {
 				p.next()
-				set.Elem = append(set.Elem, p.parseExpression())
+				set.Elem = append(set.Elem, p.parseSetElem())
 			}
 		}
 
@@ -641,6 +641,18 @@ func (p *Parser) parseLiteral() (lit ast.Expression) {
 	}
 
 	return
+}
+
+// set              = '{' [ element {',' element} ] '}'
+// element          = expression ['..' expression]
+func (p *Parser) parseSetElem() ast.Expression {
+	expr := p.parseExpression()
+	if p.tok == token.RANGE {
+		p.next()
+		return &ast.ExprRange{Beg: expr, Ed: p.parseExpression()}
+	}
+
+	return expr
 }
 
 func (p *Parser) exprStart() bool {
@@ -682,16 +694,14 @@ func (p *Parser) mulOp() bool {
 }
 
 func (p *Parser) parseNamedType() ast.Type {
-	typ := p.parseQualifiedIdent(nil)
+	typ := p.parseQualifiedIdent()
 	return ast.NewBasicType(typ.String())
 }
 
-func (p *Parser) parseQualifiedIdent(id ast.Expression) ast.Expression {
-	if id == nil {
-		id = p.parseIdent()
-	}
-
-	if p.tok == token.PERIOD {
+// qualident = [ ident '::' ] ident
+func (p *Parser) parseQualifiedIdent() ast.Expression {
+	id := p.parseIdent()
+	if p.tok == token.DCOLON {
 		p.next()
 		sel := p.parseIdent()
 
@@ -1131,7 +1141,7 @@ func (p *Parser) parseWithStmt() *ast.WithStmt {
 }
 
 func (p *Parser) parseGuard() *ast.Guard {
-	grd := &ast.Guard{Expr: p.parseQualifiedIdent(nil), Type: p.parseQualifiedIdent(nil)}
+	grd := &ast.Guard{Expr: p.parseQualifiedIdent(), Type: p.parseQualifiedIdent()}
 	p.match(token.DO)
 	grd.StmtSeq = p.parseStatementSeq()
 

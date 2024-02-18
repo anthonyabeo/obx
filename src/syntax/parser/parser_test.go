@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
@@ -175,5 +176,72 @@ end Main
 	if len(mainMod.StmtSeq) != 2 {
 		t.Errorf("expected 2 statements in '%s' module, found %d",
 			mainMod.BeginName, len(mainMod.StmtSeq))
+	}
+}
+
+func TestParseExpressions(t *testing.T) {
+	input := `
+module Main
+begin
+	phi := 1991                   
+	phi := i div 3                
+	phi := ~p or q                
+	phi := (i+j) * (i-j)          
+	phi := s - {8, 9, 13}         
+	phi := i + x                  
+	phi := a[i+j] * a[i-j]        
+	phi := (0<=i) & (i<100)       
+	phi := t.key = 0              
+	phi := k in {i..j-1}          
+	phi := w[i].name <= "John"   
+	phi := t is CenterTree        
+end Main
+`
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := &lexer.Lexer{}
+	lex.InitLexer(file, []byte(input))
+
+	p := &Parser{}
+	p.InitParser(lex)
+
+	ob := p.Oberon()
+	if len(p.errors) > 0 {
+		t.Error("found parse errors")
+		for _, err := range p.errors {
+			t.Log(err)
+		}
+	}
+
+	mainMod := ob.Program["Main"]
+	if mainMod.BeginName.Name != mainMod.EndName.Name {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			mainMod.BeginName, mainMod.EndName)
+	}
+
+	if len(mainMod.StmtSeq) != 12 {
+		t.Errorf("expected 12 statements in '%s' module, found %d",
+			mainMod.BeginName, len(mainMod.StmtSeq))
+	}
+
+	tests := []string{
+		"1991",
+		"i div 3",
+		"~p or q",
+		"i + j * i - j",
+		"s - {8, 9, 13}",
+		"i + x",
+		"a[i + j] * a[i - j]",
+		"0 <= i & i < 100",
+		"t.key = 0",
+		"k in {i..j - 1}",
+		"w[i].name <= John",
+		"t is CenterTree",
+	}
+
+	for i, stmt := range mainMod.StmtSeq {
+		st := stmt.(*ast.AssignStmt)
+		if st.RValue.String() != tests[i] {
+			t.Errorf("Expected '%s', got '%s'", tests[i], st.RValue.String())
+		}
 	}
 }
