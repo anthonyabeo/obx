@@ -642,7 +642,7 @@ func (v *Visitor) VisitTypeGuard(guard *ast.TypeGuard) {
 	panic("not implemented")
 }
 
-func (v *Visitor) VisitPointerDeref(deref *ast.PointerDeref) {
+func (v *Visitor) VisitPointerDeref(deref *ast.PtrDref) {
 	// TODO not implemented
 	panic("not implemented")
 }

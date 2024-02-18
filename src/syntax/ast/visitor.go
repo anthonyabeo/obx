@@ -10,6 +10,10 @@ type Visitor interface {
 	VisitSet(*Set)
 	VisitBasicLit(*BasicLit)
 	VisitExprRange(*ExprRange)
+	VisitDotOp(*DotOp)
+	VisitIndexOp(*IndexOp)
+	VisitTypeGuard(*TypeGuard)
+	VisitPointerDeref(*PtrDref)
 
 	VisitIfStmt(*IfStmt)
 	VisitAssignStmt(*AssignStmt)
@@ -28,6 +32,11 @@ type Visitor interface {
 	VisitVarDecl(*VarDecl)
 	VisitConstDecl(*ConstDecl)
 	VisitTypeDecl(*TypeDecl)
+	VisitReceiver(*Receiver)
+	VisitProcHead(*ProcHead)
+	VisitProcBody(*ProcBody)
+	VisitFPSection(*FPSection)
+	VisitFormalParams(*FormalParams)
 
 	VisitBasicType(*BasicType)
 	VisitArrayType(*ArrayType)
@@ -35,15 +44,4 @@ type Visitor interface {
 	VisitProcType(*ProcType)
 	VisitRecordType(*RecordType)
 	VisitEnumType(*EnumType)
-
-	VisitReceiver(*Receiver)
-	VisitProcHead(*ProcHead)
-	VisitProcBody(*ProcBody)
-	VisitFPSection(*FPSection)
-	VisitFormalParams(*FormalParams)
-
-	VisitDotOp(*DotOp)
-	VisitIndexOp(*IndexOp)
-	VisitTypeGuard(*TypeGuard)
-	VisitPointerDeref(*PtrDref)
 }

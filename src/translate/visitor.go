@@ -564,7 +564,7 @@ func (v *Visitor) VisitTypeGuard(grd *ast.TypeGuard) {
 	panic("implement me")
 }
 
-func (v *Visitor) VisitPointerDeref(drf *ast.PointerDeref) {
+func (v *Visitor) VisitPointerDeref(drf *ast.PtrDref) {
 	//TODO implement me
 	panic("implement me")
 }
