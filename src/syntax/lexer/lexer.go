@@ -74,6 +74,11 @@ func (lex *Lexer) Lex() (tok token.Token, lit string, pos *token.Position) {
 				return token.BECOMES, ":=", pos
 			}
 
+			if lex.ch == ':' {
+				lex.next()
+				return token.DCOLON, "::", pos
+			}
+
 			tok = token.COLON
 			lit = ":"
 		case '=':
@@ -85,6 +90,12 @@ func (lex *Lexer) Lex() (tok token.Token, lit string, pos *token.Position) {
 		case '+':
 			tok = token.PLUS
 			lit = "+"
+		case '*':
+			tok = token.STAR
+			lit = "*"
+		case '&':
+			tok = token.AND
+			lit = "&"
 		case '>':
 			if lex.ch == '=' {
 				lex.next()
@@ -119,6 +130,9 @@ func (lex *Lexer) Lex() (tok token.Token, lit string, pos *token.Position) {
 		case '}':
 			tok = token.RBRACE
 			lit = "}"
+		case '~':
+			tok = token.NOT
+			lit = "~"
 		case '\'', '"':
 			lit = lex.readString(ch)
 			tok = token.STRING
