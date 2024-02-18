@@ -58,6 +58,14 @@ type (
 		IRValue ir.Value
 	}
 
+	ExprRange struct {
+		Beg Expression
+		Ed  Expression
+
+		EType   types.Type
+		IRValue ir.Value
+	}
+
 	Set struct {
 		Elem    []Expression
 		EType   types.Type
@@ -73,7 +81,7 @@ type (
 	}
 
 	Designator struct {
-		QIdentPos      *token.Position
+		QPos           *token.Position
 		QualifiedIdent Expression
 		Selector       Selector
 		EType          types.Type
@@ -85,6 +93,14 @@ type (
 		To   *token.Position
 	}
 )
+
+func (e *ExprRange) String() string       { return fmt.Sprintf("%s..%s", e.Beg, e.Ed) }
+func (e *ExprRange) Pos() *token.Position { return e.Beg.Pos() }
+func (e *ExprRange) End() *token.Position { return e.Ed.Pos() }
+func (e *ExprRange) Accept(vst Visitor)   { vst.VisitExprRange(e) }
+func (e *ExprRange) expr()                {}
+func (e *ExprRange) Type() types.Type     { return e.EType }
+func (e *ExprRange) Value() ir.Value      { return e.IRValue }
 
 func (b *BasicLit) expr()                {}
 func (b *BasicLit) Pos() *token.Position { return b.ValuePos }
@@ -160,7 +176,7 @@ func (u *UnaryExpr) expr()                {}
 func (u *UnaryExpr) String() string       { return fmt.Sprintf("%v%v", u.Op, u.X) }
 func (u *UnaryExpr) Value() ir.Value      { return u.IRValue }
 
-func (d *Designator) Pos() *token.Position { return d.QIdentPos }
+func (d *Designator) Pos() *token.Position { return d.QPos }
 func (d *Designator) End() (pos *token.Position) {
 	if d.Selector != nil {
 		pos = d.Selector.End()
