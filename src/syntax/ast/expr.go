@@ -160,8 +160,15 @@ func (q *QualifiedIdent) expr()                {}
 func (q *QualifiedIdent) String() string       { return fmt.Sprintf("%v.%v", q.X, q.Sel) }
 func (q *QualifiedIdent) Value() ir.Value      { return q.IRValue }
 
-func (s *Set) expr()                {}
-func (s *Set) String() string       { panic("not implement") }
+func (s *Set) expr() {}
+func (s *Set) String() string {
+	var elems []string
+	for _, elem := range s.Elem {
+		elems = append(elems, elem.String())
+	}
+
+	return fmt.Sprintf("{%s}", strings.Join(elems, ", "))
+}
 func (s *Set) Pos() *token.Position { panic("not implemented") }
 func (s *Set) End() *token.Position { panic("not implemented") }
 func (s *Set) Accept(vst Visitor)   { vst.VisitSet(s) }
@@ -192,10 +199,18 @@ func (d *Designator) expr()              {}
 func (d *Designator) String() string {
 	s := d.QualifiedIdent.String()
 	if d.Selector != nil {
-		switch d.Selector.(type) {
+		switch sel := d.Selector.(type) {
 		case *DotOp:
+			s += fmt.Sprintf(".%s", sel.Field)
 		case *IndexOp:
+			var indices []string
+			for _, e := range sel.List {
+				indices = append(indices, e.String())
+			}
+
+			s += fmt.Sprintf("[%s]", strings.Join(indices, ", "))
 		case *TypeGuard:
+		case *PointerDeref:
 		}
 	}
 
