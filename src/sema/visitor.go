@@ -651,3 +651,7 @@ func (v *Visitor) VisitImport(imp *ast.Import) {
 	// TODO not implemented
 	panic("not implemented")
 }
+
+func (v *Visitor) VisitExprRange(rng *ast.ExprRange) {
+
+}

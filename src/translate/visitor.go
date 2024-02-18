@@ -568,3 +568,7 @@ func (v *Visitor) VisitPointerDeref(drf *ast.PointerDeref) {
 	//TODO implement me
 	panic("implement me")
 }
+
+func (v *Visitor) VisitExprRange(rng *ast.ExprRange) {
+
+}

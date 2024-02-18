@@ -9,6 +9,7 @@ type Visitor interface {
 	VisitQualifiedIdent(*QualifiedIdent)
 	VisitSet(*Set)
 	VisitBasicLit(*BasicLit)
+	VisitExprRange(*ExprRange)
 
 	VisitIfStmt(*IfStmt)
 	VisitAssignStmt(*AssignStmt)
