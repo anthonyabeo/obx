@@ -194,7 +194,11 @@ begin
 	phi := t.key = 0              
 	phi := k in {i..j-1}          
 	phi := w[i].name <= "John"   
-	phi := t is CenterTree        
+	phi := t is CenterTree      
+	phi := t{CenterTree}.subnode
+	phi := t.left.right 
+	phi := w[3].name[i]
+	
 end Main
 `
 	file := token.NewFile("test.obx", len([]byte(input)))
@@ -212,17 +216,6 @@ end Main
 		}
 	}
 
-	mainMod := ob.Program["Main"]
-	if mainMod.BeginName.Name != mainMod.EndName.Name {
-		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			mainMod.BeginName, mainMod.EndName)
-	}
-
-	if len(mainMod.StmtSeq) != 12 {
-		t.Errorf("expected 12 statements in '%s' module, found %d",
-			mainMod.BeginName, len(mainMod.StmtSeq))
-	}
-
 	tests := []string{
 		"1991",
 		"i div 3",
@@ -236,6 +229,20 @@ end Main
 		"k in {i..j - 1}",
 		"w[i].name <= John",
 		"t is CenterTree",
+		"t{CenterTree}.subnode",
+		"t.left.right",
+		"w[3].name[i]",
+	}
+
+	mainMod := ob.Program["Main"]
+	if mainMod.BeginName.Name != mainMod.EndName.Name {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			mainMod.BeginName, mainMod.EndName)
+	}
+
+	if len(mainMod.StmtSeq) != len(tests) {
+		t.Errorf("expected %d statements in '%s' module, found %d",
+			len(tests), mainMod.BeginName, len(mainMod.StmtSeq))
 	}
 
 	for i, stmt := range mainMod.StmtSeq {
