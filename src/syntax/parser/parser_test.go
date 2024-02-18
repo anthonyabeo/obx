@@ -245,3 +245,62 @@ end Main
 		}
 	}
 }
+
+func TestParseProcedureCall(t *testing.T) {
+	input := `
+module Main
+begin
+	WriteInt(i*2+1)
+	inc(w[k].count)
+	t.Insert("John")
+end Main
+`
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := &lexer.Lexer{}
+	lex.InitLexer(file, []byte(input))
+
+	p := &Parser{}
+	p.InitParser(lex)
+
+	ob := p.Oberon()
+	if len(p.errors) > 0 {
+		t.Error("found parse errors")
+		for _, err := range p.errors {
+			t.Log(err)
+		}
+	}
+
+	mainMod := ob.Program["Main"]
+	if mainMod.BeginName.Name != mainMod.EndName.Name {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			mainMod.BeginName, mainMod.EndName)
+	}
+
+	if len(mainMod.StmtSeq) != 3 {
+		t.Errorf("expected 3 statements in '%s' module, found %d",
+			mainMod.BeginName, len(mainMod.StmtSeq))
+	}
+
+	tests := []struct {
+		procName string
+		args     []string
+	}{
+		{"WriteInt", []string{"i * 2 + 1"}},
+		{"inc", []string{"w[k].count"}},
+		{"t.Insert", []string{"John"}},
+	}
+
+	for idx, stmt := range mainMod.StmtSeq {
+		proc := stmt.(*ast.ProcCall)
+		if proc.Dsg.String() != tests[idx].procName {
+			t.Errorf("expected procedure name '%s', got '%s'", tests[idx].procName, proc.Dsg.String())
+		}
+
+		for i := 0; i < len(tests[idx].args); i++ {
+			if proc.ActualParams[i].String() != tests[idx].args[i] {
+				t.Errorf("argument number %d, %s (of procedure %s) does not match expected argument '%s'",
+					i, proc.ActualParams[i].String(), tests[idx].procName, tests[idx].args[i])
+			}
+		}
+	}
+}
