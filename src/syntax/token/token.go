@@ -118,6 +118,8 @@ const (
 	BAR
 
 	operator_end
+
+	DCOLON
 )
 
 var tokens = [...]string{
@@ -138,19 +140,20 @@ var tokens = [...]string{
 	INT64:     "INT64",
 	LONGREAL:  "LONGREAL",
 
-	PLUS:  "+",
-	MINUS: "-",
-	EQUAL: "=",
-	NEQ:   "#",
-	STAR:  "*",
-	LESS:  "<",
-	LEQ:   "<=",
-	GREAT: ">",
-	GEQ:   ">=",
-	AND:   "&",
-	QUOT:  "/",
-	NOT:   "~",
-	RANGE: "..",
+	PLUS:   "+",
+	MINUS:  "-",
+	EQUAL:  "=",
+	NEQ:    "#",
+	STAR:   "*",
+	LESS:   "<",
+	LEQ:    "<=",
+	GREAT:  ">",
+	GEQ:    ">=",
+	AND:    "&",
+	QUOT:   "/",
+	NOT:    "~",
+	RANGE:  "..",
+	DCOLON: "::",
 
 	LPAREN:    "(",
 	RPAREN:    ")",
