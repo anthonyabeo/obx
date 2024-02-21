@@ -82,6 +82,15 @@ end Main
 		}
 	}
 
+	tests := []struct {
+		dim    int
+		elemTy string
+	}{
+		{2, "integer"},
+		{0, "char"},
+		{1, "[M]T"},
+	}
+
 	mainMod := ob.Program["Main"]
 	if mainMod.BeginName.Name != mainMod.EndName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
@@ -93,6 +102,29 @@ end Main
 			mainMod.BeginName, len(mainMod.DeclSeq))
 	}
 
+	for i, tt := range tests {
+		td, ok := mainMod.DeclSeq[i].(*ast.TypeDecl)
+		if !ok {
+			t.Errorf("expected type declaration, got '%s'", mainMod.DeclSeq[i])
+		}
+
+		denoTy, ok := td.DenotedType.(*ast.ArrayType)
+		if !ok {
+			t.Errorf("'%s' is not an array type-expression", td.DenotedType)
+		}
+
+		if denoTy.LenList == nil && (tt.dim != 0) {
+			t.Errorf("expected an array of dimension %d, got %d instead", tt.dim, len(denoTy.LenList.List))
+		}
+
+		if denoTy.LenList != nil && (tt.dim != len(denoTy.LenList.List)) {
+			t.Errorf("expected an array of dimension %d, got %d instead", tt.dim, len(denoTy.LenList.List))
+		}
+
+		if tt.elemTy != denoTy.ElemType.String() {
+			t.Errorf("expected an element type of  '%s', got '%s'", tt.elemTy, denoTy.ElemType.String())
+		}
+	}
 }
 
 func TestParseOberonMinimalProgram(t *testing.T) {
