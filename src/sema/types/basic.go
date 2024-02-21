@@ -1,5 +1,7 @@
 package types
 
+import "fmt"
+
 // BasicKind describes the kind of basic type.
 type BasicKind int
 
@@ -17,6 +19,7 @@ const (
 	Int64
 	Real
 	LReal
+	Set
 
 	SInt = Int16
 	Int  = Int32
@@ -64,3 +67,17 @@ func (b *Basic) Name() string { return b.name }
 
 func (b *Basic) Underlying() Type { return b }
 func (b *Basic) String() string   { return b.name }
+func (b *Basic) Width() int {
+	switch b.kind {
+	case Byte, Int8, Bool:
+		return 1
+	case Int16, WChar:
+		return 2
+	case Int, Real, Set:
+		return 4
+	case Int64, LReal:
+		return 8
+	default:
+		panic(fmt.Sprintf("'%s' is not a basic type", b.name))
+	}
+}

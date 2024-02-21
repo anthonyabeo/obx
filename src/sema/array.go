@@ -20,3 +20,5 @@ func (a *Array) Elem() types.Type { return a.elem }
 func (a *Array) Underlying() types.Type { return a }
 
 func (a *Array) String() string { return "" }
+
+func (a *Array) Width() int { panic("not implemented") }
