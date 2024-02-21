@@ -528,19 +528,15 @@ func (v *Visitor) VisitBasicType(b *ast.BasicType) {
 }
 
 func (v *Visitor) VisitArrayType(a *ast.ArrayType) {
-	var Len ast.Expression
 	if a.LenList != nil {
 		for _, index := range a.LenList.List {
 			index.Accept(v)
 		}
-
-		Len = a.LenList.List[0]
-
 	}
 
 	a.ElemType.Accept(v)
 
-	a.EType = NewArray(a.ElemType.Type(), Len)
+	a.EType = NewArray(a.ElemType.Type(), a.LenList)
 }
 
 func (v *Visitor) VisitProcType(p *ast.ProcType) {
