@@ -1,9 +1,11 @@
 package ast
 
 import (
+	"fmt"
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/translate/ir"
+	"strings"
 )
 
 type (
@@ -85,10 +87,19 @@ func NewArray(pos *token.Position, lenList *LenList, elem Type) *ArrayType {
 
 func (a *ArrayType) Pos() *token.Position { return a.Array }
 func (a *ArrayType) End() *token.Position { return a.ElemType.End() }
-func (a *ArrayType) String() string       { panic("not implemented") }
-func (a *ArrayType) Accept(vst Visitor)   { vst.VisitArrayType(a) }
-func (a *ArrayType) Type() types.Type     { return a.EType }
-func (a *ArrayType) IRType() ir.Type      { return a.IRTy }
+func (a *ArrayType) String() string {
+	var ll []string
+	if a.LenList != nil {
+		for _, l := range a.LenList.List {
+			ll = append(ll, l.String())
+		}
+	}
+
+	return fmt.Sprintf("[%s]%s", strings.Join(ll, ", "), a.ElemType)
+}
+func (a *ArrayType) Accept(vst Visitor) { vst.VisitArrayType(a) }
+func (a *ArrayType) Type() types.Type   { return a.EType }
+func (a *ArrayType) IRType() ir.Type    { return a.IRTy }
 
 type LenList struct {
 	Modifier token.Token
