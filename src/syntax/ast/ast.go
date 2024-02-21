@@ -2,8 +2,8 @@ package ast
 
 import (
 	"fmt"
-
 	"github.com/anthonyabeo/obx/src/sema/types"
+
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/translate/ir"
 )
@@ -35,6 +35,5 @@ type Declaration interface {
 type Type interface {
 	Node
 	Type() types.Type
-	Width() int
 	IRType() ir.Type
 }

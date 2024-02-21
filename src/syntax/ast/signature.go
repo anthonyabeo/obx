@@ -29,9 +29,9 @@ func (t *Signature) DeSugarParams() {
 		}
 	}
 }
-
 func (t *Signature) Underlying() types.Type { return t }
 func (t *Signature) String() string         { return "" }
+func (t *Signature) Width() int             { panic("not implemented") }
 
 // DesugParam
 // ----------------
