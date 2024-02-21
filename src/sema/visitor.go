@@ -701,9 +701,7 @@ func (v *Visitor) VisitFPSection(sec *ast.FPSection) {
 		if sec.Mod == token.IN {
 			v.env.Insert(scope.NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
 		} else {
-
 			v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
-			v.offset += sec.Type.Type().Width()
 		}
 
 		v.offset += sec.Type.Type().Width()
