@@ -196,7 +196,7 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 
 	// ensure that the ith argument is assignment-compatible with the ith formal parameter
 	for i := 0; i < sig.NumParams(); i++ {
-		if !v.AreAssignmentComp(sig.Params[i].Type.Type(), call.ActualParams[i].Type()) {
+		if !v.assignCompat(sig.Params[i].Type.Type(), call.ActualParams[i].Type()) {
 			msg := fmt.Sprintf("argument '%v' (of type '%v') does not match the corresponding parameter type '%v'",
 				call.ActualParams[i], call.ActualParams[i].Type(), sig.Params[i].Type.Type())
 			v.error(call.ActualParams[i].Pos(), msg)
@@ -274,23 +274,9 @@ func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 	stmt.LValue.Accept(v)
 	stmt.RValue.Accept(v)
 
-	if !v.AreAssignmentComp(stmt.LValue.Type(), stmt.RValue.Type()) {
+	if !v.assignCompat(stmt.LValue.Type(), stmt.RValue.Type()) {
 		v.error(stmt.AssignPos, fmt.Sprintf("%v and %v are not assignment compatible", stmt.LValue, stmt.RValue))
 	}
-}
-
-func (v *Visitor) AreAssignmentComp(left, right types.Type) bool {
-	if left.String() == right.String() {
-		return true
-	}
-
-	l, _ := left.(*types.Basic)
-	r, _ := right.(*types.Basic)
-	if l.Info() == types.IsNumeric && r.Info() == types.IsNumeric {
-		return l.Kind() >= r.Kind()
-	}
-
-	return false
 }
 
 func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
@@ -372,18 +358,17 @@ func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
 	}
 
 	// check that ctrlID is compatible to initValue and finalValue
-	if !v.AreAssignmentComp(stmt.CtlVar.Type(), stmt.InitVal.Type()) {
+	if !v.assignCompat(stmt.CtlVar.Type(), stmt.InitVal.Type()) {
 		msg := fmt.Sprintf("control variable '%s' (of type '%s'), cannot be initialized with initial value of type '%s'",
 			stmt.CtlVar.Name, stmt.CtlVar.Type(), stmt.InitVal.Type())
 		v.error(stmt.CtlVar.NamePos, msg)
 	}
 
-	if !v.AreAssignmentComp(stmt.CtlVar.Type(), stmt.FinalVal.Type()) {
+	if !v.assignCompat(stmt.CtlVar.Type(), stmt.FinalVal.Type()) {
 		msg := fmt.Sprintf("control variable '%s' (of type '%s'), and final loop value '%s' (of type '%s')",
 			stmt.CtlVar.Name, stmt.CtlVar.Type(), stmt.FinalVal, stmt.FinalVal.Type())
 		v.error(stmt.CtlVar.NamePos, msg)
 	}
-
 }
 
 func (v *Visitor) VisitExitStmt(*ast.ExitStmt) {
@@ -414,7 +399,7 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 
 		// ensure that the ith argument is assignment-compatible with the ith formal parameter
 		for i := 0; i < sig.NumParams(); i++ {
-			if !v.AreAssignmentComp(sig.Params[i].Type.Type(), call.ActualParams[i].Type()) {
+			if !v.assignCompat(sig.Params[i].Type.Type(), call.ActualParams[i].Type()) {
 				msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
 					call.ActualParams[i], sig.Params[i].Name)
 				v.error(call.ActualParams[i].Pos(), msg)
@@ -440,7 +425,7 @@ func (v *Visitor) checkBuiltin(b *scope.Builtin, call *ast.ProcCall) {
 		}
 
 		for i := 0; i < proc.Nargs; i++ {
-			if !v.AreAssignmentComp(scope.Typ[types.Bool], call.ActualParams[i].Type()) {
+			if !v.assignCompat(scope.Typ[types.Bool], call.ActualParams[i].Type()) {
 				msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
 					call.ActualParams[i], scope.Typ[types.Bool])
 				v.error(call.ActualParams[i].Pos(), msg)

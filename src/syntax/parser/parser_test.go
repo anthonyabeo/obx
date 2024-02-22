@@ -396,8 +396,9 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
+	scp := scope.NewScope(scope.Global, "Main")
 	p := &Parser{}
-	p.InitParser(lex)
+	p.InitParser(lex, scp)
 
 	ob := p.Oberon()
 	if len(p.errors) > 0 {
