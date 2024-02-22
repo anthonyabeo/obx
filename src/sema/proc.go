@@ -1,7 +1,6 @@
-package sema
+package types
 
 import (
-	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
@@ -20,6 +19,6 @@ func (p *ProcedureType) DeSugarParams() {
 	}
 }
 
-func (p *ProcedureType) String() string         { return p.fp.String() }
-func (p *ProcedureType) Underlying() types.Type { return p }
-func (p *ProcedureType) Width() int             { return 8 }
+func (p *ProcedureType) String() string   { return p.fp.String() }
+func (p *ProcedureType) Underlying() Type { return p }
+func (p *ProcedureType) Width() int       { return 8 }

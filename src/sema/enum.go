@@ -27,4 +27,4 @@ func (e *Enum) String() string {
 	return fmt.Sprintf("(%v)", strings.Join(list, ", "))
 }
 
-func (e *Enum) Width() int { panic("not implemented") }
+func (e *Enum) Width() int { return 4 }
