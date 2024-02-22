@@ -134,8 +134,15 @@ func (f *FuncCall) End() (pos *token.Position) {
 func (f *FuncCall) Type() types.Type   { return f.EType }
 func (f *FuncCall) Accept(vst Visitor) { vst.VisitFuncCall(f) }
 func (f *FuncCall) expr()              {}
-func (f *FuncCall) String() string     { panic("not implemented") }
-func (f *FuncCall) Value() ir.Value    { return f.IRValue }
+func (f *FuncCall) String() string {
+	var args []string
+	for _, arg := range f.ActualParams {
+		args = append(args, arg.String())
+	}
+
+	return fmt.Sprintf("%s(%s)", f.Dsg, strings.Join(args, ", "))
+}
+func (f *FuncCall) Value() ir.Value { return f.IRValue }
 
 func (id *Ident) Pos() *token.Position { return id.NamePos }
 func (id *Ident) End() *token.Position {
