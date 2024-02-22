@@ -664,8 +664,8 @@ func (p *Parser) parseLiteral() (lit ast.Expression) {
 	return
 }
 
-// set              = '{' [ element {',' element} ] '}'
-// element          = expression ['..' expression]
+// set = '{' [ element {',' element} ] '}'
+// element = expression ['..' expression]
 func (p *Parser) parseSetElem() ast.Expression {
 	expr := p.parseExpression()
 	if p.tok == token.RANGE {
@@ -697,7 +697,6 @@ func (p *Parser) exprStart() bool {
 		p.tok == token.INT32 ||
 		p.tok == token.INT64 ||
 		p.tok == token.LONGREAL
-
 }
 
 func (p *Parser) addOp() bool {

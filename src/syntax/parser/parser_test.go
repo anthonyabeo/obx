@@ -375,3 +375,74 @@ end Main
 		}
 	}
 }
+
+func TestParseAssignStmt(t *testing.T) {
+	input := `
+module Main
+begin
+	i := 0
+	p := i = j
+	x := i + 1
+	k := log2(i+j)
+	F := log2
+	s := {2, 3, 5, 7, 11, 13}
+	a[i] := (x+y) * (x-y)
+	t.key := i
+	w[i+1].name := "John"
+	t := c
+end Main
+`
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := &lexer.Lexer{}
+	lex.InitLexer(file, []byte(input))
+
+	p := &Parser{}
+	p.InitParser(lex)
+
+	ob := p.Oberon()
+	if len(p.errors) > 0 {
+		t.Error("found parse errors")
+		for _, err := range p.errors {
+			t.Log(err)
+		}
+	}
+
+	tests := []struct {
+		lvalue string
+		rvalue string
+	}{
+		{"i", "0"},
+		{"p", "i = j"},
+		{"x", "i + 1"},
+		{"k", "log2(i + j)"},
+		{"F", "log2"},
+		{"s", "{2, 3, 5, 7, 11, 13}"},
+		{"a[i]", "x + y * x - y"},
+		{"t.key", "i"},
+		{"w[i + 1].name", "John"},
+		{"t", "c"},
+	}
+
+	mainMod := ob.Program["Main"]
+	if mainMod.BeginName.Name != mainMod.EndName.Name {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			mainMod.BeginName, mainMod.EndName)
+	}
+
+	if len(mainMod.StmtSeq) != len(tests) {
+		t.Errorf("expected %d statements in '%s' module, found %d",
+			len(tests), mainMod.BeginName, len(mainMod.StmtSeq))
+	}
+
+	for i, stmt := range mainMod.StmtSeq {
+		st := stmt.(*ast.AssignStmt)
+
+		if st.LValue.String() != tests[i].lvalue {
+			t.Errorf("Expected LValue '%s', got '%s'", tests[i].lvalue, st.LValue.String())
+		}
+
+		if st.RValue.String() != tests[i].rvalue {
+			t.Errorf("Expected RValue '%s', got '%s'", tests[i].rvalue, st.RValue.String())
+		}
+	}
+}
