@@ -540,7 +540,7 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 }
 
 func (v *Visitor) VisitEnumType(e *ast.EnumType) {
-	typ := NewEnumType(e.Variants)
+	ty := NewEnumType(e.Variants)
 
 	for i, c := range e.Variants {
 		if obj := v.env.Lookup(c.Name); obj != nil {
@@ -553,12 +553,12 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 				EType: types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer"),
 			}
 
-			v.env.Insert(scope.NewConst(c.NamePos, c.Name, typ, c.Props(), value, v.offset))
+			v.env.Insert(scope.NewConst(c.NamePos, c.Name, ty, c.Props(), value, v.offset))
 			v.offset += value.EType.Width()
 		}
 	}
 
-	e.EType = typ
+	e.EType = ty
 }
 
 func (v *Visitor) VisitReceiver(rcv *ast.Receiver) {
