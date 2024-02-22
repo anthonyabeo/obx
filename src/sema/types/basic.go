@@ -1,9 +1,6 @@
-package sema
+package types
 
-import (
-	"fmt"
-	"github.com/anthonyabeo/obx/src/sema/types"
-)
+import "fmt"
 
 // BasicKind describes the kind of basic type.
 type BasicKind int
@@ -68,8 +65,8 @@ func (b *Basic) Info() BasicInfo { return b.info }
 // Name returns the name of basic type b.
 func (b *Basic) Name() string { return b.name }
 
-func (b *Basic) Underlying() types.Type { return b }
-func (b *Basic) String() string         { return b.name }
+func (b *Basic) Underlying() Type { return b }
+func (b *Basic) String() string   { return b.name }
 func (b *Basic) Width() int {
 	switch b.kind {
 	case Byte, Int8, Bool:

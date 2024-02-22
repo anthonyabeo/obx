@@ -1,23 +1,24 @@
-package types
+package sema
 
 import (
 	"fmt"
 	"strings"
 
+	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
 // An Array represents an array type.
 type Array struct {
 	LenList *ast.LenList
-	ElemTy  Type
+	ElemTy  types.Type
 }
 
-func NewArray(elem Type, len *ast.LenList) *Array {
+func NewArray(elem types.Type, len *ast.LenList) *Array {
 	return &Array{LenList: len, ElemTy: elem}
 }
 
-func (a *Array) Underlying() Type { return a }
+func (a *Array) Underlying() types.Type { return a }
 
 func (a *Array) String() string {
 	var ll []string
