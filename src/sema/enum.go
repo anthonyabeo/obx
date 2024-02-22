@@ -2,9 +2,9 @@ package sema
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/sema/types"
 	"strings"
 
+	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
