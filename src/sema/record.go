@@ -8,7 +8,12 @@ import (
 )
 
 type Record struct {
+	base   *Record
 	fields *Scope
+}
+
+func NewRecordType(fields *Scope, base *Record) *Record {
+	return &Record{base, fields}
 }
 
 func (r Record) String() string {
