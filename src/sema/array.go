@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/sema/types"
@@ -32,8 +33,9 @@ func (a *Array) String() string {
 func (a *Array) Width() int {
 	w := a.ElemTy.Width()
 
-	for i := len(a.LenList.List) - 1; i <= 0; i-- {
-		w *= a.LenList.List[i].Type().Width()
+	for i := len(a.LenList.List) - 1; i >= 0; i-- {
+		idx, _ := strconv.Atoi(a.LenList.List[i].(*ast.BasicLit).Val)
+		w *= idx
 	}
 
 	return w
