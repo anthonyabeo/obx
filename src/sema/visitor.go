@@ -557,7 +557,7 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 
 	for _, field := range r.Fields {
 		field.Type.Accept(v)
-		if _, ok := field.Type.(types.Type); !ok {
+		if _, ok := field.Type.Type().(types.Type); !ok {
 			msg := fmt.Sprintf("cannot use '%s' as a field type", field.Type)
 			v.error(field.Type.Pos(), msg)
 		}
