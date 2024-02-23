@@ -1,8 +1,6 @@
 package translate
 
 import (
-	"fmt"
-
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/sema"
@@ -42,8 +40,8 @@ end Main
 	cgen := NewVisitor(ob, scp)
 	module := cgen.VisitModule("Main")
 
-	Main := module.GetFunction("main")
-	fmt.Println(Main)
+	_ = module.GetFunction("main")
+	//fmt.Println(Main)
 }
 
 func TestIRCodegenBasicWhileLoop(t *testing.T) {
@@ -82,8 +80,8 @@ end Main
 	cgen := NewVisitor(ob, scp)
 	module := cgen.VisitModule("Main")
 
-	Main := module.GetFunction("main")
-	fmt.Println(Main)
+	_ = module.GetFunction("main")
+	//fmt.Println(Main)
 }
 
 func TestIRCodegenWhileLoopWithSingleElseIfBranch(t *testing.T) {
@@ -123,8 +121,8 @@ end Main
 	cgen := NewVisitor(ob, scp)
 	module := cgen.VisitModule("Main")
 
-	Main := module.GetFunction("main")
-	fmt.Println(Main)
+	_ = module.GetFunction("main")
+	//fmt.Println(Main)
 }
 
 func TestIRCodegenWhileLoopWithTwoElseIfBranch(t *testing.T) {
@@ -166,8 +164,8 @@ end Main
 	cgen := NewVisitor(ob, scp)
 	module := cgen.VisitModule("Main")
 
-	Main := module.GetFunction("main")
-	fmt.Println(Main)
+	_ = module.GetFunction("main")
+	//fmt.Println(Main)
 }
 
 func TestIRCodegenRepeatStmt(t *testing.T) {
@@ -206,8 +204,8 @@ end Main
 	cgen := NewVisitor(ob, scp)
 	module := cgen.VisitModule("Main")
 
-	Main := module.GetFunction("main")
-	fmt.Println(Main)
+	_ = module.GetFunction("main")
+	//fmt.Println(Main)
 }
 
 func TestIRCodegenIfThenElse(t *testing.T) {
@@ -246,8 +244,8 @@ end Main
 	cgen := NewVisitor(ob, scp)
 	module := cgen.VisitModule("Main")
 
-	Main := module.GetFunction("main")
-	fmt.Println(Main)
+	_ = module.GetFunction("main")
+	//fmt.Println(Main)
 }
 
 func TestIRCodegenIfThenElsifElse(t *testing.T) {
@@ -288,8 +286,8 @@ end Main
 	cgen := NewVisitor(ob, scp)
 	module := cgen.VisitModule("Main")
 
-	Main := module.GetFunction("main")
-	fmt.Println(Main)
+	_ = module.GetFunction("main")
+	//fmt.Println(Main)
 }
 
 func TestIRCodegenIfThenElsifWithNoElse(t *testing.T) {
@@ -330,6 +328,6 @@ end Main
 	cgen := NewVisitor(ob, scp)
 	module := cgen.VisitModule("Main")
 
-	Main := module.GetFunction("main")
-	fmt.Println(Main)
+	_ = module.GetFunction("main")
+	//fmt.Println(Main)
 }
