@@ -535,8 +535,44 @@ func (v *Visitor) VisitPointerType(p *ast.PointerType) {
 }
 
 func (v *Visitor) VisitRecordType(r *ast.RecordType) {
-	// TODO not implemented
-	panic("not implemented")
+	var (
+		base      *Record
+		isRecType bool
+	)
+
+	// entering a new scope. store the current offset and reset v.offset to be used in the new scope
+	off := v.offset
+	v.offset = 0
+
+	if r.BaseType != nil {
+		r.BaseType.Accept(v)
+		base, isRecType = r.BaseType.Type().(*Record)
+		if !isRecType {
+			msg := fmt.Sprintf("cannot extend from a '%s' which is not a record-type", r.BaseType.Type())
+			v.error(r.BaseType.Pos(), msg)
+		}
+	}
+
+	ty := NewRecordType(NewScope(v.env, ""), base)
+
+	for _, field := range r.Fields {
+		field.Type.Accept(v)
+
+		for _, id := range field.IdList {
+			if obj := ty.fields.Lookup(id.Name); obj != nil {
+				msg := fmt.Sprintf("field name '%s' already declared at '%v'", id.Name, obj.Pos())
+				v.error(id.NamePos, msg)
+			} else {
+				ty.fields.Insert(NewVar(id.NamePos, id.Name, field.Type.Type(), id.IProps, v.offset))
+				v.offset += field.Type.Type().Width()
+			}
+		}
+	}
+
+	r.EType = ty
+
+	// restore the previous offset
+	v.offset = off
 }
 
 func (v *Visitor) VisitEnumType(e *ast.EnumType) {
@@ -635,5 +671,5 @@ func (v *Visitor) VisitImport(imp *ast.Import) {
 }
 
 func (v *Visitor) VisitExprRange(rng *ast.ExprRange) {
-
+	panic("not implemented")
 }
