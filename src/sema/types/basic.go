@@ -69,7 +69,7 @@ func (b *Basic) Underlying() Type { return b }
 func (b *Basic) String() string   { return b.name }
 func (b *Basic) Width() int {
 	switch b.kind {
-	case Byte, Int8, Bool:
+	case Byte, Int8, Bool, Char:
 		return 1
 	case Int16, WChar:
 		return 2

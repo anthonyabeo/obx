@@ -557,6 +557,10 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 
 	for _, field := range r.Fields {
 		field.Type.Accept(v)
+		if _, ok := field.Type.(types.Type); !ok {
+			msg := fmt.Sprintf("cannot use '%s' as a field type", field.Type)
+			v.error(field.Type.Pos(), msg)
+		}
 
 		for _, id := range field.IdList {
 			if obj := ty.fields.Lookup(id.Name); obj != nil {
