@@ -82,3 +82,35 @@ end Main
 		}
 	}
 }
+
+func TestTypeCheckRecordType(t *testing.T) {
+	input := `
+module Main
+	const foo = 255
+	var employee: record
+	  name, firstname: array 32 of char
+	  age: integer
+	  salary: real
+	end
+
+end Main
+`
+
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := &lexer.Lexer{}
+	lex.InitLexer(file, []byte(input))
+
+	p := &parser.Parser{}
+	p.InitParser(lex)
+	ob := p.Oberon()
+
+	sema := &Visitor{}
+	sema.InitSemaVisitor(ob, Global)
+	sema.VisitModule("Main")
+	if len(sema.errors) > 0 {
+		t.Error("found semantic errors")
+		for _, err := range sema.errors {
+			t.Log(err.Error())
+		}
+	}
+}
