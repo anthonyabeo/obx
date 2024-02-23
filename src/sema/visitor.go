@@ -96,7 +96,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 
 	switch expr.Op {
 	case token.PLUS, token.MINUS, token.STAR, token.QUOT:
-		if left.Info() != types.IsNumeric || right.Info() != types.IsNumeric {
+		if left.Info()|types.IsNumeric != types.IsNumeric || right.Info()|types.IsNumeric != types.IsNumeric {
 			msg := fmt.Sprintf("cannot perform operation '%v' on non-numeric types, '%v' and '%v'", expr.Op, expr.Left, expr.Right)
 			v.error(expr.Pos(), msg)
 		}
@@ -111,7 +111,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 		}
 
 	case token.DIV, token.MOD:
-		if left.Info() != types.IsInteger || right.Info() != types.IsInteger {
+		if left.Info()|types.IsNumeric != types.IsInteger || right.Info()|types.IsNumeric != types.IsInteger {
 			msg := fmt.Sprintf("cannot perform operation '%v' on non-integer types, '%v' and '%v'", expr.Op, expr.Left, expr.Right)
 			v.error(expr.Pos(), msg)
 		}
@@ -120,24 +120,24 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			expr.EType = right
 		}
 	case token.EQUAL, token.NEQ:
-		if left.Info() != types.IsNumeric /* && left.info() != IsEnum && IsChar && IsString && IsCharArray && IsBool && IsSet && IsPointer && IsProc && IsNil */ {
+		if left.Info()|types.IsNumeric != types.IsNumeric /* && left.info() != IsEnum && IsChar && IsString && IsCharArray && IsBool && IsSet && IsPointer && IsProc && IsNil */ {
 			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Left)
 			v.error(expr.Left.Pos(), msg)
 		}
 
-		if right.Info() != types.IsNumeric /* && left.info() != IsEnum && IsChar && IsString && IsCharArray & IsBool && IsSet && IsPointer && IsProc && IsNil */ {
+		if right.Info()|types.IsNumeric != types.IsNumeric /* && left.info() != IsEnum && IsChar && IsString && IsCharArray & IsBool && IsSet && IsPointer && IsProc && IsNil */ {
 			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Right)
 			v.error(expr.Right.Pos(), msg)
 		}
 
 		expr.EType = scope.Typ[types.Bool]
 	case token.LESS, token.LEQ, token.GREAT, token.GEQ:
-		if left.Info() != types.IsNumeric /*&& left.Info() != types.IsEnum*/ && left.Info() != types.IsChar && left.Info() != types.IsString /*&& IsCharArray */ {
+		if left.Info()|types.IsNumeric != types.IsNumeric /*&& left.Info() != types.IsEnum*/ && left.Info() != types.IsChar && left.Info() != types.IsString /*&& IsCharArray */ {
 			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Left)
 			v.error(expr.Left.Pos(), msg)
 		}
 
-		if right.Info() != types.IsNumeric && right.Info() != types.IsChar && right.Info() != types.IsString /* && IsEnum && IsCharArray*/ {
+		if right.Info()|types.IsNumeric != types.IsNumeric && right.Info() != types.IsChar && right.Info() != types.IsString /* && IsEnum && IsCharArray*/ {
 			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Right)
 			v.error(expr.Right.Pos(), msg)
 		}
@@ -197,8 +197,9 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 	// ensure that the ith argument is assignment-compatible with the ith formal parameter
 	for i := 0; i < sig.NumParams(); i++ {
 		if !v.assignCompat(sig.Params[i].Type.Type(), call.ActualParams[i].Type()) {
-			msg := fmt.Sprintf("argument '%v' (of type '%v') does not match the corresponding parameter type '%v'",
-				call.ActualParams[i], call.ActualParams[i].Type(), sig.Params[i].Type.Type())
+			msg := fmt.Sprintf(
+				"argument '%v' (of type '%v') does not match the corresponding parameter type '%v' in function call '%s'",
+				call.ActualParams[i], call.ActualParams[i].Type(), sig.Params[i].Type.Type(), call)
 			v.error(call.ActualParams[i].Pos(), msg)
 		}
 	}
@@ -516,6 +517,14 @@ func (v *Visitor) VisitArrayType(a *ast.ArrayType) {
 	if a.LenList != nil {
 		for _, index := range a.LenList.List {
 			index.Accept(v)
+			i, ok := index.Type().(*types.Basic)
+			if !ok {
+				v.error(nil, "")
+			}
+
+			if i.Info() != types.IsInteger {
+				v.error(nil, "")
+			}
 		}
 	}
 

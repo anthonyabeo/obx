@@ -44,7 +44,7 @@ func (v *Visitor) assignCompat(left, right types.Type) bool {
 
 	l, _ := left.(*types.Basic)
 	r, _ := right.(*types.Basic)
-	if l.Info() == types.IsNumeric && r.Info() == types.IsNumeric {
+	if l.Info()|types.IsNumeric == types.IsNumeric && r.Info()|types.IsNumeric == types.IsNumeric {
 		return l.Kind() >= r.Kind()
 	}
 
