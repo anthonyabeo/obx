@@ -519,11 +519,13 @@ func (v *Visitor) VisitArrayType(a *ast.ArrayType) {
 			index.Accept(v)
 			i, ok := index.Type().(*types.Basic)
 			if !ok {
-				v.error(nil, "")
+				msg := fmt.Sprintf("expected the size of array to be basic (integer) type, got '%s'", index.Type())
+				v.error(index.Pos(), msg)
 			}
 
 			if i.Info() != types.IsInteger {
-				v.error(nil, "")
+				msg := fmt.Sprintf("expected the size of array to be integer-type, got '%s'", index.Type())
+				v.error(index.Pos(), msg)
 			}
 		}
 	}
