@@ -44,6 +44,10 @@ func (s *Scope) Insert(obj Symbol) Symbol {
 	return nil
 }
 
+func (s *Scope) Elems() map[string]Symbol {
+	return s.elems
+}
+
 func (s *Scope) insert(name string, obj Symbol) {
 	if s.elems == nil {
 		s.elems = make(map[string]Symbol)

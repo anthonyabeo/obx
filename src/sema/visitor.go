@@ -541,8 +541,14 @@ func (v *Visitor) VisitProcType(p *ast.ProcType) {
 }
 
 func (v *Visitor) VisitPointerType(p *ast.PointerType) {
-	// TODO not implemented
-	panic("not implemented")
+	p.Base.Accept(v)
+	if _, isRecordType := p.Base.Type().(*Record); !isRecordType {
+		if _, isArrayType := p.Base.Type().(*Array); !isArrayType {
+			v.error(p.Pos(), "pointer base type must be an array or record-type")
+		}
+	}
+
+	p.EType = &PtrType{p.Base.Type()}
 }
 
 func (v *Visitor) VisitRecordType(r *ast.RecordType) {
@@ -564,7 +570,7 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 		}
 	}
 
-	ty := NewRecordType(NewScope(v.env, ""), base)
+	ty := NewRecordType(scope.NewScope(v.env, ""), base)
 
 	for _, field := range r.Fields {
 		field.Type.Accept(v)
@@ -578,7 +584,7 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 				msg := fmt.Sprintf("field name '%s' already declared at '%v'", id.Name, obj.Pos())
 				v.error(id.NamePos, msg)
 			} else {
-				ty.fields.Insert(NewVar(id.NamePos, id.Name, field.Type.Type(), id.IProps, v.offset))
+				ty.fields.Insert(scope.NewVar(id.NamePos, id.Name, field.Type.Type(), id.IProps, v.offset))
 				v.offset += field.Type.Type().Width()
 			}
 		}
