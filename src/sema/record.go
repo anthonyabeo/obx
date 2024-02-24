@@ -37,3 +37,7 @@ func (r Record) Width() int {
 
 	return w
 }
+
+func (r Record) ExtendsBase() bool { return r.base != nil }
+
+func (r Record) Base() *Record { return r.base }
