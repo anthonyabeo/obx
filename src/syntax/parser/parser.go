@@ -85,6 +85,49 @@ func (p *Parser) Oberon() *ast.Oberon {
 	return ob
 }
 
+// MetaParams = '(' MetaSection { [';'] MetaSection } ')'
+func (p *Parser) metaParams() (seq []*ast.MetaSection) {
+	p.match(token.LPAREN)
+
+	seq = append(seq, p.parseMetaSection())
+	for p.tok == token.SEMICOLON || p.tok == token.CONST || p.tok == token.TYPE {
+		if p.tok == token.SEMICOLON {
+			p.next()
+		}
+
+		seq = append(seq, p.parseMetaSection())
+	}
+
+	p.match(token.RPAREN)
+	return
+}
+
+// MetaSection      = [ TYPE | CONST ] ident { [','] ident } [ ':' TypeConstraint ]
+func (p *Parser) parseMetaSection() *ast.MetaSection {
+	ms := &ast.MetaSection{}
+
+	if p.tok == token.TYPE || p.tok == token.CONST {
+		ms.Mode = p.tok
+		p.next()
+	}
+
+	ms.Ids = append(ms.Ids, p.parseIdent())
+	for p.tok == token.COMMA || p.tok == token.IDENT {
+		if p.tok == token.COMMA {
+			p.next()
+		}
+
+		ms.Ids = append(ms.Ids, p.parseIdent())
+	}
+
+	if p.tok == token.COLON {
+		p.next()
+		ms.TyConstraint = p.parseNamedType()
+	}
+
+	return ms
+}
+
 func (p *Parser) parseModule() *ast.Module {
 	mod := new(ast.Module)
 
@@ -92,7 +135,7 @@ func (p *Parser) parseModule() *ast.Module {
 	mod.BeginName = p.parseIdent()
 
 	if p.tok == token.LPAREN {
-		p.metaParams()
+		mod.MetaParams = p.metaParams()
 	}
 
 	if p.tok == token.SEMICOLON {
@@ -938,8 +981,6 @@ func (p *Parser) parseIdent() *ast.Ident {
 
 	return &ast.Ident{NamePos: pos, Name: name}
 }
-
-func (p *Parser) metaParams() {}
 
 func (p *Parser) parseStatement() (stmt ast.Statement) {
 	switch p.tok {
