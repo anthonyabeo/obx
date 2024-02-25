@@ -74,8 +74,9 @@ func (v *Visitor) VisitBasicLit(b *ast.BasicLit) {
 	case token.INT64:
 		b.EType = scope.Typ[types.Int64]
 	case token.REAL:
-	case token.STRING:
-	case token.HEXSTRING:
+		b.EType = Typ[types.Real]
+	case token.LONGREAL:
+		b.EType = Typ[types.LReal]
 	case token.TRUE, token.FALSE:
 		b.EType = scope.Typ[types.Bool]
 	}
@@ -214,10 +215,9 @@ func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
 
 	switch expr.Op {
 	case token.PLUS, token.MINUS:
-		if X.Info() != types.IsNumeric {
+		if X.Info()|types.IsNumeric != types.IsNumeric {
 			msg := fmt.Sprintf("'%v' must be numeric type", expr.X)
 			v.error(expr.X.Pos(), msg)
-			return
 		}
 
 		expr.EType = X
@@ -225,7 +225,6 @@ func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
 		if X.Info() != types.IsBoolean {
 			msg := fmt.Sprintf("'%v' does not evaluate to Boolean type", expr.X)
 			v.error(expr.X.Pos(), msg)
-			return
 		}
 
 		expr.EType = scope.Typ[types.Bool]
@@ -343,7 +342,7 @@ func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
 		stmt.By = &ast.BasicLit{
 			Kind:  token.INT,
 			Val:   "1",
-			EType: types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer"),
+			EType: types.NewBasicType(types.Int, types.IsInteger, "integer"),
 		}
 	}
 
@@ -607,7 +606,7 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 			value := &ast.BasicLit{
 				Kind:  token.INT,
 				Val:   strconv.Itoa(i),
-				EType: types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer"),
+				EType: types.NewBasicType(types.Int, types.IsInteger, "integer"),
 			}
 
 			v.env.Insert(scope.NewConst(c.NamePos, c.Name, ty, c.Props(), value, v.offset))
