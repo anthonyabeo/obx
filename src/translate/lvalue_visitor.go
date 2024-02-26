@@ -22,5 +22,11 @@ func (l *LValueVisitor) VisitIdentifier(id *ast.Ident) {
 
 func (l *LValueVisitor) VisitDesignator(d *ast.Designator) {
 	d.QualifiedIdent.Accept(l)
+	if d.Selector != nil {
+		d.Selector.Accept(l)
+		d.IRValue = d.Selector.Value()
+		return
+	}
+
 	d.IRValue = d.QualifiedIdent.Value()
 }

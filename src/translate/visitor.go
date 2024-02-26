@@ -488,9 +488,11 @@ func (v *Visitor) VisitBasicType(t *ast.BasicType) {
 		case types.Int8:
 			ty = ir.Int8Type
 		case types.Int16:
+			ty = ir.Int1Type
 		case types.Int32:
 			ty = ir.Int32Type
 		case types.Int64:
+			ty = ir.Int64Type
 		}
 	default:
 
@@ -570,5 +572,6 @@ func (v *Visitor) VisitPointerDeref(drf *ast.PtrDref) {
 }
 
 func (v *Visitor) VisitExprRange(rng *ast.ExprRange) {
-
+	//TODO implement me
+	panic("implement me")
 }
