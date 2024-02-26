@@ -443,6 +443,9 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 		v.offset += 8
 	}
 
+	off := v.offset
+	v.offset = 0
+
 	parent := v.env
 
 	// create a new scope to accommodate the symbols in the procedure. Make this new scope
@@ -455,8 +458,9 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 
 	// TODO check that all the paths in the body have a return statement that matches the procedure's return type
 
-	// revert the scope back to the parent
+	// revert the scope and symbol offset back to the parent
 	v.env = parent
+	v.offset = off
 }
 
 func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
