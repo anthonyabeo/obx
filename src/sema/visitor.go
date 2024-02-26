@@ -74,9 +74,9 @@ func (v *Visitor) VisitBasicLit(b *ast.BasicLit) {
 	case token.INT64:
 		b.EType = scope.Typ[types.Int64]
 	case token.REAL:
-		b.EType = Typ[types.Real]
+		b.EType = scope.Typ[types.Real]
 	case token.LONGREAL:
-		b.EType = Typ[types.LReal]
+		b.EType = scope.Typ[types.LReal]
 	case token.TRUE, token.FALSE:
 		b.EType = scope.Typ[types.Bool]
 	}
@@ -431,6 +431,59 @@ func (v *Visitor) checkBuiltin(b *scope.Builtin, call *ast.ProcCall) {
 				v.error(call.ActualParams[i].Pos(), msg)
 			}
 		}
+	//case _Assertn:
+	//case _Bytes:
+	//case _Dec:
+	//case _Decn:
+	//case _Excl:
+	//case _Halt:
+	case scope.Inc_:
+		//case _Incn:
+		//case _Incl:
+		//case _New:
+		//case _Newn:
+		//case _Number:
+		//case _PCall:
+		//case _Raise:
+		//case _Copy:
+		//case _Pack:
+		//case _UnPk:
+		//
+		//case _Abs:
+		//case _Cap:
+		//case _BitAnd:
+		//case _BitAsr:
+		//case _BitNot:
+		//case _BitOr:
+		//case _Bits:
+		//case _BitShl:
+		//case _BitShr:
+		//case _BitXor:
+		//case _Cast:
+		//case _Chr:
+		//case _Default:
+		//case _Floor:
+		//case _Flt:
+		//case _LdCmd:
+		//case _LdMod:
+		//case _Len:
+		//case _LenN:
+		//case _Long:
+		//case _Max:
+		//case _MaxN:
+		//case _Min:
+		//case _MinN:
+		//case _Odd:
+		//case _Ord:
+		//case _Short:
+		//case _Size:
+		//case _StrLen:
+		//case _WChr:
+		//case _ASh:
+		//case _ASr:
+		//case _Entier:
+		//case _Lsl:
+		//case _Ror:
 	}
 }
 
