@@ -53,7 +53,6 @@ func (v *Visitor) VisitIdentifier(id *ast.Ident) {
 	obj := v.env.Lookup(id.Name)
 	if obj == nil {
 		v.error(id.Pos(), fmt.Sprintf("name %v is undecleared", id.Name))
-		return
 	}
 
 	id.EType = obj.Type()
@@ -557,7 +556,6 @@ func (v *Visitor) VisitBasicType(b *ast.BasicType) {
 	if obj == nil {
 		msg := fmt.Sprintf("name '%v' is not declared and is not a predeclared type", b.Name())
 		v.error(b.Pos(), msg)
-		return
 	}
 
 	t, ok := obj.Type().(types.Type)
