@@ -111,7 +111,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 		}
 
 	case token.DIV, token.MOD:
-		if left.Info()|types.IsNumeric != types.IsInteger || right.Info()|types.IsNumeric != types.IsInteger {
+		if left.Info() != types.IsInteger || right.Info() != types.IsInteger {
 			msg := fmt.Sprintf("cannot perform operation '%v' on non-integer types, '%v' and '%v'", expr.Op, expr.Left, expr.Right)
 			v.error(expr.Pos(), msg)
 		}
