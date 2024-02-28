@@ -12,7 +12,7 @@ type Module struct {
 }
 
 type MetaSection struct {
-	Mode         token.Token
-	Ids          []*Ident
-	TyConstraint Type
+	Mode    token.Token
+	Ids     []*Ident
+	TyConst Type
 }

@@ -628,20 +628,6 @@ end Drawing
 		{token.IDENT, "Drawing"},
 	}
 
-	// begin
-	//  figures := C.createDeque()
-	//  new(circle)
-	//  circle.position.x := F.calc(3)
-	//  circle.position.y := F.calc(4)
-	//  circle.diameter := 3
-	//  figures.append(circle)
-	//  new(square)
-	//  square.position.x := F.calc(5)
-	//  square.position.y := F.calc(6)
-	//  square.width := 4
-	//  figures.append(square)
-	//  drawAll()
-	//end Drawing
 	for _, tt := range tests {
 		tok, lit, _ := lexer.Lex()
 		if tok != tt.tokenKind {
