@@ -447,3 +447,61 @@ end Main
 		}
 	}
 }
+
+func TestParseImportDecl(t *testing.T) {
+	input := `module Drawing
+ import F := Fibonacci
+        C := Collections(Figure)
+		Foobar
+		a.b.c.d
+		D := a.b.c
+		E := a.b.c.d(Bar)
+		F := a.b.c.d(Bar, Baz)
+		G := a.b.c.d(Foo Bar Baz)
+		Out
+end Drawing
+`
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := &lexer.Lexer{}
+	lex.InitLexer(file, []byte(input))
+
+	p := &Parser{}
+	p.InitParser(lex)
+
+	ob := p.Oberon()
+	if len(p.errors) > 0 {
+		t.Error("found parse errors")
+		for _, err := range p.errors {
+			t.Log(err)
+		}
+	}
+
+	tests := []string{
+		"F := Fibonacci",
+		"C := Collections(Figure)",
+		"Foobar",
+		"a.b.c.d",
+		"D := a.b.c",
+		"E := a.b.c.d(Bar)",
+		"F := a.b.c.d(Bar, Baz)",
+		"G := a.b.c.d(Foo, Bar, Baz)",
+		"Out",
+	}
+
+	mainMod := ob.Program["Drawing"]
+	if mainMod.BeginName.Name != mainMod.EndName.Name {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			mainMod.BeginName, mainMod.EndName)
+	}
+
+	if len(mainMod.ImportList) != len(tests) {
+		t.Errorf("ecpected %d import statements, found %d", len(tests), len(mainMod.ImportList))
+	}
+
+	for i, imp := range mainMod.ImportList {
+		if tests[i] != imp.String() {
+			t.Errorf("expected import %s, got %s instead", tests[i], imp.String())
+		}
+	}
+
+}
