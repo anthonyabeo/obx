@@ -122,7 +122,7 @@ func (p *Parser) parseMetaSection() *ast.MetaSection {
 
 	if p.tok == token.COLON {
 		p.next()
-		ms.TyConstraint = p.parseNamedType()
+		ms.TyConst = p.parseNamedType()
 	}
 
 	return ms
@@ -148,8 +148,11 @@ func (p *Parser) parseModule() *ast.Module {
 			p.next()
 
 			mod.ImportList = append(mod.ImportList, p.parseImport())
-			for p.tok == token.COMMA {
-				p.next()
+			for p.tok == token.COMMA || p.tok == token.IDENT {
+				if p.tok == token.COMMA {
+					p.next()
+				}
+
 				mod.ImportList = append(mod.ImportList, p.parseImport())
 			}
 
@@ -235,18 +238,30 @@ func (p *Parser) parseImportList() []*ast.Import {
 // ImportPath = { ident '.' }
 func (p *Parser) parseImport() *ast.Import {
 	imp := &ast.Import{ImpNamePos: p.pos}
-	if p.tok == token.IDENT {
-		imp.Alias = p.parseIdent()
+	var avail bool
+
+	id := p.parseIdent()
+	if p.tok == token.BECOMES {
+		imp.Alias = id
 		p.match(token.BECOMES)
+
+		avail = true
 	}
 
-	for p.tok == token.IDENT {
-		imp.ImportPath = append(imp.ImportPath, p.parseIdent())
+	if avail {
+		id = p.parseIdent()
+	}
+
+ImportPath:
+	if p.tok == token.PERIOD {
+		imp.ImportPath = append(imp.ImportPath, id)
 		p.match(token.PERIOD)
+
+		id = p.parseIdent()
+		goto ImportPath
 	}
 
-	p.match(token.IDENT)
-	imp.Name = p.parseIdent()
+	imp.Name = id
 
 	if p.tok == token.LPAREN {
 		p.next()
