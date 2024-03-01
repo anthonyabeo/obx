@@ -280,18 +280,6 @@ ImportPath:
 	return imp
 }
 
-func (p *Parser) startsImportOrDecl() bool {
-	return p.tok == token.IMPORT || p.startsDecl()
-}
-
-func (p *Parser) startsDecl() bool {
-	return p.tok == token.VAR ||
-		p.tok == token.TYPE ||
-		p.tok == token.CONST ||
-		p.tok == token.PROC ||
-		p.tok == token.PROCEDURE
-}
-
 //	DeclarationSequence = {
 //			  CONST { ConstDeclaration [';'] }
 //			| TYPE { TypeDeclaration [';'] }
@@ -374,104 +362,20 @@ func (p *Parser) parseVarDecl() (v *ast.VarDecl) {
 	return
 }
 
-func (p *Parser) parseType() (typ ast.Type) {
+func (p *Parser) parseType() (ty ast.Type) {
 	switch p.tok {
 	case token.IDENT:
-		typ = p.parseNamedType()
+		ty = p.parseNamedType()
 	case token.ARRAY, token.LBRACK:
-		pos := p.pos
-		p.next()
-
-		var ll *ast.LenList
-		if p.tok == token.VAR || p.exprStart() {
-			ll = new(ast.LenList)
-			if p.tok == token.VAR {
-				ll.Modifier = p.tok
-				p.next()
-			}
-
-			ll.List = p.parseExprList()
-		}
-
-		if p.tok == token.RBRACK {
-			p.match(token.RBRACK)
-			typ := p.parseType()
-
-			return ast.NewArray(pos, ll, typ)
-		}
-
-		p.match(token.OF)
-
-		typ = ast.NewArray(pos, ll, p.parseType())
+		ty = p.parseArrayType()
 	case token.RECORD:
-		rec := &ast.RecordType{Record: p.pos}
-
-		p.match(token.RECORD)
-
-		if p.tok == token.LPAREN {
-			p.next()
-			rec.BaseType = p.parseNamedType()
-			p.match(token.RPAREN)
-		}
-
-		if p.tok == token.IDENT {
-			rec.Fields = append(rec.Fields, p.fieldList())
-			for p.tok == token.SEMICOLON || p.tok == token.IDENT {
-				if p.tok == token.SEMICOLON {
-					p.next()
-				}
-				rec.Fields = append(rec.Fields, p.fieldList())
-			}
-		}
-
-		p.match(token.END)
-
-		typ = rec
+		ty = p.parseRecordType()
 	case token.PROCEDURE, token.PROC:
-		proc := &ast.ProcType{Proc: p.pos}
-		p.next()
-
-		if p.tok == token.LPAREN {
-			p.next()
-			if p.tok == token.POINTER || p.tok == token.CARET {
-				p.next()
-			}
-
-			p.match(token.RPAREN)
-		}
-
-		if p.tok == token.LPAREN {
-			proc.FP = p.parseFormalParameters()
-		}
-
-		typ = proc
+		ty = p.parseProcType()
 	case token.POINTER, token.CARET:
-		ptr := &ast.PointerType{Ptr: p.pos}
-		tok := p.tok
-
-		p.next()
-		if tok == token.POINTER {
-			p.match(token.TO)
-		}
-
-		ptr.Base = p.parseType()
-
-		typ = ptr
+		ty = p.parsePtrType()
 	case token.LPAREN:
-		enum := &ast.EnumType{Enum: p.pos}
-		p.next()
-
-		enum.Variants = append(enum.Variants, p.parseIdent())
-		for p.tok == token.COMMA || p.tok == token.IDENT {
-			if p.tok == token.COMMA {
-				p.next()
-			}
-			enum.Variants = append(enum.Variants, p.parseIdent())
-		}
-
-		p.match(token.RPAREN)
-
-		typ = enum
+		ty = p.parseEnumType()
 	default:
 		pos := p.pos
 		p.errorExpected(pos, "type")
@@ -480,6 +384,110 @@ func (p *Parser) parseType() (typ ast.Type) {
 	}
 
 	return
+}
+
+func (p *Parser) parseEnumType() *ast.EnumType {
+	enum := &ast.EnumType{Enum: p.pos}
+	p.next()
+
+	enum.Variants = append(enum.Variants, p.parseIdent())
+	for p.tok == token.COMMA || p.tok == token.IDENT {
+		if p.tok == token.COMMA {
+			p.next()
+		}
+		enum.Variants = append(enum.Variants, p.parseIdent())
+	}
+
+	p.match(token.RPAREN)
+
+	return enum
+}
+
+func (p *Parser) parsePtrType() *ast.PointerType {
+	ptr := &ast.PointerType{Ptr: p.pos}
+	tok := p.tok
+
+	p.next()
+	if tok == token.POINTER {
+		p.match(token.TO)
+	}
+
+	ptr.Base = p.parseType()
+
+	return ptr
+}
+
+func (p *Parser) parseProcType() *ast.ProcType {
+	proc := &ast.ProcType{Proc: p.pos}
+	p.next()
+
+	if p.tok == token.LPAREN {
+		p.next()
+		if p.tok == token.POINTER || p.tok == token.CARET {
+			p.next()
+		}
+
+		p.match(token.RPAREN)
+	}
+
+	if p.tok == token.LPAREN {
+		proc.FP = p.parseFormalParameters()
+	}
+
+	return proc
+}
+
+func (p *Parser) parseArrayType() *ast.ArrayType {
+	pos := p.pos
+	p.next()
+
+	var ll *ast.LenList
+	if p.tok == token.VAR || p.exprStart() {
+		ll = new(ast.LenList)
+		if p.tok == token.VAR {
+			ll.Modifier = p.tok
+			p.next()
+		}
+
+		ll.List = p.parseExprList()
+	}
+
+	if p.tok == token.RBRACK {
+		p.next()
+		typ := p.parseType()
+
+		return ast.NewArray(pos, ll, typ)
+	}
+
+	p.match(token.OF)
+
+	return ast.NewArray(pos, ll, p.parseType())
+}
+
+func (p *Parser) parseRecordType() *ast.RecordType {
+	rec := &ast.RecordType{Record: p.pos}
+
+	p.match(token.RECORD)
+
+	if p.tok == token.LPAREN {
+		p.next()
+		rec.BaseType = p.parseNamedType()
+		p.match(token.RPAREN)
+	}
+
+	if p.tok == token.IDENT {
+		rec.Fields = append(rec.Fields, p.fieldList())
+		for p.tok == token.SEMICOLON || p.tok == token.IDENT {
+			if p.tok == token.SEMICOLON {
+				p.next()
+			}
+			rec.Fields = append(rec.Fields, p.fieldList())
+		}
+	}
+
+	p.match(token.END)
+
+	return rec
 }
 
 func (p *Parser) fieldList() *ast.FieldList {
@@ -509,37 +517,6 @@ func (p *Parser) advance(to map[token.Token]bool) {
 			}
 		}
 	}
-}
-
-var stmtStart = map[token.Token]bool{
-	token.EXIT:   true,
-	token.WHILE:  true,
-	token.FOR:    true,
-	token.LOOP:   true,
-	token.IF:     true,
-	token.RETURN: true,
-	token.CASE:   true,
-	token.WITH:   true,
-	token.REPEAT: true,
-	token.IDENT:  true,
-}
-
-var declStart = map[token.Token]bool{
-	token.IMPORT:    true,
-	token.CONST:     true,
-	token.TYPE:      true,
-	token.VAR:       true,
-	token.PROC:      true,
-	token.PROCEDURE: true,
-}
-
-var exprEnd = map[token.Token]bool{
-	token.COMMA:     true,
-	token.COLON:     true,
-	token.SEMICOLON: true,
-	token.RPAREN:    true,
-	token.RBRACK:    true,
-	token.RBRACE:    true,
 }
 
 // expression = SimpleExpression [ relation SimpleExpression ]
@@ -584,17 +561,6 @@ func (p *Parser) parseSimpleExpression() (expr ast.Expression) {
 	}
 
 	return
-}
-
-func (p *Parser) relation() bool {
-	return p.tok == token.EQUAL ||
-		p.tok == token.LESS ||
-		p.tok == token.LEQ ||
-		p.tok == token.GREAT ||
-		p.tok == token.GEQ ||
-		p.tok == token.IN ||
-		p.tok == token.IS ||
-		p.tok == token.NEQ
 }
 
 // term = factor {MulOperator factor}
@@ -753,43 +719,6 @@ func (p *Parser) parseSetElem() ast.Expression {
 	}
 
 	return expr
-}
-
-func (p *Parser) exprStart() bool {
-	return p.tok == token.LPAREN ||
-		p.tok == token.PLUS ||
-		p.tok == token.MINUS ||
-		p.tok == token.IDENT ||
-		p.tok == token.TRUE ||
-		p.tok == token.FALSE ||
-		p.tok == token.NIL ||
-		p.tok == token.LBRACE ||
-		p.tok == token.STRING ||
-		p.tok == token.HEXSTRING ||
-		p.tok == token.CHAR ||
-		p.tok == token.INT ||
-		p.tok == token.REAL ||
-		p.tok == token.NOT ||
-		p.tok == token.BYTE ||
-		p.tok == token.INT8 ||
-		p.tok == token.INT16 ||
-		p.tok == token.INT32 ||
-		p.tok == token.INT64 ||
-		p.tok == token.LONGREAL
-}
-
-func (p *Parser) addOp() bool {
-	return p.tok == token.PLUS ||
-		p.tok == token.MINUS ||
-		p.tok == token.OR
-}
-
-func (p *Parser) mulOp() bool {
-	return p.tok == token.STAR ||
-		p.tok == token.QUOT ||
-		p.tok == token.DIV ||
-		p.tok == token.MOD ||
-		p.tok == token.AND
 }
 
 func (p *Parser) parseNamedType() ast.Type {
@@ -991,19 +920,6 @@ func (p *Parser) parseStatementSeq() (seq []ast.Statement) {
 	}
 
 	return
-}
-
-func (p *Parser) stmtStart() bool {
-	return p.tok == token.EXIT ||
-		p.tok == token.IF ||
-		p.tok == token.WITH ||
-		p.tok == token.RETURN ||
-		p.tok == token.REPEAT ||
-		p.tok == token.LOOP ||
-		p.tok == token.WHILE ||
-		p.tok == token.FOR ||
-		p.tok == token.CASE ||
-		p.tok == token.IDENT
 }
 
 func (p *Parser) parseIdent() *ast.Ident {
