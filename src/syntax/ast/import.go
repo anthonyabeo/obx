@@ -9,14 +9,14 @@ import (
 )
 
 type Import struct {
-	ImpNamePos *token.Position
+	NamePos    *token.Position
 	Alias      *Ident
 	Name       *Ident
 	ImportPath []*Ident
 	Meta       []Expression
 }
 
-func (imp *Import) Pos() *token.Position { panic("not implemented") }
+func (imp *Import) Pos() *token.Position { return imp.NamePos }
 func (imp *Import) End() *token.Position { panic("not implemented") }
 func (imp *Import) String() string {
 	buf := new(bytes.Buffer)
