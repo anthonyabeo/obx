@@ -1,7 +1,9 @@
 package ast
 
 import (
+	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
@@ -70,53 +72,118 @@ type (
 	}
 )
 
-func (v *VarDecl) decl()   {}
-func (c *ConstDecl) decl() {}
-func (t *TypeDecl) decl()  {}
-func (p *ProcDecl) decl()  {}
+func (v *VarDecl) decl() {}
+func (v *VarDecl) String() string {
+	var list []string
+	for _, id := range v.IdentList {
+		list = append(list, id.String())
+	}
 
-func (v *VarDecl) String() string      { return fmt.Sprintf("") }
-func (c *ConstDecl) String() string    { return fmt.Sprintf("const %v = %v", c.Name, c.Value) }
-func (t *TypeDecl) String() string     { panic("not implemented") }
-func (p *ProcHead) String() string     { panic("not implemented") }
-func (p *ProcBody) String() string     { panic("not implemented") }
-func (p *ProcDecl) String() string     { panic("not implemented") }
-func (sec *FPSection) String() string  { panic("not implemented") }
-func (p *FormalParams) String() string { panic("not implemented") }
-func (r *Receiver) String() string     { panic("not implemented") }
+	return fmt.Sprintf("%s: %s", strings.Join(list, ", "), v.Type)
+}
+func (v *VarDecl) Pos() *token.Position { return v.Var }
+func (v *VarDecl) End() *token.Position { panic("not implemented") }
+func (v *VarDecl) Accept(vst Visitor)   { vst.VisitVarDecl(v) }
 
-func (v *VarDecl) Pos() *token.Position      { return v.Var }
-func (c *ConstDecl) Pos() *token.Position    { return c.Const }
-func (t *TypeDecl) Pos() *token.Position     { return t.Type }
-func (p *ProcHead) Pos() *token.Position     { panic("not implemented") }
-func (p *ProcBody) Pos() *token.Position     { panic("not implemented") }
-func (p *ProcDecl) Pos() *token.Position     { return p.Proc }
-func (sec *FPSection) Pos() *token.Position  { panic("not implemented") }
+func (c *ConstDecl) decl()                {}
+func (c *ConstDecl) String() string       { return fmt.Sprintf("%v = %v", c.Name, c.Value) }
+func (c *ConstDecl) Pos() *token.Position { return c.Const }
+func (c *ConstDecl) End() *token.Position { return c.Value.End() }
+func (c *ConstDecl) Accept(vst Visitor)   { vst.VisitConstDecl(c) }
+
+func (t *TypeDecl) decl()                {}
+func (t *TypeDecl) String() string       { panic("not implemented") }
+func (t *TypeDecl) Pos() *token.Position { return t.Type }
+func (t *TypeDecl) End() *token.Position { panic("not implemented") }
+func (t *TypeDecl) Accept(vst Visitor)   { vst.VisitTypeDecl(t) }
+
+func (p *ProcDecl) decl() {}
+func (p *ProcDecl) String() string {
+	buf := new(bytes.Buffer)
+	buf.WriteString(fmt.Sprintf("proc %s", p.Head.String()))
+	if len(p.Body.DeclSeq) > 0 {
+		buf.WriteString(p.Body.String())
+	}
+
+	return buf.String()
+}
+func (p *ProcDecl) Pos() *token.Position { return p.Proc }
+func (p *ProcDecl) End() *token.Position { panic("not implemented") }
+func (p *ProcDecl) Accept(vst Visitor)   { vst.VisitProcDecl(p) }
+
+func (p *ProcHead) String() string {
+	buf := new(bytes.Buffer)
+	if p.Rcv != nil {
+		buf.WriteString(fmt.Sprintf("%s ", p.Rcv.String()))
+	}
+	buf.WriteString(fmt.Sprintf("%s%s", p.Name, p.FP.String()))
+
+	return buf.String()
+}
+func (p *ProcHead) Pos() *token.Position { panic("not implemented") }
+func (p *ProcHead) End() *token.Position { panic("not implemented") }
+func (p *ProcHead) Accept(vst Visitor)   { vst.VisitProcHead(p) }
+
+func (p *ProcBody) String() string       { panic("not implemented") }
+func (p *ProcBody) Pos() *token.Position { panic("not implemented") }
+func (p *ProcBody) End() *token.Position { panic("not implemented") }
+func (p *ProcBody) Accept(vst Visitor)   { vst.VisitProcBody(p) }
+
+func (sec *FPSection) String() string {
+	buf := new(bytes.Buffer)
+	if sec.Mod != token.ILLEGAL {
+		buf.WriteString(sec.Mod.String())
+	}
+
+	var names []string
+	for _, name := range sec.Names {
+		names = append(names, name.Name)
+	}
+	buf.WriteString(fmt.Sprintf("%s: %s", strings.Join(names, ", "), sec.Type))
+
+	return buf.String()
+}
+func (sec *FPSection) Pos() *token.Position { panic("not implemented") }
+func (sec *FPSection) End() *token.Position { panic("not implemented") }
+func (sec *FPSection) Accept(vst Visitor)   { vst.VisitFPSection(sec) }
+
+func (p *FormalParams) String() string {
+	buf := new(bytes.Buffer)
+
+	var params []string
+	for _, fp := range p.Params {
+		params = append(params, fp.String())
+	}
+
+	buf.WriteString(fmt.Sprintf("(%s)", strings.Join(params, "; ")))
+	if p.RetType != nil {
+		buf.WriteString(fmt.Sprintf(": %s", p.RetType.String()))
+	}
+
+	return buf.String()
+}
 func (p *FormalParams) Pos() *token.Position { panic("not implemented") }
-func (r *Receiver) Pos() *token.Position     { panic("not implemented") }
-
-func (v *VarDecl) End() *token.Position      { panic("not implemented") }
-func (c *ConstDecl) End() *token.Position    { return c.Value.End() }
-func (t *TypeDecl) End() *token.Position     { panic("not implemented") }
-func (p *ProcHead) End() *token.Position     { panic("not implemented") }
-func (p *ProcBody) End() *token.Position     { panic("not implemented") }
-func (p *ProcDecl) End() *token.Position     { panic("not implemented") }
-func (sec *FPSection) End() *token.Position  { panic("not implemented") }
 func (p *FormalParams) End() *token.Position { panic("not implemented") }
-func (r *Receiver) End() *token.Position     { panic("not implemented") }
+func (p *FormalParams) Accept(vst Visitor)   { vst.VisitFormalParams(p) }
 
-func (v *VarDecl) Accept(vst Visitor)      { vst.VisitVarDecl(v) }
-func (c *ConstDecl) Accept(vst Visitor)    { vst.VisitConstDecl(c) }
-func (t *TypeDecl) Accept(vst Visitor)     { vst.VisitTypeDecl(t) }
-func (p *ProcHead) Accept(vst Visitor)     { vst.VisitProcHead(p) }
-func (p *ProcBody) Accept(vst Visitor)     { vst.VisitProcBody(p) }
-func (p *ProcDecl) Accept(vst Visitor)     { vst.VisitProcDecl(p) }
-func (sec *FPSection) Accept(vst Visitor)  { vst.VisitFPSection(sec) }
-func (p *FormalParams) Accept(vst Visitor) { vst.VisitFormalParams(p) }
-func (r *Receiver) Accept(vst Visitor)     { vst.VisitReceiver(r) }
+func (r *Receiver) String() string {
+	buf := new(bytes.Buffer)
+
+	buf.WriteString("(")
+	if r.Mod != token.ILLEGAL {
+		buf.WriteString(fmt.Sprintf("%s ", r.Mod.String()))
+	}
+	buf.WriteString(fmt.Sprintf("%s: %s", r.Var.Name, r.Type))
+	buf.WriteString(")")
+
+	return buf.String()
+}
+func (r *Receiver) Pos() *token.Position { panic("not implemented") }
+func (r *Receiver) End() *token.Position { panic("not implemented") }
+func (r *Receiver) Accept(vst Visitor)   { vst.VisitReceiver(r) }
 
 func (b *BadDecl) Pos() *token.Position { return b.From }
 func (b *BadDecl) End() *token.Position { return b.To }
-func (b *BadDecl) Accept(vst Visitor)   { panic("unimplemented") }
+func (b *BadDecl) Accept(Visitor)       { panic("unimplemented") }
 func (b *BadDecl) decl()                {}
 func (b *BadDecl) String() string       { panic("unimplemented") }
