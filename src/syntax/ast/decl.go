@@ -28,9 +28,10 @@ type (
 	// ProcDecl
 	// -----------------------------------------------------
 	ProcDecl struct {
-		Proc *token.Position
-		Head *ProcHead
-		Body *ProcBody
+		Proc    *token.Position
+		Head    *ProcHead
+		Body    *ProcBody
+		EndName *Ident
 	}
 
 	ProcHead struct {
