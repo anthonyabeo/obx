@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
@@ -152,7 +153,20 @@ func (id *Ident) End() *token.Position {
 		Column:   id.NamePos.Column + len(id.Name),
 	}
 }
-func (id *Ident) String() string     { return id.Name }
+func (id *Ident) String() string {
+	buf := new(bytes.Buffer)
+	buf.WriteString(id.Name)
+
+	if id.IProps == Exported {
+		buf.WriteString("*")
+	}
+
+	if id.IProps == Exported|ReadOnly {
+		buf.WriteString("-")
+	}
+
+	return buf.String()
+}
 func (id *Ident) expr()              {}
 func (id *Ident) Accept(vst Visitor) { vst.VisitIdentifier(id) }
 func (id *Ident) Props() IdentProps  { return id.IProps }
@@ -215,7 +229,7 @@ func (d *Designator) Value() ir.Value { return d.IRValue }
 
 func (b *BadExpr) Pos() *token.Position { return b.From }
 func (b *BadExpr) End() *token.Position { return b.To }
-func (b *BadExpr) Accept(vst Visitor)   { panic("not implemented") }
+func (b *BadExpr) Accept(Visitor)       { panic("not implemented") }
 func (b *BadExpr) Type() types.Type     { return nil }
 func (b *BadExpr) expr()                {}
 func (b *BadExpr) String() string       { panic("not implemented") }
