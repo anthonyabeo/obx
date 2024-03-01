@@ -2,6 +2,8 @@ package ast
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -124,7 +126,14 @@ func (p *ProcCall) Pos() *token.Position { return p.NamePos }
 func (p *ProcCall) End() *token.Position { panic("not implemented") }
 func (p *ProcCall) Accept(vst Visitor)   { vst.VisitProcCall(p) }
 func (p *ProcCall) stmt()                {}
-func (p *ProcCall) String() string       { panic("not implemented") }
+func (p *ProcCall) String() string {
+	var args []string
+	for _, arg := range p.ActualParams {
+		args = append(args, arg.String())
+	}
+
+	return fmt.Sprintf("%s(%s)", p.Dsg, strings.Join(args, ", "))
+}
 
 func (w *WhileStmt) Pos() *token.Position { return w.While }
 func (w *WhileStmt) End() *token.Position { panic("not implemented") }
