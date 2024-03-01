@@ -159,7 +159,6 @@ func (p *Parser) parseModule() *ast.Module {
 			if p.tok == token.SEMICOLON {
 				p.next()
 			}
-
 		case token.VAR, token.TYPE, token.CONST, token.PROC, token.PROCEDURE:
 			mod.DeclSeq = p.parseDeclarationSeq()
 		default:
@@ -237,7 +236,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 // import = [ ident ':=' ] ImportPath ident [ MetaActuals ]
 // ImportPath = { ident '.' }
 func (p *Parser) parseImport() *ast.Import {
-	imp := &ast.Import{ImpNamePos: p.pos}
+	imp := &ast.Import{NamePos: p.pos}
 	var avail bool
 
 	id := p.parseIdent()
@@ -293,17 +292,44 @@ func (p *Parser) startsDecl() bool {
 		p.tok == token.PROCEDURE
 }
 
+//	DeclarationSequence = {
+//			  CONST { ConstDeclaration [';'] }
+//			| TYPE { TypeDeclaration [';'] }
+//			| VAR { VariableDeclaration [';'] }
+//			| ProcedureDeclaration [';']
+//		}
 func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 	for p.startsDecl() {
 		switch p.tok {
 		case token.VAR:
-			seq = append(seq, p.parseVarDecl())
+			p.match(token.VAR)
+			for p.tok == token.IDENT {
+				seq = append(seq, p.parseVarDecl())
+				if p.tok == token.SEMICOLON {
+					p.next()
+				}
+			}
 		case token.TYPE:
-			seq = append(seq, p.parseTypeDecl())
+			p.match(token.TYPE)
+			for p.tok == token.IDENT {
+				seq = append(seq, p.parseTypeDecl())
+				if p.tok == token.SEMICOLON {
+					p.next()
+				}
+			}
 		case token.CONST:
-			seq = append(seq, p.parseConstDecl())
+			p.match(token.CONST)
+			for p.tok == token.IDENT {
+				seq = append(seq, p.parseConstDecl())
+				if p.tok == token.SEMICOLON {
+					p.next()
+				}
+			}
 		case token.PROC, token.PROCEDURE:
 			seq = append(seq, p.parseProcDecl())
+			if p.tok == token.SEMICOLON {
+				p.next()
+			}
 		default:
 			pos := p.pos
 			p.errorExpected(pos, "declaration")
@@ -319,7 +345,6 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 	t := &ast.TypeDecl{Type: p.pos}
 
-	p.match(token.TYPE)
 	t.Name = p.parseIdentDef()
 	p.match(token.EQUAL)
 	t.DenotedType = p.parseType()
@@ -331,8 +356,6 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 func (p *Parser) parseConstDecl() *ast.ConstDecl {
 	c := &ast.ConstDecl{Const: p.pos}
 
-	p.match(token.CONST)
-
 	c.Name = p.parseIdentDef()
 	p.match(token.EQUAL)
 	c.Value = p.parseExpression()
@@ -343,8 +366,6 @@ func (p *Parser) parseConstDecl() *ast.ConstDecl {
 // VariableDeclaration = IdentList ':' type
 func (p *Parser) parseVarDecl() (v *ast.VarDecl) {
 	v = &ast.VarDecl{Var: p.pos}
-
-	p.match(token.VAR)
 
 	v.IdentList = p.parseIdentList()
 	p.match(token.COLON)
@@ -776,10 +797,10 @@ func (p *Parser) parseNamedType() ast.Type {
 	return ast.NewBasicType(typ.String())
 }
 
-// qualident = [ ident '::' ] ident
+// qualident = [ ident '.' ] ident
 func (p *Parser) parseQualifiedIdent() ast.Expression {
 	id := p.parseIdent()
-	if p.tok == token.DCOLON {
+	if p.tok == token.PERIOD {
 		p.next()
 		sel := p.parseIdent()
 
@@ -802,7 +823,7 @@ func (p *Parser) parseIdentList() (list []*ast.Ident) {
 	return
 }
 
-// ProcedureDeclaration = ProcedureHeading [ ';' ] ProcedureBody END ident
+// ProcedureDeclaration = ProcedureHeading [ ';' ] ProcedureBody END [ ident ]
 func (p *Parser) parseProcDecl() (proc *ast.ProcDecl) {
 	proc = &ast.ProcDecl{Proc: p.pos}
 
@@ -814,7 +835,9 @@ func (p *Parser) parseProcDecl() (proc *ast.ProcDecl) {
 	proc.Body = p.parseProcBody()
 
 	p.match(token.END)
-	p.match(token.IDENT)
+	if p.tok == token.IDENT {
+		proc.EndName = p.parseIdent()
+	}
 
 	return
 }
