@@ -495,7 +495,7 @@ end Drawing
 	}
 
 	if len(mainMod.ImportList) != len(tests) {
-		t.Errorf("ecpected %d import statements, found %d", len(tests), len(mainMod.ImportList))
+		t.Errorf("expected %d import statements, found %d", len(tests), len(mainMod.ImportList))
 	}
 
 	for i, imp := range mainMod.ImportList {
@@ -503,5 +503,133 @@ end Drawing
 			t.Errorf("expected import %s, got %s instead", tests[i], imp.String())
 		}
 	}
+}
 
+func TestParseOOPExample(t *testing.T) {
+	input := `module Drawing
+ import F := Fibonacci
+        C := Collections(Figure)
+
+ type Figure* = pointer to record
+                  position: record
+                    x,y: integer
+                  end
+				 end
+ proc (this: Figure) draw*() end
+
+ type
+    Circle* = pointer to record (Figure)
+                 diameter: integer
+			   end
+    Square* = pointer to record (Figure)
+                         width: integer end
+ proc (this: Circle) draw*() end
+ proc (this: Square) draw*() end
+
+ var figures: C.Deque
+      circle: Circle
+      square: Square
+
+ proc drawAll()
+   type I = record(C.Iterator) count: integer end
+   proc (var this: I) apply( in figure: Figure )
+   begin
+     figure.draw(); inc(this.count)
+   end apply
+   var i: I
+ begin
+   figures.forEach(i)
+   assert(i.count = 2)
+ end drawAll
+begin
+ figures := C.createDeque()
+ new(circle)
+ circle.position.x := F.calc(3)
+ circle.position.y := F.calc(4)
+ circle.diameter := 3
+ figures.append(circle)
+ new(square)
+ square.position.x := F.calc(5)
+ square.position.y := F.calc(6)
+ square.width := 4
+ figures.append(square)
+ drawAll()
+end Drawing
+`
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := &lexer.Lexer{}
+	lex.InitLexer(file, []byte(input))
+
+	p := &Parser{}
+	p.InitParser(lex)
+
+	ob := p.Oberon()
+	if len(p.errors) > 0 {
+		t.Error("found parse errors")
+		for _, err := range p.errors {
+			t.Log(err)
+		}
+	}
+
+	mod := ob.Program["Drawing"]
+	if mod.BeginName.Name != mod.EndName.Name {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			mod.BeginName, mod.EndName)
+	}
+
+	stmtTests := []string{
+		"figures := C.createDeque()",
+		"new(circle)",
+		"circle.position.x := F.calc(3)",
+		"circle.position.y := F.calc(4)",
+		"circle.diameter := 3",
+		"figures.append(circle)",
+		"new(square)",
+		"square.position.x := F.calc(5)",
+		"square.position.y := F.calc(6)",
+		"square.width := 4",
+		"figures.append(square)",
+		"drawAll()",
+	}
+
+	if len(stmtTests) != len(mod.StmtSeq) {
+		t.Errorf("expected %d statements, found %d", len(stmtTests), len(mod.StmtSeq))
+	}
+
+	for i, stmt := range mod.StmtSeq {
+		if stmtTests[i] != stmt.String() {
+			t.Errorf("expected statement '%s', got '%s'",
+				stmtTests[i], stmt.String())
+		}
+	}
+
+	Decls := []string{
+		"Figure* = ^record{record{integer; integer}}",
+		"(this: Figure) draw*()",
+		"Circle* = ^record(Figure){integer}",
+		"Square* = ^record(Figure){integer}",
+		"(this: Circle) draw*()",
+		"(this: Square) draw*()",
+		"figures: C.Deque",
+		"circle: Circle",
+		"square: Square",
+		"drawAll()",
+	}
+
+	for i, decl := range mod.DeclSeq {
+		switch d := decl.(type) {
+		case *ast.VarDecl:
+			if Decls[i] != d.String() {
+				t.Errorf("expected variable declaration '%s', got '%s'", Decls[i], d.String())
+			}
+		case *ast.TypeDecl:
+			if Decls[i] != d.String() {
+				t.Errorf("expected type declaration '%s', got '%s'", Decls[i], d.String())
+			}
+		case *ast.ProcDecl:
+			if Decls[i] != d.Head.String() {
+				t.Errorf("expected procedure declaration '%s', got '%s'", Decls[i], d.Head.String())
+			}
+		}
+	}
 }
