@@ -92,7 +92,7 @@ func (c *ConstDecl) End() *token.Position { return c.Value.End() }
 func (c *ConstDecl) Accept(vst Visitor)   { vst.VisitConstDecl(c) }
 
 func (t *TypeDecl) decl()                {}
-func (t *TypeDecl) String() string       { panic("not implemented") }
+func (t *TypeDecl) String() string       { return fmt.Sprintf("%s = %s", t.Name, t.DenotedType) }
 func (t *TypeDecl) Pos() *token.Position { return t.Type }
 func (t *TypeDecl) End() *token.Position { panic("not implemented") }
 func (t *TypeDecl) Accept(vst Visitor)   { vst.VisitTypeDecl(t) }
