@@ -1,11 +1,13 @@
 package ast
 
 import (
+	"bytes"
 	"fmt"
+	"strings"
+
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/translate/ir"
-	"strings"
 )
 
 type (
@@ -106,26 +108,44 @@ type LenList struct {
 	List     []Expression
 }
 
-func (p *ProcType) Pos() *token.Position { panic("not implemented") }
+func (p *ProcType) Pos() *token.Position { return p.Proc }
 func (p *ProcType) End() *token.Position { panic("not implemented") }
 func (p *ProcType) String() string       { panic("not implemented") }
 func (p *ProcType) Type() types.Type     { return p.EType }
 func (p *ProcType) Accept(vst Visitor)   { vst.VisitProcType(p) }
 func (p *ProcType) IRType() ir.Type      { return p.IRTy }
 
-func (p *PointerType) Pos() *token.Position { panic("not implemented") }
+func (p *PointerType) Pos() *token.Position { return p.Ptr }
 func (p *PointerType) End() *token.Position { panic("not implemented") }
-func (p *PointerType) String() string       { panic("not implemented") }
+func (p *PointerType) String() string       { return fmt.Sprintf("^%s", p.Base) }
 func (p *PointerType) Type() types.Type     { return p.EType }
 func (p *PointerType) Accept(vst Visitor)   { vst.VisitPointerType(p) }
 func (p *PointerType) IRType() ir.Type      { return p.IRTy }
 
-func (r *RecordType) Pos() *token.Position { panic("not implemented") }
+func (r *RecordType) Pos() *token.Position { return r.Record }
 func (r *RecordType) End() *token.Position { panic("not implemented") }
-func (r *RecordType) String() string       { panic("not implemented") }
-func (r *RecordType) Type() types.Type     { return r.EType }
-func (r *RecordType) Accept(vst Visitor)   { vst.VisitRecordType(r) }
-func (r *RecordType) IRType() ir.Type      { return r.IRTy }
+func (r *RecordType) String() string {
+	buf := new(bytes.Buffer)
+	buf.WriteString("record")
+
+	if r.BaseType != nil {
+		t, _ := r.BaseType.(*BasicType)
+		buf.WriteString(fmt.Sprintf("(%s)", t.name))
+	}
+
+	var fields []string
+	for _, field := range r.Fields {
+		for i := 0; i < len(field.IdList); i++ {
+			fields = append(fields, field.Type.String())
+		}
+	}
+	buf.WriteString(fmt.Sprintf("{%s}", strings.Join(fields, "; ")))
+
+	return buf.String()
+}
+func (r *RecordType) Type() types.Type   { return r.EType }
+func (r *RecordType) Accept(vst Visitor) { vst.VisitRecordType(r) }
+func (r *RecordType) IRType() ir.Type    { return r.IRTy }
 
 func (e *EnumType) Pos() *token.Position { return e.Enum }
 func (e *EnumType) End() *token.Position { panic("not implemented") }
