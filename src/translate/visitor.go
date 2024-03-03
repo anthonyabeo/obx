@@ -177,9 +177,8 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 		v.builder.CreateCondBr(stmt.BoolExpr.Value(), ThenBB, ContBB)
 	}
 
-	// if-then-elif-else. elif and else paths exist.
-	// create basic blocks for both paths. set the false path of
-	// conditional branch to the elif basic-block
+	// if-then-elif-else. elif and else paths exist. Create basic blocks for both paths.
+	// Set the false path of conditional branch to the elif basic-block
 	if len(stmt.ElsePath) > 0 && len(stmt.ElseIfBranches) > 0 {
 		ElseBB = ir.CreateBasicBlock("if.else", BB.Parent())
 		ElsifBB = ir.CreateBasicBlock("elsif", BB.Parent())
@@ -218,8 +217,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 			elif.BoolExpr.Accept(v)
 			v.builder.CreateCondBr(elif.BoolExpr.Value(), ElifThen, ElifElse)
 
-			// emit code for the ith, elif branch
-			// unconditionally branch to 'cont' BasicBlock
+			// emit code for the ith, elif branch unconditionally branch to 'cont' BasicBlock
 			v.builder.SetInsertPoint(ElifThen)
 			for _, s := range elif.ThenPath {
 				s.Accept(v)
@@ -233,15 +231,11 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 			// we've reached the last elif-branch and there is no else-branch
 			if (i == len(stmt.ElseIfBranches)-1) && len(stmt.ElsePath) == 0 {
 				v.builder.CreateBr(ContBB)
-
-				ContBB.AddPredecessors(ElifElse)
 			}
 
 			// we've reached the last elif-branch and there exists an else-branch
 			if (i == len(stmt.ElseIfBranches)-1) && len(stmt.ElsePath) > 0 {
 				v.builder.CreateBr(ElseBB)
-
-				ElseBB.AddPredecessors(ElifElse)
 			}
 		}
 	}
@@ -254,16 +248,9 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 		}
 		ElseBB = v.builder.GetInsertBlock()
 		v.builder.CreateBr(ContBB)
-
-		// Update edges in CFG
-		ContBB.AddPredecessors(ThenBB, ElseBB)
-		ElseBB.AddSuccessors(ContBB)
 	}
 
 	v.builder.SetInsertPoint(ContBB)
-
-	// Update edges in CFG
-	ThenBB.AddSuccessors(ContBB)
 }
 
 func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
@@ -318,7 +305,6 @@ func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
 	for _, s := range stmt.StmtSeq {
 		s.Accept(v)
 	}
-
 	v.builder.SetInsertPoint(BodyBB)
 
 	// generate conditional branch to regulate loop
@@ -326,14 +312,6 @@ func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
 	v.builder.CreateCondBr(stmt.BoolExpr.Value(), BodyBB, ContBB)
 
 	v.builder.SetInsertPoint(ContBB)
-
-	// Update CFG Edges
-	BodyBB.AddPredecessors(BB, BodyBB)
-	BodyBB.AddSuccessors(ContBB, BodyBB)
-
-	ContBB.AddPredecessors(BodyBB)
-
-	BB.AddSuccessors(BodyBB)
 }
 
 func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
