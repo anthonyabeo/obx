@@ -47,7 +47,7 @@ func (c CallInstr) Operand(i int) Value {
 }
 func (c CallInstr) OperandList() *list.List { return c.useList }
 func (c CallInstr) Type() Type              { return c.fty }
-func (c CallInstr) Name() string            { return c.name }
+func (c CallInstr) Name() string            { return "%" + c.name }
 func (c CallInstr) SetName(name string)     { c.name = name }
 func (c CallInstr) HasName() bool           { return c.name != "" }
 func (c CallInstr) IsTerm() bool            { return termop_begin < c.op && c.op < termop_end }
@@ -62,14 +62,13 @@ func (c CallInstr) String() string {
 		args = append(args, fmt.Sprintf("%s %s", op.Type(), op.Name()))
 	}
 
-	return fmt.Sprintf("%s = call %s %s(%s)", c.name, c.fty.retTy, c.callee.Name(), strings.Join(args, ", "))
+	return fmt.Sprintf("%s = call %s %s(%s)", c.Name(), c.fty.retTy, c.callee.Name(), strings.Join(args, ", "))
 }
 
 func CreateCall(fty *FunctionType, callee Value, args []Value, name string) *CallInstr {
 	if name == "" {
 		name = NextTemp()
 	}
-	name = "%" + name
 
 	uses := list.New()
 	uses.Init()
@@ -104,7 +103,7 @@ func (c ICmpInstr) Operand(idx int) Value {
 }
 func (c ICmpInstr) OperandList() *list.List { return c.useList }
 func (c ICmpInstr) Type() Type              { return c.evalTy }
-func (c ICmpInstr) Name() string            { return c.name }
+func (c ICmpInstr) Name() string            { return "%" + c.name }
 func (c ICmpInstr) SetName(name string)     { c.name = name }
 func (c ICmpInstr) HasName() bool           { return c.name != "" }
 func (c ICmpInstr) IsTerm() bool            { return termop_begin < c.pred && c.pred < termop_end }
@@ -114,14 +113,13 @@ func (c ICmpInstr) IsMemOp() bool           { return memop_begin < c.pred && c.p
 func (c ICmpInstr) IsBitBinOp() bool        { return bit_binop_begin < c.pred && c.pred < bit_binop_end }
 func (c ICmpInstr) Opcode() Opcode          { return c.pred }
 func (c ICmpInstr) String() string {
-	return fmt.Sprintf("%s = icmp %s %s %s, %s", c.name, c.pred, c.opdTy, c.x.Name(), c.y.Name())
+	return fmt.Sprintf("%s = icmp %s %s %s, %s", c.Name(), c.pred, c.opdTy, c.x.Name(), c.y.Name())
 }
 
 func CreateICmp(ty Type, cond Opcode, x, y Value, name string) *ICmpInstr {
 	if name == "" {
 		name = NextTemp()
 	}
-	name = "%" + name
 
 	uses := list.New()
 	uses.Init()
@@ -156,7 +154,7 @@ func (b BinaryOp) Operand(idx int) Value {
 	return b.right
 }
 func (b BinaryOp) Type() Type          { return b.evalTy }
-func (b BinaryOp) Name() string        { return b.name }
+func (b BinaryOp) Name() string        { return "%" + b.name }
 func (b BinaryOp) SetName(name string) { b.name = name }
 func (b BinaryOp) HasName() bool       { return b.name != "" }
 func (b BinaryOp) Opcode() Opcode      { return b.op }
@@ -166,14 +164,13 @@ func (b BinaryOp) IsOtherOp() bool     { return other_op_begin < b.op && b.op < 
 func (b BinaryOp) IsMemOp() bool       { return memop_begin < b.op && b.op < memop_end }
 func (b BinaryOp) IsBitBinOp() bool    { return bit_binop_begin < b.op && b.op < bit_binop_end }
 func (b BinaryOp) String() string {
-	return fmt.Sprintf("%s = %s %s %s, %s", b.name, b.op, b.evalTy, b.left.Name(), b.right.Name())
+	return fmt.Sprintf("%s = %s %s %s, %s", b.Name(), b.op, b.evalTy, b.left.Name(), b.right.Name())
 }
 
 func CreateAdd(ty Type, left, right Value, name string) *BinaryOp {
 	if name == "" {
 		name = NextTemp()
 	}
-	name = "%" + name
 
 	uses := list.New()
 	uses.Init()
@@ -185,7 +182,6 @@ func CreateSub(ty Type, left, right Value, name string) *BinaryOp {
 	if name == "" {
 		name = NextTemp()
 	}
-	name = "%" + name
 
 	uses := list.New()
 	uses.Init()
@@ -197,7 +193,6 @@ func CreateXOR(ty Type, left, right Value, name string) *BinaryOp {
 	if name == "" {
 		name = NextTemp()
 	}
-	name = "%" + name
 
 	uses := list.New()
 	uses.Init()
@@ -227,7 +222,7 @@ func (l LoadInst) Operand(idx int) Value {
 }
 func (l LoadInst) OperandList() *list.List { return l.useList }
 func (l LoadInst) Type() Type              { return l.typ }
-func (l LoadInst) Name() string            { return l.name }
+func (l LoadInst) Name() string            { return "%" + l.name }
 func (l LoadInst) SetName(name string)     { l.name = name }
 func (l LoadInst) HasName() bool           { return l.name != "" }
 func (l LoadInst) Opcode() Opcode          { return l.op }
@@ -238,14 +233,13 @@ func (l LoadInst) IsMemOp() bool           { return memop_begin < l.op && l.op <
 func (l LoadInst) IsBitBinOp() bool        { return bit_binop_begin < l.op && l.op < bit_binop_end }
 func (l LoadInst) String() string {
 	srcStr := fmt.Sprintf("%s %s", l.ptr.Type(), l.ptr.Name())
-	return fmt.Sprintf("%s = load %s, %s", l.name, l.typ, srcStr)
+	return fmt.Sprintf("%s = load %s, %s", l.Name(), l.typ, srcStr)
 }
 
 func CreateLoad(typ Type, src Value, name string) *LoadInst {
 	if name == "" {
 		name = NextTemp()
 	}
-	name = "%" + name
 
 	uses := list.New()
 	uses.Init()
@@ -323,7 +317,6 @@ func CreateAlloca(ty Type, numElems int, align int, name string) *AllocaInst {
 	if name == "" {
 		name = NextTemp()
 	}
-	name = "%" + name
 
 	uses := list.New()
 	uses.Init()
@@ -354,11 +347,11 @@ func (a AllocaInst) IsMemOp() bool           { return memop_begin < a.op && a.op
 func (a AllocaInst) IsOtherOp() bool         { return other_op_begin < a.op && a.op < other_op_end }
 func (a AllocaInst) IsBitBinOp() bool        { return bit_binop_begin < a.op && a.op < bit_binop_end }
 func (a AllocaInst) Type() Type              { return a.evalTy }
-func (a AllocaInst) Name() string            { return a.name }
+func (a AllocaInst) Name() string            { return "%" + a.name }
 func (a AllocaInst) SetName(name string)     { a.name = name }
 func (a AllocaInst) HasName() bool           { return a.name != "" }
 func (a AllocaInst) String() string {
-	s := fmt.Sprintf("%s = alloca %s", a.name, a.allocTy)
+	s := fmt.Sprintf("%s = alloca %s", a.Name(), a.allocTy)
 	if a.numElem > 1 {
 		s += fmt.Sprintf(", i32 %d", a.numElem)
 	}
@@ -536,7 +529,6 @@ func CreatePHINode(ty Type, numIncomingPaths uint, name string) *PHINode {
 	if name == "" {
 		name = NextTemp()
 	}
-	name = "%" + name
 
 	uses := list.New()
 	uses.Init()
@@ -561,7 +553,7 @@ func (phi *PHINode) Operand(idx int) Value {
 }
 func (phi *PHINode) OperandList() *list.List { return phi.useList }
 func (phi *PHINode) Type() Type              { return phi.ty }
-func (phi *PHINode) Name() string            { return phi.name }
+func (phi *PHINode) Name() string            { return "%" + phi.name }
 func (phi *PHINode) SetName(name string)     { phi.name = name }
 func (phi *PHINode) HasName() bool           { return phi.name != "" }
 func (phi *PHINode) String() string {
@@ -570,7 +562,7 @@ func (phi *PHINode) String() string {
 		incs = append(incs, inc.String())
 	}
 
-	return fmt.Sprintf("%s = phi %s %s", phi.name, phi.ty, strings.Join(incs, ", "))
+	return fmt.Sprintf("%s = phi %s %s", phi.Name(), phi.ty, strings.Join(incs, ", "))
 }
 func (phi *PHINode) Opcode() Opcode   { return phi.op }
 func (phi *PHINode) IsTerm() bool     { return termop_begin < phi.op && phi.op < termop_end }
