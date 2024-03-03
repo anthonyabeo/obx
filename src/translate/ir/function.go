@@ -13,16 +13,16 @@ const (
 	External
 )
 
-// BasicBlockListType defines the type of the list of basic blocks
+// BasicBlockList defines the type of the list of basic blocks
 // of a Function. It is a map of strings to BasicBlocks
-type BasicBlockListType map[string]*BasicBlock
+type BasicBlockList map[string]*BasicBlock
 
 // AddNewBasicBlock adds a new BasicBlock and updates the successors
 // and predecessors accordingly to maintain the CFG.
-func (bb BasicBlockListType) AddNewBasicBlock(BBName string, BB *BasicBlock) { bb[BBName] = BB }
+func (bb BasicBlockList) AddNewBasicBlock(BBName string, BB *BasicBlock) { bb[BBName] = BB }
 
 // Block returns a block using its name or nil if not such block exists
-func (bb BasicBlockListType) Block(name string) *BasicBlock { return bb[name] }
+func (bb BasicBlockList) Block(name string) *BasicBlock { return bb[name] }
 
 // Function ...
 // -----------------------------
@@ -30,7 +30,7 @@ type Function struct {
 	name   string
 	link   LinkageKind
 	ty     *FunctionType
-	blocks BasicBlockListType
+	blocks BasicBlockList
 	module *Module
 
 	useList *list.List
@@ -99,8 +99,8 @@ type BasicBlock struct {
 	ty     *LabelType
 	parent *Function
 	instr  list.List
-	succ   BasicBlockListType
-	pred   BasicBlockListType
+	succ   BasicBlockList
+	pred   BasicBlockList
 }
 
 func CreateBasicBlock(name string, parent *Function) *BasicBlock {
@@ -113,8 +113,8 @@ func CreateBasicBlock(name string, parent *Function) *BasicBlock {
 		ty:     &LabelType{name: name},
 		parent: parent,
 		instr:  list.List{},
-		succ:   BasicBlockListType{},
-		pred:   BasicBlockListType{},
+		succ:   BasicBlockList{},
+		pred:   BasicBlockList{},
 	}
 
 	parent.blocks.AddNewBasicBlock(name, blk)

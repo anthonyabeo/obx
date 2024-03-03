@@ -26,7 +26,7 @@ func (m *Module) GetOrInsertFunction(name string, ty *FunctionType, link Linkage
 		name,
 		link,
 		ty,
-		BasicBlockListType{},
+		BasicBlockList{},
 		m,
 		uses,
 	}
