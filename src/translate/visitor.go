@@ -350,9 +350,8 @@ func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 	stmt.BoolExpr.Accept(v)
 	v.builder.CreateCondBr(stmt.BoolExpr.Value(), IfThen, IfElse)
 
-	// generate code for the 'True' path. The process may change
-	// the insert basic block. so we should set it back to IfThen
-	// before creating the unconditional branch instruction
+	// generate code for the 'True' path. The process may change the insert basic block.
+	// so we should set it back to IfThen before creating the unconditional branch instruction
 	v.builder.SetInsertPoint(IfThen)
 	for _, s := range stmt.StmtSeq {
 		s.Accept(v)
@@ -360,19 +359,8 @@ func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 	v.builder.SetInsertPoint(IfThen)
 	v.builder.CreateBr(Loop)
 
-	// Update CFG Edges
-	BB.AddSuccessors(Loop)
-
-	Loop.AddPredecessors(BB, IfThen)
-	Loop.AddSuccessors(IfThen, IfElse)
-
-	IfThen.AddPredecessors(Loop)
-	IfThen.AddSuccessors(Loop)
-
-	IfElse.AddPredecessors(Loop)
-
+	v.builder.SetInsertPoint(IfElse)
 	if len(stmt.ElsIfs) > 0 {
-		v.builder.SetInsertPoint(IfElse)
 		for i, elif := range stmt.ElsIfs {
 			ElifThen := ir.CreateBasicBlock(fmt.Sprintf("elif.then.%d", i), BB.Parent())
 			ElifElse := ir.CreateBasicBlock(fmt.Sprintf("elif.else.%d", i), BB.Parent())
@@ -387,32 +375,12 @@ func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 			v.builder.SetInsertPoint(ElifThen)
 			v.builder.CreateBr(Loop)
 
-			if i == len(stmt.ElsIfs)-1 {
-				v.builder.SetInsertPoint(ElifElse)
-				v.builder.CreateBr(ContBB)
-			}
-
-			// Update CFG Edges
-			ElifThen.AddPredecessors(IfElse)
-			ElifThen.AddSuccessors(Loop)
-
-			ElifElse.AddPredecessors(IfElse)
-
-			IfElse.AddSuccessors(ElifThen)
-			IfElse.AddSuccessors(ElifElse)
-
-			Loop.AddPredecessors(ElifThen)
-
 			IfElse = ElifElse
 			v.builder.SetInsertPoint(IfElse)
 		}
-	} else {
-		v.builder.SetInsertPoint(IfElse)
-		v.builder.CreateBr(ContBB)
 	}
 
-	IfElse.AddSuccessors(ContBB)
-	ContBB.AddPredecessors(IfElse)
+	v.builder.CreateBr(ContBB)
 
 	v.builder.SetInsertPoint(ContBB)
 }
