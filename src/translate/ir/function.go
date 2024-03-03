@@ -145,12 +145,18 @@ func (b BasicBlock) String() string {
 func (b BasicBlock) Parent() *Function { return b.parent }
 func (b BasicBlock) AddSuccessors(successors ...*BasicBlock) {
 	for _, BB := range successors {
+		if _, ok := b.succ[BB.name]; ok {
+			return
+		}
 		b.succ[BB.name] = BB
 	}
 }
 func (b BasicBlock) AddPredecessors(predecessors ...*BasicBlock) {
 	for _, BB := range predecessors {
-		b.succ[BB.name] = BB
+		if _, ok := b.pred[BB.name]; ok {
+			return
+		}
+		b.pred[BB.name] = BB
 	}
 }
 func (b BasicBlock) Instr() list.List { return b.instr }
