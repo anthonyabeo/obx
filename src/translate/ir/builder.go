@@ -249,6 +249,8 @@ func (b *Builder) CreateCondBr(cond Value, ifTrue, ifFalse *BasicBlock) *BranchI
 	b.BB.instr.PushBack(br)
 
 	b.BB.AddSuccessors(ifTrue, ifFalse)
+	ifTrue.AddPredecessors(b.BB)
+	ifFalse.AddPredecessors(b.BB)
 
 	return br
 }
@@ -258,6 +260,7 @@ func (b *Builder) CreateBr(dst *BasicBlock) *BranchInst {
 	b.BB.instr.PushBack(br)
 
 	b.BB.AddSuccessors(dst)
+	dst.AddPredecessors(b.BB)
 
 	return br
 }
