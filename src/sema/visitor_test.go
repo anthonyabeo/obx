@@ -43,9 +43,9 @@ end Main
 	p.InitParser(lex, scp)
 	ob := p.Oberon()
 
-	sema := &Visitor{}
-	sema.InitSemaVisitor(ob, scope.Global)
-	sema.VisitModule("Main")
+	sema := NewVisitor(scope.Global)
+	sema.VisitOberon(ob)
+
 	if len(sema.errors) > 0 {
 		t.Error("found semantic errors")
 		for _, err := range sema.errors {
@@ -68,13 +68,14 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
+	scp := scope.NewScope(scope.Global, "Main")
+
 	p := &parser.Parser{}
-	p.InitParser(lex)
+	p.InitParser(lex, scp)
 	ob := p.Oberon()
 
-	sema := &Visitor{}
-	sema.InitSemaVisitor(ob, Global)
-	sema.VisitModule("Main")
+	sema := NewVisitor(scp)
+	sema.VisitOberon(ob)
 	if len(sema.errors) > 0 {
 		t.Error("found semantic errors")
 		for _, err := range sema.errors {
@@ -100,13 +101,14 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
+	scp := scope.NewScope(scope.Global, "Main")
+
 	p := &parser.Parser{}
-	p.InitParser(lex)
+	p.InitParser(lex, scp)
 	ob := p.Oberon()
 
-	sema := &Visitor{}
-	sema.InitSemaVisitor(ob, Global)
-	sema.VisitModule("Main")
+	sema := NewVisitor(scp)
+	sema.VisitOberon(ob)
 	if len(sema.errors) > 0 {
 		t.Error("found semantic errors")
 		for _, err := range sema.errors {

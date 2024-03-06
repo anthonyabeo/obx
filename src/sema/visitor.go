@@ -19,9 +19,8 @@ type Visitor struct {
 	env *scope.Scope
 }
 
-func (v *Visitor) InitSemaVisitor(ast *ast.Oberon, env *scope.Scope) {
-	v.ast = ast
-	v.env = env
+func NewVisitor(env *scope.Scope) *Visitor {
+	return &Visitor{env: env}
 }
 
 func (v *Visitor) error(pos *token.Position, msg string) {
@@ -37,16 +36,30 @@ func (v *Visitor) error(pos *token.Position, msg string) {
 	v.errors.Append(pos, msg)
 }
 
-func (v *Visitor) VisitModule(name string) {
-	module := v.ast.Program[name]
+func (v *Visitor) VisitOberon(ob *ast.Oberon) {
+	v.ast = ob
+	for _, m := range ob.Program {
+		m.Accept(v)
+	}
+}
 
-	for _, decl := range module.DeclSeq {
+func (v *Visitor) VisitModule(m *ast.Module) {
+	for _, imp := range m.ImportList {
+		imp.Accept(v)
+	}
+
+	for _, decl := range m.DeclSeq {
 		decl.Accept(v)
 	}
 
-	for _, stmt := range module.StmtSeq {
+	for _, stmt := range m.StmtSeq {
 		stmt.Accept(v)
 	}
+}
+
+func (v *Visitor) VisitDefinition(def *ast.Definition) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (v *Visitor) VisitIdentifier(id *ast.Ident) {

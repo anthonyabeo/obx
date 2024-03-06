@@ -27,8 +27,14 @@ func NewVisitor(ast *ast.Oberon, env *scope.Scope) *Visitor {
 	}
 }
 
-func (v *Visitor) VisitModule(name string) *ir.Module {
-	v.module = ir.NewModule(name)
+func (v *Visitor) VisitOberon(ob *ast.Oberon) {
+	for _, m := range ob.Program {
+		m.Accept(v)
+	}
+}
+
+func (v *Visitor) VisitModule(m *ast.Module) {
+	v.module = ir.NewModule(m.BeginName.Name)
 
 	Main := ir.CreateFunction(
 		ir.CreateFunctionType([]ir.Type{}, ir.Int32Type, false),
@@ -40,18 +46,20 @@ func (v *Visitor) VisitModule(name string) *ir.Module {
 	EntryBB := ir.CreateBasicBlock("entry", Main)
 	v.builder.SetInsertPoint(EntryBB)
 
-	module := v.ast.Program[name]
-	for _, decl := range module.DeclSeq {
+	for _, decl := range m.DeclSeq {
 		decl.Accept(v)
 	}
 
-	for _, stmt := range module.StmtSeq {
+	for _, stmt := range m.StmtSeq {
 		stmt.Accept(v)
 	}
 
 	v.builder.CreateRet(ir.NewConstantInt(ir.Int32Type, 0, true, ""))
+}
 
-	return v.module
+func (v *Visitor) VisitDefinition(def *ast.Definition) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (v *Visitor) VisitIdentifier(id *ast.Ident) {

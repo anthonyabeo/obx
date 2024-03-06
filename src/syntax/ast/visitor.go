@@ -1,6 +1,10 @@
 package ast
 
 type Visitor interface {
+	VisitOberon(*Oberon)
+	VisitModule(*Module)
+	VisitDefinition(*Definition)
+
 	VisitIdentifier(*Ident)
 	VisitBinaryExpr(*BinaryExpr)
 	VisitDesignator(*Designator)

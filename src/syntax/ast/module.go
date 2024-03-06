@@ -11,6 +11,8 @@ type Module struct {
 	StmtSeq    []Statement
 }
 
+func (m *Module) Accept(vst Visitor) { vst.VisitModule(m) }
+
 type MetaSection struct {
 	Mode    token.Token
 	Ids     []*Ident

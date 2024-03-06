@@ -33,15 +33,11 @@ end Main
 	p.InitParser(lex, scp)
 	ob := p.Oberon()
 
-	sema_vst := &sema.Visitor{}
-	sema_vst.InitSemaVisitor(ob, scp)
-	sema_vst.VisitModule("Main")
+	vst := sema.NewVisitor(scp)
+	vst.VisitOberon(ob)
 
 	cgen := NewVisitor(ob, scp)
-	module := cgen.VisitModule("Main")
-
-	_ = module.GetFunction("main")
-	//fmt.Println(Main)
+	cgen.VisitOberon(ob)
 }
 
 func TestIRCodegenBasicWhileLoop(t *testing.T) {
@@ -73,15 +69,11 @@ end Main
 	p.InitParser(lex, scp)
 	ob := p.Oberon()
 
-	sema_vst := &sema.Visitor{}
-	sema_vst.InitSemaVisitor(ob, scp)
-	sema_vst.VisitModule("Main")
+	vst := sema.NewVisitor(scp)
+	vst.VisitOberon(ob)
 
 	cgen := NewVisitor(ob, scp)
-	module := cgen.VisitModule("Main")
-
-	_ = module.GetFunction("main")
-	//fmt.Println(Main)
+	cgen.VisitOberon(ob)
 }
 
 func TestIRCodegenWhileLoopWithSingleElseIfBranch(t *testing.T) {
@@ -114,15 +106,11 @@ end Main
 	p.InitParser(lex, scp)
 	ob := p.Oberon()
 
-	sema_vst := &sema.Visitor{}
-	sema_vst.InitSemaVisitor(ob, scp)
-	sema_vst.VisitModule("Main")
+	vst := sema.NewVisitor(scp)
+	vst.VisitOberon(ob)
 
 	cgen := NewVisitor(ob, scp)
-	module := cgen.VisitModule("Main")
-
-	_ = module.GetFunction("main")
-	//fmt.Println(Main)
+	cgen.VisitOberon(ob)
 }
 
 func TestIRCodegenWhileLoopWithTwoElseIfBranch(t *testing.T) {
@@ -157,15 +145,11 @@ end Main
 	p.InitParser(lex, scp)
 	ob := p.Oberon()
 
-	sema_vst := &sema.Visitor{}
-	sema_vst.InitSemaVisitor(ob, scp)
-	sema_vst.VisitModule("Main")
+	vst := sema.NewVisitor(scp)
+	vst.VisitOberon(ob)
 
 	cgen := NewVisitor(ob, scp)
-	module := cgen.VisitModule("Main")
-
-	_ = module.GetFunction("main")
-	//fmt.Println(Main)
+	cgen.VisitOberon(ob)
 }
 
 func TestIRCodegenRepeatStmt(t *testing.T) {
@@ -197,15 +181,11 @@ end Main
 	p.InitParser(lex, scp)
 	ob := p.Oberon()
 
-	sema_vst := &sema.Visitor{}
-	sema_vst.InitSemaVisitor(ob, scp)
-	sema_vst.VisitModule("Main")
+	vst := sema.NewVisitor(scp)
+	vst.VisitOberon(ob)
 
 	cgen := NewVisitor(ob, scp)
-	module := cgen.VisitModule("Main")
-
-	_ = module.GetFunction("main")
-	//fmt.Println(Main)
+	cgen.VisitOberon(ob)
 }
 
 func TestIRCodegenIfThenElse(t *testing.T) {
@@ -237,14 +217,13 @@ end Main
 	p.InitParser(lex, scp)
 	ob := p.Oberon()
 
-	sema_vst := &sema.Visitor{}
-	sema_vst.InitSemaVisitor(ob, scp)
-	sema_vst.VisitModule("Main")
+	vst := sema.NewVisitor(scp)
+	vst.VisitOberon(ob)
 
 	cgen := NewVisitor(ob, scp)
-	module := cgen.VisitModule("Main")
+	cgen.VisitOberon(ob)
 
-	_ = module.GetFunction("main")
+	//_ = module.GetFunction("main")
 	//fmt.Println(Main)
 }
 
@@ -279,15 +258,11 @@ end Main
 	p.InitParser(lex, scp)
 	ob := p.Oberon()
 
-	sema_vst := &sema.Visitor{}
-	sema_vst.InitSemaVisitor(ob, scp)
-	sema_vst.VisitModule("Main")
+	vst := sema.NewVisitor(scp)
+	vst.VisitOberon(ob)
 
 	cgen := NewVisitor(ob, scp)
-	module := cgen.VisitModule("Main")
-
-	_ = module.GetFunction("main")
-	//fmt.Println(Main)
+	cgen.VisitOberon(ob)
 }
 
 func TestIRCodegenIfThenElsifWithNoElse(t *testing.T) {
@@ -321,13 +296,9 @@ end Main
 	p.InitParser(lex, scp)
 	ob := p.Oberon()
 
-	sema_vst := &sema.Visitor{}
-	sema_vst.InitSemaVisitor(ob, scp)
-	sema_vst.VisitModule("Main")
+	vst := sema.NewVisitor(scp)
+	vst.VisitOberon(ob)
 
 	cgen := NewVisitor(ob, scp)
-	module := cgen.VisitModule("Main")
-
-	_ = module.GetFunction("main")
-	//fmt.Println(Main)
+	cgen.VisitOberon(ob)
 }
