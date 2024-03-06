@@ -151,7 +151,13 @@ func (b *Builder) CreateXOR(lhs, rhs Value, name string) Value {
 }
 
 func (b *Builder) CreateRet(v Value) *ReturnInst {
-	ret := CreateRet(v.Type(), v)
+	var ret *ReturnInst
+	if v != nil {
+		ret = CreateRet(v.Type(), v)
+	} else {
+		ret = CreateRet(VoidType, nil)
+	}
+
 	b.BB.instr.PushBack(ret)
 
 	return ret

@@ -100,9 +100,9 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 		args = append(args, arg.Value())
 	}
 
-	F := v.module.GetFunction(call.Dsg.String())
+	F := v.module.GetFunction(call.Callee.String())
 	if F == nil {
-		panic(fmt.Sprintf("[internal] undeclared function '%s'", call.Dsg.String()))
+		panic(fmt.Sprintf("[internal] undeclared function '%s'", call.Callee.String()))
 	}
 
 	fty := F.Type().(*ir.FunctionType)
@@ -268,8 +268,13 @@ func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 }
 
 func (v *Visitor) VisitReturnStmt(stmt *ast.ReturnStmt) {
-	//TODO implement me
-	panic("implement me")
+	var value ir.Value
+	if stmt.Value != nil {
+		stmt.Value.Accept(v)
+		value = stmt.Value.Value()
+	}
+
+	v.builder.CreateRet(value)
 }
 
 func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
@@ -287,8 +292,8 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 
 	v.builder.CreateCall(
 		ir.CreateFunctionType(fArgs, ir.VoidType, false),
-		v.module.GetFunction(call.Dsg.String()), args,
-		call.Dsg.String(),
+		v.module.GetFunction(call.Callee.String()), args,
+		call.Callee.String(),
 	)
 }
 
