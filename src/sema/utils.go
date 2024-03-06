@@ -1,6 +1,8 @@
 package sema
 
 import (
+	"fmt"
+	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
@@ -75,3 +77,74 @@ func (v *Visitor) arrayCompat(a, b types.Type) bool { return false }
 // 2. parameters at corresponding positions have equal types, and
 // 3. parameters at corresponding positions are both either value, VAR or IN parameters.
 func (v *Visitor) paramListMatch(a, b *ast.FormalParams) bool { return false }
+
+func (v *Visitor) checkBuiltin(b *scope.Builtin, call *ast.ProcCall) {
+	proc := scope.PredeclaredProcedures[b.Id]
+	switch b.Id {
+	case scope.Assert_:
+		if proc.Nargs != len(call.ActualParams) {
+			v.error(call.Pos(), fmt.Sprintf("not enough arguments to procedure call '%v'", call.String()))
+		}
+
+		for i := 0; i < proc.Nargs; i++ {
+			if !v.assignCompat(scope.Typ[types.Bool], call.ActualParams[i].Type()) {
+				msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
+					call.ActualParams[i], scope.Typ[types.Bool])
+				v.error(call.ActualParams[i].Pos(), msg)
+			}
+		}
+	//case _Assertn:
+	//case _Bytes:
+	//case _Dec:
+	//case _Decn:
+	//case _Excl:
+	//case _Halt:
+	case scope.Inc_:
+		//case _Incn:
+		//case _Incl:
+		//case _New:
+		//case _Newn:
+		//case _Number:
+		//case _PCall:
+		//case _Raise:
+		//case _Copy:
+		//case _Pack:
+		//case _UnPk:
+		//
+		//case _Abs:
+		//case _Cap:
+		//case _BitAnd:
+		//case _BitAsr:
+		//case _BitNot:
+		//case _BitOr:
+		//case _Bits:
+		//case _BitShl:
+		//case _BitShr:
+		//case _BitXor:
+		//case _Cast:
+		//case _Chr:
+		//case _Default:
+		//case _Floor:
+		//case _Flt:
+		//case _LdCmd:
+		//case _LdMod:
+		//case _Len:
+		//case _LenN:
+		//case _Long:
+		//case _Max:
+		//case _MaxN:
+		//case _Min:
+		//case _MinN:
+		//case _Odd:
+		//case _Ord:
+		//case _Short:
+		//case _Size:
+		//case _StrLen:
+		//case _WChr:
+		//case _ASh:
+		//case _ASr:
+		//case _Entier:
+		//case _Lsl:
+		//case _Ror:
+	}
+}

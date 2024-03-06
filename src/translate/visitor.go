@@ -254,14 +254,14 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 }
 
 func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
-	lv := &LValueVisitor{Visitor{
+	av := &AddrVisitor{Visitor{
 		builder: v.builder,
 		module:  v.module,
 		ast:     v.ast,
 		env:     v.env,
 	}}
 
-	stmt.LValue.Accept(lv)
+	stmt.LValue.Accept(av)
 	stmt.RValue.Accept(v)
 
 	v.builder.CreateStore(stmt.RValue.Value(), stmt.LValue.Value())
