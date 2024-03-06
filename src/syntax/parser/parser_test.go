@@ -363,8 +363,8 @@ end Main
 
 	for idx, stmt := range mainMod.StmtSeq {
 		proc := stmt.(*ast.ProcCall)
-		if proc.Dsg.String() != tests[idx].procName {
-			t.Errorf("expected procedure name '%s', got '%s'", tests[idx].procName, proc.Dsg.String())
+		if proc.Callee.String() != tests[idx].procName {
+			t.Errorf("expected procedure name '%s', got '%s'", tests[idx].procName, proc.Callee.String())
 		}
 
 		for i := 0; i < len(tests[idx].args); i++ {

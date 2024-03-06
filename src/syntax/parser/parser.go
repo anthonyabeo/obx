@@ -592,7 +592,7 @@ func (p *Parser) parseFactor() (expr ast.Expression) {
 	case token.IDENT:
 		expr = p.parseDesignator()
 		if p.tok == token.LPAREN {
-			expr = &ast.FuncCall{Dsg: expr, ActualParams: p.parseActualParameters()}
+			expr = &ast.FuncCall{Callee: expr, ActualParams: p.parseActualParameters()}
 		}
 	case token.INT, token.BYTE, token.INT8, token.INT16, token.INT32, token.INT64,
 		token.REAL, token.LONGREAL, token.STRING, token.HEXSTRING, token.CHAR,
@@ -964,7 +964,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 			p.next()
 			stmt = &ast.AssignStmt{AssignPos: pos, LValue: dsg, RValue: p.parseExpression()}
 		case token.LPAREN:
-			stmt = &ast.ProcCall{Dsg: dsg, ActualParams: p.parseActualParameters()}
+			stmt = &ast.ProcCall{Callee: dsg, ActualParams: p.parseActualParameters()}
 		}
 	default:
 		pos := p.pos
