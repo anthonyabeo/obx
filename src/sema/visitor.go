@@ -179,14 +179,14 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 }
 
 func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
-	call.Dsg.Accept(v)
+	call.Callee.Accept(v)
 	for _, param := range call.ActualParams {
 		param.Accept(v)
 	}
 
-	sig, ok := call.Dsg.Type().(*ast.Signature)
+	sig, ok := call.Callee.Type().(*ast.Signature)
 	if !ok {
-		v.error(call.Pos(), fmt.Sprintf("cannot call a non-procedure %v", call.Dsg.String()))
+		v.error(call.Pos(), fmt.Sprintf("cannot call a non-procedure %v", call.Callee.String()))
 	}
 
 	// ensure that the number of arguments matches the number of formal parameters
@@ -380,15 +380,15 @@ func (v *Visitor) VisitWithStmt(stmt *ast.WithStmt) {
 }
 
 func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
-	call.Dsg.Accept(v)
+	call.Callee.Accept(v)
 	for _, param := range call.ActualParams {
 		param.Accept(v)
 	}
 
-	if call.Dsg.Type() != scope.Typ[types.Invalid] {
-		sig, ok := call.Dsg.Type().(*ast.Signature)
+	if call.Callee.Type() != scope.Typ[types.Invalid] {
+		sig, ok := call.Callee.Type().(*ast.Signature)
 		if !ok {
-			v.error(call.Pos(), fmt.Sprintf("cannot call a non-procedure %v", call.Dsg.String()))
+			v.error(call.Pos(), fmt.Sprintf("cannot call a non-procedure %v", call.Callee.String()))
 		}
 
 		// ensure that the number of arguments matches the number of formal parameters
@@ -405,9 +405,9 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 			}
 		}
 	} else {
-		obj := v.env.Lookup(call.Dsg.String())
+		obj := v.env.Lookup(call.Callee.String())
 		if obj == nil {
-			v.error(call.Pos(), fmt.Sprintf("unknown procedure '%v'", call.Dsg.String()))
+			v.error(call.Pos(), fmt.Sprintf("unknown procedure '%v'", call.Callee.String()))
 		}
 
 		b := obj.(*scope.Builtin)

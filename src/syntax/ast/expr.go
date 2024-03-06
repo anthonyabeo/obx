@@ -38,7 +38,7 @@ type (
 	}
 
 	FuncCall struct {
-		Dsg          Expression
+		Callee       Expression
 		ActualParams []Expression
 		EType        types.Type
 		IRValue      ir.Value
@@ -119,14 +119,14 @@ func (b *BinaryExpr) Type() types.Type     { return b.EType }
 func (b *BinaryExpr) Accept(vst Visitor)   { vst.VisitBinaryExpr(b) }
 func (b *BinaryExpr) Value() ir.Value      { return b.IRValue }
 
-func (f *FuncCall) Pos() *token.Position { return f.Dsg.Pos() }
+func (f *FuncCall) Pos() *token.Position { return f.Callee.Pos() }
 func (f *FuncCall) End() (pos *token.Position) {
 	size := len(f.ActualParams)
 	if size > 0 {
 		pos = f.ActualParams[size-1].End()
 		pos.Column += len(")")
 	} else {
-		pos = f.Dsg.End()
+		pos = f.Callee.End()
 		pos.Column += len("()")
 	}
 
@@ -141,7 +141,7 @@ func (f *FuncCall) String() string {
 		args = append(args, arg.String())
 	}
 
-	return fmt.Sprintf("%s(%s)", f.Dsg, strings.Join(args, ", "))
+	return fmt.Sprintf("%s(%s)", f.Callee, strings.Join(args, ", "))
 }
 func (f *FuncCall) Value() ir.Value { return f.IRValue }
 

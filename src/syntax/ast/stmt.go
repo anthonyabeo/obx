@@ -35,7 +35,7 @@ type (
 
 	ProcCall struct {
 		NamePos      *token.Position
-		Dsg          *Designator
+		Callee       *Designator
 		ActualParams []Expression
 	}
 
@@ -132,7 +132,7 @@ func (p *ProcCall) String() string {
 		args = append(args, arg.String())
 	}
 
-	return fmt.Sprintf("%s(%s)", p.Dsg, strings.Join(args, ", "))
+	return fmt.Sprintf("%s(%s)", p.Callee, strings.Join(args, ", "))
 }
 
 func (w *WhileStmt) Pos() *token.Position { return w.While }
