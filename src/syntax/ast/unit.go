@@ -20,7 +20,7 @@ type Unit interface {
 // Module
 // --------------
 type Module struct {
-	MPos       *token.Position
+	Mod        *token.Position
 	BeginName  *Ident
 	EndName    *Ident
 	MetaParams []*MetaSection
@@ -32,7 +32,7 @@ type Module struct {
 func (m *Module) Accept(vst Visitor)   { vst.VisitModule(m) }
 func (m *Module) Name() string         { return m.BeginName.Name }
 func (m *Module) Kind() UnitKind       { return MOD }
-func (m *Module) Pos() *token.Position { return m.MPos }
+func (m *Module) Pos() *token.Position { return m.Mod }
 
 type MetaSection struct {
 	Mode    token.Token

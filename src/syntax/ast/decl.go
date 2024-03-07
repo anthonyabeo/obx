@@ -123,6 +123,7 @@ func (p *ProcHead) String() string {
 func (p *ProcHead) Pos() *token.Position { panic("not implemented") }
 func (p *ProcHead) End() *token.Position { panic("not implemented") }
 func (p *ProcHead) Accept(vst Visitor)   { vst.VisitProcHead(p) }
+func (p *ProcHead) decl()                {}
 
 func (p *ProcBody) String() string       { panic("not implemented") }
 func (p *ProcBody) Pos() *token.Position { panic("not implemented") }
