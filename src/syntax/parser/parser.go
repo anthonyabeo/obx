@@ -77,9 +77,13 @@ func (p *Parser) Oberon() *ast.Oberon {
 	case token.MODULE:
 		mod := p.parseModule()
 		if err := ob.AddUnit(mod.BeginName.Name, mod); err != nil {
-			p.error(mod.MPos, err.Error())
+			p.error(mod.Mod, err.Error())
 		}
 	case token.DEFINITION:
+		def := p.parseDefinition()
+		if err := ob.AddUnit(def.BeginName.Name, def); err != nil {
+			p.error(def.Def, err.Error())
+		}
 	default:
 		p.errorExpected(p.pos, "MODULE or DEFINITION")
 	}
@@ -131,8 +135,7 @@ func (p *Parser) parseMetaSection() *ast.MetaSection {
 }
 
 func (p *Parser) parseModule() *ast.Module {
-	//mod := new(ast.Module)
-	mod := &ast.Module{MPos: p.pos}
+	mod := &ast.Module{Mod: p.pos}
 
 	p.match(token.MODULE)
 	mod.BeginName = p.parseIdent()
@@ -281,6 +284,55 @@ ImportPath:
 	}
 
 	return imp
+}
+
+//	DeclarationSequence2 = {
+//			  CONST { ConstDeclaration [';'] }
+//			| TYPE { TypeDeclaration [';'] }
+//			| VAR { VariableDeclaration [';'] }
+//			| ProcedureHeading [';']
+//		}
+func (p *Parser) parseDeclarationSeq2() (seq []ast.Declaration) {
+	for p.startsDecl() {
+		switch p.tok {
+		case token.VAR:
+			p.match(token.VAR)
+			for p.tok == token.IDENT {
+				seq = append(seq, p.parseVarDecl())
+				if p.tok == token.SEMICOLON {
+					p.next()
+				}
+			}
+		case token.TYPE:
+			p.match(token.TYPE)
+			for p.tok == token.IDENT {
+				seq = append(seq, p.parseTypeDecl())
+				if p.tok == token.SEMICOLON {
+					p.next()
+				}
+			}
+		case token.CONST:
+			p.match(token.CONST)
+			for p.tok == token.IDENT {
+				seq = append(seq, p.parseConstDecl())
+				if p.tok == token.SEMICOLON {
+					p.next()
+				}
+			}
+		case token.PROC, token.PROCEDURE:
+			seq = append(seq, p.parseProcHeading())
+			if p.tok == token.SEMICOLON {
+				p.next()
+			}
+		default:
+			pos := p.pos
+			p.errorExpected(pos, "declaration")
+			p.advance(declStart)
+			seq = append(seq, &ast.BadDecl{From: pos, To: p.pos})
+		}
+	}
+
+	return seq
 }
 
 //	DeclarationSequence = {
