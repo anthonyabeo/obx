@@ -48,10 +48,14 @@ end Main`
 		}
 	}
 
-	mainMod := ob.Program["Main"]
-	if mainMod.BeginName.Name != mainMod.EndName.Name {
+	main, err := ob.Module("Main")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if main.BeginName.Name != main.EndName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			mainMod.BeginName, mainMod.EndName)
+			main.BeginName, main.EndName)
 	}
 
 }
@@ -91,21 +95,25 @@ end Main
 		{1, "[M]T"},
 	}
 
-	mainMod := ob.Program["Main"]
-	if mainMod.BeginName.Name != mainMod.EndName.Name {
-		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			mainMod.BeginName, mainMod.EndName)
+	main, err := ob.Module("Main")
+	if err != nil {
+		t.Error(err)
 	}
 
-	if len(mainMod.DeclSeq) != 3 {
+	if main.BeginName.Name != main.EndName.Name {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			main.BeginName, main.EndName)
+	}
+
+	if len(main.DeclSeq) != len(tests) {
 		t.Errorf("expected 1 declaration in '%v' module, found %d",
-			mainMod.BeginName, len(mainMod.DeclSeq))
+			main.BeginName, len(main.DeclSeq))
 	}
 
 	for i, tt := range tests {
-		td, ok := mainMod.DeclSeq[i].(*ast.TypeDecl)
+		td, ok := main.DeclSeq[i].(*ast.TypeDecl)
 		if !ok {
-			t.Errorf("expected type declaration, got '%s'", mainMod.DeclSeq[i])
+			t.Errorf("expected type declaration, got '%s'", main.DeclSeq[i])
 		}
 
 		denoTy, ok := td.DenotedType.(*ast.ArrayType)
@@ -166,22 +174,25 @@ end Main
 		}
 	}
 
-	mainMod := ob.Program["Main"]
-	if mainMod.BeginName.Name != mainMod.EndName.Name {
+	main, err := ob.Module("Main")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if main.BeginName.Name != main.EndName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			mainMod.BeginName, mainMod.EndName)
+			main.BeginName, main.EndName)
 	}
 
-	if len(mainMod.DeclSeq) != 1 {
+	if len(main.DeclSeq) != 1 {
 		t.Errorf("expected 1 declaration in '%v' module, found %d",
-			mainMod.BeginName, len(mainMod.DeclSeq))
+			main.BeginName, len(main.DeclSeq))
 	}
 
-	if len(mainMod.StmtSeq) != 2 {
+	if len(main.StmtSeq) != 2 {
 		t.Errorf("expected 2 statements in '%s' module, found %d",
-			mainMod.BeginName, len(mainMod.StmtSeq))
+			main.BeginName, len(main.StmtSeq))
 	}
-
 }
 
 func TestParseWhileStatement(t *testing.T) {
@@ -218,15 +229,19 @@ end Main
 		}
 	}
 
-	mainMod := ob.Program["Main"]
-	if mainMod.BeginName.Name != mainMod.EndName.Name {
-		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			mainMod.BeginName, mainMod.EndName)
+	main, err := ob.Module("Main")
+	if err != nil {
+		t.Error(err)
 	}
 
-	if len(mainMod.StmtSeq) != 2 {
+	if main.BeginName.Name != main.EndName.Name {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			main.BeginName, main.EndName)
+	}
+
+	if len(main.StmtSeq) != 2 {
 		t.Errorf("expected 2 statements in '%s' module, found %d",
-			mainMod.BeginName, len(mainMod.StmtSeq))
+			main.BeginName, len(main.StmtSeq))
 	}
 }
 
@@ -291,18 +306,22 @@ end Main
 		"t(CenterTree)",
 	}
 
-	mainMod := ob.Program["Main"]
-	if mainMod.BeginName.Name != mainMod.EndName.Name {
+	main, err := ob.Module("Main")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if main.BeginName.Name != main.EndName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			mainMod.BeginName, mainMod.EndName)
+			main.BeginName, main.EndName)
 	}
 
-	if len(mainMod.StmtSeq) != len(tests) {
+	if len(main.StmtSeq) != len(tests) {
 		t.Errorf("expected %d statements in '%s' module, found %d",
-			len(tests), mainMod.BeginName, len(mainMod.StmtSeq))
+			len(tests), main.BeginName, len(main.StmtSeq))
 	}
 
-	for i, stmt := range mainMod.StmtSeq {
+	for i, stmt := range main.StmtSeq {
 		st := stmt.(*ast.AssignStmt)
 		if st.RValue.String() != tests[i] {
 			t.Errorf("Expected '%s', got '%s'", tests[i], st.RValue.String())
@@ -341,15 +360,19 @@ end Main
 		}
 	}
 
-	mainMod := ob.Program["Main"]
-	if mainMod.BeginName.Name != mainMod.EndName.Name {
-		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			mainMod.BeginName, mainMod.EndName)
+	main, err := ob.Module("Main")
+	if err != nil {
+		t.Error(err)
 	}
 
-	if len(mainMod.StmtSeq) != 3 {
+	if main.BeginName.Name != main.EndName.Name {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			main.BeginName, main.EndName)
+	}
+
+	if len(main.StmtSeq) != 3 {
 		t.Errorf("expected 3 statements in '%s' module, found %d",
-			mainMod.BeginName, len(mainMod.StmtSeq))
+			main.BeginName, len(main.StmtSeq))
 	}
 
 	tests := []struct {
@@ -361,7 +384,7 @@ end Main
 		{"t.Insert", []string{"John"}},
 	}
 
-	for idx, stmt := range mainMod.StmtSeq {
+	for idx, stmt := range main.StmtSeq {
 		proc := stmt.(*ast.ProcCall)
 		if proc.Callee.String() != tests[idx].procName {
 			t.Errorf("expected procedure name '%s', got '%s'", tests[idx].procName, proc.Callee.String())
@@ -424,18 +447,22 @@ end Main
 		{"t", "c"},
 	}
 
-	mainMod := ob.Program["Main"]
-	if mainMod.BeginName.Name != mainMod.EndName.Name {
+	main, err := ob.Module("Main")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if main.BeginName.Name != main.EndName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			mainMod.BeginName, mainMod.EndName)
+			main.BeginName, main.EndName)
 	}
 
-	if len(mainMod.StmtSeq) != len(tests) {
+	if len(main.StmtSeq) != len(tests) {
 		t.Errorf("expected %d statements in '%s' module, found %d",
-			len(tests), mainMod.BeginName, len(mainMod.StmtSeq))
+			len(tests), main.BeginName, len(main.StmtSeq))
 	}
 
-	for i, stmt := range mainMod.StmtSeq {
+	for i, stmt := range main.StmtSeq {
 		st := stmt.(*ast.AssignStmt)
 
 		if st.LValue.String() != tests[i].lvalue {
@@ -488,17 +515,21 @@ end Drawing
 		"Out",
 	}
 
-	mainMod := ob.Program["Drawing"]
-	if mainMod.BeginName.Name != mainMod.EndName.Name {
+	main, err := ob.Module("Drawing")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if main.BeginName.Name != main.EndName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			mainMod.BeginName, mainMod.EndName)
+			main.BeginName, main.EndName)
 	}
 
-	if len(mainMod.ImportList) != len(tests) {
-		t.Errorf("expected %d import statements, found %d", len(tests), len(mainMod.ImportList))
+	if len(main.ImportList) != len(tests) {
+		t.Errorf("expected %d import statements, found %d", len(tests), len(main.ImportList))
 	}
 
-	for i, imp := range mainMod.ImportList {
+	for i, imp := range main.ImportList {
 		if tests[i] != imp.String() {
 			t.Errorf("expected import %s, got %s instead", tests[i], imp.String())
 		}
@@ -571,10 +602,14 @@ end Drawing
 		}
 	}
 
-	mod := ob.Program["Drawing"]
-	if mod.BeginName.Name != mod.EndName.Name {
+	main, err := ob.Module("Drawing")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if main.BeginName.Name != main.EndName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			mod.BeginName, mod.EndName)
+			main.BeginName, main.EndName)
 	}
 
 	stmtTests := []string{
@@ -592,11 +627,11 @@ end Drawing
 		"drawAll()",
 	}
 
-	if len(stmtTests) != len(mod.StmtSeq) {
-		t.Errorf("expected %d statements, found %d", len(stmtTests), len(mod.StmtSeq))
+	if len(stmtTests) != len(main.StmtSeq) {
+		t.Errorf("expected %d statements, found %d", len(stmtTests), len(main.StmtSeq))
 	}
 
-	for i, stmt := range mod.StmtSeq {
+	for i, stmt := range main.StmtSeq {
 		if stmtTests[i] != stmt.String() {
 			t.Errorf("expected statement '%s', got '%s'",
 				stmtTests[i], stmt.String())
@@ -616,7 +651,7 @@ end Drawing
 		"drawAll()",
 	}
 
-	for i, decl := range mod.DeclSeq {
+	for i, decl := range main.DeclSeq {
 		switch d := decl.(type) {
 		case *ast.VarDecl:
 			if Decls[i] != d.String() {

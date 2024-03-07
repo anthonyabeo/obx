@@ -28,7 +28,7 @@ func NewVisitor(ast *ast.Oberon, env *scope.Scope) *Visitor {
 }
 
 func (v *Visitor) VisitOberon(ob *ast.Oberon) {
-	for _, m := range ob.Program {
+	for _, m := range ob.Program() {
 		m.Accept(v)
 	}
 }

@@ -38,7 +38,7 @@ func (v *Visitor) error(pos *token.Position, msg string) {
 
 func (v *Visitor) VisitOberon(ob *ast.Oberon) {
 	v.ast = ob
-	for _, m := range ob.Program {
+	for _, m := range ob.Program() {
 		m.Accept(v)
 	}
 }

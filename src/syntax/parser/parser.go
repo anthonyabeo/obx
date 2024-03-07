@@ -76,7 +76,9 @@ func (p *Parser) Oberon() *ast.Oberon {
 	switch p.tok {
 	case token.MODULE:
 		mod := p.parseModule()
-		ob.Program[mod.BeginName.Name] = mod
+		if err := ob.AddUnit(mod.BeginName.Name, mod); err != nil {
+			p.error(mod.MPos, err.Error())
+		}
 	case token.DEFINITION:
 	default:
 		p.errorExpected(p.pos, "MODULE or DEFINITION")
@@ -129,7 +131,8 @@ func (p *Parser) parseMetaSection() *ast.MetaSection {
 }
 
 func (p *Parser) parseModule() *ast.Module {
-	mod := new(ast.Module)
+	//mod := new(ast.Module)
+	mod := &ast.Module{MPos: p.pos}
 
 	p.match(token.MODULE)
 	mod.BeginName = p.parseIdent()
