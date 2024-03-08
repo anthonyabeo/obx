@@ -32,8 +32,7 @@ begin
 end Main`
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
@@ -67,8 +66,7 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
@@ -152,8 +150,7 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
@@ -204,8 +201,7 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
@@ -259,8 +255,7 @@ begin
 end Main
 `
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
@@ -329,8 +324,7 @@ begin
 end Main
 `
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
@@ -398,8 +392,7 @@ begin
 end Main
 `
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
@@ -469,11 +462,11 @@ func TestParseImportDecl(t *testing.T) {
 end Drawing
 `
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
+
 	ob := p.Oberon()
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -567,8 +560,7 @@ begin
 end Drawing
 `
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)

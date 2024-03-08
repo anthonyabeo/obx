@@ -24,8 +24,7 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 
@@ -59,8 +58,7 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 
@@ -95,8 +93,7 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 
@@ -133,8 +130,7 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 
@@ -168,8 +164,7 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 
@@ -203,8 +198,7 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 
@@ -243,8 +237,7 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 
@@ -280,8 +273,7 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := &lexer.Lexer{}
-	lex.InitLexer(file, []byte(input))
+	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
 

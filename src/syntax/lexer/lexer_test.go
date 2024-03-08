@@ -14,8 +14,7 @@ const arrow = $0F0F 0060 0070 0038 001C 000E 0007 8003
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lexer := Lexer{}
-	lexer.InitLexer(file, []byte(input))
+	lexer := NewLexer(file, []byte(input))
 
 	tests := []struct {
 		kind token.Token
@@ -55,8 +54,7 @@ func TestLexingNumbers(t *testing.T) {
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lexer := Lexer{}
-	lexer.InitLexer(file, []byte(input))
+	lexer := NewLexer(file, []byte(input))
 
 	tests := []struct {
 		kind token.Token
@@ -95,8 +93,7 @@ begin
 end Main
 `
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lexer := Lexer{}
-	lexer.InitLexer(file, []byte(input))
+	lexer := NewLexer(file, []byte(input))
 
 	tests := []struct {
 		kind   token.Token
@@ -142,8 +139,7 @@ _y
 firstLetter
 `
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lexer := Lexer{}
-	lexer.InitLexer(file, []byte(input))
+	lexer := NewLexer(file, []byte(input))
 
 	tests := []struct {
 		kind   token.Token
@@ -201,8 +197,7 @@ end Main
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lexer := Lexer{}
-	lexer.InitLexer(file, []byte(input))
+	lexer := NewLexer(file, []byte(input))
 
 	tests := []struct {
 		tokenKind token.Token
@@ -360,8 +355,7 @@ end Drawing
 `
 
 	file := token.NewFile("test.obx", len([]byte(input)))
-	lexer := Lexer{}
-	lexer.InitLexer(file, []byte(input))
+	lexer := NewLexer(file, []byte(input))
 
 	tests := []struct {
 		tokenKind token.Token

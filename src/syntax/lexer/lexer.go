@@ -19,7 +19,8 @@ type Lexer struct {
 	rdOffset int  // next character offset
 }
 
-func (lex *Lexer) InitLexer(file *token.File, src []byte) {
+func NewLexer(file *token.File, src []byte) *Lexer {
+	lex := &Lexer{}
 	lex.file = file
 
 	lex.src = src
@@ -29,6 +30,8 @@ func (lex *Lexer) InitLexer(file *token.File, src []byte) {
 	lex.rdOffset = 0
 
 	lex.next()
+
+	return lex
 }
 
 func (lex *Lexer) Lex() (tok token.Token, lit string, pos *token.Position) {
