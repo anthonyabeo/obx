@@ -70,6 +70,10 @@ func (p *Parser) next() {
 	p.tok, p.lit, p.pos = p.lex.Lex()
 }
 
+func (p *Parser) Errors() lexer.ErrorList {
+	return p.errors
+}
+
 func (p *Parser) Oberon() *ast.Oberon {
 	ob := ast.NewOberon()
 
@@ -79,10 +83,18 @@ func (p *Parser) Oberon() *ast.Oberon {
 		if err := ob.AddUnit(mod.BeginName.Name, mod); err != nil {
 			p.error(mod.Mod, err.Error())
 		}
+
+		for _, unit := range mod.ImportList {
+			mod.AddAdjacent(unit.Name.Name)
+		}
 	case token.DEFINITION:
 		def := p.parseDefinition()
 		if err := ob.AddUnit(def.BeginName.Name, def); err != nil {
 			p.error(def.Def, err.Error())
+		}
+
+		for _, unit := range def.ImportList {
+			def.AddAdjacent(unit.Name.Name)
 		}
 	default:
 		p.errorExpected(p.pos, "MODULE or DEFINITION")
