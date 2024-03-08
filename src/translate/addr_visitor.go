@@ -22,11 +22,14 @@ func (l *AddrVisitor) VisitIdentifier(id *ast.Ident) {
 
 func (l *AddrVisitor) VisitDesignator(d *ast.Designator) {
 	d.QualifiedIdent.Accept(l)
-	if d.Selector != nil {
-		d.Selector.Accept(l)
-		d.IRValue = d.Selector.Value()
-		return
+	if d.Selector == nil {
+		d.IRValue = d.QualifiedIdent.Value()
 	}
 
-	d.IRValue = d.QualifiedIdent.Value()
+	switch d.Selector.(type) {
+	case *ast.DotOp:
+	case *ast.IndexOp:
+	case *ast.PtrDref:
+	case *ast.TypeGuard:
+	}
 }

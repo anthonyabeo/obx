@@ -14,10 +14,6 @@ type Visitor interface {
 	VisitSet(*Set)
 	VisitBasicLit(*BasicLit)
 	VisitExprRange(*ExprRange)
-	VisitDotOp(*DotOp)
-	VisitIndexOp(*IndexOp)
-	VisitTypeGuard(*TypeGuard)
-	VisitPointerDeref(*PtrDref)
 
 	VisitIfStmt(*IfStmt)
 	VisitAssignStmt(*AssignStmt)

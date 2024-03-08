@@ -716,26 +716,6 @@ func (v *Visitor) VisitFormalParams(params *ast.FormalParams) {
 	params.RetType.Accept(v)
 }
 
-func (v *Visitor) VisitDotOp(op *ast.DotOp) {
-	// TODO not implemented
-	panic("not implemented")
-}
-
-func (v *Visitor) VisitIndexOp(op *ast.IndexOp) {
-	// TODO not implemented
-	panic("not implemented")
-}
-
-func (v *Visitor) VisitTypeGuard(guard *ast.TypeGuard) {
-	// TODO not implemented
-	panic("not implemented")
-}
-
-func (v *Visitor) VisitPointerDeref(deref *ast.PtrDref) {
-	// TODO not implemented
-	panic("not implemented")
-}
-
 func (v *Visitor) VisitImport(imp *ast.Import) {
 	// TODO not implemented
 	panic("not implemented")

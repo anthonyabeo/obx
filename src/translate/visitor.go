@@ -510,26 +510,6 @@ func (v *Visitor) VisitFormalParams(params *ast.FormalParams) {
 	panic("implement me")
 }
 
-func (v *Visitor) VisitDotOp(dot *ast.DotOp) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (v *Visitor) VisitIndexOp(idx *ast.IndexOp) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (v *Visitor) VisitTypeGuard(grd *ast.TypeGuard) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (v *Visitor) VisitPointerDeref(drf *ast.PtrDref) {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (v *Visitor) VisitExprRange(rng *ast.ExprRange) {
 	//TODO implement me
 	panic("implement me")
