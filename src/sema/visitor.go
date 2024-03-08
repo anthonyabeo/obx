@@ -122,7 +122,6 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 		if expr.EType = left; left.Kind() < right.Kind() {
 			expr.EType = right
 		}
-
 	case token.DIV, token.MOD:
 		if left.Info() != types.IsInteger || right.Info() != types.IsInteger {
 			msg := fmt.Sprintf("cannot perform operation '%v' on non-integer types, '%v' and '%v'", expr.Op, expr.Left, expr.Right)
@@ -182,13 +181,64 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 
 func (v *Visitor) VisitDesignator(des *ast.Designator) {
 	des.QualifiedIdent.Accept(v)
-	if des.Selector != nil {
-		des.Selector.Accept(v)
-		des.EType = des.Selector.Type()
+	if des.Selector == nil {
+		des.EType = des.QualifiedIdent.Type()
 		return
 	}
 
-	des.EType = des.QualifiedIdent.Type()
+	obj := v.env.Lookup(des.QualifiedIdent.String())
+	if obj == nil {
+		msg := fmt.Sprintf("name '%s' is not defined", des.QualifiedIdent.String())
+		v.error(des.QualifiedIdent.Pos(), msg)
+	}
+
+	switch sel := des.Selector.(type) {
+	case *ast.DotOp:
+		switch ty := obj.Type().(type) {
+		case *Record:
+			sym := ty.fields.Lookup(sel.Field.Name)
+			if sym == nil {
+				v.error(sel.Field.Pos(), fmt.Sprintf("'%s' is not a field in '%s'", sel.Field, ty))
+			}
+
+			des.EType = sym.Type()
+		case *PtrType:
+			record, ok := ty.UTy.(*Record)
+			if !ok {
+				msg := fmt.Sprintf("pointer '%s' does not reference a record type", ty)
+				v.error(obj.Pos(), msg)
+			}
+
+			sym := record.fields.Lookup(sel.Field.Name)
+			if sym == nil {
+				v.error(sel.Field.Pos(), fmt.Sprintf("'%s' is not a field in '%s'", sel.Field, record))
+			}
+
+			des.EType = sym.Type()
+		default:
+			msg := fmt.Sprintf("'%s' must be a (pointer to) record type", obj.Type())
+			v.error(obj.Pos(), msg)
+		}
+	case *ast.PtrDref:
+		ptr, ok := obj.Type().(*PtrType)
+		if !ok {
+			msg := fmt.Sprintf("name '%s' is not defined as an pointer type", des.QualifiedIdent.String())
+			v.error(des.QualifiedIdent.Pos(), msg)
+		}
+
+		des.EType = ptr.UTy
+	case *ast.IndexOp:
+		arrTy, ok := obj.Type().(*Array)
+		if !ok {
+			msg := fmt.Sprintf("name '%s' is not defined as an array type", des.QualifiedIdent.String())
+			v.error(des.QualifiedIdent.Pos(), msg)
+		}
+
+		des.EType = arrTy.ElemTy
+	case *ast.TypeGuard:
+	}
+
+	return
 }
 
 func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
@@ -532,8 +582,12 @@ func (v *Visitor) VisitArrayType(a *ast.ArrayType) {
 }
 
 func (v *Visitor) VisitProcType(p *ast.ProcType) {
-	// TODO not implemented
-	panic("not implemented")
+	p.FP.Accept(v)
+
+	pTy := &ProcedureType{Proc: p.Proc, fp: p.FP}
+	pTy.DeSugarParams()
+
+	p.EType = pTy
 }
 
 func (v *Visitor) VisitPointerType(p *ast.PointerType) {
