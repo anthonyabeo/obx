@@ -24,11 +24,11 @@ type Parser struct {
 	syncCnt int             // number of parser.advance calls without progress
 }
 
-func (p *Parser) InitParser(lex *lexer.Lexer, env *scope.Scope) {
-	p.lex = lex
-	p.env = env
-
+func NewParser(lex *lexer.Lexer, env *scope.Scope) *Parser {
+	p := &Parser{lex: lex, env: env}
 	p.next()
+
+	return p
 }
 
 func (p *Parser) error(pos *token.Position, msg string) {

@@ -29,8 +29,7 @@ end Main
 
 	scp := scope.NewScope(scope.Global, "Main")
 
-	p := &parser.Parser{}
-	p.InitParser(lex, scp)
+	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
@@ -65,8 +64,7 @@ end Main
 
 	scp := scope.NewScope(scope.Global, "Main")
 
-	p := &parser.Parser{}
-	p.InitParser(lex, scp)
+	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
@@ -102,8 +100,7 @@ end Main
 
 	scp := scope.NewScope(scope.Global, "Main")
 
-	p := &parser.Parser{}
-	p.InitParser(lex, scp)
+	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
@@ -141,8 +138,7 @@ end Main
 
 	scp := scope.NewScope(scope.Global, "Main")
 
-	p := &parser.Parser{}
-	p.InitParser(lex, scp)
+	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
@@ -177,8 +173,7 @@ end Main
 
 	scp := scope.NewScope(scope.Global, "Main")
 
-	p := &parser.Parser{}
-	p.InitParser(lex, scp)
+	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
@@ -213,8 +208,7 @@ end Main
 
 	scp := scope.NewScope(scope.Global, "Main")
 
-	p := &parser.Parser{}
-	p.InitParser(lex, scp)
+	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
@@ -254,8 +248,7 @@ end Main
 
 	scp := scope.NewScope(scope.Global, "Main")
 
-	p := &parser.Parser{}
-	p.InitParser(lex, scp)
+	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
@@ -292,8 +285,7 @@ end Main
 
 	scp := scope.NewScope(scope.Global, "Main")
 
-	p := &parser.Parser{}
-	p.InitParser(lex, scp)
+	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)

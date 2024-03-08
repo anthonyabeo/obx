@@ -39,8 +39,7 @@ end Main
 
 	scp := scope.NewScope(scope.Global, "Main")
 
-	p := &parser.Parser{}
-	p.InitParser(lex, scp)
+	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	sema := NewVisitor(scope.Global)
@@ -70,8 +69,7 @@ end Main
 
 	scp := scope.NewScope(scope.Global, "Main")
 
-	p := &parser.Parser{}
-	p.InitParser(lex, scp)
+	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	sema := NewVisitor(scp)
@@ -102,9 +100,7 @@ end Main
 	lex.InitLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
-
-	p := &parser.Parser{}
-	p.InitParser(lex, scp)
+	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	sema := NewVisitor(scp)
