@@ -9,8 +9,6 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
-func (v *Visitor) match(a, b types.Type) bool { return false }
-
 // Two variables a and b with types Ta and Tb are of the same type if
 //
 //  1. Ta and Tb are both denoted by the same type identifier, or
@@ -180,7 +178,7 @@ func (v *Visitor) paramCompat(fpKind token.Token, Ta, Tf types.Type) bool {
 	return false
 }
 
-//	An actual parameter a of type Ta is array compatible with a formal parameter f of type Tf if
+//	An actual parameter 'a' of type Ta is array compatible with a formal parameter f of type Tf if
 //
 // 1. Tf and Ta are the equal type, or
 // 2. Tf is an open array, Ta is any array, and their element types are array compatible, or
@@ -207,6 +205,14 @@ func (v *Visitor) paramListMatch(Ta, Tb *ast.FormalParams) bool {
 		if !v.equalType(Ta.Params[i].Type.Type(), Tb.Params[i].Type.Type()) {
 			return false
 		}
+	}
+
+	return true
+}
+
+func (v *Visitor) resultTypeMatch(a, b types.Type) bool {
+	if !v.sameType(a, b) {
+		return false
 	}
 
 	return true
