@@ -74,33 +74,21 @@ func (p *Parser) Errors() lexer.ErrorList {
 	return p.errors
 }
 
-func (p *Parser) Oberon() *ast.Oberon {
-	ob := ast.NewOberon()
-
+func (p *Parser) Oberon(obx *ast.Oberon) {
 	switch p.tok {
 	case token.MODULE:
 		mod := p.parseModule()
-		if err := ob.AddUnit(mod.BeginName.Name, mod); err != nil {
+		if err := obx.AddUnit(mod.BeginName.Name, mod); err != nil {
 			p.error(mod.Mod, err.Error())
-		}
-
-		for _, unit := range mod.ImportList {
-			mod.AddAdjacent(unit.Name.Name)
 		}
 	case token.DEFINITION:
 		def := p.parseDefinition()
-		if err := ob.AddUnit(def.BeginName.Name, def); err != nil {
+		if err := obx.AddUnit(def.BeginName.Name, def); err != nil {
 			p.error(def.Def, err.Error())
-		}
-
-		for _, unit := range def.ImportList {
-			def.AddAdjacent(unit.Name.Name)
 		}
 	default:
 		p.errorExpected(p.pos, "MODULE or DEFINITION")
 	}
-
-	return ob
 }
 
 // MetaParams = '(' MetaSection { [';'] MetaSection } ')'
@@ -1031,7 +1019,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 			p.next()
 			stmt = &ast.AssignStmt{AssignPos: pos, LValue: dsg, RValue: p.parseExpression()}
 		case token.LPAREN:
-			stmt = &ast.ProcCall{Callee: dsg, ActualParams: p.parseActualParameters()}
+			stmt = &ast.ProcCall{NamePos: dsg.QPos, Callee: dsg, ActualParams: p.parseActualParameters()}
 		}
 	default:
 		pos := p.pos
@@ -1186,6 +1174,7 @@ func (p *Parser) parseLabelRange() *ast.LabelRange {
 func (p *Parser) parseForStmt() (stmt *ast.ForStmt) {
 	stmt = &ast.ForStmt{For: p.pos}
 
+	p.match(token.FOR)
 	stmt.CtlVar = p.parseIdent()
 	p.match(token.BECOMES)
 	stmt.InitVal = p.parseExpression()

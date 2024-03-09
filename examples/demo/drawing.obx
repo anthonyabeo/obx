@@ -25,7 +25,7 @@ module Drawing
     begin
       figure.draw(); inc(this.count)
     end apply
-    var i: I // count is initialized to zero
+    var i: I
   begin
     figures.forEach(i)
     assert(i.count = 2)
