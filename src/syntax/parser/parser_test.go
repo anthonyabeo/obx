@@ -37,6 +37,7 @@ end Main`
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
 	ob := p.Oberon()
+
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -71,6 +72,7 @@ end Main
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
 	ob := p.Oberon()
+
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -155,6 +157,7 @@ end Main
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
 	ob := p.Oberon()
+
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -206,6 +209,7 @@ end Main
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
 	ob := p.Oberon()
+
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -260,6 +264,7 @@ end Main
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
 	ob := p.Oberon()
+
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -329,6 +334,7 @@ end Main
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
 	ob := p.Oberon()
+
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -397,6 +403,7 @@ end Main
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
 	ob := p.Oberon()
+
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -466,8 +473,8 @@ end Drawing
 
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
-
 	ob := p.Oberon()
+
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -565,6 +572,7 @@ end Drawing
 	scp := scope.NewScope(scope.Global, "Main")
 	p := NewParser(lex, scp)
 	ob := p.Oberon()
+
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {

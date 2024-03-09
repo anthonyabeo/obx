@@ -1,6 +1,7 @@
 package translate
 
 import (
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/sema"
@@ -26,7 +27,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
+=======
+	ob := ast.NewOberon()
+	p := parser.NewParser(lex)
+	p.Oberon(ob)
+>>>>>>> 8c86479 (Refactor)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
@@ -60,7 +67,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
+=======
+	ob := ast.NewOberon()
+	p := parser.NewParser(lex)
+	p.Oberon(ob)
+>>>>>>> 8c86479 (Refactor)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
@@ -95,7 +108,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
+=======
+	ob := ast.NewOberon()
+	p := parser.NewParser(lex)
+	p.Oberon(ob)
+>>>>>>> 8c86479 (Refactor)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
@@ -132,7 +151,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
+=======
+	ob := ast.NewOberon()
+	p := parser.NewParser(lex)
+	p.Oberon(ob)
+>>>>>>> 8c86479 (Refactor)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
@@ -166,7 +191,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
+=======
+	ob := ast.NewOberon()
+	p := parser.NewParser(lex)
+	p.Oberon(ob)
+>>>>>>> 8c86479 (Refactor)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
@@ -200,7 +231,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
+=======
+	ob := ast.NewOberon()
+	p := parser.NewParser(lex)
+	p.Oberon(ob)
+>>>>>>> 8c86479 (Refactor)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
@@ -239,7 +276,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
+=======
+	ob := ast.NewOberon()
+	p := parser.NewParser(lex)
+	p.Oberon(ob)
+>>>>>>> 8c86479 (Refactor)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
@@ -275,7 +318,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
+=======
+	ob := ast.NewOberon()
+	p := parser.NewParser(lex)
+	p.Oberon(ob)
+>>>>>>> 8c86479 (Refactor)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
