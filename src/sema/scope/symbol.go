@@ -140,3 +140,15 @@ func NewConst(
 }
 
 func (c *Const) String() string { panic("not implemented") }
+
+// Module
+// -----------------------
+type Module struct {
+	symbol
+}
+
+func NewModule(pos *token.Position, name string) *Module {
+	return &Module{symbol{nil, pos, name, MOD, Typ[types.Invalid], 0, 0, nil}}
+}
+
+func (m *Module) String() string { panic("not implemented") }

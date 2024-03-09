@@ -35,8 +35,10 @@ end Main`
 	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
+
+	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	ob := p.Oberon()
+	p.Oberon(ob)
 
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -70,8 +72,10 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
+
+	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	ob := p.Oberon()
+	p.Oberon(ob)
 
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -155,8 +159,10 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
+
+	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	ob := p.Oberon()
+	p.Oberon(ob)
 
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -207,8 +213,10 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
+
+	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	ob := p.Oberon()
+	p.Oberon(ob)
 
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -262,8 +270,10 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
+
+	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	ob := p.Oberon()
+	p.Oberon(ob)
 
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -332,8 +342,10 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
+
+	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	ob := p.Oberon()
+	p.Oberon(ob)
 
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -401,8 +413,10 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
+
+	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	ob := p.Oberon()
+	p.Oberon(ob)
 
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -472,8 +486,10 @@ end Drawing
 	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
+
+	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	ob := p.Oberon()
+	p.Oberon(ob)
 
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -570,8 +586,10 @@ end Drawing
 	lex := lexer.NewLexer(file, []byte(input))
 
 	scp := scope.NewScope(scope.Global, "Main")
+
+	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	ob := p.Oberon()
+	p.Oberon(ob)
 
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
