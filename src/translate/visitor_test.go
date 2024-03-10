@@ -1,7 +1,6 @@
 package translate
 
 import (
-	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/sema"
@@ -28,21 +27,26 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 =======
 	ob := ast.NewOberon()
 	p := parser.NewParser(lex)
 	p.Oberon(ob)
 >>>>>>> 8c86479 (Refactor)
+=======
+	p := parser.NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
-	vst.VisitOberon(ob)
+	unit.Accept(vst)
 
-	cgen := NewVisitor(ob, scp)
-	cgen.VisitOberon(ob)
+	cgen := NewVisitor(scp)
+	unit.Accept(cgen)
 }
 
 func TestIRCodegenBasicWhileLoop(t *testing.T) {
@@ -68,21 +72,26 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 =======
 	ob := ast.NewOberon()
 	p := parser.NewParser(lex)
 	p.Oberon(ob)
 >>>>>>> 8c86479 (Refactor)
+=======
+	p := parser.NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
-	vst.VisitOberon(ob)
+	unit.Accept(vst)
 
-	cgen := NewVisitor(ob, scp)
-	cgen.VisitOberon(ob)
+	cgen := NewVisitor(scp)
+	unit.Accept(cgen)
 }
 
 func TestIRCodegenWhileLoopWithSingleElseIfBranch(t *testing.T) {
@@ -109,21 +118,26 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 =======
 	ob := ast.NewOberon()
 	p := parser.NewParser(lex)
 	p.Oberon(ob)
 >>>>>>> 8c86479 (Refactor)
+=======
+	p := parser.NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
-	vst.VisitOberon(ob)
+	unit.Accept(vst)
 
-	cgen := NewVisitor(ob, scp)
-	cgen.VisitOberon(ob)
+	cgen := NewVisitor(scp)
+	unit.Accept(cgen)
 }
 
 func TestIRCodegenWhileLoopWithTwoElseIfBranch(t *testing.T) {
@@ -152,21 +166,26 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 =======
 	ob := ast.NewOberon()
 	p := parser.NewParser(lex)
 	p.Oberon(ob)
 >>>>>>> 8c86479 (Refactor)
+=======
+	p := parser.NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
-	vst.VisitOberon(ob)
+	unit.Accept(vst)
 
-	cgen := NewVisitor(ob, scp)
-	cgen.VisitOberon(ob)
+	cgen := NewVisitor(scp)
+	unit.Accept(cgen)
 }
 
 func TestIRCodegenRepeatStmt(t *testing.T) {
@@ -192,21 +211,26 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 =======
 	ob := ast.NewOberon()
 	p := parser.NewParser(lex)
 	p.Oberon(ob)
 >>>>>>> 8c86479 (Refactor)
+=======
+	p := parser.NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
-	vst.VisitOberon(ob)
+	unit.Accept(vst)
 
-	cgen := NewVisitor(ob, scp)
-	cgen.VisitOberon(ob)
+	cgen := NewVisitor(scp)
+	unit.Accept(cgen)
 }
 
 func TestIRCodegenIfThenElse(t *testing.T) {
@@ -232,24 +256,26 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 =======
 	ob := ast.NewOberon()
 	p := parser.NewParser(lex)
 	p.Oberon(ob)
 >>>>>>> 8c86479 (Refactor)
+=======
+	p := parser.NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
-	vst.VisitOberon(ob)
+	unit.Accept(vst)
 
-	cgen := NewVisitor(ob, scp)
-	cgen.VisitOberon(ob)
-
-	//_ = module.GetFunction("main")
-	//fmt.Println(Main)
+	cgen := NewVisitor(scp)
+	unit.Accept(cgen)
 }
 
 func TestIRCodegenIfThenElsifElse(t *testing.T) {
@@ -277,21 +303,26 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 =======
 	ob := ast.NewOberon()
 	p := parser.NewParser(lex)
 	p.Oberon(ob)
 >>>>>>> 8c86479 (Refactor)
+=======
+	p := parser.NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
-	vst.VisitOberon(ob)
+	unit.Accept(vst)
 
-	cgen := NewVisitor(ob, scp)
-	cgen.VisitOberon(ob)
+	cgen := NewVisitor(scp)
+	unit.Accept(cgen)
 }
 
 func TestIRCodegenIfThenElsifWithNoElse(t *testing.T) {
@@ -319,19 +350,24 @@ end Main
 	lex := lexer.NewLexer(file, []byte(input))
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 =======
 	ob := ast.NewOberon()
 	p := parser.NewParser(lex)
 	p.Oberon(ob)
 >>>>>>> 8c86479 (Refactor)
+=======
+	p := parser.NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	vst := sema.NewVisitor(scp)
-	vst.VisitOberon(ob)
+	unit.Accept(vst)
 
-	cgen := NewVisitor(ob, scp)
-	cgen.VisitOberon(ob)
+	cgen := NewVisitor(scp)
+	unit.Accept(cgen)
 }

@@ -36,6 +36,7 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
 	p := parser.NewParser(lex, scp)
@@ -43,6 +44,13 @@ end Main
 
 	sema := NewVisitor(scope.Global)
 	sema.VisitOberon(ob)
+=======
+	p := parser.NewParser(lex)
+	unit := p.Parse()
+
+	sema := NewVisitor(Global)
+	unit.Accept(sema)
+>>>>>>> 27db89d (refactoring)
 
 	if len(sema.errors) > 0 {
 		t.Error("found semantic errors")
@@ -65,6 +73,7 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
 	p := parser.NewParser(lex, scp)
@@ -72,6 +81,14 @@ end Main
 
 	sema := NewVisitor(scp)
 	sema.VisitOberon(ob)
+=======
+	p := parser.NewParser(lex)
+	unit := p.Parse()
+
+	sema := NewVisitor(Global)
+	unit.Accept(sema)
+
+>>>>>>> 27db89d (refactoring)
 	if len(sema.errors) > 0 {
 		t.Error("found semantic errors")
 		for _, err := range sema.errors {
@@ -96,12 +113,21 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 	p := parser.NewParser(lex, scp)
 	ob := p.Oberon()
 
 	sema := NewVisitor(scp)
 	sema.VisitOberon(ob)
+=======
+	p := parser.NewParser(lex)
+	unit := p.Parse()
+
+	sema := NewVisitor(Global)
+	unit.Accept(sema)
+
+>>>>>>> 27db89d (refactoring)
 	if len(sema.errors) > 0 {
 		t.Error("found semantic errors")
 		for _, err := range sema.errors {

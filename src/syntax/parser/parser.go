@@ -74,21 +74,17 @@ func (p *Parser) Errors() lexer.ErrorList {
 	return p.errors
 }
 
-func (p *Parser) Oberon(obx *ast.Oberon) {
+func (p *Parser) Parse() (unit ast.Unit) {
 	switch p.tok {
 	case token.MODULE:
-		mod := p.parseModule()
-		if err := obx.AddUnit(mod.BeginName.Name, mod); err != nil {
-			p.error(mod.Mod, err.Error())
-		}
+		unit = p.parseModule()
 	case token.DEFINITION:
-		def := p.parseDefinition()
-		if err := obx.AddUnit(def.BeginName.Name, def); err != nil {
-			p.error(def.Def, err.Error())
-		}
+		unit = p.parseDefinition()
 	default:
 		p.errorExpected(p.pos, "MODULE or DEFINITION")
 	}
+
+	return
 }
 
 // MetaParams = '(' MetaSection { [';'] MetaSection } ')'
@@ -135,10 +131,10 @@ func (p *Parser) parseMetaSection() *ast.MetaSection {
 }
 
 func (p *Parser) parseModule() *ast.Module {
-	mod := &ast.Module{Mod: p.pos}
+	mod := ast.NewModule(p.pos)
 
 	p.match(token.MODULE)
-	mod.BeginName = p.parseIdent()
+	mod.BName = p.parseIdent()
 
 	if p.tok == token.LPAREN {
 		mod.MetaParams = p.metaParams()
@@ -151,20 +147,7 @@ func (p *Parser) parseModule() *ast.Module {
 	for p.startsImportOrDecl() {
 		switch p.tok {
 		case token.IMPORT:
-			p.next()
-
-			mod.ImportList = append(mod.ImportList, p.parseImport())
-			for p.tok == token.COMMA || p.tok == token.IDENT {
-				if p.tok == token.COMMA {
-					p.next()
-				}
-
-				mod.ImportList = append(mod.ImportList, p.parseImport())
-			}
-
-			if p.tok == token.SEMICOLON {
-				p.next()
-			}
+			mod.ImportList = p.parseImportList()
 		case token.VAR, token.TYPE, token.CONST, token.PROC, token.PROCEDURE:
 			mod.DeclSeq = p.parseDeclarationSeq()
 		default:
@@ -181,7 +164,7 @@ func (p *Parser) parseModule() *ast.Module {
 	}
 
 	p.match(token.END)
-	mod.EndName = p.parseIdent()
+	mod.EName = p.parseIdent()
 	if p.tok == token.PERIOD {
 		p.next()
 	}
@@ -191,10 +174,10 @@ func (p *Parser) parseModule() *ast.Module {
 
 // definition   = DEFINITION ident [';']  [ ImportList ] DeclarationSequence2 END ident ['.']
 func (p *Parser) parseDefinition() *ast.Definition {
-	def := &ast.Definition{Def: p.pos}
+	def := ast.NewDefinition(p.pos)
 
 	p.match(token.DEFINITION)
-	def.BeginName = p.parseIdent()
+	def.BName = p.parseIdent()
 	if p.tok == token.SEMICOLON {
 		p.next()
 	}
@@ -209,13 +192,12 @@ func (p *Parser) parseDefinition() *ast.Definition {
 
 	p.match(token.END)
 
-	def.EndName = p.parseIdent()
+	def.EName = p.parseIdent()
 	if p.tok == token.PERIOD {
 		p.next()
 	}
 
 	return def
-
 }
 
 // ImportList = IMPORT import { [','] import } [';']

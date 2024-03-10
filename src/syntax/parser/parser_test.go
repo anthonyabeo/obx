@@ -34,12 +34,17 @@ end Main`
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
 	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
 	p.Oberon(ob)
 
+=======
+	p := NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -47,14 +52,10 @@ end Main`
 		}
 	}
 
-	main, err := ob.Module("Main")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if main.BeginName.Name != main.EndName.Name {
+	main := unit.(*ast.Module)
+	if main.BName.Name != main.EName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			main.BeginName, main.EndName)
+			main.BName, main.EName)
 	}
 
 }
@@ -71,11 +72,16 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
 	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
 	p.Oberon(ob)
+=======
+	p := NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -93,19 +99,15 @@ end Main
 		{1, "[M]T"},
 	}
 
-	main, err := ob.Module("Main")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if main.BeginName.Name != main.EndName.Name {
+	main := unit.(*ast.Module)
+	if main.BName.Name != main.EName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			main.BeginName, main.EndName)
+			main.BName, main.EName)
 	}
 
 	if len(main.DeclSeq) != len(tests) {
 		t.Errorf("expected 1 declaration in '%v' module, found %d",
-			main.BeginName, len(main.DeclSeq))
+			main.BName, len(main.DeclSeq))
 	}
 
 	for i, tt := range tests {
@@ -158,12 +160,17 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
 	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
 	p.Oberon(ob)
 
+=======
+	p := NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -171,24 +178,20 @@ end Main
 		}
 	}
 
-	main, err := ob.Module("Main")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if main.BeginName.Name != main.EndName.Name {
+	main := unit.(*ast.Module)
+	if main.BName.Name != main.EName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			main.BeginName, main.EndName)
+			main.BName, main.EName)
 	}
 
 	if len(main.DeclSeq) != 1 {
 		t.Errorf("expected 1 declaration in '%v' module, found %d",
-			main.BeginName, len(main.DeclSeq))
+			main.BName, len(main.DeclSeq))
 	}
 
 	if len(main.StmtSeq) != 2 {
 		t.Errorf("expected 2 statements in '%s' module, found %d",
-			main.BeginName, len(main.StmtSeq))
+			main.BName, len(main.StmtSeq))
 	}
 }
 
@@ -212,12 +215,17 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
 	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
 	p.Oberon(ob)
 
+=======
+	p := NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -225,19 +233,15 @@ end Main
 		}
 	}
 
-	main, err := ob.Module("Main")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if main.BeginName.Name != main.EndName.Name {
+	main := unit.(*ast.Module)
+	if main.BName.Name != main.EName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			main.BeginName, main.EndName)
+			main.BName, main.EName)
 	}
 
 	if len(main.StmtSeq) != 2 {
 		t.Errorf("expected 2 statements in '%s' module, found %d",
-			main.BeginName, len(main.StmtSeq))
+			main.BName, len(main.StmtSeq))
 	}
 }
 
@@ -269,12 +273,17 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
 	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
 	p.Oberon(ob)
 
+=======
+	p := NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -301,19 +310,15 @@ end Main
 		"t(CenterTree)",
 	}
 
-	main, err := ob.Module("Main")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if main.BeginName.Name != main.EndName.Name {
+	main := unit.(*ast.Module)
+	if main.BName.Name != main.EName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			main.BeginName, main.EndName)
+			main.BName, main.EName)
 	}
 
 	if len(main.StmtSeq) != len(tests) {
 		t.Errorf("expected %d statements in '%s' module, found %d",
-			len(tests), main.BeginName, len(main.StmtSeq))
+			len(tests), main.BName, len(main.StmtSeq))
 	}
 
 	for i, stmt := range main.StmtSeq {
@@ -341,12 +346,17 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
 	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
 	p.Oberon(ob)
 
+=======
+	p := NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -354,19 +364,15 @@ end Main
 		}
 	}
 
-	main, err := ob.Module("Main")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if main.BeginName.Name != main.EndName.Name {
+	main := unit.(*ast.Module)
+	if main.BName.Name != main.EName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			main.BeginName, main.EndName)
+			main.BName, main.EName)
 	}
 
 	if len(main.StmtSeq) != 3 {
 		t.Errorf("expected 3 statements in '%s' module, found %d",
-			main.BeginName, len(main.StmtSeq))
+			main.BName, len(main.StmtSeq))
 	}
 
 	tests := []struct {
@@ -412,12 +418,17 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
 	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
 	p.Oberon(ob)
 
+=======
+	p := NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -441,19 +452,15 @@ end Main
 		{"t", "c"},
 	}
 
-	main, err := ob.Module("Main")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if main.BeginName.Name != main.EndName.Name {
+	main := unit.(*ast.Module)
+	if main.BName.Name != main.EName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			main.BeginName, main.EndName)
+			main.BName, main.EName)
 	}
 
 	if len(main.StmtSeq) != len(tests) {
 		t.Errorf("expected %d statements in '%s' module, found %d",
-			len(tests), main.BeginName, len(main.StmtSeq))
+			len(tests), main.BName, len(main.StmtSeq))
 	}
 
 	for i, stmt := range main.StmtSeq {
@@ -485,12 +492,17 @@ end Drawing
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
 	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
 	p.Oberon(ob)
 
+=======
+	p := NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -510,14 +522,10 @@ end Drawing
 		"Out",
 	}
 
-	main, err := ob.Module("Drawing")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if main.BeginName.Name != main.EndName.Name {
+	main := unit.(*ast.Module)
+	if main.BName.Name != main.EName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			main.BeginName, main.EndName)
+			main.BName, main.EName)
 	}
 
 	if len(main.ImportList) != len(tests) {
@@ -585,12 +593,17 @@ end Drawing
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
+<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
 	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
 	p.Oberon(ob)
 
+=======
+	p := NewParser(lex)
+	unit := p.Parse()
+>>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -598,14 +611,10 @@ end Drawing
 		}
 	}
 
-	main, err := ob.Module("Drawing")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if main.BeginName.Name != main.EndName.Name {
+	main := unit.(*ast.Module)
+	if main.BName.Name != main.EName.Name {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			main.BeginName, main.EndName)
+			main.BName, main.EName)
 	}
 
 	stmtTests := []string{
