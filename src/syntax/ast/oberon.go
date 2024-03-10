@@ -1,59 +1,46 @@
 package ast
 
-import "fmt"
-
 // Oberon is the top-level representation of an Oberon+ program
 // It is modelled as directed-acyclic graph where the nodes in the graph
 // are compilation units (Module and Definition) and the edges between
 // them represent their import dependency.
 type Oberon struct {
-	program map[string]Unit
+	units map[string]Unit
 }
 
 func NewOberon() *Oberon {
-	return &Oberon{program: make(map[string]Unit)}
+	return &Oberon{units: make(map[string]Unit)}
 }
 
-func (obx *Oberon) Module(name string) (*Module, error) {
-	m, ok := obx.program[name]
-	if !ok {
-		return nil, fmt.Errorf("no module named '%s' found", name)
+func (obx *Oberon) AddUnit(name string, node Unit) {
+	if _, exist := obx.units[name]; exist {
+		return
 	}
 
-	mod, ok := m.(*Module)
-	if !ok {
-		return nil, fmt.Errorf("'%s' is not a module", m.Name())
-	}
-
-	return mod, nil
+	obx.units[name] = node
 }
 
-func (obx *Oberon) Definition(name string) (*Definition, error) {
-	m, ok := obx.program[name]
-	if !ok {
-		return nil, fmt.Errorf("no definition named '%s' found", name)
+func (obx *Oberon) AddEdge(src, dst string) {
+	if _, ok := obx.units[src]; !ok {
+		return
+	}
+	if _, ok := obx.units[dst]; !ok {
+		return
 	}
 
-	def, ok := m.(*Definition)
-	if !ok {
-		return nil, fmt.Errorf("'%s' is not a definition", m.Name())
-	}
-
-	return def, nil
+	obx.units[src].addEdge(dst, obx.units[dst])
 }
 
-func (obx *Oberon) AddUnit(name string, unit Unit) error {
-	if u, ok := obx.program[name]; ok {
-		if u.Kind() == unit.Kind() {
-			return fmt.Errorf("unit with name '%s' already defined", name)
-		}
+func (obx *Oberon) Neighbors(src string) []string {
+	var result []string
+
+	for _, edge := range obx.units[src].Edges() {
+		result = append(result, edge.Name())
 	}
 
-	obx.program[name] = unit
-
-	return nil
+	return result
 }
 
-func (obx *Oberon) Program() map[string]Unit {
-	return obx.program
+func (obx *Oberon) Units() map[string]Unit {
+	return obx.units
 }

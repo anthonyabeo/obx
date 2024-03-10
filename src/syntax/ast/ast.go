@@ -37,3 +37,11 @@ type Type interface {
 	Type() types.Type
 	IRType() ir.Type
 }
+
+type Unit interface {
+	Node
+	Name() string
+	ListImport() []*Import
+	Edges() map[string]Unit
+	addEdge(string, Unit)
+}

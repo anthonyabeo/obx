@@ -2,44 +2,33 @@ package ast
 
 import "github.com/anthonyabeo/obx/src/syntax/token"
 
-type UnitKind int
-
-const (
-	Invalid UnitKind = iota
-
-	MOD
-	DEF
-)
-
-type Unit interface {
-	Name() string
-	Kind() UnitKind
-	Accept(Visitor)
-	Incident() []string
-}
-
 // Module
 // --------------
 type Module struct {
-	Mod        *token.Position
-	BeginName  *Ident
-	EndName    *Ident
+	pos   *token.Position
+	BName *Ident
+	EName *Ident
+
 	MetaParams []*MetaSection
 	ImportList []*Import
 	DeclSeq    []Declaration
 	StmtSeq    []Statement
 
-	incidence []string
+	edges map[string]Unit
 }
 
-func (m *Module) Accept(vst Visitor)   { vst.VisitModule(m) }
-func (m *Module) Name() string         { return m.BeginName.Name }
-func (m *Module) Kind() UnitKind       { return MOD }
-func (m *Module) Pos() *token.Position { return m.Mod }
-func (m *Module) Incident() []string   { return m.incidence }
-func (m *Module) AddAdjacent(name string) {
-	m.incidence = append(m.incidence, name)
+func NewModule(pos *token.Position) *Module {
+	return &Module{pos: pos, edges: map[string]Unit{}}
 }
+
+func (m *Module) Edges() map[string]Unit         { return m.edges }
+func (m *Module) addEdge(name string, unit Unit) { m.edges[name] = unit }
+func (m *Module) Name() string                   { return m.BName.Name }
+func (m *Module) ListImport() []*Import          { return m.ImportList }
+func (m *Module) Accept(vst Visitor)             { vst.VisitModule(m) }
+func (m *Module) Pos() *token.Position           { return m.pos }
+func (m *Module) End() *token.Position           { panic("implement me") }
+func (m *Module) String() string                 { panic("implement me") }
 
 type MetaSection struct {
 	Mode    token.Token
@@ -50,19 +39,25 @@ type MetaSection struct {
 // Definition
 // -------------------
 type Definition struct {
-	Def        *token.Position
-	BeginName  *Ident
-	EndName    *Ident
+	pos   *token.Position
+	BName *Ident
+	EName *Ident
+
 	ImportList []*Import
 	DeclSeq    []Declaration
 
-	incidence []string
+	edges map[string]Unit
 }
 
-func (def *Definition) Accept(vst Visitor) { vst.VisitDefinition(def) }
-func (def *Definition) Name() string       { return def.BeginName.Name }
-func (def *Definition) Kind() UnitKind     { return DEF }
-func (def *Definition) Incident() []string { return def.incidence }
-func (def *Definition) AddAdjacent(name string) {
-	def.incidence = append(def.incidence, name)
+func NewDefinition(pos *token.Position) *Definition {
+	return &Definition{pos: pos}
 }
+
+func (def *Definition) Edges() map[string]Unit         { return def.edges }
+func (def *Definition) addEdge(name string, unit Unit) { def.edges[name] = unit }
+func (def *Definition) Pos() *token.Position           { return def.pos }
+func (def *Definition) End() *token.Position           { panic("implement me") }
+func (def *Definition) Accept(vst Visitor)             { vst.VisitDefinition(def) }
+func (def *Definition) Name() string                   { return def.BName.Name }
+func (def *Definition) ListImport() []*Import          { return def.ImportList }
+func (def *Definition) String() string                 { panic("implement me") }
