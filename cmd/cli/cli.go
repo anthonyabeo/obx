@@ -9,9 +9,9 @@ import (
 func Run(args []string) error {
 	app := &cli.App{
 		Name:  "obx",
-		Usage: "obx <command> [arguments]",
+		Usage: "Oberon+ Compiler",
 		Commands: []*cli.Command{
-			loadCmd,
+			buildCmd,
 		},
 	}
 
