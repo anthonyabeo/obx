@@ -44,4 +44,5 @@ type Visitor interface {
 	VisitProcType(*ProcType)
 	VisitRecordType(*RecordType)
 	VisitEnumType(*EnumType)
+	VisitNamedType(*NamedType)
 }

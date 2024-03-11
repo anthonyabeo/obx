@@ -758,14 +758,35 @@ func (p *Parser) parseSetElem() ast.Expression {
 	return expr
 }
 
+var basicTypes = map[string]bool{
+	"integer":  true,
+	"real":     true,
+	"longreal": true,
+	"boolean":  true,
+	"byte":     true,
+	"char":     true,
+	"set":      true,
+	"wchar":    true,
+	"int8":     true,
+	"int16":    true,
+	"int32":    true,
+	"int64":    true,
+}
+
 func (p *Parser) parseNamedType() ast.Type {
 	typ := p.parseQualifiedIdent()
-	return ast.NewBasicType(typ.String())
+	if basicTypes[typ.String()] {
+		return ast.NewBasicType(typ.Pos(), typ.String())
+	}
+
+	return ast.NewNamedType(typ.Pos(), typ)
+
 }
 
 // qualident = [ ident '.' ] ident
 func (p *Parser) parseQualifiedIdent() ast.Expression {
 	id := p.parseIdent()
+	// if id is an imported module/module alias, then return qualified ID
 	if p.tok == token.PERIOD {
 		p.next()
 		sel := p.parseIdent()
