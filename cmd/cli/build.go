@@ -9,6 +9,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 
+	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
@@ -67,7 +68,13 @@ func runBuild(ctx *cli.Context) (err error) {
 
 	_ = ParseModule(obx, module, path)
 
-	// checking for circular imports
+	tsOrd := topologicalSort(obx)
+
+	vst := sema.NewVisitor(obx)
+	for _, name := range tsOrd {
+		unit := obx.Units()[name]
+		unit.Accept(vst)
+	}
 
 	return nil
 }
@@ -108,6 +115,7 @@ func ParseModule(obx *ast.Oberon, module, path string) ast.Unit {
 	unit := p.Parse()
 
 	obx.AddUnit(unit.Name(), unit)
+	obx.TopOrd = append(obx.TopOrd, mod.file)
 
 	for _, imp := range unit.ListImport() {
 		var importPath string
@@ -122,9 +130,18 @@ func ParseModule(obx *ast.Oberon, module, path string) ast.Unit {
 			importPath = path
 		}
 
-		u := ParseModule(obx, imp.Name.Name, importPath)
+		if _, processed := obx.Units()[imp.Name.Name]; !processed {
+			u := ParseModule(obx, imp.Name.Name, importPath)
+			obx.AddEdge(u.Name(), unit.Name())
+		} else {
+			obx.TopOrd = append(obx.TopOrd, fmt.Sprintf("%s/%s.obx", importPath, imp.Name.Name))
 
-		obx.AddEdge(u.Name(), unit.Name())
+			fmt.Println("import cycle detected")
+			for _, p := range obx.TopOrd {
+				fmt.Printf("\t%s\n", p)
+			}
+			os.Exit(1)
+		}
 	}
 
 	return unit
@@ -133,4 +150,50 @@ func ParseModule(obx *ast.Oberon, module, path string) ast.Unit {
 type Module struct {
 	file  string
 	input []byte
+}
+
+func topologicalSort(obx *ast.Oberon) []string {
+	// construct a hash mapping nodes to their indegrees
+	var inDeg = make(map[string]int, 0)
+	for name := range obx.Units() {
+		inDeg[name] = 0
+	}
+
+	for _, unit := range obx.Units() {
+		for _, adj := range obx.Neighbors(unit.Name()) {
+			inDeg[adj] += 1
+		}
+	}
+
+	// track nodes with no incoming edges
+	var zeroInDegNodes = make([]string, 0)
+	for name, inD := range inDeg {
+		if inD == 0 {
+			zeroInDegNodes = append(zeroInDegNodes, name)
+		}
+	}
+
+	// initially, no nodes in our ordering
+	var tsOrd = make([]string, 0)
+	for len(zeroInDegNodes) > 0 {
+		unit := zeroInDegNodes[0]
+		tsOrd = append(tsOrd, unit)
+		zeroInDegNodes = zeroInDegNodes[1:]
+
+		// decrement the indegree of that node's neighbors
+		for _, neighbor := range obx.Neighbors(unit) {
+			inDeg[neighbor] -= 1
+			if inDeg[neighbor] == 0 {
+				zeroInDegNodes = append(zeroInDegNodes, neighbor)
+			}
+		}
+	}
+
+	if len(tsOrd) != len(obx.Units()) {
+		// graph has a cycle
+		log.Fatal("Import cycle of modules and definitions not allowed")
+
+	}
+
+	return tsOrd
 }
