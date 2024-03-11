@@ -11,7 +11,15 @@ import (
 )
 
 type (
+	NamedType struct {
+		pos  *token.Position
+		Name Expression
+
+		EType types.Type
+	}
+
 	BasicType struct {
+		pos  *token.Position
 		name string // e.g. integer, bool
 
 		EType types.Type
@@ -71,12 +79,23 @@ type (
 	}
 )
 
-func NewBasicType(name string) *BasicType {
-	return &BasicType{name: name}
+func NewNamedType(pos *token.Position, name Expression) *NamedType {
+	return &NamedType{pos: pos, Name: name}
+}
+
+func (n *NamedType) String() string       { return n.Name.String() }
+func (n *NamedType) Pos() *token.Position { return n.pos }
+func (n *NamedType) End() *token.Position { panic("implement me") }
+func (n *NamedType) Accept(vst Visitor)   { vst.VisitNamedType(n) }
+func (n *NamedType) Type() types.Type     { return n.EType }
+func (n *NamedType) IRType() ir.Type      { panic("implement me") }
+
+func NewBasicType(pos *token.Position, name string) *BasicType {
+	return &BasicType{name: name, pos: pos}
 }
 
 func (b *BasicType) Name() string         { return b.name }
-func (b *BasicType) Pos() *token.Position { panic("not implemented") }
+func (b *BasicType) Pos() *token.Position { return b.pos }
 func (b *BasicType) End() *token.Position { panic("not implemented") }
 func (b *BasicType) Type() types.Type     { return b.EType }
 func (b *BasicType) String() string       { return b.name }
@@ -129,8 +148,8 @@ func (r *RecordType) String() string {
 	buf.WriteString("record")
 
 	if r.BaseType != nil {
-		t, _ := r.BaseType.(*BasicType)
-		buf.WriteString(fmt.Sprintf("(%s)", t.name))
+		t, _ := r.BaseType.(*NamedType)
+		buf.WriteString(fmt.Sprintf("(%s)", t.Name))
 	}
 
 	var fields []string
