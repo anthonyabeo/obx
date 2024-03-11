@@ -145,10 +145,12 @@ func (c *Const) String() string { panic("not implemented") }
 // -----------------------
 type Module struct {
 	symbol
+	Scope *Scope
 }
 
-func NewModule(pos *token.Position, name string) *Module {
-	return &Module{symbol{nil, pos, name, MOD, Typ[types.Invalid], 0, 0, nil}}
+func NewModule(pos *token.Position, name string, scp *Scope) *Module {
+	return &Module{
+		symbol{nil, pos, name, MOD, Typ[types.Invalid], 0, 0, nil}, scp}
 }
 
 func (m *Module) String() string { panic("not implemented") }
