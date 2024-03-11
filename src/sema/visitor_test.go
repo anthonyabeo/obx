@@ -3,7 +3,11 @@ package sema
 import (
 	"testing"
 
+<<<<<<< HEAD
 	"github.com/anthonyabeo/obx/src/sema/scope"
+=======
+	"github.com/anthonyabeo/obx/src/syntax/ast"
+>>>>>>> 422f461 (Update sema.VisitModule)
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -41,7 +45,12 @@ end Main
 	p := parser.NewParser(lex, scp)
 	unit := p.Parse()
 
+<<<<<<< HEAD
 	sema := NewVisitor(scope.Global)
+=======
+	obx := ast.NewOberon()
+	sema := NewVisitor(obx)
+>>>>>>> 422f461 (Update sema.VisitModule)
 	unit.Accept(sema)
 
 	if len(sema.errors) > 0 {
@@ -70,7 +79,12 @@ end Main
 	p := parser.NewParser(lex, scp)
 	unit := p.Parse()
 
+<<<<<<< HEAD
 	sema := NewVisitor(scope.Global)
+=======
+	obx := ast.NewOberon()
+	sema := NewVisitor(obx)
+>>>>>>> 422f461 (Update sema.VisitModule)
 	unit.Accept(sema)
 	if len(sema.errors) > 0 {
 		t.Error("found semantic errors")
@@ -101,7 +115,12 @@ end Main
 	p := parser.NewParser(lex, scp)
 	unit := p.Parse()
 
+<<<<<<< HEAD
 	sema := NewVisitor(scope.Global)
+=======
+	obx := ast.NewOberon()
+	sema := NewVisitor(obx)
+>>>>>>> 422f461 (Update sema.VisitModule)
 	unit.Accept(sema)
 	if len(sema.errors) > 0 {
 		t.Error("found semantic errors")

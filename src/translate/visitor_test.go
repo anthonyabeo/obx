@@ -1,6 +1,7 @@
 package translate
 
 import (
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/sema"
@@ -31,8 +32,9 @@ end Main
 	p := parser.NewParser(lex, scp)
 	unit := p.Parse()
 
-	vst := sema.NewVisitor(scp)
-	unit.Accept(vst)
+	obx := ast.NewOberon()
+	s := sema.NewVisitor(obx)
+	unit.Accept(s)
 
 	cgen := NewVisitor(scp)
 	unit.Accept(cgen)
@@ -65,8 +67,9 @@ end Main
 	p := parser.NewParser(lex, scp)
 	unit := p.Parse()
 
-	vst := sema.NewVisitor(scp)
-	unit.Accept(vst)
+	obx := ast.NewOberon()
+	s := sema.NewVisitor(obx)
+	unit.Accept(s)
 
 	cgen := NewVisitor(scp)
 	unit.Accept(cgen)
@@ -100,8 +103,9 @@ end Main
 	p := parser.NewParser(lex, scp)
 	unit := p.Parse()
 
-	vst := sema.NewVisitor(scp)
-	unit.Accept(vst)
+	obx := ast.NewOberon()
+	s := sema.NewVisitor(obx)
+	unit.Accept(s)
 
 	cgen := NewVisitor(scp)
 	unit.Accept(cgen)
@@ -137,8 +141,9 @@ end Main
 	p := parser.NewParser(lex, scp)
 	unit := p.Parse()
 
-	vst := sema.NewVisitor(scp)
-	unit.Accept(vst)
+	obx := ast.NewOberon()
+	s := sema.NewVisitor(obx)
+	unit.Accept(s)
 
 	cgen := NewVisitor(scp)
 	unit.Accept(cgen)
@@ -171,8 +176,9 @@ end Main
 	p := parser.NewParser(lex, scp)
 	unit := p.Parse()
 
-	vst := sema.NewVisitor(scp)
-	unit.Accept(vst)
+	obx := ast.NewOberon()
+	s := sema.NewVisitor(obx)
+	unit.Accept(s)
 
 	cgen := NewVisitor(scp)
 	unit.Accept(cgen)
@@ -205,8 +211,9 @@ end Main
 	p := parser.NewParser(lex, scp)
 	unit := p.Parse()
 
-	vst := sema.NewVisitor(scp)
-	unit.Accept(vst)
+	obx := ast.NewOberon()
+	s := sema.NewVisitor(obx)
+	unit.Accept(s)
 
 	cgen := NewVisitor(scp)
 	unit.Accept(cgen)
@@ -241,8 +248,9 @@ end Main
 	p := parser.NewParser(lex, scp)
 	unit := p.Parse()
 
-	vst := sema.NewVisitor(scp)
-	unit.Accept(vst)
+	obx := ast.NewOberon()
+	s := sema.NewVisitor(obx)
+	unit.Accept(s)
 
 	cgen := NewVisitor(scp)
 	unit.Accept(cgen)
@@ -277,8 +285,9 @@ end Main
 	p := parser.NewParser(lex, scp)
 	unit := p.Parse()
 
-	vst := sema.NewVisitor(scp)
-	unit.Accept(vst)
+	obx := ast.NewOberon()
+	s := sema.NewVisitor(obx)
+	unit.Accept(s)
 
 	cgen := NewVisitor(scp)
 	unit.Accept(cgen)

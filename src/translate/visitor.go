@@ -438,6 +438,11 @@ func (v *Visitor) VisitTypeDecl(decl *ast.TypeDecl) {
 	panic("implement me")
 }
 
+func (v *Visitor) VisitNamedType(n *ast.NamedType) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (v *Visitor) VisitBasicType(t *ast.BasicType) {
 	var ty ir.Type
 

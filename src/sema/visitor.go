@@ -50,9 +50,34 @@ func (v *Visitor) VisitOberon(ob *ast.Oberon) {
 }
 
 func (v *Visitor) VisitModule(m *ast.Module) {
+	if m.BName.Name != m.EName.Name {
+		msg := fmt.Sprintf("module start name '%s' does not match end name '%s'", m.BName, m.EName)
+		v.error(m.Pos(), msg)
+	}
+
 	scp := scope.NewScope(scope.Global, m.BName.Name)
 	v.scopes[m.BName.Name] = scp
 	v.env = scp
+
+	for _, metaP := range m.MetaParams {
+		if metaP.TyConst != nil {
+			metaP.TyConst.Accept(v)
+		}
+
+		switch metaP.Mode {
+		case token.CONST:
+		default:
+			for _, ty := range metaP.Ids {
+				var tyConst types.Type = nil
+				if metaP.TyConst != nil {
+					tyConst = metaP.TyConst.Type()
+				}
+
+				genTy := types.NewGenericType(ty.Name, tyConst)
+				v.env.Insert(scope.NewTypeName(ty.NamePos, ty.Name, genTy, ty.IProps, -1))
+			}
+		}
+	}
 
 	for _, imp := range m.ImportList {
 		imp.Accept(v)
@@ -551,6 +576,11 @@ func (v *Visitor) VisitTypeDecl(decl *ast.TypeDecl) {
 		v.env.Insert(scope.NewTypeName(decl.Type, decl.Name.Name, decl.DenotedType.Type(), decl.Name.Props(), v.offset))
 		v.offset += decl.DenotedType.Type().Width()
 	}
+}
+
+func (v *Visitor) VisitNamedType(n *ast.NamedType) {
+	n.Name.Accept(v)
+	n.EType = n.Name.Type()
 }
 
 func (v *Visitor) VisitBasicType(b *ast.BasicType) {
