@@ -15,12 +15,18 @@ type Visitor struct {
 	offset int
 	errors lexer.ErrorList
 
-	ast *ast.Oberon
-	env *scope.Scope
+	ast    *ast.Oberon
+	env    *scope.Scope
+	scopes map[string]*scope.Scope
 }
 
-func NewVisitor(env *scope.Scope) *Visitor {
-	return &Visitor{env: env}
+func NewVisitor(obx *ast.Oberon) *Visitor {
+	vst := &Visitor{scopes: map[string]*scope.Scope{}}
+	for _, unit := range obx.Units() {
+		vst.scopes[unit.Name()] = nil
+	}
+
+	return vst
 }
 
 func (v *Visitor) error(pos *token.Position, msg string) {
@@ -44,6 +50,10 @@ func (v *Visitor) VisitOberon(ob *ast.Oberon) {
 }
 
 func (v *Visitor) VisitModule(m *ast.Module) {
+	scp := scope.NewScope(scope.Global, m.BName.Name)
+	v.scopes[m.BName.Name] = scp
+	v.env = scp
+
 	for _, imp := range m.ImportList {
 		imp.Accept(v)
 	}
@@ -196,7 +206,7 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 	case *ast.DotOp:
 		switch ty := obj.Type().(type) {
 		case *Record:
-			sym := ty.fields.Lookup(sel.Field.Name)
+			sym := ty.fields[sel.Field.Name]
 			if sym == nil {
 				v.error(sel.Field.Pos(), fmt.Sprintf("'%s' is not a field in '%s'", sel.Field, ty))
 			}
@@ -209,7 +219,7 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 				v.error(obj.Pos(), msg)
 			}
 
-			sym := record.fields.Lookup(sel.Field.Name)
+			sym := record.fields[sel.Field.Name]
 			if sym == nil {
 				v.error(sel.Field.Pos(), fmt.Sprintf("'%s' is not a field in '%s'", sel.Field, record))
 			}
@@ -620,7 +630,7 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 		}
 	}
 
-	ty := NewRecordType(scope.NewScope(v.env, ""), base)
+	ty := NewRecordType(map[string]scope.Symbol{}, base)
 
 	for _, field := range r.Fields {
 		field.Type.Accept(v)
@@ -630,11 +640,11 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 		}
 
 		for _, id := range field.IdList {
-			if obj := ty.fields.Lookup(id.Name); obj != nil {
+			if obj := ty.fields[id.Name]; obj != nil {
 				msg := fmt.Sprintf("field name '%s' already declared at '%v'", id.Name, obj.Pos())
 				v.error(id.NamePos, msg)
 			} else {
-				ty.fields.Insert(scope.NewVar(id.NamePos, id.Name, field.Type.Type(), id.IProps, v.offset))
+				ty.fields[id.Name] = scope.NewVar(id.NamePos, id.Name, field.Type.Type(), id.IProps, v.offset)
 				v.offset += field.Type.Type().Width()
 			}
 		}
@@ -717,8 +727,9 @@ func (v *Visitor) VisitFormalParams(params *ast.FormalParams) {
 }
 
 func (v *Visitor) VisitImport(imp *ast.Import) {
-	// TODO not implemented
-	panic("not implemented")
+	scp := v.scopes[imp.Name.Name]
+	v.env.Insert(scope.NewModule(nil, imp.Alias.Name, scp))
+	v.env.Insert(scope.NewModule(nil, imp.Name.Name, scp))
 }
 
 func (v *Visitor) VisitExprRange(rng *ast.ExprRange) {

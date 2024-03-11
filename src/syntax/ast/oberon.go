@@ -5,7 +5,8 @@ package ast
 // are compilation units (Module and Definition) and the edges between
 // them represent their import dependency.
 type Oberon struct {
-	units map[string]Unit
+	units  map[string]Unit
+	TopOrd []string
 }
 
 func NewOberon() *Oberon {
