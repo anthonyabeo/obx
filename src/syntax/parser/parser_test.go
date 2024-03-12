@@ -220,12 +220,7 @@ begin
 	phi := t(CenterTree).subnode
 	phi := t.left.right 
 	phi := w[3].name[i]
-<<<<<<< HEAD
 	phi := t(CenterTree)
-	
-=======
-	phi := t{CenterTree}
->>>>>>> 52ef4c4 (update TestParseExpressions)
 end Main
 `
 	file := token.NewFile("test.obx", len([]byte(input)))

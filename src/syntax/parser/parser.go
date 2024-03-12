@@ -382,12 +382,12 @@ func (p *Parser) parseType() (typ ast.Type) {
 		enum := &ast.EnumType{Enum: p.pos}
 		p.next()
 
-		enum.Consts = append(enum.Consts, p.parseIdent())
+		enum.Variants = append(enum.Variants, p.parseIdent())
 		for p.tok == token.COMMA || p.tok == token.IDENT {
 			if p.tok == token.COMMA {
 				p.next()
 			}
-			enum.Consts = append(enum.Consts, p.parseIdent())
+			enum.Variants = append(enum.Variants, p.parseIdent())
 		}
 
 		p.match(token.RPAREN)

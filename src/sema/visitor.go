@@ -2,9 +2,9 @@ package sema
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/sema/scope"
 	"strconv"
 
+	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
@@ -482,7 +482,7 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 			v.error(decl.Pos(), fmt.Sprintf("variable name '%s' already declared at '%v'", obj.String(), obj.Pos()))
 		} else {
 			v.env.Insert(scope.NewVar(ident.Pos(), ident.Name, decl.Type.Type(), ident.Props(), v.offset))
-			v.offset += decl.Type.Width()
+			v.offset += decl.Type.Type().Width()
 		}
 	}
 }
@@ -559,9 +559,9 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 }
 
 func (v *Visitor) VisitEnumType(e *ast.EnumType) {
-	typ := NewEnumType(e.Consts)
+	typ := NewEnumType(e.Variants)
 
-	for i, c := range e.Consts {
+	for i, c := range e.Variants {
 		if obj := v.env.Lookup(c.Name); obj != nil {
 			msg := fmt.Sprintf("name '%s' already declared at '%v'", c.Name, obj.Pos())
 			v.error(c.NamePos, msg)
@@ -615,7 +615,7 @@ func (v *Visitor) VisitFPSection(sec *ast.FPSection) {
 			// v.offset += ?
 		} else {
 			v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
-			v.offset += sec.Type.Width()
+			v.offset += sec.Type.Type().Width()
 		}
 	}
 }
