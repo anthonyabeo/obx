@@ -272,7 +272,7 @@ type TypeGuard struct {
 
 func (t *TypeGuard) Pos() *token.Position { panic("not implement") }
 func (t *TypeGuard) End() *token.Position { panic("not implement") }
-func (t *TypeGuard) String() string       { return fmt.Sprintf("{%s}", t.Ty) }
+func (t *TypeGuard) String() string       { return fmt.Sprintf("(%s)", t.Ty) }
 func (t *TypeGuard) sel()                 {}
 
 // PtrDref

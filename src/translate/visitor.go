@@ -15,19 +15,11 @@ type Visitor struct {
 	builder *ir.Builder
 	module  *ir.Module
 
-<<<<<<< HEAD
 	ast *ast.Oberon
 	env *scope.Scope
 }
 
-func NewVisitor(ast *ast.Oberon, env *scope.Scope) *Visitor {
-=======
-	//ast *ast.Oberon
-	env *sema.Scope
-}
-
-func NewVisitor(env *sema.Scope) *Visitor {
->>>>>>> 27db89d (refactoring)
+func NewVisitor(env *scope.Scope) *Visitor {
 	return &Visitor{
 		//ast:     ast,
 		env:     env,

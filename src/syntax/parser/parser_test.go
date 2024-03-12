@@ -34,17 +34,11 @@ end Main`
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
-	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	p.Oberon(ob)
-
-=======
-	p := NewParser(lex)
 	unit := p.Parse()
->>>>>>> 27db89d (refactoring)
+
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -72,17 +66,10 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
-	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	p.Oberon(ob)
-=======
-	p := NewParser(lex)
 	unit := p.Parse()
->>>>>>> 27db89d (refactoring)
-
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -160,17 +147,10 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
-	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	p.Oberon(ob)
-
-=======
-	p := NewParser(lex)
 	unit := p.Parse()
->>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -215,17 +195,10 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
-	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	p.Oberon(ob)
-
-=======
-	p := NewParser(lex)
 	unit := p.Parse()
->>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -273,17 +246,10 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
-	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	p.Oberon(ob)
-
-=======
-	p := NewParser(lex)
 	unit := p.Parse()
->>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -346,17 +312,10 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
-	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	p.Oberon(ob)
-
-=======
-	p := NewParser(lex)
 	unit := p.Parse()
->>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -402,6 +361,9 @@ end Main
 func TestParseAssignStmt(t *testing.T) {
 	input := `
 module Main
+proc log2(x: real)
+end log2
+
 begin
 	i := 0
 	p := i = j
@@ -418,17 +380,10 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
-	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	p.Oberon(ob)
-
-=======
-	p := NewParser(lex)
 	unit := p.Parse()
->>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -492,17 +447,10 @@ end Drawing
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
-	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	p.Oberon(ob)
-
-=======
-	p := NewParser(lex)
 	unit := p.Parse()
->>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {
@@ -593,17 +541,10 @@ end Drawing
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-<<<<<<< HEAD
 	scp := scope.NewScope(scope.Global, "Main")
 
-	ob := ast.NewOberon()
 	p := NewParser(lex, scp)
-	p.Oberon(ob)
-
-=======
-	p := NewParser(lex)
 	unit := p.Parse()
->>>>>>> 27db89d (refactoring)
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
 		for _, err := range p.errors {

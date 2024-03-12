@@ -2,15 +2,18 @@ package cli
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/syntax/ast"
-	"github.com/anthonyabeo/obx/src/syntax/lexer"
-	"github.com/anthonyabeo/obx/src/syntax/parser"
-	"github.com/anthonyabeo/obx/src/syntax/token"
-	"github.com/urfave/cli/v2"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/urfave/cli/v2"
+
+	"github.com/anthonyabeo/obx/src/sema/scope"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/syntax/lexer"
+	"github.com/anthonyabeo/obx/src/syntax/parser"
+	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 var buildArgs struct {
@@ -101,7 +104,7 @@ func ParseModule(obx *ast.Oberon, module, path string) ast.Unit {
 	file := token.NewFile(mod.file, len(mod.input))
 	lex := lexer.NewLexer(file, mod.input)
 
-	p := parser.NewParser(lex)
+	p := parser.NewParser(lex, scope.Global)
 	unit := p.Parse()
 
 	obx.AddUnit(unit.Name(), unit)
