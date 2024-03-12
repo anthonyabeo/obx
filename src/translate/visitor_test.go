@@ -2,9 +2,11 @@ package translate
 
 import (
 	"fmt"
+
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/sema"
+	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -27,11 +29,11 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
-	p := &parser.Parser{}
-	p.InitParser(lex)
-	ob := p.Oberon()
+	scp := scope.NewScope(scope.Global, "Main")
 
-	scp := sema.NewScope(sema.Global, "Main")
+	p := &parser.Parser{}
+	p.InitParser(lex, scp)
+	ob := p.Oberon()
 
 	sema_vst := &sema.Visitor{}
 	sema_vst.InitSemaVisitor(ob, scp)
@@ -67,11 +69,11 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
-	p := &parser.Parser{}
-	p.InitParser(lex)
-	ob := p.Oberon()
+	scp := scope.NewScope(scope.Global, "Main")
 
-	scp := sema.NewScope(sema.Global, "Main")
+	p := &parser.Parser{}
+	p.InitParser(lex, scp)
+	ob := p.Oberon()
 
 	sema_vst := &sema.Visitor{}
 	sema_vst.InitSemaVisitor(ob, scp)
@@ -108,11 +110,11 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
-	p := &parser.Parser{}
-	p.InitParser(lex)
-	ob := p.Oberon()
+	scp := scope.NewScope(scope.Global, "Main")
 
-	scp := sema.NewScope(sema.Global, "Main")
+	p := &parser.Parser{}
+	p.InitParser(lex, scp)
+	ob := p.Oberon()
 
 	sema_vst := &sema.Visitor{}
 	sema_vst.InitSemaVisitor(ob, scp)
@@ -151,11 +153,11 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
-	p := &parser.Parser{}
-	p.InitParser(lex)
-	ob := p.Oberon()
+	scp := scope.NewScope(scope.Global, "Main")
 
-	scp := sema.NewScope(sema.Global, "Main")
+	p := &parser.Parser{}
+	p.InitParser(lex, scp)
+	ob := p.Oberon()
 
 	sema_vst := &sema.Visitor{}
 	sema_vst.InitSemaVisitor(ob, scp)
@@ -191,11 +193,11 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
-	p := &parser.Parser{}
-	p.InitParser(lex)
-	ob := p.Oberon()
+	scp := scope.NewScope(scope.Global, "Main")
 
-	scp := sema.NewScope(sema.Global, "Main")
+	p := &parser.Parser{}
+	p.InitParser(lex, scp)
+	ob := p.Oberon()
 
 	sema_vst := &sema.Visitor{}
 	sema_vst.InitSemaVisitor(ob, scp)
@@ -231,11 +233,11 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
-	p := &parser.Parser{}
-	p.InitParser(lex)
-	ob := p.Oberon()
+	scp := scope.NewScope(scope.Global, "Main")
 
-	scp := sema.NewScope(sema.Global, "Main")
+	p := &parser.Parser{}
+	p.InitParser(lex, scp)
+	ob := p.Oberon()
 
 	sema_vst := &sema.Visitor{}
 	sema_vst.InitSemaVisitor(ob, scp)
@@ -273,11 +275,11 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
-	p := &parser.Parser{}
-	p.InitParser(lex)
-	ob := p.Oberon()
+	scp := scope.NewScope(scope.Global, "Main")
 
-	scp := sema.NewScope(sema.Global, "Main")
+	p := &parser.Parser{}
+	p.InitParser(lex, scp)
+	ob := p.Oberon()
 
 	sema_vst := &sema.Visitor{}
 	sema_vst.InitSemaVisitor(ob, scp)
@@ -315,11 +317,11 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
-	p := &parser.Parser{}
-	p.InitParser(lex)
-	ob := p.Oberon()
+	scp := scope.NewScope(scope.Global, "Main")
 
-	scp := sema.NewScope(sema.Global, "Main")
+	p := &parser.Parser{}
+	p.InitParser(lex, scp)
+	ob := p.Oberon()
 
 	sema_vst := &sema.Visitor{}
 	sema_vst.InitSemaVisitor(ob, scp)
