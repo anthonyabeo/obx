@@ -455,7 +455,7 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 	} else {
 		sig := ast.NewSignature(decl.Head.Rcv, decl.Head.FP)
 		v.env.Insert(scope.NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props(), v.offset))
-		// v.offset += ?
+		v.offset += 8
 	}
 
 	parent := v.env
@@ -495,7 +495,7 @@ func (v *Visitor) VisitConstDecl(decl *ast.ConstDecl) {
 		v.error(decl.Pos(), msg)
 	} else {
 		v.env.Insert(scope.NewConst(decl.Name.NamePos, decl.Name.Name, decl.Value.Type(), decl.Name.Props(), decl.Value, v.offset))
-		// v.offset += decl.Value?
+		v.offset += decl.Value.Type().Width()
 	}
 }
 
@@ -506,7 +506,7 @@ func (v *Visitor) VisitTypeDecl(decl *ast.TypeDecl) {
 		v.error(decl.Pos(), msg)
 	} else {
 		v.env.Insert(scope.NewTypeName(decl.Type, decl.Name.Name, decl.DenotedType.Type(), decl.Name.Props(), v.offset))
-		// v.offset += ?
+		v.offset += decl.DenotedType.Type().Width()
 	}
 }
 
@@ -573,7 +573,7 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 			}
 
 			v.env.Insert(scope.NewConst(c.NamePos, c.Name, typ, c.Props(), value, v.offset))
-			// v.offset += ?
+			v.offset += value.EType.Width()
 		}
 	}
 
@@ -612,11 +612,11 @@ func (v *Visitor) VisitFPSection(sec *ast.FPSection) {
 
 		if sec.Mod == token.IN {
 			v.env.Insert(scope.NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
-			// v.offset += ?
 		} else {
 			v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
-			v.offset += sec.Type.Type().Width()
 		}
+
+		v.offset += sec.Type.Type().Width()
 	}
 }
 
