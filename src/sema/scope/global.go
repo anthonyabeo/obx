@@ -1,4 +1,4 @@
-package sema
+package scope
 
 import (
 	"github.com/anthonyabeo/obx/src/sema/types"
@@ -41,25 +41,27 @@ func defPredeclaredTypes() {
 	}
 }
 
-// A builtinId is the id of a builtin function.
-type builtinId int
+// A BuiltinId is the id of a builtin function.
+type BuiltinId int
 
 const (
-	_Assert builtinId = iota
+	Assert_ BuiltinId = iota
+	Inc_
 )
 
-var predeclaredProcedures = [...]struct {
-	name  string
-	nargs int
+var PredeclaredProcedures = [...]struct {
+	Name  string
+	Nargs int
 }{
-	_Assert: {"assert", 1},
+	Assert_: {"assert", 1},
+	Inc_:    {"inc", 1},
 }
 
 func defPredeclaredProcedures() {
-	for i := range predeclaredProcedures {
-		id := builtinId(i)
+	for i := range PredeclaredProcedures {
+		id := BuiltinId(i)
 
-		Global.Insert(newBuiltin(id))
+		Global.Insert(NewBuiltin(id))
 	}
 }
 

@@ -1,10 +1,23 @@
-package sema
+package scope
 
 import (
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/translate/ir"
+)
+
+type SymbolKind int
+
+const (
+	Invalid SymbolKind = iota
+
+	PROC
+	VAR
+	CONST
+	TYPE
+	PREDECL
+	MOD
 )
 
 // Symbol
@@ -18,6 +31,7 @@ type Symbol interface {
 	Props() ast.IdentProps // reports whether the name ends with a + or -
 	String() string        // String returns a human-readable string of the object.
 	setParent(*Scope)      // setParent sets the parent scope of the object.
+	Kind() SymbolKind
 
 	Alloca() *ir.AllocaInst
 	SetAlloca(*ir.AllocaInst)
@@ -32,6 +46,7 @@ type symbol struct {
 	props  ast.IdentProps
 	offset int
 	alloc  *ir.AllocaInst
+	kind   SymbolKind
 }
 
 func (sym *symbol) Parent() *Scope                { return sym.parent }
@@ -42,6 +57,7 @@ func (sym *symbol) setParent(parent *Scope)       { sym.parent = parent }
 func (sym *symbol) Props() ast.IdentProps         { return sym.props }
 func (sym *symbol) SetAlloca(inst *ir.AllocaInst) { sym.alloc = inst }
 func (sym *symbol) Alloca() *ir.AllocaInst        { return sym.alloc }
+func (sym *symbol) Kind() SymbolKind              { return sym.kind }
 
 // A Variable represents a declared variable (including function parameters and results, and struct fields).
 // ----------------------------------------------------------------------------------------------------------
@@ -51,7 +67,8 @@ type Variable struct {
 
 // NewVar returns a new variable.
 func NewVar(pos *token.Position, name string, typ types.Type, props ast.IdentProps, offset int) *Variable {
-	return &Variable{symbol: symbol{nil, pos, name, typ, props, offset, nil}}
+	return &Variable{
+		symbol: symbol{nil, pos, name, typ, props, offset, nil, VAR}}
 }
 
 func (v Variable) String() string { return v.name }
@@ -69,7 +86,7 @@ func NewProcedure(pos *token.Position, name string, sig *ast.Signature, props as
 		typ = sig
 	}
 
-	return &Procedure{symbol{nil, pos, name, typ, props, offset, nil}}
+	return &Procedure{symbol{nil, pos, name, typ, props, offset, nil, PROC}}
 }
 
 func (p *Procedure) String() string { return "" }
@@ -79,11 +96,11 @@ func (p *Procedure) Offset() int    { return p.symbol.offset }
 // --------------------------------------------------------------------------------------------------
 type Builtin struct {
 	symbol
-	id builtinId
+	Id BuiltinId
 }
 
-func newBuiltin(id builtinId) *Builtin {
-	return &Builtin{symbol{name: predeclaredProcedures[id].name, typ: Typ[types.Invalid]}, id}
+func NewBuiltin(id BuiltinId) *Builtin {
+	return &Builtin{symbol{name: PredeclaredProcedures[id].Name, typ: Typ[types.Invalid], kind: PREDECL}, id}
 }
 
 func (obj *Builtin) String() string { return obj.symbol.name }
@@ -103,7 +120,7 @@ func NewTypeName(
 	offset int,
 ) *TypeName {
 
-	return &TypeName{symbol{nil, pos, name, ty, props, offset, nil}}
+	return &TypeName{symbol{nil, pos, name, ty, props, offset, nil, TYPE}}
 }
 
 func (obj *TypeName) String() string { return "" }
@@ -124,7 +141,7 @@ func NewConst(
 	value ast.Expression,
 	offset int,
 ) *Const {
-	return &Const{symbol{nil, pos, name, ty, props, offset, nil}, value}
+	return &Const{symbol{nil, pos, name, ty, props, offset, nil, CONST}, value}
 }
 
 func (c *Const) String() string { panic("not implemented") }

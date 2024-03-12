@@ -1,4 +1,4 @@
-package sema
+package scope
 
 type Scope struct {
 	name   string
