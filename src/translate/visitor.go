@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/anthonyabeo/obx/src/sema"
+	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -16,10 +16,10 @@ type Visitor struct {
 	module  *ir.Module
 
 	ast *ast.Oberon
-	env *sema.Scope
+	env *scope.Scope
 }
 
-func NewVisitor(ast *ast.Oberon, env *sema.Scope) *Visitor {
+func NewVisitor(ast *ast.Oberon, env *scope.Scope) *Visitor {
 	return &Visitor{
 		ast:     ast,
 		env:     env,

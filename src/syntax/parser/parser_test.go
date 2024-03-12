@@ -1,31 +1,44 @@
 package parser
 
 import (
-	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/sema/scope"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 func TestParseCaseStatement(t *testing.T) {
 	input := `module Main
+proc ReadIdentifier()
+end ReadIdentifier
 
+proc ReadNumber()
+end ReadNumber
+
+proc ReadString()
+end ReadString
+
+proc SpecialCharacter()
+end SpecialCharacter
 begin
-    case ch of
-      "A" .. "Z": ReadIdentifier()
-    | "0" .. "9": ReadNumber()
-    | "'", '"': ReadString()
-    else SpecialCharacter()
-    end
+   case ch of
+     "A" .. "Z": ReadIdentifier()
+   | "0" .. "9": ReadNumber()
+   | "'", '"': ReadString()
+   else SpecialCharacter()
+   end
 end Main`
 
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
+	scp := scope.NewScope(scope.Global, "Main")
+
 	p := &Parser{}
-	p.InitParser(lex)
+	p.InitParser(lex, scp)
 
 	ob := p.Oberon()
 	if len(p.errors) > 0 {
@@ -56,8 +69,10 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
+	scp := scope.NewScope(scope.Global, "Main")
+
 	p := &Parser{}
-	p.InitParser(lex)
+	p.InitParser(lex, scp)
 
 	ob := p.Oberon()
 	if len(p.errors) > 0 {
@@ -106,8 +121,10 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
+	scp := scope.NewScope(scope.Global, "Main")
+
 	p := &Parser{}
-	p.InitParser(lex)
+	p.InitParser(lex, scp)
 
 	ob := p.Oberon()
 	if len(p.errors) > 0 {
@@ -156,8 +173,10 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
+	scp := scope.NewScope(scope.Global, "Main")
+
 	p := &Parser{}
-	p.InitParser(lex)
+	p.InitParser(lex, scp)
 
 	ob := p.Oberon()
 	if len(p.errors) > 0 {
@@ -182,6 +201,9 @@ end Main
 func TestParseExpressions(t *testing.T) {
 	input := `
 module Main
+	type CenterTree = record
+		x,y: integer 
+	end
 begin
 	phi := 1991                   
 	phi := i div 3                
@@ -195,9 +217,10 @@ begin
 	phi := k in {i..j-1}          
 	phi := w[i].name <= "John"   
 	phi := t is CenterTree      
-	phi := t{CenterTree}.subnode
+	phi := t(CenterTree).subnode
 	phi := t.left.right 
 	phi := w[3].name[i]
+	phi := t(CenterTree)
 	
 end Main
 `
@@ -205,8 +228,10 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
+	scp := scope.NewScope(scope.Global, "Main")
+
 	p := &Parser{}
-	p.InitParser(lex)
+	p.InitParser(lex, scp)
 
 	ob := p.Oberon()
 	if len(p.errors) > 0 {
@@ -229,9 +254,10 @@ end Main
 		"k in {i..j - 1}",
 		"w[i].name <= John",
 		"t is CenterTree",
-		"t{CenterTree}.subnode",
+		"t(CenterTree).subnode",
 		"t.left.right",
 		"w[3].name[i]",
+		"t(CenterTree)",
 	}
 
 	mainMod := ob.Program["Main"]
@@ -256,6 +282,11 @@ end Main
 func TestParseProcedureCall(t *testing.T) {
 	input := `
 module Main
+	proc WriteInt(i: integer)
+	end WriteInt
+
+	proc (t: CenterTree) Insert(s: array of char)
+	end Insert
 begin
 	WriteInt(i*2+1)
 	inc(w[k].count)
@@ -266,8 +297,10 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
+	scp := scope.NewScope(scope.Global, "Main")
+
 	p := &Parser{}
-	p.InitParser(lex)
+	p.InitParser(lex, scp)
 
 	ob := p.Oberon()
 	if len(p.errors) > 0 {

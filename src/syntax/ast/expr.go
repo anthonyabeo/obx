@@ -273,7 +273,7 @@ type TypeGuard struct {
 
 func (t *TypeGuard) Pos() *token.Position { panic("not implement") }
 func (t *TypeGuard) End() *token.Position { panic("not implement") }
-func (t *TypeGuard) String() string       { return fmt.Sprintf("{%s}", t.Ty) }
+func (t *TypeGuard) String() string       { return fmt.Sprintf("(%s)", t.Ty) }
 func (t *TypeGuard) Type() types.Type     { return t.EType }
 func (t *TypeGuard) Accept(vst Visitor)   { vst.VisitTypeGuard(t) }
 func (t *TypeGuard) expr()                {}

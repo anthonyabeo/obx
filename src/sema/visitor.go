@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/sema/scope"
 	"strconv"
 
 	"github.com/anthonyabeo/obx/src/sema/types"
@@ -15,10 +16,10 @@ type Visitor struct {
 	errors lexer.ErrorList
 
 	ast *ast.Oberon
-	env *Scope
+	env *scope.Scope
 }
 
-func (v *Visitor) InitSemaVisitor(ast *ast.Oberon, env *Scope) {
+func (v *Visitor) InitSemaVisitor(ast *ast.Oberon, env *scope.Scope) {
 	v.ast = ast
 	v.env = env
 }
@@ -61,22 +62,22 @@ func (v *Visitor) VisitIdentifier(id *ast.Ident) {
 func (v *Visitor) VisitBasicLit(b *ast.BasicLit) {
 	switch b.Kind {
 	case token.INT:
-		b.EType = Typ[types.Int]
+		b.EType = scope.Typ[types.Int]
 	case token.BYTE:
-		b.EType = Typ[types.Byte]
+		b.EType = scope.Typ[types.Byte]
 	case token.INT8:
-		b.EType = Typ[types.Int8]
+		b.EType = scope.Typ[types.Int8]
 	case token.INT16:
-		b.EType = Typ[types.Int16]
+		b.EType = scope.Typ[types.Int16]
 	case token.INT32:
-		b.EType = Typ[types.Int32]
+		b.EType = scope.Typ[types.Int32]
 	case token.INT64:
-		b.EType = Typ[types.Int64]
+		b.EType = scope.Typ[types.Int64]
 	case token.REAL:
 	case token.STRING:
 	case token.HEXSTRING:
 	case token.TRUE, token.FALSE:
-		b.EType = Typ[types.Bool]
+		b.EType = scope.Typ[types.Bool]
 	}
 }
 
@@ -101,7 +102,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 		}
 
 		if expr.Op == token.QUOT {
-			expr.EType = Typ[types.LReal]
+			expr.EType = scope.Typ[types.LReal]
 			return
 		}
 
@@ -129,7 +130,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			v.error(expr.Right.Pos(), msg)
 		}
 
-		expr.EType = Typ[types.Bool]
+		expr.EType = scope.Typ[types.Bool]
 	case token.LESS, token.LEQ, token.GREAT, token.GEQ:
 		if left.Info() != types.IsNumeric /*&& left.Info() != types.IsEnum*/ && left.Info() != types.IsChar && left.Info() != types.IsString /*&& IsCharArray */ {
 			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Left)
@@ -141,14 +142,14 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			v.error(expr.Right.Pos(), msg)
 		}
 
-		expr.EType = Typ[types.Bool]
+		expr.EType = scope.Typ[types.Bool]
 	case token.OR, token.AND:
 		if left.Info() != types.IsBoolean && right.Info() != types.IsBoolean {
 			msg := fmt.Sprintf("both operands of a '%v' operation must be boolean", expr.Op)
 			v.error(expr.OpPos, msg)
 		}
 
-		expr.EType = Typ[types.Bool]
+		expr.EType = scope.Typ[types.Bool]
 	case token.IN:
 		if left.Info() != types.IsInteger {
 			msg := fmt.Sprintf("the key for an IN operation must be an integer")
@@ -160,9 +161,9 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			v.error(expr.Right.Pos(), msg)
 		}
 
-		expr.EType = Typ[types.Bool]
+		expr.EType = scope.Typ[types.Bool]
 	case token.IS:
-		expr.EType = Typ[types.Bool]
+		expr.EType = scope.Typ[types.Bool]
 	}
 }
 
@@ -226,7 +227,7 @@ func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
 			return
 		}
 
-		expr.EType = Typ[types.Bool]
+		expr.EType = scope.Typ[types.Bool]
 	}
 }
 
@@ -243,7 +244,7 @@ func (v *Visitor) VisitQualifiedIdent(id *ast.QualifiedIdent) {
 
 func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 	stmt.BoolExpr.Accept(v)
-	if stmt.BoolExpr.Type() != Typ[types.Bool] {
+	if stmt.BoolExpr.Type() != scope.Typ[types.Bool] {
 		msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", stmt.BoolExpr)
 		v.error(stmt.BoolExpr.Pos(), msg)
 	}
@@ -254,7 +255,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 
 	for _, elsif := range stmt.ElseIfBranches {
 		elsif.BoolExpr.Accept(v)
-		if elsif.BoolExpr.Type() != Typ[types.Bool] {
+		if elsif.BoolExpr.Type() != scope.Typ[types.Bool] {
 			msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", elsif.BoolExpr)
 			v.error(elsif.BoolExpr.Pos(), msg)
 		}
@@ -300,7 +301,7 @@ func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
 	stmt.BoolExpr.Accept(v)
-	if stmt.BoolExpr.Type() != Typ[types.Bool] {
+	if stmt.BoolExpr.Type() != scope.Typ[types.Bool] {
 		msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", stmt.BoolExpr)
 		v.error(stmt.BoolExpr.Pos(), msg)
 	}
@@ -312,7 +313,7 @@ func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
 
 func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 	stmt.BoolExpr.Accept(v)
-	if stmt.BoolExpr.Type() != Typ[types.Bool] {
+	if stmt.BoolExpr.Type() != scope.Typ[types.Bool] {
 		msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", stmt.BoolExpr)
 		v.error(stmt.BoolExpr.Pos(), msg)
 	}
@@ -323,7 +324,7 @@ func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 
 	for _, elsif := range stmt.ElsIfs {
 		elsif.BoolExpr.Accept(v)
-		if elsif.BoolExpr.Type() != Typ[types.Bool] {
+		if elsif.BoolExpr.Type() != scope.Typ[types.Bool] {
 			msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", elsif.BoolExpr)
 			v.error(elsif.BoolExpr.Pos(), msg)
 		}
@@ -364,7 +365,7 @@ func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
 	}
 
 	// check that the control variable is of integer or enum type
-	if stmt.CtlVar.Type() != Typ[types.Int] {
+	if stmt.CtlVar.Type() != scope.Typ[types.Int] {
 		msg := fmt.Sprintf("for-loop control variable '%v' must be of integer or enum type. It is a '%v' type",
 			stmt.CtlVar.Name, stmt.CtlVar.Type())
 		v.error(stmt.CtlVar.NamePos, msg)
@@ -400,7 +401,7 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 		param.Accept(v)
 	}
 
-	if call.Dsg.Type() != Typ[types.Invalid] {
+	if call.Dsg.Type() != scope.Typ[types.Invalid] {
 		sig, ok := call.Dsg.Type().(*ast.Signature)
 		if !ok {
 			v.error(call.Pos(), fmt.Sprintf("cannot call a non-procedure %v", call.Dsg.String()))
@@ -425,23 +426,23 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 			v.error(call.Pos(), fmt.Sprintf("unknown procedure '%v'", call.Dsg.String()))
 		}
 
-		b := obj.(*Builtin)
+		b := obj.(*scope.Builtin)
 		v.checkBuiltin(b, call)
 	}
 }
 
-func (v *Visitor) checkBuiltin(b *Builtin, call *ast.ProcCall) {
-	proc := predeclaredProcedures[b.id]
-	switch b.id {
-	case _Assert:
-		if proc.nargs != len(call.ActualParams) {
+func (v *Visitor) checkBuiltin(b *scope.Builtin, call *ast.ProcCall) {
+	proc := scope.PredeclaredProcedures[b.Id]
+	switch b.Id {
+	case scope.Assert_:
+		if proc.Nargs != len(call.ActualParams) {
 			v.error(call.Pos(), fmt.Sprintf("not enough arguments to procedure call '%v'", call.String()))
 		}
 
-		for i := 0; i < proc.nargs; i++ {
-			if !v.AreAssignmentComp(Typ[types.Bool], call.ActualParams[i].Type()) {
+		for i := 0; i < proc.Nargs; i++ {
+			if !v.AreAssignmentComp(scope.Typ[types.Bool], call.ActualParams[i].Type()) {
 				msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
-					call.ActualParams[i], Typ[types.Bool])
+					call.ActualParams[i], scope.Typ[types.Bool])
 				v.error(call.ActualParams[i].Pos(), msg)
 			}
 		}
@@ -453,7 +454,7 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 		v.error(decl.Pos(), fmt.Sprintf("name %s already declared at %v", obj.String(), obj.Pos()))
 	} else {
 		sig := ast.NewSignature(decl.Head.Rcv, decl.Head.FP)
-		v.env.Insert(NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props(), v.offset))
+		v.env.Insert(scope.NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props(), v.offset))
 		// v.offset += ?
 	}
 
@@ -462,7 +463,7 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 	// create a new scope to accommodate the symbols in the procedure. Make this new scope
 	// the current scope (v.env) so that subsequent insertions of symbols will go into this
 	// scope while we are processing the procedure.
-	v.env = NewScope(v.env, decl.Head.Name.Name)
+	v.env = scope.NewScope(v.env, decl.Head.Name.Name)
 
 	decl.Head.Accept(v)
 	decl.Body.Accept(v)
@@ -480,7 +481,7 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 		if obj := v.env.Lookup(ident.Name); obj != nil {
 			v.error(decl.Pos(), fmt.Sprintf("variable name '%s' already declared at '%v'", obj.String(), obj.Pos()))
 		} else {
-			v.env.Insert(NewVar(ident.Pos(), ident.Name, decl.Type.Type(), ident.Props(), v.offset))
+			v.env.Insert(scope.NewVar(ident.Pos(), ident.Name, decl.Type.Type(), ident.Props(), v.offset))
 			v.offset += decl.Type.Width()
 		}
 	}
@@ -493,7 +494,7 @@ func (v *Visitor) VisitConstDecl(decl *ast.ConstDecl) {
 		msg := fmt.Sprintf("name '%s' already declared at '%v'", obj.String(), obj.Pos())
 		v.error(decl.Pos(), msg)
 	} else {
-		v.env.Insert(NewConst(decl.Name.NamePos, decl.Name.Name, decl.Value.Type(), decl.Name.Props(), decl.Value, v.offset))
+		v.env.Insert(scope.NewConst(decl.Name.NamePos, decl.Name.Name, decl.Value.Type(), decl.Name.Props(), decl.Value, v.offset))
 		// v.offset += decl.Value?
 	}
 }
@@ -504,7 +505,7 @@ func (v *Visitor) VisitTypeDecl(decl *ast.TypeDecl) {
 		msg := fmt.Sprintf("name '%s' already declared at '%v'", obj.String(), obj.Pos())
 		v.error(decl.Pos(), msg)
 	} else {
-		v.env.Insert(NewTypeName(decl.Type, decl.Name.Name, decl.DenotedType.Type(), decl.Name.Props(), v.offset))
+		v.env.Insert(scope.NewTypeName(decl.Type, decl.Name.Name, decl.DenotedType.Type(), decl.Name.Props(), v.offset))
 		// v.offset += ?
 	}
 }
@@ -571,7 +572,7 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 				EType: types.NewBasicType(types.Int, types.IsInteger|types.IsNumeric, "integer"),
 			}
 
-			v.env.Insert(NewConst(c.NamePos, c.Name, typ, c.Props(), value, v.offset))
+			v.env.Insert(scope.NewConst(c.NamePos, c.Name, typ, c.Props(), value, v.offset))
 			// v.offset += ?
 		}
 	}
@@ -610,10 +611,10 @@ func (v *Visitor) VisitFPSection(sec *ast.FPSection) {
 		}
 
 		if sec.Mod == token.IN {
-			v.env.Insert(NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
+			v.env.Insert(scope.NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
 			// v.offset += ?
 		} else {
-			v.env.Insert(NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
+			v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
 			v.offset += sec.Type.Width()
 		}
 	}

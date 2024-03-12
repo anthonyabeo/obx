@@ -3,6 +3,7 @@ package sema
 import (
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -36,12 +37,14 @@ end Main
 	lex := &lexer.Lexer{}
 	lex.InitLexer(file, []byte(input))
 
+	scp := scope.NewScope(scope.Global, "Main")
+
 	p := &parser.Parser{}
-	p.InitParser(lex)
+	p.InitParser(lex, scp)
 	ob := p.Oberon()
 
 	sema := &Visitor{}
-	sema.InitSemaVisitor(ob, Global)
+	sema.InitSemaVisitor(ob, scope.Global)
 	sema.VisitModule("Main")
 	if len(sema.errors) > 0 {
 		t.Error("found semantic errors")

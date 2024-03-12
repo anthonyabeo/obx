@@ -1,12 +1,17 @@
 package parser
 
 import (
+	"fmt"
+
+	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Parser struct {
+	env *scope.Scope
+
 	errors lexer.ErrorList
 	lex    *lexer.Lexer
 
@@ -19,8 +24,9 @@ type Parser struct {
 	syncCnt int             // number of parser.advance calls without progress
 }
 
-func (p *Parser) InitParser(lex *lexer.Lexer) {
+func (p *Parser) InitParser(lex *lexer.Lexer, env *scope.Scope) {
 	p.lex = lex
+	p.env = env
 
 	p.next()
 }
@@ -339,6 +345,8 @@ func (p *Parser) parseType() (typ ast.Type) {
 			}
 		}
 
+		p.match(token.END)
+
 		typ = rec
 	case token.PROCEDURE, token.PROC:
 		proc := &ast.ProcType{Proc: p.pos}
@@ -587,7 +595,14 @@ func (p *Parser) parseDesignator() (dsg *ast.Designator) {
 
 	expr := dsg.QualifiedIdent
 
-	for p.tok == token.PERIOD || p.tok == token.LBRACK || p.tok == token.CARET || p.tok == token.LBRACE {
+	if p.tok == token.LPAREN {
+		obj := p.env.Lookup(dsg.String())
+		if obj != nil && (obj.Kind() == scope.PROC || obj.Kind() == scope.PREDECL) {
+			return
+		}
+	}
+
+	for p.tok == token.PERIOD || p.tok == token.LBRACK || p.tok == token.CARET || p.tok == token.LPAREN {
 		dsg = &ast.Designator{QPos: p.pos, QualifiedIdent: expr}
 
 		switch p.tok {
@@ -601,10 +616,16 @@ func (p *Parser) parseDesignator() (dsg *ast.Designator) {
 			dsg.Selector = &ast.IndexOp{List: List}
 		case token.CARET:
 			dsg.Selector = &ast.PtrDref{}
-		case token.LBRACE:
-			p.match(token.LBRACE)
+		case token.LPAREN:
+			obj := p.env.Lookup(dsg.String())
+			if obj != nil && (obj.Kind() == scope.PROC || obj.Kind() == scope.PREDECL) {
+				expr = dsg
+				return
+			}
+
+			p.match(token.LPAREN)
 			dsg.Selector = &ast.TypeGuard{Ty: p.parseQualifiedIdent()}
-			p.match(token.RBRACE)
+			p.match(token.RPAREN)
 		}
 
 		expr = dsg
@@ -760,6 +781,21 @@ func (p *Parser) parseProcHeading() (head *ast.ProcHead) {
 		if p.tok == token.LPAREN {
 			head.FP = p.parseFormalParameters()
 		}
+	}
+
+	if obj := p.env.Lookup(head.Name.Name); obj != nil {
+		p.error(head.Pos(), fmt.Sprintf("name %s already declared at %v", obj.String(), obj.Pos()))
+	} else {
+		sig := ast.NewSignature(head.Rcv, head.FP)
+		var name string
+		if head.Rcv != nil {
+			name = fmt.Sprintf("%s.%s", head.Rcv.Var, head.Name.Name)
+		} else {
+			name = head.Name.Name
+		}
+
+		p.env.Insert(scope.NewProcedure(nil, name, sig, head.Name.Props(), 0))
+		// v.offset += ?
 	}
 
 	return
