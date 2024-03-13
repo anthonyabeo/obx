@@ -3,7 +3,6 @@ package parser
 import (
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -34,9 +33,7 @@ end Main`
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := NewParser(lex, scp)
+	p := NewParser(lex)
 	unit := p.Parse()
 
 	if len(p.errors) > 0 {
@@ -66,9 +63,7 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := NewParser(lex, scp)
+	p := NewParser(lex)
 	unit := p.Parse()
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -147,9 +142,7 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := NewParser(lex, scp)
+	p := NewParser(lex)
 	unit := p.Parse()
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -195,9 +188,7 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := NewParser(lex, scp)
+	p := NewParser(lex)
 	unit := p.Parse()
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -237,18 +228,16 @@ begin
 	phi := k in {i..j-1}          
 	phi := w[i].name <= "John"   
 	phi := t is CenterTree      
-	phi := t(CenterTree).subnode
+	phi := t{CenterTree}.subnode
 	phi := t.left.right 
 	phi := w[3].name[i]
-	phi := t(CenterTree)
+	phi := t{CenterTree}
 end Main
 `
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := NewParser(lex, scp)
+	p := NewParser(lex)
 	unit := p.Parse()
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -270,10 +259,10 @@ end Main
 		"k in {i..j - 1}",
 		"w[i].name <= John",
 		"t is CenterTree",
-		"t(CenterTree).subnode",
+		"t{CenterTree}.subnode",
 		"t.left.right",
 		"w[3].name[i]",
-		"t(CenterTree)",
+		"t{CenterTree}",
 	}
 
 	main := unit.(*ast.Module)
@@ -312,9 +301,7 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := NewParser(lex, scp)
+	p := NewParser(lex)
 	unit := p.Parse()
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -380,9 +367,7 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := NewParser(lex, scp)
+	p := NewParser(lex)
 	unit := p.Parse()
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -447,9 +432,7 @@ end Drawing
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := NewParser(lex, scp)
+	p := NewParser(lex)
 	unit := p.Parse()
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -508,12 +491,12 @@ func TestParseOOPExample(t *testing.T) {
  proc (this: Circle) draw*() end
  proc (this: Square) draw*() end
 
- var figures: C.Deque
+ var figures: C::Deque
       circle: Circle
       square: Square
 
  proc drawAll()
-   type I = record(C.Iterator) count: integer end
+   type I = record(C::Iterator) count: integer end
    proc (var this: I) apply( in figure: Figure )
    begin
      figure.draw(); inc(this.count)
@@ -524,15 +507,15 @@ func TestParseOOPExample(t *testing.T) {
    assert(i.count = 2)
  end drawAll
 begin
- figures := C.createDeque()
+ figures := C::createDeque()
  new(circle)
- circle.position.x := F.calc(3)
- circle.position.y := F.calc(4)
+ circle.position.x := F::calc(3)
+ circle.position.y := F::calc(4)
  circle.diameter := 3
  figures.append(circle)
  new(square)
- square.position.x := F.calc(5)
- square.position.y := F.calc(6)
+ square.position.x := F::calc(5)
+ square.position.y := F::calc(6)
  square.width := 4
  figures.append(square)
  drawAll()
@@ -541,9 +524,7 @@ end Drawing
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := NewParser(lex, scp)
+	p := NewParser(lex)
 	unit := p.Parse()
 	if len(p.errors) > 0 {
 		t.Error("found parse errors")
@@ -559,15 +540,15 @@ end Drawing
 	}
 
 	stmtTests := []string{
-		"figures := C.createDeque()",
+		"figures := C::createDeque()",
 		"new(circle)",
-		"circle.position.x := F.calc(3)",
-		"circle.position.y := F.calc(4)",
+		"circle.position.x := F::calc(3)",
+		"circle.position.y := F::calc(4)",
 		"circle.diameter := 3",
 		"figures.append(circle)",
 		"new(square)",
-		"square.position.x := F.calc(5)",
-		"square.position.y := F.calc(6)",
+		"square.position.x := F::calc(5)",
+		"square.position.y := F::calc(6)",
 		"square.width := 4",
 		"figures.append(square)",
 		"drawAll()",
@@ -591,7 +572,7 @@ end Drawing
 		"Square* = ^record(Figure){integer}",
 		"(this: Circle) draw*()",
 		"(this: Square) draw*()",
-		"figures: C.Deque",
+		"figures: C::Deque",
 		"circle: Circle",
 		"square: Square",
 		"drawAll()",

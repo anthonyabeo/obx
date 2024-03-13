@@ -3,11 +3,8 @@ package sema
 import (
 	"testing"
 
-<<<<<<< HEAD
 	"github.com/anthonyabeo/obx/src/sema/scope"
-=======
 	"github.com/anthonyabeo/obx/src/syntax/ast"
->>>>>>> 422f461 (Update sema.VisitModule)
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -40,17 +37,16 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := parser.NewParser(lex, scp)
+	p := parser.NewParser(lex)
 	unit := p.Parse()
 
-<<<<<<< HEAD
-	sema := NewVisitor(scope.Global)
-=======
 	obx := ast.NewOberon()
-	sema := NewVisitor(obx)
->>>>>>> 422f461 (Update sema.VisitModule)
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	sema := NewVisitor(scopes)
 	unit.Accept(sema)
 
 	if len(sema.errors) > 0 {
@@ -74,17 +70,16 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := parser.NewParser(lex, scp)
+	p := parser.NewParser(lex)
 	unit := p.Parse()
 
-<<<<<<< HEAD
-	sema := NewVisitor(scope.Global)
-=======
 	obx := ast.NewOberon()
-	sema := NewVisitor(obx)
->>>>>>> 422f461 (Update sema.VisitModule)
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	sema := NewVisitor(scopes)
 	unit.Accept(sema)
 	if len(sema.errors) > 0 {
 		t.Error("found semantic errors")
@@ -110,17 +105,16 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := parser.NewParser(lex, scp)
+	p := parser.NewParser(lex)
 	unit := p.Parse()
 
-<<<<<<< HEAD
-	sema := NewVisitor(scope.Global)
-=======
 	obx := ast.NewOberon()
-	sema := NewVisitor(obx)
->>>>>>> 422f461 (Update sema.VisitModule)
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	sema := NewVisitor(scopes)
 	unit.Accept(sema)
 	if len(sema.errors) > 0 {
 		t.Error("found semantic errors")

@@ -15,14 +15,13 @@ type Visitor struct {
 	builder *ir.Builder
 	module  *ir.Module
 
-	ast *ast.Oberon
-	env *scope.Scope
+	env    *scope.Scope
+	scopes map[string]*scope.Scope
 }
 
-func NewVisitor(env *scope.Scope) *Visitor {
+func NewVisitor(scopes map[string]*scope.Scope) *Visitor {
 	return &Visitor{
-		//ast:     ast,
-		env:     env,
+		scopes:  scopes,
 		builder: ir.NewBuilder(),
 	}
 }
@@ -34,6 +33,8 @@ func (v *Visitor) VisitOberon(ob *ast.Oberon) {
 }
 
 func (v *Visitor) VisitModule(m *ast.Module) {
+	v.env = v.scopes[m.BName.Name]
+
 	v.module = ir.NewModule(m.BName.Name)
 
 	Main := ir.CreateFunction(
@@ -265,8 +266,7 @@ func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 	av := &AddrVisitor{Visitor{
 		builder: v.builder,
 		module:  v.module,
-		//ast:     v.ast,
-		env: v.env,
+		env:     v.env,
 	}}
 
 	stmt.LValue.Accept(av)

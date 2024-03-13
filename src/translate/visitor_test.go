@@ -27,16 +27,20 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := parser.NewParser(lex, scp)
+	p := parser.NewParser(lex)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
-	s := sema.NewVisitor(obx)
+
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	s := sema.NewVisitor(scopes)
 	unit.Accept(s)
 
-	cgen := NewVisitor(scp)
+	cgen := NewVisitor(scopes)
 	unit.Accept(cgen)
 }
 
@@ -62,16 +66,20 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := parser.NewParser(lex, scp)
+	p := parser.NewParser(lex)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
-	s := sema.NewVisitor(obx)
+
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	s := sema.NewVisitor(scopes)
 	unit.Accept(s)
 
-	cgen := NewVisitor(scp)
+	cgen := NewVisitor(scopes)
 	unit.Accept(cgen)
 }
 
@@ -98,16 +106,20 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := parser.NewParser(lex, scp)
+	p := parser.NewParser(lex)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
-	s := sema.NewVisitor(obx)
+
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	s := sema.NewVisitor(scopes)
 	unit.Accept(s)
 
-	cgen := NewVisitor(scp)
+	cgen := NewVisitor(scopes)
 	unit.Accept(cgen)
 }
 
@@ -136,16 +148,20 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := parser.NewParser(lex, scp)
+	p := parser.NewParser(lex)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
-	s := sema.NewVisitor(obx)
+
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	s := sema.NewVisitor(scopes)
 	unit.Accept(s)
 
-	cgen := NewVisitor(scp)
+	cgen := NewVisitor(scopes)
 	unit.Accept(cgen)
 }
 
@@ -171,16 +187,20 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := parser.NewParser(lex, scp)
+	p := parser.NewParser(lex)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
-	s := sema.NewVisitor(obx)
+
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	s := sema.NewVisitor(scopes)
 	unit.Accept(s)
 
-	cgen := NewVisitor(scp)
+	cgen := NewVisitor(scopes)
 	unit.Accept(cgen)
 }
 
@@ -206,16 +226,20 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := parser.NewParser(lex, scp)
+	p := parser.NewParser(lex)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
-	s := sema.NewVisitor(obx)
+
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	s := sema.NewVisitor(scopes)
 	unit.Accept(s)
 
-	cgen := NewVisitor(scp)
+	cgen := NewVisitor(scopes)
 	unit.Accept(cgen)
 }
 
@@ -243,16 +267,20 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := parser.NewParser(lex, scp)
+	p := parser.NewParser(lex)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
-	s := sema.NewVisitor(obx)
+
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	s := sema.NewVisitor(scopes)
 	unit.Accept(s)
 
-	cgen := NewVisitor(scp)
+	cgen := NewVisitor(scopes)
 	unit.Accept(cgen)
 }
 
@@ -280,15 +308,19 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	scp := scope.NewScope(scope.Global, "Main")
-
-	p := parser.NewParser(lex, scp)
+	p := parser.NewParser(lex)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
-	s := sema.NewVisitor(obx)
+
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	s := sema.NewVisitor(scopes)
 	unit.Accept(s)
 
-	cgen := NewVisitor(scp)
+	cgen := NewVisitor(scopes)
 	unit.Accept(cgen)
 }

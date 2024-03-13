@@ -180,7 +180,7 @@ func (q *QualifiedIdent) End() *token.Position { panic("not implemented") }
 func (q *QualifiedIdent) Type() types.Type     { return q.EType }
 func (q *QualifiedIdent) Accept(vst Visitor)   { vst.VisitQualifiedIdent(q) }
 func (q *QualifiedIdent) expr()                {}
-func (q *QualifiedIdent) String() string       { return fmt.Sprintf("%v.%v", q.Module, q.Sel) }
+func (q *QualifiedIdent) String() string       { return fmt.Sprintf("%v::%v", q.Module, q.Sel) }
 func (q *QualifiedIdent) Value() ir.Value      { return q.IRValue }
 
 func (s *Set) expr() {}
@@ -274,7 +274,7 @@ type TypeGuard struct {
 
 func (t *TypeGuard) Pos() *token.Position { panic("not implement") }
 func (t *TypeGuard) End() *token.Position { panic("not implement") }
-func (t *TypeGuard) String() string       { return fmt.Sprintf("(%s)", t.Ty) }
+func (t *TypeGuard) String() string       { return fmt.Sprintf("{%s}", t.Ty) }
 func (t *TypeGuard) sel()                 {}
 
 // PtrDref

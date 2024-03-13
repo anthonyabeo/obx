@@ -65,12 +65,16 @@ func runBuild(ctx *cli.Context) (err error) {
 	}
 
 	obx := ast.NewOberon()
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
 
 	_ = ParseModule(obx, module, path)
 
 	tsOrd := topologicalSort(obx)
 
-	vst := sema.NewVisitor(obx)
+	vst := sema.NewVisitor(scopes)
 	for _, name := range tsOrd {
 		unit := obx.Units()[name]
 		unit.Accept(vst)
@@ -111,7 +115,7 @@ func ParseModule(obx *ast.Oberon, module, path string) ast.Unit {
 	file := token.NewFile(mod.file, len(mod.input))
 	lex := lexer.NewLexer(file, mod.input)
 
-	p := parser.NewParser(lex, scope.Global)
+	p := parser.NewParser(lex)
 	unit := p.Parse()
 
 	obx.AddUnit(unit.Name(), unit)

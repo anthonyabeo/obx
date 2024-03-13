@@ -1,17 +1,12 @@
 package parser
 
 import (
-	"fmt"
-
-	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Parser struct {
-	env *scope.Scope
-
 	errors lexer.ErrorList
 	lex    *lexer.Lexer
 
@@ -24,8 +19,8 @@ type Parser struct {
 	syncCnt int             // number of parser.advance calls without progress
 }
 
-func NewParser(lex *lexer.Lexer, env *scope.Scope) *Parser {
-	p := &Parser{lex: lex, env: env}
+func NewParser(lex *lexer.Lexer) *Parser {
+	p := &Parser{lex: lex}
 	p.next()
 
 	return p
@@ -677,14 +672,7 @@ func (p *Parser) parseDesignator() (dsg *ast.Designator) {
 
 	expr := dsg.QualifiedIdent
 
-	if p.tok == token.LPAREN {
-		obj := p.env.Lookup(dsg.String())
-		if obj != nil && (obj.Kind() == scope.PROC || obj.Kind() == scope.PREDECL) {
-			return
-		}
-	}
-
-	for p.tok == token.PERIOD || p.tok == token.LBRACK || p.tok == token.CARET || p.tok == token.LPAREN {
+	for p.tok == token.PERIOD || p.tok == token.LBRACK || p.tok == token.CARET || p.tok == token.LBRACE {
 		dsg = &ast.Designator{QPos: p.pos, QualifiedIdent: expr}
 
 		switch p.tok {
@@ -698,16 +686,10 @@ func (p *Parser) parseDesignator() (dsg *ast.Designator) {
 			dsg.Selector = &ast.IndexOp{List: List}
 		case token.CARET:
 			dsg.Selector = &ast.PtrDref{}
-		case token.LPAREN:
-			obj := p.env.Lookup(dsg.String())
-			if obj != nil && (obj.Kind() == scope.PROC || obj.Kind() == scope.PREDECL) {
-				expr = dsg
-				return
-			}
-
-			p.match(token.LPAREN)
+		case token.LBRACE:
+			p.match(token.LBRACE)
 			dsg.Selector = &ast.TypeGuard{Ty: p.parseQualifiedIdent()}
-			p.match(token.RPAREN)
+			p.match(token.RBRACE)
 		}
 
 		expr = dsg
@@ -786,12 +768,12 @@ func (p *Parser) parseNamedType() ast.Type {
 // qualident = [ ident '.' ] ident
 func (p *Parser) parseQualifiedIdent() ast.Expression {
 	id := p.parseIdent()
-	// if id is an imported module/module alias, then return qualified ID
-	if p.tok == token.PERIOD {
+
+	if p.tok == token.DCOLON {
 		p.next()
 		sel := p.parseIdent()
 
-		return &ast.QualifiedIdent{X: id, Sel: sel}
+		return &ast.QualifiedIdent{Module: id, Sel: sel}
 	}
 
 	return id
@@ -848,21 +830,6 @@ func (p *Parser) parseProcHeading() (head *ast.ProcHead) {
 		if p.tok == token.LPAREN {
 			head.FP = p.parseFormalParameters()
 		}
-	}
-
-	if obj := p.env.Lookup(head.Name.Name); obj != nil {
-		p.error(head.Pos(), fmt.Sprintf("name %s already declared at %v", obj.String(), obj.Pos()))
-	} else {
-		sig := ast.NewSignature(head.Rcv, head.FP)
-		var name string
-		if head.Rcv != nil {
-			name = fmt.Sprintf("%s.%s", head.Rcv.Var, head.Name.Name)
-		} else {
-			name = head.Name.Name
-		}
-
-		p.env.Insert(scope.NewProcedure(nil, name, sig, head.Name.Props(), 0))
-		// v.offset += ?
 	}
 
 	return

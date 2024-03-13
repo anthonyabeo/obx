@@ -20,13 +20,8 @@ type Visitor struct {
 	scopes map[string]*scope.Scope
 }
 
-func NewVisitor(obx *ast.Oberon) *Visitor {
-	vst := &Visitor{scopes: map[string]*scope.Scope{}}
-	for _, unit := range obx.Units() {
-		vst.scopes[unit.Name()] = nil
-	}
-
-	return vst
+func NewVisitor(scopes map[string]*scope.Scope) *Visitor {
+	return &Visitor{scopes: scopes}
 }
 
 func (v *Visitor) error(pos *token.Position, msg string) {
