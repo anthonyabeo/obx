@@ -120,7 +120,13 @@ func (p *ProcHead) String() string {
 
 	return buf.String()
 }
-func (p *ProcHead) Pos() *token.Position { panic("not implemented") }
+func (p *ProcHead) Pos() *token.Position {
+	if p.Rcv != nil {
+		return p.Rcv.Pos()
+	}
+
+	return p.Name.NamePos
+}
 func (p *ProcHead) End() *token.Position { panic("not implemented") }
 func (p *ProcHead) Accept(vst Visitor)   { vst.VisitProcHead(p) }
 func (p *ProcHead) decl()                {}
@@ -144,7 +150,7 @@ func (sec *FPSection) String() string {
 
 	return buf.String()
 }
-func (sec *FPSection) Pos() *token.Position { panic("not implemented") }
+func (sec *FPSection) Pos() *token.Position { return sec.Names[0].NamePos }
 func (sec *FPSection) End() *token.Position { panic("not implemented") }
 func (sec *FPSection) Accept(vst Visitor)   { vst.VisitFPSection(sec) }
 
@@ -179,7 +185,7 @@ func (r *Receiver) String() string {
 
 	return buf.String()
 }
-func (r *Receiver) Pos() *token.Position { panic("not implemented") }
+func (r *Receiver) Pos() *token.Position { return r.Var.NamePos }
 func (r *Receiver) End() *token.Position { panic("not implemented") }
 func (r *Receiver) Accept(vst Visitor)   { vst.VisitReceiver(r) }
 
