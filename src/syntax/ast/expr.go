@@ -48,13 +48,15 @@ type (
 		NamePos *token.Position
 		Name    string
 		IProps  IdentProps
+
 		EType   types.Type
 		IRValue ir.Value
 	}
 
 	QualifiedIdent struct {
-		X       Expression
-		Sel     *Ident
+		Module Expression
+		Sel    *Ident
+
 		EType   types.Type
 		IRValue ir.Value
 	}
@@ -173,12 +175,12 @@ func (id *Ident) Props() IdentProps  { return id.IProps }
 func (id *Ident) Type() types.Type   { return id.EType }
 func (id *Ident) Value() ir.Value    { return id.IRValue }
 
-func (q *QualifiedIdent) Pos() *token.Position { return q.X.Pos() }
+func (q *QualifiedIdent) Pos() *token.Position { return q.Module.Pos() }
 func (q *QualifiedIdent) End() *token.Position { panic("not implemented") }
 func (q *QualifiedIdent) Type() types.Type     { return q.EType }
 func (q *QualifiedIdent) Accept(vst Visitor)   { vst.VisitQualifiedIdent(q) }
 func (q *QualifiedIdent) expr()                {}
-func (q *QualifiedIdent) String() string       { return fmt.Sprintf("%v.%v", q.X, q.Sel) }
+func (q *QualifiedIdent) String() string       { return fmt.Sprintf("%v.%v", q.Module, q.Sel) }
 func (q *QualifiedIdent) Value() ir.Value      { return q.IRValue }
 
 func (s *Set) expr() {}

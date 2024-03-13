@@ -329,14 +329,14 @@ func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
 }
 
 func (v *Visitor) VisitQualifiedIdent(id *ast.QualifiedIdent) {
-	id.X.Accept(v)
+	id.Module.Accept(v)
 	if id.Sel != nil {
 		id.Sel.Accept(v)
 		id.EType = id.Sel.Type()
 		return
 	}
 
-	id.EType = id.X.Type()
+	id.EType = id.Module.Type()
 }
 
 func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
