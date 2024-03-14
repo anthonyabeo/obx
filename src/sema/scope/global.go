@@ -28,6 +28,7 @@ var Typ = []*types.Basic{
 	types.LReal: types.NewBasicType(types.LReal, types.IsReal, "longreal"),
 	types.Char:  types.NewBasicType(types.Char, types.IsChar, "char"),
 	types.WChar: types.NewBasicType(types.WChar, types.IsWChar, "wchar"),
+	types.Set:   types.NewBasicType(types.Set, types.IsSet, "set"),
 }
 
 var AliasTypes = []*types.Basic{
