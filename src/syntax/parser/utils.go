@@ -105,3 +105,19 @@ func (p *Parser) startsDecl() bool {
 		p.tok == token.PROC ||
 		p.tok == token.PROCEDURE
 }
+
+var basicTypes = map[string]bool{
+	"integer":  true,
+	"real":     true,
+	"longreal": true,
+	"boolean":  true,
+	"byte":     true,
+	"char":     true,
+	"set":      true,
+	"wchar":    true,
+	"int8":     true,
+	"int16":    true,
+	"int32":    true,
+	"int64":    true,
+	"bool":     true,
+}

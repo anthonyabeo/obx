@@ -182,7 +182,7 @@ func (p *Parser) parseDefinition() *ast.Definition {
 	}
 
 	for p.startsDecl() {
-		def.DeclSeq = p.parseDeclarationSeq()
+		def.DeclSeq = p.parseDeclarationSeq2()
 	}
 
 	p.match(token.END)
@@ -709,7 +709,7 @@ func (p *Parser) parseLiteral() (lit ast.Expression) {
 		p.next()
 	case token.NIL:
 	case token.LBRACE:
-		p.match(token.LBRACE)
+		p.next()
 		set := &ast.Set{}
 
 		if p.exprStart() {
@@ -738,21 +738,6 @@ func (p *Parser) parseSetElem() ast.Expression {
 	}
 
 	return expr
-}
-
-var basicTypes = map[string]bool{
-	"integer":  true,
-	"real":     true,
-	"longreal": true,
-	"boolean":  true,
-	"byte":     true,
-	"char":     true,
-	"set":      true,
-	"wchar":    true,
-	"int8":     true,
-	"int16":    true,
-	"int32":    true,
-	"int64":    true,
 }
 
 func (p *Parser) parseNamedType() ast.Type {
