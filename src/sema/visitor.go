@@ -125,8 +125,18 @@ func (v *Visitor) VisitBasicLit(b *ast.BasicLit) {
 }
 
 func (v *Visitor) VisitSet(s *ast.Set) {
-	// TODO not implemented
-	panic("not implemented")
+	for _, elem := range s.Elem {
+		elem.Accept(v)
+
+		ty := elem.Type().(*types.Basic)
+		if ty == nil || ty.Info() != types.IsInteger {
+			msg := fmt.Sprintf("elements of set '%s' must be integers. Found '%s' at '%s'",
+				s, ty, elem.Pos())
+			v.error(elem.Pos(), msg)
+		}
+	}
+
+	s.EType = scope.Typ[types.Set]
 }
 
 func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
@@ -153,7 +163,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			expr.EType = right
 		}
 	case token.DIV, token.MOD:
-		if left.Info()|types.IsNumeric != types.IsInteger || right.Info()|types.IsNumeric != types.IsInteger {
+		if left.Info() != types.IsInteger || right.Info() != types.IsInteger {
 			msg := fmt.Sprintf("cannot perform operation '%v' on non-integer types, '%v' and '%v'", expr.Op, expr.Left, expr.Right)
 			v.error(expr.Pos(), msg)
 		}
@@ -216,15 +226,9 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 		return
 	}
 
-	obj := v.env.Lookup(des.QualifiedIdent.String())
-	if obj == nil {
-		msg := fmt.Sprintf("name '%s' is not defined", des.QualifiedIdent.String())
-		v.error(des.QualifiedIdent.Pos(), msg)
-	}
-
 	switch sel := des.Selector.(type) {
 	case *ast.DotOp:
-		switch ty := obj.Type().(type) {
+		switch ty := des.QualifiedIdent.Type().(type) {
 		case *Record:
 			sym := ty.fields[sel.Field.Name]
 			if sym == nil {
@@ -236,7 +240,7 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 			record, ok := ty.UTy.(*Record)
 			if !ok {
 				msg := fmt.Sprintf("pointer '%s' does not reference a record type", ty)
-				v.error(obj.Pos(), msg)
+				v.error(des.QualifiedIdent.Pos(), msg)
 			}
 
 			sym := record.fields[sel.Field.Name]
@@ -246,11 +250,11 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 
 			des.EType = sym.Type()
 		default:
-			msg := fmt.Sprintf("'%s' must be a (pointer to) record type", obj.Type())
-			v.error(obj.Pos(), msg)
+			msg := fmt.Sprintf("'%s' must be a (pointer to) record type", des.QualifiedIdent.Type())
+			v.error(des.QualifiedIdent.Pos(), msg)
 		}
 	case *ast.PtrDref:
-		ptr, ok := obj.Type().(*PtrType)
+		ptr, ok := des.QualifiedIdent.Type().(*PtrType)
 		if !ok {
 			msg := fmt.Sprintf("name '%s' is not defined as an pointer type", des.QualifiedIdent.String())
 			v.error(des.QualifiedIdent.Pos(), msg)
@@ -258,7 +262,7 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 
 		des.EType = ptr.UTy
 	case *ast.IndexOp:
-		arrTy, ok := obj.Type().(*Array)
+		arrTy, ok := des.QualifiedIdent.Type().(*Array)
 		if !ok {
 			msg := fmt.Sprintf("name '%s' is not defined as an array type", des.QualifiedIdent.String())
 			v.error(des.QualifiedIdent.Pos(), msg)
@@ -574,8 +578,18 @@ func (v *Visitor) VisitTypeDecl(decl *ast.TypeDecl) {
 }
 
 func (v *Visitor) VisitNamedType(n *ast.NamedType) {
-	n.Name.Accept(v)
-	n.EType = n.Name.Type()
+	obj := v.env.Lookup(n.Name.String())
+	if obj == nil {
+		msg := fmt.Sprintf("name '%v' is not declared and is not a predeclared type", n.Name)
+		v.error(n.Pos(), msg)
+	}
+
+	if obj.Kind() != scope.TYPE {
+		msg := fmt.Sprintf("'%v' is not recognized as a type", n.Name)
+		v.error(n.Pos(), msg)
+	}
+
+	n.EType = obj.Type()
 }
 
 func (v *Visitor) VisitBasicType(b *ast.BasicType) {
@@ -758,5 +772,20 @@ func (v *Visitor) VisitImport(imp *ast.Import) {
 }
 
 func (v *Visitor) VisitExprRange(rng *ast.ExprRange) {
-	panic("not implemented")
+	rng.Beg.Accept(v)
+	rng.Ed.Accept(v)
+
+	b := rng.Beg.Type().(*types.Basic)
+	if b == nil || b.Info() != types.IsInteger {
+		msg := fmt.Sprintf("start value of range '%s' is not an integer", rng)
+		v.error(rng.Beg.Pos(), msg)
+	}
+
+	b = rng.Ed.Type().(*types.Basic)
+	if b == nil || b.Info() != types.IsInteger {
+		msg := fmt.Sprintf("end value of range '%s' is not an integer", rng)
+		v.error(rng.Ed.Pos(), msg)
+	}
+
+	rng.EType = rng.Beg.Type()
 }
