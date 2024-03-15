@@ -411,7 +411,7 @@ func (p *Parser) parseType() (ty ast.Type) {
 	default:
 		pos := p.pos
 		p.errorExpected(pos, "type")
-		p.advance(exprEnd)
+		p.advance(typeStart)
 		return &ast.BadType{From: pos, To: p.pos}
 	}
 

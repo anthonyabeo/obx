@@ -149,8 +149,13 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 
 	switch expr.Op {
 	case token.PLUS, token.MINUS, token.STAR, token.QUOT:
-		if left.Info()|types.IsNumeric != types.IsNumeric || right.Info()|types.IsNumeric != types.IsNumeric {
-			msg := fmt.Sprintf("cannot perform operation '%v' on non-numeric types, '%v' and '%v'", expr.Op, expr.Left, expr.Right)
+		if left.Info()|types.IsNumeric != types.IsNumeric && left.Info()|types.IsNumeric != types.IsNumeric && left.Info() != types.IsSet {
+			msg := fmt.Sprintf("cannot perform operation '%v' with '%s' (of type '%s')", expr.Op, expr.Left, expr.Left.Type())
+			v.error(expr.Pos(), msg)
+		}
+
+		if right.Info()|types.IsNumeric != types.IsNumeric && right.Info()|types.IsNumeric != types.IsNumeric && right.Info() != types.IsSet {
+			msg := fmt.Sprintf("cannot perform operation '%v' with '%s' (of type '%s')", expr.Op, expr.Right, expr.Right.Type())
 			v.error(expr.Pos(), msg)
 		}
 
@@ -270,6 +275,30 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 
 		des.EType = arrTy.ElemTy
 	case *ast.TypeGuard:
+		var a types.Type
+
+		switch ty := des.QualifiedIdent.Type().(type) {
+		case *Record:
+			a = ty
+		case *PtrType:
+			a = ty.UTy.(*Record)
+			if a == nil {
+				msg := fmt.Sprintf("'%s' must be a (pointer to) record type", des.QualifiedIdent)
+				v.error(des.QualifiedIdent.Pos(), msg)
+			}
+		default:
+			msg := fmt.Sprintf("'%s' must be a (pointer to) record type", des.QualifiedIdent)
+			v.error(des.QualifiedIdent.Pos(), msg)
+		}
+
+		sel.Ty.Accept(v)
+
+		if !v.recordTyExt(a, sel.Ty.Type()) {
+			msg := fmt.Sprintf("")
+			v.error(des.QualifiedIdent.Pos(), msg)
+		}
+
+		des.EType = sel.Ty.Type()
 	}
 
 	return

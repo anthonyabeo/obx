@@ -123,3 +123,65 @@ end Main
 		}
 	}
 }
+
+func TestTypeCheckExpressions(t *testing.T) {
+	input := `
+module Main
+	type Person = record
+		age: integer
+		name: array 10 of char
+	end
+
+	type a = array 10 of integer
+		 w = array 10 of Person
+
+	type CenterTree = record
+		key: integer
+	end
+
+	var i, j, x, k: integer
+		b, p, q: bool
+		s: set
+		t, u: CenterTree
+		c: char
+
+begin
+	i := 1991
+	i := i div 3
+	b := ~p or q
+	i := (i+j) * (i-j)
+	s := s - {8, 9, 13}
+	i := i + x
+	i := a[i+j] * a[i-j]
+	b := (0<=i) & (i<100)
+	b := t.key = 0
+	b := k in {i..j-1}
+	b := w[i].age <= 15
+	c := w[3].name[i]
+	b := t is CenterTree
+	i := t{CenterTree}.key
+	u := t{CenterTree}
+end Main
+`
+
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := lexer.NewLexer(file, []byte(input))
+
+	p := parser.NewParser(lex)
+	unit := p.Parse()
+
+	obx := ast.NewOberon()
+	scopes := map[string]*scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	sema := NewVisitor(scopes)
+	unit.Accept(sema)
+	if len(sema.errors) > 0 {
+		t.Error("found semantic errors")
+		for _, err := range sema.errors {
+			t.Log(err.Error())
+		}
+	}
+}

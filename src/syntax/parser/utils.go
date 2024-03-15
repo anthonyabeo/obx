@@ -33,6 +33,17 @@ var exprEnd = map[token.Token]bool{
 	token.RBRACE:    true,
 }
 
+var typeStart = map[token.Token]bool{
+	token.ARRAY:     true,
+	token.LBRACK:    true,
+	token.PROCEDURE: true,
+	token.LPAREN:    true,
+	token.POINTER:   true,
+	token.CARET:     true,
+	token.RECORD:    true,
+	token.IDENT:     true,
+}
+
 func (p *Parser) addOp() bool {
 	return p.tok == token.PLUS ||
 		p.tok == token.MINUS ||
@@ -82,16 +93,7 @@ func (p *Parser) exprStart() bool {
 }
 
 func (p *Parser) stmtStart() bool {
-	return p.tok == token.EXIT ||
-		p.tok == token.IF ||
-		p.tok == token.WITH ||
-		p.tok == token.RETURN ||
-		p.tok == token.REPEAT ||
-		p.tok == token.LOOP ||
-		p.tok == token.WHILE ||
-		p.tok == token.FOR ||
-		p.tok == token.CASE ||
-		p.tok == token.IDENT
+	return stmtStart[p.tok]
 }
 
 func (p *Parser) startsImportOrDecl() bool {
@@ -99,11 +101,7 @@ func (p *Parser) startsImportOrDecl() bool {
 }
 
 func (p *Parser) startsDecl() bool {
-	return p.tok == token.VAR ||
-		p.tok == token.TYPE ||
-		p.tok == token.CONST ||
-		p.tok == token.PROC ||
-		p.tok == token.PROCEDURE
+	return declStart[p.tok]
 }
 
 var basicTypes = map[string]bool{
