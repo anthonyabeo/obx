@@ -18,17 +18,19 @@ var Global *Scope
 var Typ = []*types.Basic{
 	types.Invalid: types.NewBasicType(types.Invalid, 0, "invalid type"),
 
-	types.Bool:  types.NewBasicType(types.Bool, types.IsBoolean, "bool"),
-	types.Byte:  types.NewBasicType(types.Byte, types.IsInteger, "byte"),
-	types.Int8:  types.NewBasicType(types.Int8, types.IsInteger, "int8"),
-	types.Int16: types.NewBasicType(types.Int16, types.IsInteger, "int16"),
-	types.Int32: types.NewBasicType(types.Int32, types.IsInteger, "int32"),
-	types.Int64: types.NewBasicType(types.Int64, types.IsInteger, "int64"),
-	types.Real:  types.NewBasicType(types.Real, types.IsReal, "real"),
-	types.LReal: types.NewBasicType(types.LReal, types.IsReal, "longreal"),
-	types.Char:  types.NewBasicType(types.Char, types.IsChar, "char"),
-	types.WChar: types.NewBasicType(types.WChar, types.IsWChar, "wchar"),
-	types.Set:   types.NewBasicType(types.Set, types.IsSet, "set"),
+	types.Bool:   types.NewBasicType(types.Bool, types.IsBoolean, "bool"),
+	types.Byte:   types.NewBasicType(types.Byte, types.IsInteger, "byte"),
+	types.Int8:   types.NewBasicType(types.Int8, types.IsInteger, "int8"),
+	types.Int16:  types.NewBasicType(types.Int16, types.IsInteger, "int16"),
+	types.Int32:  types.NewBasicType(types.Int32, types.IsInteger, "int32"),
+	types.Int64:  types.NewBasicType(types.Int64, types.IsInteger, "int64"),
+	types.Real:   types.NewBasicType(types.Real, types.IsReal, "real"),
+	types.LReal:  types.NewBasicType(types.LReal, types.IsReal, "longreal"),
+	types.Char:   types.NewBasicType(types.Char, types.IsChar, "char"),
+	types.WChar:  types.NewBasicType(types.WChar, types.IsWChar, "wchar"),
+	types.Set:    types.NewBasicType(types.Set, types.IsSet, "set"),
+	types.String: types.NewBasicType(types.String, types.IsString, "string"),
+	types.Nil:    types.NewBasicType(types.Nil, types.IsNil, "nil"),
 }
 
 var AliasTypes = []*types.Basic{

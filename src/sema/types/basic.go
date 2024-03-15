@@ -20,6 +20,8 @@ const (
 	Real
 	LReal
 	Set
+	String
+	Nil
 
 	SInt = Int16
 	Int  = Int32

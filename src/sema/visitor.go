@@ -121,6 +121,10 @@ func (v *Visitor) VisitBasicLit(b *ast.BasicLit) {
 		b.EType = scope.Typ[types.LReal]
 	case token.TRUE, token.FALSE:
 		b.EType = scope.Typ[types.Bool]
+	case token.STRING:
+		b.EType = scope.Typ[types.String]
+	case token.NIL:
+		b.EType = scope.Typ[types.Nil]
 	}
 }
 
@@ -225,8 +229,8 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			return
 		}
 
-		LTyEnum, LTyEnumOk := LTy.(*Enum)
-		RTyEnum, RTyEnumOk := RTy.(*Enum)
+		LTyEnum, LTyEnumOk := LTy.(*types.Enum)
+		RTyEnum, RTyEnumOk := RTy.(*types.Enum)
 		if LTyEnumOk && RTyEnumOk {
 			if !LTyEnum.SameAs(RTyEnum) {
 				msg := fmt.Sprintf("cannot compare different enum types, '%s' and '%s'", expr.Left, expr.Right)
@@ -237,8 +241,8 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			return
 		}
 
-		LTyPtr, LTyPtrOk := LTy.(*PtrType)
-		RTyPtr, RTyPtrOk := RTy.(*PtrType)
+		LTyPtr, LTyPtrOk := LTy.(*types.PtrType)
+		RTyPtr, RTyPtrOk := RTy.(*types.PtrType)
 		if LTyPtrOk && RTyPtrOk {
 			if !v.ptrExt(LTyPtr, RTyPtr) || !v.ptrExt(RTyPtr, LTyPtr) {
 				msg := fmt.Sprintf("cannot compare pointer types '%s' and '%s'", expr.Left, expr.Right)
@@ -283,8 +287,8 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			return
 		}
 
-		LTyEnum, LTyEnumOk := LTy.(*Enum)
-		RTyEnum, RTyEnumOk := RTy.(*Enum)
+		LTyEnum, LTyEnumOk := LTy.(*types.Enum)
+		RTyEnum, RTyEnumOk := RTy.(*types.Enum)
 		if LTyEnumOk && RTyEnumOk {
 			if !LTyEnum.SameAs(RTyEnum) {
 				msg := fmt.Sprintf("cannot compare different enum types, '%s' and '%s'", expr.Left, expr.Right)
@@ -341,7 +345,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 		switch ty := LTy.(type) {
 		case *Record:
 			a = ty
-		case *PtrType:
+		case *types.PtrType:
 			a = ty.UTy.(*Record)
 			if a == nil {
 				msg := fmt.Sprintf("'%s' must be a (pointer to) record type", expr.Left)
@@ -378,7 +382,7 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 			}
 
 			des.EType = sym.Type()
-		case *PtrType:
+		case *types.PtrType:
 			record, ok := ty.UTy.(*Record)
 			if !ok {
 				msg := fmt.Sprintf("pointer '%s' does not reference a record type", ty)
@@ -396,7 +400,7 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 			v.error(des.QualifiedIdent.Pos(), msg)
 		}
 	case *ast.PtrDref:
-		ptr, ok := des.QualifiedIdent.Type().(*PtrType)
+		ptr, ok := des.QualifiedIdent.Type().(*types.PtrType)
 		if !ok {
 			msg := fmt.Sprintf("name '%s' is not defined as an pointer type", des.QualifiedIdent.String())
 			v.error(des.QualifiedIdent.Pos(), msg)
@@ -417,7 +421,7 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 		switch ty := des.QualifiedIdent.Type().(type) {
 		case *Record:
 			a = ty
-		case *PtrType:
+		case *types.PtrType:
 			a = ty.UTy.(*Record)
 			if a == nil {
 				msg := fmt.Sprintf("'%s' must be a (pointer to) record type", des.QualifiedIdent)
@@ -813,7 +817,7 @@ func (v *Visitor) VisitPointerType(p *ast.PointerType) {
 		}
 	}
 
-	p.EType = &PtrType{p.Base.Type()}
+	p.EType = &types.PtrType{p.Base.Type()}
 }
 
 func (v *Visitor) VisitRecordType(r *ast.RecordType) {
@@ -866,7 +870,7 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 	for idx, id := range e.Variants {
 		variants[id.Name] = idx
 	}
-	ty := NewEnumType(variants)
+	ty := types.NewEnumType(variants)
 
 	for i, c := range e.Variants {
 		if obj := v.env.Lookup(c.Name); obj != nil {

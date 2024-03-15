@@ -1,10 +1,8 @@
-package sema
+package types
 
 import (
 	"fmt"
 	"strings"
-
-	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 type Enum struct {
@@ -15,7 +13,7 @@ func NewEnumType(variants map[string]int) *Enum {
 	return &Enum{variants}
 }
 
-func (e *Enum) Underlying() types.Type { return e }
+func (e *Enum) Underlying() Type { return e }
 
 func (e *Enum) String() string {
 	var list []string

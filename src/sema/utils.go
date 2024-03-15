@@ -68,8 +68,8 @@ func (v *Visitor) equalType(Ta, Tb types.Type) bool {
 		}
 	}
 
-	TaPtr := Ta.(*PtrType)
-	TbPtr := Tb.(*PtrType)
+	TaPtr := Ta.(*types.PtrType)
+	TbPtr := Tb.(*types.PtrType)
 	if TaPtr != nil && TbPtr != nil {
 		if v.equalType(TaPtr.UTy, TbPtr.UTy) {
 			return true
@@ -118,7 +118,7 @@ func (v *Visitor) assignCompat(Te, Tv types.Type) bool {
 		}
 	}
 
-	TeEnum, TeEnumOk := Te.(*Enum)
+	TeEnum, TeEnumOk := Te.(*types.Enum)
 	if TeEnumOk && TvBasicOk {
 		if TvBasic.Info() == types.IsInteger && TeEnum != nil {
 			return true
@@ -132,7 +132,7 @@ func (v *Visitor) assignCompat(Te, Tv types.Type) bool {
 
 // If Pa = POINTER TO Ta and Pb = POINTER TO Tb , Pb is an extension of Pa (Pa is a base type of Pb)
 // if Tb is an extension of Ta.
-func (v *Visitor) ptrExt(Ta, Tb *PtrType) bool {
+func (v *Visitor) ptrExt(Ta, Tb *types.PtrType) bool {
 	return true
 }
 
