@@ -16,6 +16,10 @@ import (
 //  3. a and b appear in the same identifier list in a variable, record field,
 //     or formal parameter declaration and are not open arrays.
 func (v *Visitor) sameType(Ta, Tb types.Type) bool {
+	if Ta == nil || Tb == nil {
+		return false
+	}
+
 	if Ta.String() == Tb.String() {
 		return true
 	}
@@ -40,6 +44,10 @@ func (v *Visitor) sameType(Ta, Tb types.Type) bool {
 // 3. Ta and Tb are procedure types whose formal parameters match, or
 // 4. Ta and Tb are pointer types with equal base types.
 func (v *Visitor) equalType(Ta, Tb types.Type) bool {
+	if Ta == nil || Tb == nil {
+		return false
+	}
+
 	if v.sameType(Ta, Tb) {
 		return true
 	}
@@ -86,32 +94,46 @@ func (v *Visitor) equalType(Ta, Tb types.Type) bool {
 // 11. Tv is an array of CHAR, Te is a Latin-1 string or character array, and STRLEN(e) < LEN(v);
 // 12. Tv is a procedure type and e is the name of a procedure whose formal parameters match those of Tv.
 func (v *Visitor) assignCompat(Te, Tv types.Type) bool {
+	if Te == nil && Tv == nil {
+		return false
+	}
+
 	if v.sameType(Te, Tv) {
 		return true
 	}
 
-	TeBasic := Te.(*types.Basic)
-	TvBasic := Tv.(*types.Basic)
-	if TeBasic.Info()|types.IsNumeric == types.IsNumeric && TvBasic.Info()|types.IsNumeric == types.IsNumeric {
-		return TvBasic.Kind() >= TeBasic.Kind()
+	TeBasic, TeBasicOk := Te.(*types.Basic)
+	TvBasic, TvBasicOk := Tv.(*types.Basic)
+	if TeBasicOk && TvBasicOk {
+		if TeBasic.Info()|types.IsNumeric == types.IsNumeric && TvBasic.Info()|types.IsNumeric == types.IsNumeric {
+			return TvBasic.Kind() >= TeBasic.Kind()
+		}
+
+		if TvBasic.Info() == types.IsSet && TeBasic.Kind() < types.Int32 {
+			return true
+		}
+
+		if TvBasic.Kind() == types.Byte && TeBasic.Kind() == types.Char {
+			return true
+		}
 	}
 
-	if TvBasic.Info() == types.IsSet && TeBasic.Kind() < types.Int32 {
-		return true
+	TeEnum, TeEnumOk := Te.(*Enum)
+	if TeEnumOk && TvBasicOk {
+		if TvBasic.Info() == types.IsInteger && TeEnum != nil {
+			return true
+		}
 	}
 
-	if TvBasic.Kind() == types.Byte && TeBasic.Kind() == types.Char {
-		return true
-	}
-
-	TeEnum := Te.(*Enum)
-	if TvBasic.Info() == types.IsInteger && TeEnum != nil {
-		return true
-	}
-
-	// TODO 6-12 Remain
+	//TODO 6-12 Remain
 
 	return false
+}
+
+// If Pa = POINTER TO Ta and Pb = POINTER TO Tb , Pb is an extension of Pa (Pa is a base type of Pb)
+// if Tb is an extension of Ta.
+func (v *Visitor) ptrExt(Ta, Tb *PtrType) bool {
+	return true
 }
 
 // Given a type declaration Tb = RECORD(Ta)...END, Tb is a direct extension of Ta, and Ta is a direct base type of Tb.
@@ -121,6 +143,10 @@ func (v *Visitor) assignCompat(Te, Tv types.Type) bool {
 // 2. Tb is a direct extension of Ta.
 // 3. Ta is of type ANYREC.
 func (v *Visitor) recordTyExt(baseTy, extTy types.Type) bool {
+	if baseTy == nil || extTy == nil {
+		return false
+	}
+
 	if v.sameType(baseTy, extTy) {
 		return true
 	}
@@ -137,6 +163,10 @@ func (v *Visitor) recordTyExt(baseTy, extTy types.Type) bool {
 }
 
 func (v *Visitor) directExt(baseTy, extTy types.Type) bool {
+	if baseTy == nil || extTy == nil {
+		return false
+	}
+
 	sym := v.env.Lookup(extTy.String())
 	if sym == nil || sym.Kind() != scope.TYPE {
 		return false
@@ -156,6 +186,10 @@ func (v *Visitor) directExt(baseTy, extTy types.Type) bool {
 // 2. f is a value parameter and Ta is assignment compatible with Tf, or
 // 3. f is an IN or VAR parameter Ta must be the same type as Tf, or Tf must be a record type and Ta an extension of Tf.
 func (v *Visitor) paramCompat(fpKind token.Token, Ta, Tf types.Type) bool {
+	if Tf == nil {
+		return false
+	}
+
 	if v.equalType(Tf, Ta) {
 		return true
 	}
@@ -193,6 +227,10 @@ func (v *Visitor) arrayCompat(a, b types.Type) bool { return false }
 // 2. parameters at corresponding positions have equal types, and
 // 3. parameters at corresponding positions are both either value, VAR or IN parameters.
 func (v *Visitor) paramListMatch(Ta, Tb *ast.FormalParams) bool {
+	if Ta == nil || Tb == nil {
+		return false
+	}
+
 	if len(Ta.Params) != len(Tb.Params) {
 		return false
 	}
@@ -211,6 +249,10 @@ func (v *Visitor) paramListMatch(Ta, Tb *ast.FormalParams) bool {
 }
 
 func (v *Visitor) resultTypeMatch(a, b types.Type) bool {
+	if a == nil || b == nil {
+		return false
+	}
+
 	if !v.sameType(a, b) {
 		return false
 	}

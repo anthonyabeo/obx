@@ -143,12 +143,20 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 	expr.Left.Accept(v)
 	expr.Right.Accept(v)
 
-	// TODO the operands could be non-basic types.
-	left, _ := expr.Left.Type().(*types.Basic)
-	right, _ := expr.Right.Type().(*types.Basic)
+	LTy := expr.Left.Type()
+	RTy := expr.Right.Type()
 
 	switch expr.Op {
 	case token.PLUS, token.MINUS, token.STAR, token.QUOT:
+		left, leftOk := LTy.(*types.Basic)
+		right, rightOk := RTy.(*types.Basic)
+		if !leftOk || !rightOk {
+			msg := fmt.Sprintf("one of the operands of '%s' is not a basic type", expr)
+			v.error(expr.Pos(), msg)
+
+			return
+		}
+
 		if left.Info()|types.IsNumeric != types.IsNumeric && left.Info()|types.IsNumeric != types.IsNumeric && left.Info() != types.IsSet {
 			msg := fmt.Sprintf("cannot perform operation '%v' with '%s' (of type '%s')", expr.Op, expr.Left, expr.Left.Type())
 			v.error(expr.Pos(), msg)
@@ -157,6 +165,11 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 		if right.Info()|types.IsNumeric != types.IsNumeric && right.Info()|types.IsNumeric != types.IsNumeric && right.Info() != types.IsSet {
 			msg := fmt.Sprintf("cannot perform operation '%v' with '%s' (of type '%s')", expr.Op, expr.Right, expr.Right.Type())
 			v.error(expr.Pos(), msg)
+		}
+
+		if left.Info() == types.IsSet && right.Info() == types.IsSet {
+			expr.EType = scope.Typ[types.Set]
+			return
 		}
 
 		if expr.Op == token.QUOT {
@@ -168,6 +181,15 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			expr.EType = right
 		}
 	case token.DIV, token.MOD:
+		left, leftOk := LTy.(*types.Basic)
+		right, rightOk := RTy.(*types.Basic)
+		if !leftOk || !rightOk {
+			msg := fmt.Sprintf("one of the operands of '%s' is not a basic type", expr)
+			v.error(expr.Pos(), msg)
+
+			return
+		}
+
 		if left.Info() != types.IsInteger || right.Info() != types.IsInteger {
 			msg := fmt.Sprintf("cannot perform operation '%v' on non-integer types, '%v' and '%v'", expr.Op, expr.Left, expr.Right)
 			v.error(expr.Pos(), msg)
@@ -177,30 +199,115 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			expr.EType = right
 		}
 	case token.EQUAL, token.NEQ:
-		if left.Info()|types.IsNumeric != types.IsNumeric /* && left.info() != IsEnum && IsChar && IsString && IsCharArray && IsBool && IsSet && IsPointer && IsProc && IsNil */ {
-			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Left)
-			v.error(expr.Left.Pos(), msg)
+		// apply to the numeric types, as well as enumerations, CHAR, strings, and CHAR arrays
+		// containing 0x as a terminator. Also apply to BOOLEAN and SET, as well as to pointer
+		// and procedure types (including the value NIL)
+		left, leftOk := LTy.(*types.Basic)
+		right, rightOk := RTy.(*types.Basic)
+		if leftOk && rightOk {
+			if left.Info()|types.IsNumeric != types.IsNumeric && left.Info() != types.IsChar &&
+				left.Info() != types.IsString && left.Info() != types.IsBoolean && left.Info() != types.IsSet &&
+				left.Info() != types.IsNil {
+
+				msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Left)
+				v.error(expr.Left.Pos(), msg)
+			}
+
+			if right.Info()|types.IsNumeric != types.IsNumeric && right.Info() != types.IsChar &&
+				right.Info() != types.IsString && right.Info() != types.IsBoolean && right.Info() != types.IsSet &&
+				right.Info() != types.IsNil {
+
+				msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Right)
+				v.error(expr.Right.Pos(), msg)
+			}
+
+			expr.EType = scope.Typ[types.Bool]
+			return
 		}
 
-		if right.Info()|types.IsNumeric != types.IsNumeric /* && left.info() != IsEnum && IsChar && IsString && IsCharArray & IsBool && IsSet && IsPointer && IsProc && IsNil */ {
-			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Right)
-			v.error(expr.Right.Pos(), msg)
+		LTyEnum, LTyEnumOk := LTy.(*Enum)
+		RTyEnum, RTyEnumOk := RTy.(*Enum)
+		if LTyEnumOk && RTyEnumOk {
+			if !LTyEnum.SameAs(RTyEnum) {
+				msg := fmt.Sprintf("cannot compare different enum types, '%s' and '%s'", expr.Left, expr.Right)
+				v.error(expr.Pos(), msg)
+			}
+
+			expr.EType = scope.Typ[types.Bool]
+			return
 		}
 
-		expr.EType = scope.Typ[types.Bool]
+		LTyPtr, LTyPtrOk := LTy.(*PtrType)
+		RTyPtr, RTyPtrOk := RTy.(*PtrType)
+		if LTyPtrOk && RTyPtrOk {
+			if !v.ptrExt(LTyPtr, RTyPtr) || !v.ptrExt(RTyPtr, LTyPtr) {
+				msg := fmt.Sprintf("cannot compare pointer types '%s' and '%s'", expr.Left, expr.Right)
+				v.error(expr.Pos(), msg)
+			}
+
+			expr.EType = scope.Typ[types.Bool]
+			return
+		}
+
+		LTyProc, LTyProcOk := LTy.(*ProcedureType)
+		RTyProc, RTyProcOk := RTy.(*ProcedureType)
+		if LTyProcOk && RTyProcOk {
+			if !v.sameType(LTyProc.fp.RetType.Type(), RTyProc.fp.RetType.Type()) || !v.paramListMatch(LTyProc.fp, RTyProc.fp) {
+				msg := fmt.Sprintf("cannot compare operand '%s' (of type '%s') and operand '%s' (of type '%s')",
+					expr.Left, LTyProc, expr.Right, RTyProc)
+				v.error(expr.Pos(), msg)
+			}
+
+			expr.EType = scope.Typ[types.Bool]
+			return
+		}
+
+		// TODO check for CHAR and WCHAR arrays
 	case token.LESS, token.LEQ, token.GREAT, token.GEQ:
-		if left.Info()|types.IsNumeric != types.IsNumeric /*&& left.Info() != types.IsEnum*/ && left.Info() != types.IsChar && left.Info() != types.IsString /*&& IsCharArray */ {
-			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Left)
-			v.error(expr.Left.Pos(), msg)
+		// apply to the numeric types, as well as enumerations, CHAR, strings, and CHAR arrays
+		// containing 0x as a terminator.
+		left, leftOk := LTy.(*types.Basic)
+		right, rightOk := RTy.(*types.Basic)
+		if leftOk && rightOk {
+			if left.Info()|types.IsNumeric != types.IsNumeric && left.Info() != types.IsChar && left.Info() != types.IsString {
+				msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Left)
+				v.error(expr.Left.Pos(), msg)
+			}
+
+			if right.Info()|types.IsNumeric != types.IsNumeric && right.Info() != types.IsChar && right.Info() != types.IsString {
+				msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Right)
+				v.error(expr.Right.Pos(), msg)
+			}
+
+			expr.EType = scope.Typ[types.Bool]
+			return
 		}
 
-		if right.Info()|types.IsNumeric != types.IsNumeric && right.Info() != types.IsChar && right.Info() != types.IsString /* && IsEnum && IsCharArray*/ {
-			msg := fmt.Sprintf("cannot perform operation '%v' on '%v' type", expr.Op, expr.Right)
-			v.error(expr.Right.Pos(), msg)
+		LTyEnum, LTyEnumOk := LTy.(*Enum)
+		RTyEnum, RTyEnumOk := RTy.(*Enum)
+		if LTyEnumOk && RTyEnumOk {
+			if !LTyEnum.SameAs(RTyEnum) {
+				msg := fmt.Sprintf("cannot compare different enum types, '%s' and '%s'", expr.Left, expr.Right)
+				v.error(expr.Pos(), msg)
+			}
+
+			expr.EType = scope.Typ[types.Bool]
+			return
 		}
+
+		// TODO check for CHAR and WCHAR arrays
 
 		expr.EType = scope.Typ[types.Bool]
 	case token.OR, token.AND:
+		left, leftOk := LTy.(*types.Basic)
+		right, rightOk := RTy.(*types.Basic)
+		if !leftOk || !rightOk {
+			msg := fmt.Sprintf("one of the operands of '%s' is not a basic type", expr)
+			v.error(expr.Pos(), msg)
+
+			return
+		}
+
 		if left.Info() != types.IsBoolean && right.Info() != types.IsBoolean {
 			msg := fmt.Sprintf("both operands of a '%v' operation must be boolean", expr.Op)
 			v.error(expr.OpPos, msg)
@@ -208,6 +315,15 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 
 		expr.EType = scope.Typ[types.Bool]
 	case token.IN:
+		left, leftOk := LTy.(*types.Basic)
+		right, rightOk := RTy.(*types.Basic)
+		if !leftOk || !rightOk {
+			msg := fmt.Sprintf("one of the operands of '%s' is not a basic type", expr)
+			v.error(expr.Pos(), msg)
+
+			return
+		}
+
 		if left.Info() != types.IsInteger {
 			msg := fmt.Sprintf("the key for an IN operation must be an integer")
 			v.error(expr.Left.Pos(), msg)
@@ -220,6 +336,27 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 
 		expr.EType = scope.Typ[types.Bool]
 	case token.IS:
+		var a types.Type
+
+		switch ty := LTy.(type) {
+		case *Record:
+			a = ty
+		case *PtrType:
+			a = ty.UTy.(*Record)
+			if a == nil {
+				msg := fmt.Sprintf("'%s' must be a (pointer to) record type", expr.Left)
+				v.error(expr.Left.Pos(), msg)
+			}
+		default:
+			msg := fmt.Sprintf("'%s' must be a (pointer to) record type", expr.Left)
+			v.error(expr.Left.Pos(), msg)
+		}
+
+		if !v.recordTyExt(a, RTy) {
+			msg := fmt.Sprintf("'%s' is not an extension of '%s'", RTy, a)
+			v.error(expr.Pos(), msg)
+		}
+
 		expr.EType = scope.Typ[types.Bool]
 	}
 }
@@ -294,7 +431,7 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 		sel.Ty.Accept(v)
 
 		if !v.recordTyExt(a, sel.Ty.Type()) {
-			msg := fmt.Sprintf("")
+			msg := fmt.Sprintf("'%s' is not an extension of '%s'", sel.Ty.Type(), a)
 			v.error(des.QualifiedIdent.Pos(), msg)
 		}
 
@@ -725,7 +862,11 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 }
 
 func (v *Visitor) VisitEnumType(e *ast.EnumType) {
-	ty := NewEnumType(e.Variants)
+	variants := make(map[string]int, 0)
+	for idx, id := range e.Variants {
+		variants[id.Name] = idx
+	}
+	ty := NewEnumType(variants)
 
 	for i, c := range e.Variants {
 		if obj := v.env.Lookup(c.Name); obj != nil {

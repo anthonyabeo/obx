@@ -39,6 +39,7 @@ const (
 	IsChar
 	IsWChar
 	IsSet
+	IsNil
 
 	IsOrdered   = IsInteger | IsReal | IsString
 	IsNumeric   = IsInteger | IsReal

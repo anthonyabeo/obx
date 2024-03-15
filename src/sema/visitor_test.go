@@ -127,25 +127,32 @@ end Main
 func TestTypeCheckExpressions(t *testing.T) {
 	input := `
 module Main
-	type Person = record
-		age: integer
-		name: array 10 of char
-	end
+	type 
+		Color = (red, green, blue)
 
-	type a = array 10 of integer
-		 w = array 10 of Person
+		Person = record
+			age: integer
+			name: array 10 of char
+		end
 
-	type CenterTree = record
-		key: integer
-	end
+		a = array 10 of integer
+		w = array 10 of Person
+
+	 	CenterTree = record
+			key: integer
+		end
 
 	var i, j, x, k: integer
 		b, p, q: bool
 		s: set
 		t, u: CenterTree
 		c: char
+		m, n: Color
 
 begin
+	m := 1
+	n :=  2
+    b := m <= n
 	i := 1991
 	i := i div 3
 	b := ~p or q
