@@ -63,7 +63,7 @@ module Main
 	var primary: (red, green, blue)
 
 begin
-	primary := red
+	primary := ord(red)
 end Main
 `
 
@@ -150,8 +150,8 @@ module Main
 		m, n: Color
 
 begin
-	m := 1
-	n :=  2
+	m := ord(red)
+	n :=  ord(green)
     b := m <= n
 	i := 1991
 	i := i div 3

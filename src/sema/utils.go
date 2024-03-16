@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/sema/types"
@@ -260,14 +261,81 @@ func (v *Visitor) resultTypeMatch(a, b types.Type) bool {
 	return true
 }
 
-func (v *Visitor) checkBuiltin(b *scope.Builtin, call *ast.ProcCall) {
+func (v *Visitor) checkFuncBuiltin(b *scope.Builtin, call *ast.FuncCall) {
 	proc := scope.PredeclaredProcedures[b.Id]
+
+	if proc.Nargs != len(call.ActualParams) {
+		v.error(call.Pos(), fmt.Sprintf("not enough arguments to procedure call '%v'", call.String()))
+	}
+
 	switch b.Id {
-	case scope.Assert_:
-		if proc.Nargs != len(call.ActualParams) {
-			v.error(call.Pos(), fmt.Sprintf("not enough arguments to procedure call '%v'", call.String()))
+	case scope.Abs_:
+	case scope.Cap_:
+	case scope.BitAnd_:
+	case scope.BitAsr_:
+	case scope.BitNot_:
+	case scope.BitOr_:
+	case scope.Bits_:
+	case scope.BitShl_:
+	case scope.BitShr_:
+	case scope.BitXor_:
+	case scope.Cast_:
+	case scope.Chr_:
+	case scope.Default_:
+	case scope.Floor_:
+	case scope.Flt_:
+	case scope.LdCmd_:
+	case scope.LdMod_:
+	case scope.Len_:
+	case scope.LenN_:
+	case scope.Long_:
+	case scope.Max_:
+	case scope.MaxN_:
+	case scope.Min_:
+	case scope.MinN_:
+	case scope.Odd_:
+	case scope.Ord_:
+		obj := v.env.Lookup(call.ActualParams[0].String())
+		if obj == nil || obj.Kind() != scope.CONST {
+			msg := fmt.Sprintf("'%s' is not recognised as an enumeration variant", call.ActualParams[0].String())
+			v.error(call.ActualParams[0].Pos(), msg)
 		}
 
+		bl, ok := obj.(*scope.Const).Value().(*ast.BasicLit)
+		if !ok {
+			msg := fmt.Sprintf("ordinal value of enum variant '%s' is not an integer", call.ActualParams[0].String())
+			v.error(call.ActualParams[0].Pos(), msg)
+		}
+
+		i, err := strconv.Atoi(bl.Val)
+		enum := call.ActualParams[0].Type().(*types.Enum)
+		if err != nil || !enum.IsValidOrd(i) {
+			msg := fmt.Sprintf("'%d' is not a valid ordinal value of the enum '%s'", i, enum)
+			v.error(call.ActualParams[0].Pos(), msg)
+		}
+
+		call.EType = scope.Typ[types.Int]
+	case scope.Short_:
+	case scope.Size_:
+	case scope.StrLen_:
+	case scope.WChr_:
+	case scope.ASh_:
+	case scope.ASr_:
+	case scope.Entier_:
+	case scope.Lsl_:
+	case scope.Ror_:
+	}
+}
+
+func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcCall) {
+	proc := scope.PredeclaredProcedures[b.Id]
+
+	if proc.Nargs != len(call.ActualParams) {
+		v.error(call.Pos(), fmt.Sprintf("not enough arguments to procedure call '%v'", call.String()))
+	}
+
+	switch b.Id {
+	case scope.Assert_:
 		for i := 0; i < proc.Nargs; i++ {
 			if !v.assignCompat(scope.Typ[types.Bool], call.ActualParams[i].Type()) {
 				msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
@@ -275,58 +343,22 @@ func (v *Visitor) checkBuiltin(b *scope.Builtin, call *ast.ProcCall) {
 				v.error(call.ActualParams[i].Pos(), msg)
 			}
 		}
-	//case _Assertn:
-	//case _Bytes:
-	//case _Dec:
-	//case _Decn:
-	//case _Excl:
-	//case _Halt:
+	case scope.Assertn_:
+	case scope.Bytes_:
+	case scope.Dec_:
+	case scope.Decn_:
+	case scope.Excl_:
+	case scope.Halt_:
 	case scope.Inc_:
-		//case _Incn:
-		//case _Incl:
-		//case _New:
-		//case _Newn:
-		//case _Number:
-		//case _PCall:
-		//case _Raise:
-		//case _Copy:
-		//case _Pack:
-		//case _UnPk:
-		//
-		//case _Abs:
-		//case _Cap:
-		//case _BitAnd:
-		//case _BitAsr:
-		//case _BitNot:
-		//case _BitOr:
-		//case _Bits:
-		//case _BitShl:
-		//case _BitShr:
-		//case _BitXor:
-		//case _Cast:
-		//case _Chr:
-		//case _Default:
-		//case _Floor:
-		//case _Flt:
-		//case _LdCmd:
-		//case _LdMod:
-		//case _Len:
-		//case _LenN:
-		//case _Long:
-		//case _Max:
-		//case _MaxN:
-		//case _Min:
-		//case _MinN:
-		//case _Odd:
-		//case _Ord:
-		//case _Short:
-		//case _Size:
-		//case _StrLen:
-		//case _WChr:
-		//case _ASh:
-		//case _ASr:
-		//case _Entier:
-		//case _Lsl:
-		//case _Ror:
+	case scope.Incn_:
+	case scope.Incl_:
+	case scope.New_:
+	case scope.Newn_:
+	case scope.Number_:
+	case scope.PCall_:
+	case scope.Raise_:
+	case scope.Copy_:
+	case scope.Pack_:
+	case scope.UnPk_:
 	}
 }

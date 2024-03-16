@@ -139,7 +139,8 @@ func NewConst(
 	return &Const{symbol{nil, pos, name, CONST, ty, props, offset, nil}, value}
 }
 
-func (c *Const) String() string { panic("not implemented") }
+func (c *Const) String() string        { panic("not implemented") }
+func (c *Const) Value() ast.Expression { return c.value }
 
 // Module
 // -----------------------

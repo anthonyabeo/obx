@@ -35,3 +35,13 @@ func (e *Enum) SameAs(other *Enum) bool {
 
 	return true
 }
+
+func (e *Enum) IsValidOrd(i int) bool {
+	for _, ord := range e.variants {
+		if ord == i {
+			return true
+		}
+	}
+
+	return false
+}

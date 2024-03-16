@@ -54,62 +54,62 @@ type BuiltinId int
 
 const (
 	Assert_ BuiltinId = iota
-	_Assertn
-	_Bytes
-	_Dec
-	_Decn
-	_Excl
-	_Halt
+	Assertn_
+	Bytes_
+	Dec_
+	Decn_
+	Excl_
+	Halt_
 	Inc_
-	_Incn
-	_Incl
-	_New
-	_Newn
-	_Number
-	_PCall
-	_Raise
-	_Copy
-	_Pack
-	_UnPk
+	Incn_
+	Incl_
+	New_
+	Newn_
+	Number_
+	PCall_
+	Raise_
+	Copy_
+	Pack_
+	UnPk_
 
 	// Predeclared function procedures
-	_Abs
-	_Cap
-	_BitAnd
-	_BitAsr
-	_BitNot
-	_BitOr
-	_Bits
-	_BitShl
-	_BitShr
-	_BitXor
-	_Cast
-	_Chr
-	_Default
-	_Floor
-	_Flt
-	_LdCmd
-	_LdMod
-	_Len
-	_LenN
-	_Long
-	_Max
-	_MaxN
-	_Min
-	_MinN
-	_Odd
-	_Ord
-	_Short
-	_Size
-	_StrLen
-	_WChr
+	Abs_
+	Cap_
+	BitAnd_
+	BitAsr_
+	BitNot_
+	BitOr_
+	Bits_
+	BitShl_
+	BitShr_
+	BitXor_
+	Cast_
+	Chr_
+	Default_
+	Floor_
+	Flt_
+	LdCmd_
+	LdMod_
+	Len_
+	LenN_
+	Long_
+	Max_
+	MaxN_
+	Min_
+	MinN_
+	Odd_
+	Ord_
+	Short_
+	Size_
+	StrLen_
+	WChr_
 
 	// Deprecated predeclared functions for backward compatibility
-	_ASh
-	_ASr
-	_Entier
-	_Lsl
-	_Ror
+	ASh_
+	ASr_
+	Entier_
+	Lsl_
+	Ror_
 )
 
 var PredeclaredProcedures = [...]struct {
@@ -120,63 +120,63 @@ var PredeclaredProcedures = [...]struct {
 }{
 	// Predeclared proper procedures
 	Assert_:  {"assert", 1, false, stmt},
-	_Assertn: {"assert", 2, false, stmt},
-	_Bytes:   {"bytes", 2, false, stmt},
-	_Dec:     {"dec", 1, false, stmt},
-	_Decn:    {"dec", 2, false, stmt},
-	_Excl:    {"excl", 2, false, stmt},
-	_Halt:    {"halt", 1, false, stmt},
+	Assertn_: {"assert", 2, false, stmt},
+	Bytes_:   {"bytes", 2, false, stmt},
+	Dec_:     {"dec", 1, false, stmt},
+	Decn_:    {"dec", 2, false, stmt},
+	Excl_:    {"excl", 2, false, stmt},
+	Halt_:    {"halt", 1, false, stmt},
 	Inc_:     {"inc", 1, false, stmt},
-	_Incn:    {"inc", 2, false, stmt},
-	_Incl:    {"incl", 2, false, stmt},
-	_New:     {"new", 1, false, stmt},
-	_Newn:    {"new", 2, true, stmt},
-	_Number:  {"number", 2, false, stmt},
-	_PCall:   {"pcall", 3, true, stmt},
-	_Raise:   {"raise", 1, false, stmt},
+	Incn_:    {"inc", 2, false, stmt},
+	Incl_:    {"incl", 2, false, stmt},
+	New_:     {"new", 1, false, stmt},
+	Newn_:    {"new", 2, true, stmt},
+	Number_:  {"number", 2, false, stmt},
+	PCall_:   {"pcall", 3, true, stmt},
+	Raise_:   {"raise", 1, false, stmt},
 
 	// Deprecated predeclared proper procedures for backward compatibility
-	_Copy: {"copy", 2, false, stmt},
-	_Pack: {"pack", 2, false, stmt},
-	_UnPk: {"unpk", 2, false, stmt},
+	Copy_: {"copy", 2, false, stmt},
+	Pack_: {"pack", 2, false, stmt},
+	UnPk_: {"unpk", 2, false, stmt},
 
-	_Abs:     {"abs", 1, false, expr},
-	_Cap:     {"cap", 1, false, expr},
-	_BitAnd:  {"bitand", 2, false, expr},
-	_BitAsr:  {"bitasr", 2, false, expr},
-	_BitNot:  {"bitnot", 1, false, expr},
-	_BitOr:   {"bitor", 2, false, expr},
-	_Bits:    {"bits", 1, false, expr},
-	_BitShl:  {"bitshl", 2, false, expr},
-	_BitShr:  {"bitshr", 2, false, expr},
-	_BitXor:  {"bitxor", 2, false, expr},
-	_Cast:    {"cast", 2, false, expr},
-	_Chr:     {"chr", 1, false, expr},
-	_Default: {"default", 1, false, expr},
-	_Floor:   {"floor", 1, false, expr},
-	_Flt:     {"flt", 1, false, expr},
-	_LdCmd:   {"ldcmd", 2, false, expr},
-	_LdMod:   {"ldmod", 1, false, expr},
-	_Len:     {"len", 1, false, expr},
-	_LenN:    {"len", 2, false, expr},
-	_Long:    {"long", 1, false, expr},
-	_Max:     {"max", 1, false, expr},
-	_MaxN:    {"max", 2, false, expr},
-	_Min:     {"min", 1, false, expr},
-	_MinN:    {"min", 2, false, expr},
-	_Odd:     {"odd", 1, false, expr},
-	_Ord:     {"ord", 1, false, expr},
-	_Short:   {"short", 1, false, expr},
-	_Size:    {"size", 1, false, expr},
-	_StrLen:  {"strlen", 1, false, expr},
-	_WChr:    {"wchr", 1, false, expr},
+	Abs_:     {"abs", 1, false, expr},
+	Cap_:     {"cap", 1, false, expr},
+	BitAnd_:  {"bitand", 2, false, expr},
+	BitAsr_:  {"bitasr", 2, false, expr},
+	BitNot_:  {"bitnot", 1, false, expr},
+	BitOr_:   {"bitor", 2, false, expr},
+	Bits_:    {"bits", 1, false, expr},
+	BitShl_:  {"bitshl", 2, false, expr},
+	BitShr_:  {"bitshr", 2, false, expr},
+	BitXor_:  {"bitxor", 2, false, expr},
+	Cast_:    {"cast", 2, false, expr},
+	Chr_:     {"chr", 1, false, expr},
+	Default_: {"default", 1, false, expr},
+	Floor_:   {"floor", 1, false, expr},
+	Flt_:     {"flt", 1, false, expr},
+	LdCmd_:   {"ldcmd", 2, false, expr},
+	LdMod_:   {"ldmod", 1, false, expr},
+	Len_:     {"len", 1, false, expr},
+	LenN_:    {"len", 2, false, expr},
+	Long_:    {"long", 1, false, expr},
+	Max_:     {"max", 1, false, expr},
+	MaxN_:    {"max", 2, false, expr},
+	Min_:     {"min", 1, false, expr},
+	MinN_:    {"min", 2, false, expr},
+	Odd_:     {"odd", 1, false, expr},
+	Ord_:     {"ord", 1, false, expr},
+	Short_:   {"short", 1, false, expr},
+	Size_:    {"size", 1, false, expr},
+	StrLen_:  {"strlen", 1, false, expr},
+	WChr_:    {"wchr", 1, false, expr},
 
 	// Deprecated predeclared functions for backward compatibility
-	_ASh:    {"ash", 2, false, expr},
-	_ASr:    {"asr", 2, false, expr},
-	_Entier: {"entier", 1, false, expr},
-	_Lsl:    {"lsl", 2, false, expr},
-	_Ror:    {"ror", 2, false, expr},
+	ASh_:    {"ash", 2, false, expr},
+	ASr_:    {"asr", 2, false, expr},
+	Entier_: {"entier", 1, false, expr},
+	Lsl_:    {"lsl", 2, false, expr},
+	Ror_:    {"ror", 2, false, expr},
 }
 
 func defPredeclaredProcedures() {

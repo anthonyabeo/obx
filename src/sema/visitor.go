@@ -88,8 +88,18 @@ func (v *Visitor) VisitModule(m *ast.Module) {
 }
 
 func (v *Visitor) VisitDefinition(def *ast.Definition) {
-	//TODO implement me
-	panic("implement me")
+	if def.BName.Name != def.EName.Name {
+		msg := fmt.Sprintf("module start name '%s' does not match end name '%s'", def.BName, def.EName)
+		v.error(def.Pos(), msg)
+	}
+
+	for _, imp := range def.ImportList {
+		imp.Accept(v)
+	}
+
+	for _, decl := range def.DeclSeq {
+		decl.Accept(v)
+	}
 }
 
 func (v *Visitor) VisitIdentifier(id *ast.Ident) {
@@ -451,6 +461,18 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 		param.Accept(v)
 	}
 
+	if call.Callee.Type() == scope.Typ[types.Invalid] {
+		obj := v.env.Lookup(call.Callee.String())
+		if obj == nil {
+			v.error(call.Pos(), fmt.Sprintf("unknown procedure '%v'", call.Callee.String()))
+		}
+
+		b := obj.(*scope.Builtin)
+		v.checkFuncBuiltin(b, call)
+
+		return
+	}
+
 	sig, ok := call.Callee.Type().(*ast.Signature)
 	if !ok {
 		v.error(call.Pos(), fmt.Sprintf("cannot call a non-procedure %v", call.Callee.String()))
@@ -678,7 +700,7 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 		}
 
 		b := obj.(*scope.Builtin)
-		v.checkBuiltin(b, call)
+		v.checkProcBuiltin(b, call)
 	}
 }
 
@@ -701,8 +723,41 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 	// scope while we are processing the procedure.
 	v.env = scope.NewScope(v.env, decl.Head.Name.Name)
 
-	decl.Head.Accept(v)
-	decl.Body.Accept(v)
+	//decl.Head.Accept(v)
+	if decl.Head.Rcv != nil {
+		decl.Head.Rcv.Type.Accept(v)
+		decl.Head.Rcv.Var.EType = decl.Head.Rcv.Type.EType
+	}
+
+	for _, sec := range decl.Head.FP.Params {
+		sec.Type.Accept(v)
+
+		for _, name := range sec.Names {
+			obj := v.env.Lookup(name.Name)
+			if obj != nil {
+				v.error(obj.Pos(), fmt.Sprintf("parameter name %s already declared at %v", obj.String(), obj.Pos()))
+				continue
+			}
+
+			if sec.Mod == token.IN {
+				v.env.Insert(scope.NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
+			} else {
+				v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
+			}
+
+			v.offset += sec.Type.Type().Width()
+		}
+	}
+	decl.Head.FP.RetType.Accept(v)
+
+	//decl.Body.Accept(v)
+	for _, dec := range decl.Body.DeclSeq {
+		dec.Accept(v)
+	}
+
+	for _, stmt := range decl.Body.StmtSeq {
+		stmt.Accept(v)
+	}
 
 	// TODO check that all the paths in the body have a return statement that matches the procedure's return type
 
@@ -817,7 +872,7 @@ func (v *Visitor) VisitPointerType(p *ast.PointerType) {
 		}
 	}
 
-	p.EType = &types.PtrType{p.Base.Type()}
+	p.EType = &types.PtrType{UTy: p.Base.Type()}
 }
 
 func (v *Visitor) VisitRecordType(r *ast.RecordType) {
@@ -892,12 +947,12 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 }
 
 func (v *Visitor) VisitReceiver(rcv *ast.Receiver) {
-	// TODO not implemented
-	panic("not implemented")
+	rcv.Type.Accept(v)
+	rcv.Var.EType = rcv.Type.EType
 }
 
 func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
-	//head.Rcv.Accept(v)
+	head.Rcv.Accept(v)
 	head.FP.Accept(v)
 }
 
