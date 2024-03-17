@@ -32,11 +32,7 @@ type Visitor interface {
 	VisitVarDecl(*VarDecl)
 	VisitConstDecl(*ConstDecl)
 	VisitTypeDecl(*TypeDecl)
-	VisitReceiver(*Receiver)
 	VisitProcHead(*ProcHead)
-	VisitProcBody(*ProcBody)
-	VisitFPSection(*FPSection)
-	VisitFormalParams(*FormalParams)
 
 	VisitBasicType(*BasicType)
 	VisitArrayType(*ArrayType)

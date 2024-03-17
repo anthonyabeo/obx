@@ -723,34 +723,8 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 	// scope while we are processing the procedure.
 	v.env = scope.NewScope(v.env, decl.Head.Name.Name)
 
-	//decl.Head.Accept(v)
-	if decl.Head.Rcv != nil {
-		decl.Head.Rcv.Type.Accept(v)
-		decl.Head.Rcv.Var.EType = decl.Head.Rcv.Type.EType
-	}
+	decl.Head.Accept(v)
 
-	for _, sec := range decl.Head.FP.Params {
-		sec.Type.Accept(v)
-
-		for _, name := range sec.Names {
-			obj := v.env.Lookup(name.Name)
-			if obj != nil {
-				v.error(obj.Pos(), fmt.Sprintf("parameter name %s already declared at %v", obj.String(), obj.Pos()))
-				continue
-			}
-
-			if sec.Mod == token.IN {
-				v.env.Insert(scope.NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
-			} else {
-				v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
-			}
-
-			v.offset += sec.Type.Type().Width()
-		}
-	}
-	decl.Head.FP.RetType.Accept(v)
-
-	//decl.Body.Accept(v)
 	for _, dec := range decl.Body.DeclSeq {
 		dec.Accept(v)
 	}
@@ -856,7 +830,26 @@ func (v *Visitor) VisitArrayType(a *ast.ArrayType) {
 }
 
 func (v *Visitor) VisitProcType(p *ast.ProcType) {
-	p.FP.Accept(v)
+	for _, sec := range p.FP.Params {
+		sec.Type.Accept(v)
+
+		for _, name := range sec.Names {
+			obj := v.env.Lookup(name.Name)
+			if obj != nil {
+				v.error(obj.Pos(), fmt.Sprintf("parameter name %s already declared at %v", obj.String(), obj.Pos()))
+				continue
+			}
+
+			if sec.Mod == token.IN {
+				v.env.Insert(scope.NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
+			} else {
+				v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
+			}
+
+			v.offset += sec.Type.Type().Width()
+		}
+	}
+	p.FP.RetType.Accept(v)
 
 	pTy := &ProcedureType{Proc: p.Proc, fp: p.FP}
 	pTy.DeSugarParams()
@@ -946,52 +939,32 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 	e.EType = ty
 }
 
-func (v *Visitor) VisitReceiver(rcv *ast.Receiver) {
-	rcv.Type.Accept(v)
-	rcv.Var.EType = rcv.Type.EType
-}
-
 func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
-	head.Rcv.Accept(v)
-	head.FP.Accept(v)
-}
-
-func (v *Visitor) VisitProcBody(body *ast.ProcBody) {
-	for _, dec := range body.DeclSeq {
-		dec.Accept(v)
+	if head.Rcv != nil {
+		head.Rcv.Type.Accept(v)
+		head.Rcv.Var.EType = head.Rcv.Type.EType
 	}
 
-	for _, stmt := range body.StmtSeq {
-		stmt.Accept(v)
-	}
-}
+	for _, sec := range head.FP.Params {
+		sec.Type.Accept(v)
 
-func (v *Visitor) VisitFPSection(sec *ast.FPSection) {
-	sec.Type.Accept(v)
+		for _, name := range sec.Names {
+			obj := v.env.Lookup(name.Name)
+			if obj != nil {
+				v.error(obj.Pos(), fmt.Sprintf("parameter name %s already declared at %v", obj.String(), obj.Pos()))
+				continue
+			}
 
-	for _, name := range sec.Names {
-		obj := v.env.Lookup(name.Name)
-		if obj != nil {
-			v.error(obj.Pos(), fmt.Sprintf("parameter name %s already declared at %v", obj.String(), obj.Pos()))
-			continue
+			if sec.Mod == token.IN {
+				v.env.Insert(scope.NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
+			} else {
+				v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
+			}
+
+			v.offset += sec.Type.Type().Width()
 		}
-
-		if sec.Mod == token.IN {
-			v.env.Insert(scope.NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
-		} else {
-			v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
-		}
-
-		v.offset += sec.Type.Type().Width()
 	}
-}
-
-func (v *Visitor) VisitFormalParams(params *ast.FormalParams) {
-	for _, sec := range params.Params {
-		sec.Accept(v)
-	}
-
-	params.RetType.Accept(v)
+	head.FP.RetType.Accept(v)
 }
 
 func (v *Visitor) VisitImport(imp *ast.Import) {

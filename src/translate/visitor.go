@@ -490,27 +490,7 @@ func (v *Visitor) VisitEnumType(ty *ast.EnumType) {
 	panic("implement me")
 }
 
-func (v *Visitor) VisitReceiver(rcv *ast.Receiver) {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (v *Visitor) VisitProcBody(body *ast.ProcBody) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (v *Visitor) VisitFPSection(section *ast.FPSection) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (v *Visitor) VisitFormalParams(params *ast.FormalParams) {
 	//TODO implement me
 	panic("implement me")
 }

@@ -131,10 +131,7 @@ func (p *ProcHead) End() *token.Position { panic("not implemented") }
 func (p *ProcHead) Accept(vst Visitor)   { vst.VisitProcHead(p) }
 func (p *ProcHead) decl()                {}
 
-func (p *ProcBody) String() string       { panic("not implemented") }
-func (p *ProcBody) Pos() *token.Position { panic("not implemented") }
-func (p *ProcBody) End() *token.Position { panic("not implemented") }
-func (p *ProcBody) Accept(vst Visitor)   { vst.VisitProcBody(p) }
+func (p *ProcBody) String() string { panic("not implemented") }
 
 func (sec *FPSection) String() string {
 	buf := new(bytes.Buffer)
@@ -150,9 +147,6 @@ func (sec *FPSection) String() string {
 
 	return buf.String()
 }
-func (sec *FPSection) Pos() *token.Position { return sec.Names[0].NamePos }
-func (sec *FPSection) End() *token.Position { panic("not implemented") }
-func (sec *FPSection) Accept(vst Visitor)   { vst.VisitFPSection(sec) }
 
 func (p *FormalParams) String() string {
 	buf := new(bytes.Buffer)
@@ -169,9 +163,6 @@ func (p *FormalParams) String() string {
 
 	return buf.String()
 }
-func (p *FormalParams) Pos() *token.Position { panic("not implemented") }
-func (p *FormalParams) End() *token.Position { panic("not implemented") }
-func (p *FormalParams) Accept(vst Visitor)   { vst.VisitFormalParams(p) }
 
 func (r *Receiver) String() string {
 	buf := new(bytes.Buffer)
@@ -185,9 +176,6 @@ func (r *Receiver) String() string {
 
 	return buf.String()
 }
-func (r *Receiver) Pos() *token.Position { return r.Var.NamePos }
-func (r *Receiver) End() *token.Position { panic("not implemented") }
-func (r *Receiver) Accept(vst Visitor)   { vst.VisitReceiver(r) }
 
 func (b *BadDecl) Pos() *token.Position { return b.From }
 func (b *BadDecl) End() *token.Position { return b.To }
