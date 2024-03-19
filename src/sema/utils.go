@@ -126,6 +126,19 @@ func (v *Visitor) assignCompat(Te, Tv types.Type) bool {
 		}
 	}
 
+	_, TeRecOk := Te.(*Record)
+	_, TvRecOk := Tv.(*Record)
+	if TeRecOk && TvRecOk {
+		//TODO #6
+		return true
+	}
+
+	_, TePtrOk := Te.(*types.PtrType)
+	_, TvPtrOk := Tv.(*types.PtrType)
+	if TePtrOk && TvPtrOk {
+		//TODO #7
+		return true
+	}
 	//TODO 6-12 Remain
 
 	return false
@@ -287,6 +300,24 @@ func (v *Visitor) checkFuncBuiltin(b *scope.Builtin, call *ast.FuncCall) {
 	case scope.LdCmd_:
 	case scope.LdMod_:
 	case scope.Len_:
+		arr, arrOk := call.ActualParams[0].Type().(*Array)
+		if !arrOk {
+			ptr, ptrOk := call.ActualParams[0].Type().(*types.PtrType)
+			if ptrOk {
+				ptrArr, ptrArrOk := ptr.UTy.(*Array)
+				if ptrArrOk {
+					arr = ptrArr
+				}
+			}
+		}
+
+		if arr == nil && call.ActualParams[0].Type() != scope.Typ[types.String] {
+			msg := fmt.Sprintf("len function expected array or string as first parameter, got '%s'",
+				call.ActualParams[0].Type())
+			v.error(call.ActualParams[0].Pos(), msg)
+		}
+
+		call.EType = scope.Typ[types.Int32]
 	case scope.LenN_:
 	case scope.Long_:
 	case scope.Max_:
@@ -350,9 +381,40 @@ func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcCall) {
 	case scope.Excl_:
 	case scope.Halt_:
 	case scope.Inc_:
+		b, bOk := call.ActualParams[0].Type().(*types.Basic)
+		if bOk && b.Info() == types.IsInteger {
+			return
+		}
+
+		_, enumOk := call.ActualParams[0].Type().(*types.Enum)
+		if enumOk {
+			return
+		}
+
+		msg := fmt.Sprintf("argument to inc '%s' must be integer or enum type; got '%s'",
+			call.ActualParams[0], call.ActualParams[0].Type())
+		v.error(call.ActualParams[0].Pos(), msg)
 	case scope.Incn_:
 	case scope.Incl_:
 	case scope.New_:
+		ptr, ptrOk := call.ActualParams[0].Type().(*types.PtrType)
+		if ptrOk {
+			_, recOk := ptr.UTy.(*Record)
+			if recOk {
+				return
+			}
+		}
+
+		arr, arrOk := call.ActualParams[0].Type().(*Array)
+		if arrOk {
+			if !arr.IsOpen() {
+				return
+			}
+		}
+
+		msg := fmt.Sprintf("argument to new '%s' must be fixed array or pointer to record; got '%s'",
+			call.ActualParams[0], call.ActualParams[0].Type())
+		v.error(call.ActualParams[0].Pos(), msg)
 	case scope.Newn_:
 	case scope.Number_:
 	case scope.PCall_:
@@ -361,4 +423,8 @@ func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcCall) {
 	case scope.Pack_:
 	case scope.UnPk_:
 	}
+}
+
+var predeclProc = map[string]bool{
+	"new": true,
 }

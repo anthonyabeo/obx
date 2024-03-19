@@ -20,17 +20,6 @@ type Generic struct {
 	TyConst Type
 }
 
-func (g Generic) String() string {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (g Generic) Underlying() Type {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (g Generic) Width() int {
-	//TODO implement me
-	panic("implement me")
-}
+func (g Generic) String() string   { return g.Name }
+func (g Generic) Underlying() Type { return g }
+func (g Generic) Width() int       { return 8 }

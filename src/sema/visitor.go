@@ -399,12 +399,21 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 				v.error(des.QualifiedIdent.Pos(), msg)
 			}
 
-			sym := record.fields[sel.Field.Name]
-			if sym == nil {
-				v.error(sel.Field.Pos(), fmt.Sprintf("'%s' is not a field in '%s'", sel.Field, record))
+			var sym scope.Symbol
+			sym = record.fields[sel.Field.Name]
+			if sym != nil {
+				des.EType = sym.Type()
+				return
 			}
 
-			des.EType = sym.Type()
+			if sym == nil && record.base != nil {
+				sym = record.base.fields[sel.Field.Name]
+				des.EType = sym.Type()
+				return
+			}
+
+			v.error(sel.Field.Pos(), fmt.Sprintf("'%s' is not a field in '%s'", sel.Field, record))
+
 		default:
 			msg := fmt.Sprintf("'%s' must be a (pointer to) record type", des.QualifiedIdent.Type())
 			v.error(des.QualifiedIdent.Pos(), msg)
@@ -418,13 +427,20 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 
 		des.EType = ptr.UTy
 	case *ast.IndexOp:
-		arrTy, ok := des.QualifiedIdent.Type().(*Array)
-		if !ok {
+		switch d := des.QualifiedIdent.Type().(type) {
+		case *Array:
+			des.EType = d.ElemTy
+		case *types.PtrType:
+			dArr, ok := d.UTy.(*Array)
+			if !ok {
+				msg := fmt.Sprintf("name '%s' is not defined as an array type", des.QualifiedIdent.String())
+				v.error(des.QualifiedIdent.Pos(), msg)
+			}
+			des.EType = dArr.ElemTy
+		default:
 			msg := fmt.Sprintf("name '%s' is not defined as an array type", des.QualifiedIdent.String())
 			v.error(des.QualifiedIdent.Pos(), msg)
 		}
-
-		des.EType = arrTy.ElemTy
 	case *ast.TypeGuard:
 		var a types.Type
 
@@ -520,14 +536,20 @@ func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
 }
 
 func (v *Visitor) VisitQualifiedIdent(id *ast.QualifiedIdent) {
-	id.Module.Accept(v)
-	if id.Sel != nil {
-		id.Sel.Accept(v)
-		id.EType = id.Sel.Type()
-		return
+	sym := v.env.Lookup(id.Module.String())
+	if sym == nil || sym.Kind() != scope.MOD {
+		msg := fmt.Sprintf("'%s' is not recognised as a module", id.Module.String())
+		v.error(id.Module.Pos(), msg)
 	}
 
-	id.EType = id.Module.Type()
+	mod := sym.(*scope.Module)
+	decl := mod.Scope.Lookup(id.Sel.Name)
+	if decl == nil || decl.Props()&ast.ExRdOnly != ast.Exported {
+		msg := fmt.Sprintf("'%s' is not declared/exported in module '%s'", id.Sel.Name, id.Module.String())
+		v.error(id.Sel.Pos(), msg)
+	}
+
+	id.EType = decl.Type()
 }
 
 func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
@@ -634,12 +656,9 @@ func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
 		}
 	}
 
-	for _, s := range stmt.StmtSeq {
-		s.Accept(v)
-	}
-
 	// check that the control variable is of integer or enum type
-	if stmt.CtlVar.Type() != scope.Typ[types.Int] {
+	ctrl, ctrlOk := stmt.CtlVar.Type().(*types.Basic)
+	if !ctrlOk || ctrl.Info() != types.IsInteger {
 		msg := fmt.Sprintf("for-loop control variable '%v' must be of integer or enum type. It is a '%v' type",
 			stmt.CtlVar.Name, stmt.CtlVar.Type())
 		v.error(stmt.CtlVar.NamePos, msg)
@@ -657,6 +676,10 @@ func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
 			stmt.CtlVar.Name, stmt.CtlVar.Type(), stmt.FinalVal, stmt.FinalVal.Type())
 		v.error(stmt.CtlVar.NamePos, msg)
 	}
+
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
 }
 
 func (v *Visitor) VisitExitStmt(*ast.ExitStmt) {
@@ -669,6 +692,20 @@ func (v *Visitor) VisitWithStmt(stmt *ast.WithStmt) {
 }
 
 func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
+	if predeclProc[call.Callee.String()] {
+		switch call.Callee.String() {
+		case "new":
+			if len(call.ActualParams) == 2 {
+				call.Callee.QualifiedIdent = &ast.Ident{
+					NamePos: call.Callee.QualifiedIdent.Pos(),
+					Name:    "newn",
+				}
+			}
+		case "max":
+
+		}
+	}
+
 	call.Callee.Accept(v)
 	for _, param := range call.ActualParams {
 		param.Accept(v)
@@ -705,12 +742,14 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 }
 
 func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
-	if obj := v.env.Lookup(decl.Head.Name.Name); obj != nil {
-		v.error(decl.Pos(), fmt.Sprintf("name %s already declared at %v", obj.String(), obj.Pos()))
-	} else {
-		sig := ast.NewSignature(decl.Head.Rcv, decl.Head.FP)
-		v.env.Insert(scope.NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props(), v.offset))
-		v.offset += 8
+	if decl.Head.Rcv == nil {
+		if obj := v.env.Lookup(decl.Head.Name.Name); obj != nil {
+			v.error(decl.Pos(), fmt.Sprintf("name %s already declared at %v", obj.String(), obj.Pos()))
+		} else {
+			sig := ast.NewSignature(decl.Head.Rcv, decl.Head.FP)
+			v.env.Insert(scope.NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props(), v.offset))
+			v.offset += 8
+		}
 	}
 
 	off := v.offset
@@ -777,18 +816,8 @@ func (v *Visitor) VisitTypeDecl(decl *ast.TypeDecl) {
 }
 
 func (v *Visitor) VisitNamedType(n *ast.NamedType) {
-	obj := v.env.Lookup(n.Name.String())
-	if obj == nil {
-		msg := fmt.Sprintf("name '%v' is not declared and is not a predeclared type", n.Name)
-		v.error(n.Pos(), msg)
-	}
-
-	if obj.Kind() != scope.TYPE {
-		msg := fmt.Sprintf("'%v' is not recognized as a type", n.Name)
-		v.error(n.Pos(), msg)
-	}
-
-	n.EType = obj.Type()
+	n.Name.Accept(v)
+	n.EType = n.Name.Type()
 }
 
 func (v *Visitor) VisitBasicType(b *ast.BasicType) {
@@ -870,8 +899,8 @@ func (v *Visitor) VisitPointerType(p *ast.PointerType) {
 
 func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 	var (
-		base      *Record
-		isRecType bool
+		base   *Record
+		baseOk bool
 	)
 
 	// entering a new scope. store the current offset and reset v.offset to be used in the new scope
@@ -880,9 +909,18 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 
 	if r.BaseType != nil {
 		r.BaseType.Accept(v)
-		base, isRecType = r.BaseType.Type().(*Record)
-		if !isRecType {
-			msg := fmt.Sprintf("cannot extend from a '%s' which is not a record-type", r.BaseType.Type())
+
+		switch ty := r.BaseType.Type().(type) {
+		case *Record:
+			base = ty
+		case *types.PtrType:
+			base, baseOk = ty.UTy.(*Record)
+			if !baseOk {
+				msg := fmt.Sprintf("cannot extend from a '%s' which is not a (pointer to) record-type", r.BaseType.Type())
+				v.error(r.BaseType.Pos(), msg)
+			}
+		default:
+			msg := fmt.Sprintf("cannot extend from a '%s' which is not a (pointer to) record-type", r.BaseType.Type())
 			v.error(r.BaseType.Pos(), msg)
 		}
 	}
@@ -942,6 +980,43 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
 	if head.Rcv != nil {
 		head.Rcv.Type.Accept(v)
+
+		switch ty := head.Rcv.Type.Type().(type) {
+		case *Record:
+			if ty.fields == nil {
+				ty.fields = make(map[string]scope.Symbol)
+			}
+
+			sig := ast.NewSignature(head.Rcv, head.FP)
+			ty.fields[head.Name.Name] = scope.NewProcedure(head.Name.NamePos, head.Name.Name, sig, head.Name.IProps, v.offset)
+		case *types.PtrType:
+			rec, recOk := ty.UTy.(*Record)
+			if !recOk {
+				msg := fmt.Sprintf("receiver must be a (pointer to) record type, got '%s'", ty)
+				v.error(head.Rcv.Type.Pos(), msg)
+			}
+
+			if rec.fields == nil {
+				rec.fields = make(map[string]scope.Symbol)
+			}
+
+			sig := ast.NewSignature(head.Rcv, head.FP)
+			rec.fields[head.Name.Name] = scope.NewProcedure(head.Name.NamePos, head.Name.Name, sig, head.Name.IProps, v.offset)
+		default:
+			msg := fmt.Sprintf("receiver must be a (pointer to) record type, got '%s'", ty)
+			v.error(head.Rcv.Type.Pos(), msg)
+		}
+
+		var sym scope.Symbol
+		if head.Rcv.Mod == token.IN {
+			sym = scope.NewVar(head.Rcv.Var.NamePos, head.Rcv.Var.Name, head.Rcv.Type.Type(), ast.ReadOnly, v.offset)
+		} else {
+			sym = scope.NewVar(head.Rcv.Var.NamePos, head.Rcv.Var.Name, head.Rcv.Type.Type(), head.Rcv.Var.IProps, v.offset)
+		}
+
+		v.offset += head.Rcv.Type.Type().Width()
+		v.env.Insert(sym)
+
 		head.Rcv.Var.EType = head.Rcv.Type.EType
 	}
 
@@ -956,7 +1031,7 @@ func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
 			}
 
 			if sec.Mod == token.IN {
-				v.env.Insert(scope.NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
+				v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), ast.ReadOnly, v.offset))
 			} else {
 				v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
 			}
@@ -964,7 +1039,10 @@ func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
 			v.offset += sec.Type.Type().Width()
 		}
 	}
-	head.FP.RetType.Accept(v)
+
+	if head.FP.RetType != nil {
+		head.FP.RetType.Accept(v)
+	}
 }
 
 func (v *Visitor) VisitImport(imp *ast.Import) {

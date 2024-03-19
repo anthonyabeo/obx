@@ -18,6 +18,8 @@ const (
 	Exported IdentProps = 1 << iota
 	ReadOnly
 	Predeclared
+
+	ExRdOnly = Exported | ReadOnly
 )
 
 type (

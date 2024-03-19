@@ -122,7 +122,7 @@ func (p *ProcHead) String() string {
 }
 func (p *ProcHead) Pos() *token.Position {
 	if p.Rcv != nil {
-		return p.Rcv.Pos()
+		return p.Rcv.Var.NamePos
 	}
 
 	return p.Name.NamePos

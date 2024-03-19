@@ -130,7 +130,7 @@ var PredeclaredProcedures = [...]struct {
 	Incn_:    {"inc", 2, false, stmt},
 	Incl_:    {"incl", 2, false, stmt},
 	New_:     {"new", 1, false, stmt},
-	Newn_:    {"new", 2, true, stmt},
+	Newn_:    {"newn", 2, true, stmt},
 	Number_:  {"number", 2, false, stmt},
 	PCall_:   {"pcall", 3, true, stmt},
 	Raise_:   {"raise", 1, false, stmt},
