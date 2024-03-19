@@ -692,20 +692,6 @@ func (v *Visitor) VisitWithStmt(stmt *ast.WithStmt) {
 }
 
 func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
-	if predeclProc[call.Callee.String()] {
-		switch call.Callee.String() {
-		case "new":
-			if len(call.ActualParams) == 2 {
-				call.Callee.QualifiedIdent = &ast.Ident{
-					NamePos: call.Callee.QualifiedIdent.Pos(),
-					Name:    "newn",
-				}
-			}
-		case "max":
-
-		}
-	}
-
 	call.Callee.Accept(v)
 	for _, param := range call.ActualParams {
 		param.Accept(v)

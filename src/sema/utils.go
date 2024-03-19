@@ -277,10 +277,6 @@ func (v *Visitor) resultTypeMatch(a, b types.Type) bool {
 func (v *Visitor) checkFuncBuiltin(b *scope.Builtin, call *ast.FuncCall) {
 	proc := scope.PredeclaredProcedures[b.Id]
 
-	if proc.Nargs != len(call.ActualParams) {
-		v.error(call.Pos(), fmt.Sprintf("not enough arguments to procedure call '%v'", call.String()))
-	}
-
 	switch b.Id {
 	case scope.Abs_:
 	case scope.Cap_:
@@ -300,30 +296,48 @@ func (v *Visitor) checkFuncBuiltin(b *scope.Builtin, call *ast.FuncCall) {
 	case scope.LdCmd_:
 	case scope.LdMod_:
 	case scope.Len_:
-		arr, arrOk := call.ActualParams[0].Type().(*Array)
-		if !arrOk {
-			ptr, ptrOk := call.ActualParams[0].Type().(*types.PtrType)
-			if ptrOk {
-				ptrArr, ptrArrOk := ptr.UTy.(*Array)
-				if ptrArrOk {
-					arr = ptrArr
-				}
-			}
+		if len(call.ActualParams) != 1 || len(call.ActualParams) != 2 {
+			v.error(call.Pos(), fmt.Sprintf("invalid number of arguments to procedure call '%v'", proc.Name))
 		}
 
-		if arr == nil && call.ActualParams[0].Type() != scope.Typ[types.String] {
-			msg := fmt.Sprintf("len function expected array or string as first parameter, got '%s'",
+		switch ty := call.ActualParams[0].Type().(type) {
+		case *Array:
+		case *types.PtrType:
+			if _, arrOk := ty.UTy.(*Array); !arrOk {
+				msg := fmt.Sprintf("'len' function expected (pointer to) array or string as first parameter, got '%s'",
+					call.ActualParams[0].Type())
+				v.error(call.ActualParams[0].Pos(), msg)
+			}
+		case *types.Basic:
+			if ty.Kind() != types.String {
+				msg := fmt.Sprintf("'len' function expected (pointer to) array or string as first parameter, got '%s'",
+					call.ActualParams[0].Type())
+				v.error(call.ActualParams[0].Pos(), msg)
+			}
+		default:
+			msg := fmt.Sprintf("'len' function expected (pointer to) array or string as first parameter, got '%s'",
 				call.ActualParams[0].Type())
 			v.error(call.ActualParams[0].Pos(), msg)
 		}
 
+		if len(call.ActualParams) == 2 {
+			if b, bOk := call.ActualParams[1].Type().(*types.Basic); bOk {
+				if b.Kind() != types.Int32 {
+					msg := fmt.Sprintf("second argument '%s' in 'new' function must be an integer-type",
+						call.ActualParams[1])
+					v.error(call.ActualParams[1].Pos(), msg)
+				}
+			} else {
+				msg := fmt.Sprintf("second argument '%s' in 'new' function must be an integer-type",
+					call.ActualParams[1])
+				v.error(call.ActualParams[1].Pos(), msg)
+			}
+		}
+
 		call.EType = scope.Typ[types.Int32]
-	case scope.LenN_:
 	case scope.Long_:
 	case scope.Max_:
-	case scope.MaxN_:
 	case scope.Min_:
-	case scope.MinN_:
 	case scope.Odd_:
 	case scope.Ord_:
 		obj := v.env.Lookup(call.ActualParams[0].String())
@@ -361,61 +375,105 @@ func (v *Visitor) checkFuncBuiltin(b *scope.Builtin, call *ast.FuncCall) {
 func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcCall) {
 	proc := scope.PredeclaredProcedures[b.Id]
 
-	if proc.Nargs != len(call.ActualParams) {
-		v.error(call.Pos(), fmt.Sprintf("not enough arguments to procedure call '%v'", call.String()))
-	}
-
 	switch b.Id {
 	case scope.Assert_:
-		for i := 0; i < proc.Nargs; i++ {
-			if !v.assignCompat(scope.Typ[types.Bool], call.ActualParams[i].Type()) {
-				msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
-					call.ActualParams[i], scope.Typ[types.Bool])
-				v.error(call.ActualParams[i].Pos(), msg)
+		if len(call.ActualParams) != 1 && len(call.ActualParams) != 2 {
+			v.error(call.Pos(), fmt.Sprintf("invalid number of arguments to procedure call '%v'", proc.Name))
+		}
+
+		if !v.assignCompat(scope.Typ[types.Bool], call.ActualParams[0].Type()) {
+			msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
+				call.ActualParams[0], scope.Typ[types.Bool])
+			v.error(call.ActualParams[0].Pos(), msg)
+		}
+
+		if len(call.ActualParams) == 2 {
+			lit, ok := call.ActualParams[0].(*ast.BasicLit)
+			if !ok {
+				msg := fmt.Sprintf("second argument to '%s' must be an integer constant; got '%s'",
+					proc.Name, call.ActualParams[0])
+				v.error(call.ActualParams[0].Pos(), msg)
+			}
+
+			b, bOk := lit.Type().(*types.Basic)
+			if !bOk || b.Info() != types.IsInteger {
+				msg := fmt.Sprintf("second argument to '%s' must be an integer constant; got '%s'",
+					proc.Name, call.ActualParams[0])
+				v.error(call.ActualParams[0].Pos(), msg)
 			}
 		}
-	case scope.Assertn_:
 	case scope.Bytes_:
 	case scope.Dec_:
-	case scope.Decn_:
 	case scope.Excl_:
 	case scope.Halt_:
 	case scope.Inc_:
+		if len(call.ActualParams) != 1 && len(call.ActualParams) != 2 {
+			v.error(call.Pos(), fmt.Sprintf("invalid number of arguments to procedure call '%v'", proc.Name))
+		}
+
 		b, bOk := call.ActualParams[0].Type().(*types.Basic)
-		if bOk && b.Info() == types.IsInteger {
-			return
-		}
-
 		_, enumOk := call.ActualParams[0].Type().(*types.Enum)
-		if enumOk {
-			return
+
+		if !bOk || b.Info() != types.IsInteger || !enumOk {
+			msg := fmt.Sprintf("argument to inc '%s' must be integer or enum type; got '%s'",
+				call.ActualParams[0], call.ActualParams[0].Type())
+			v.error(call.ActualParams[0].Pos(), msg)
 		}
 
-		msg := fmt.Sprintf("argument to inc '%s' must be integer or enum type; got '%s'",
-			call.ActualParams[0], call.ActualParams[0].Type())
-		v.error(call.ActualParams[0].Pos(), msg)
-	case scope.Incn_:
+		if len(call.ActualParams) == 2 {
+			b, bOk := call.ActualParams[1].Type().(*types.Basic)
+			if !bOk || b.Info() != types.IsInteger {
+				msg := fmt.Sprintf("argument '%s' to '%s' must be an integer-type",
+					call.ActualParams[1], proc.Name)
+				v.error(call.ActualParams[1].Pos(), msg)
+			}
+		}
 	case scope.Incl_:
 	case scope.New_:
-		ptr, ptrOk := call.ActualParams[0].Type().(*types.PtrType)
-		if ptrOk {
-			_, recOk := ptr.UTy.(*Record)
-			if recOk {
-				return
+		if len(call.ActualParams) == 1 {
+			switch ty := call.ActualParams[0].Type().(type) {
+			case *types.PtrType:
+				if _, recOk := ty.UTy.(*Record); !recOk {
+					v.error(call.ActualParams[0].Pos(), "expected pointer to record type")
+				}
+			case *Array:
+				if ty.IsOpen() {
+					v.error(call.ActualParams[0].Pos(), "expected fixed array")
+				}
+			default:
+				msg := fmt.Sprintf("first argument to new '%s' must be fixed array or pointer to record; got '%s'",
+					call.ActualParams[0], call.ActualParams[0].Type())
+				v.error(call.ActualParams[0].Pos(), msg)
 			}
+
+			return
 		}
 
-		arr, arrOk := call.ActualParams[0].Type().(*Array)
-		if arrOk {
-			if !arr.IsOpen() {
-				return
+		if len(call.ActualParams) > 1 {
+			switch ty := call.ActualParams[0].Type().(type) {
+			case *types.PtrType:
+				arr, arrOk := ty.UTy.(*Array)
+				if !arrOk || !arr.IsOpen() {
+					v.error(call.ActualParams[0].Pos(), "expected an open array")
+				}
+			default:
+				msg := fmt.Sprintf("first targument to new '%s' must be a pointer to an open array; got '%s'",
+					call.ActualParams[0], call.ActualParams[0].Type())
+				v.error(call.ActualParams[0].Pos(), msg)
+			}
+
+			for i := 1; i < len(call.ActualParams); i++ {
+				if b, bOk := call.ActualParams[i].Type().(*types.Basic); bOk {
+					if b.Info() != types.IsInteger {
+						msg := fmt.Sprintf("argument number '%d' in new must be an integer-type", i+1)
+						v.error(call.ActualParams[i].Pos(), msg)
+					}
+				} else {
+					msg := fmt.Sprintf("argument number '%d' in new must be an integer-type", i+1)
+					v.error(call.ActualParams[i].Pos(), msg)
+				}
 			}
 		}
-
-		msg := fmt.Sprintf("argument to new '%s' must be fixed array or pointer to record; got '%s'",
-			call.ActualParams[0], call.ActualParams[0].Type())
-		v.error(call.ActualParams[0].Pos(), msg)
-	case scope.Newn_:
 	case scope.Number_:
 	case scope.PCall_:
 	case scope.Raise_:
@@ -423,8 +481,4 @@ func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcCall) {
 	case scope.Pack_:
 	case scope.UnPk_:
 	}
-}
-
-var predeclProc = map[string]bool{
-	"new": true,
 }

@@ -5,13 +5,6 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
-type exprKind int
-
-const (
-	stmt exprKind = iota
-	expr
-)
-
 var offset = 0
 var Global *Scope
 
@@ -54,17 +47,13 @@ type BuiltinId int
 
 const (
 	Assert_ BuiltinId = iota
-	Assertn_
 	Bytes_
 	Dec_
-	Decn_
 	Excl_
 	Halt_
 	Inc_
-	Incn_
 	Incl_
 	New_
-	Newn_
 	Number_
 	PCall_
 	Raise_
@@ -91,12 +80,9 @@ const (
 	LdCmd_
 	LdMod_
 	Len_
-	LenN_
 	Long_
 	Max_
-	MaxN_
 	Min_
-	MinN_
 	Odd_
 	Ord_
 	Short_
@@ -113,70 +99,60 @@ const (
 )
 
 var PredeclaredProcedures = [...]struct {
-	Name     string
-	Nargs    int
-	Variadic bool
-	Kind     exprKind
+	Name string
 }{
 	// Predeclared proper procedures
-	Assert_:  {"assert", 1, false, stmt},
-	Assertn_: {"assert", 2, false, stmt},
-	Bytes_:   {"bytes", 2, false, stmt},
-	Dec_:     {"dec", 1, false, stmt},
-	Decn_:    {"dec", 2, false, stmt},
-	Excl_:    {"excl", 2, false, stmt},
-	Halt_:    {"halt", 1, false, stmt},
-	Inc_:     {"inc", 1, false, stmt},
-	Incn_:    {"inc", 2, false, stmt},
-	Incl_:    {"incl", 2, false, stmt},
-	New_:     {"new", 1, false, stmt},
-	Newn_:    {"newn", 2, true, stmt},
-	Number_:  {"number", 2, false, stmt},
-	PCall_:   {"pcall", 3, true, stmt},
-	Raise_:   {"raise", 1, false, stmt},
+	Assert_: {"assert"},
+	Bytes_:  {"bytes"},
+	Dec_:    {"dec"},
+	Excl_:   {"excl"},
+	Halt_:   {"halt"},
+	Inc_:    {"inc"},
+	Incl_:   {"incl"},
+	New_:    {"new"},
+	Number_: {"number"},
+	PCall_:  {"pcall"},
+	Raise_:  {"raise"},
 
 	// Deprecated predeclared proper procedures for backward compatibility
-	Copy_: {"copy", 2, false, stmt},
-	Pack_: {"pack", 2, false, stmt},
-	UnPk_: {"unpk", 2, false, stmt},
+	Copy_: {"copy"},
+	Pack_: {"pack"},
+	UnPk_: {"unpk"},
 
-	Abs_:     {"abs", 1, false, expr},
-	Cap_:     {"cap", 1, false, expr},
-	BitAnd_:  {"bitand", 2, false, expr},
-	BitAsr_:  {"bitasr", 2, false, expr},
-	BitNot_:  {"bitnot", 1, false, expr},
-	BitOr_:   {"bitor", 2, false, expr},
-	Bits_:    {"bits", 1, false, expr},
-	BitShl_:  {"bitshl", 2, false, expr},
-	BitShr_:  {"bitshr", 2, false, expr},
-	BitXor_:  {"bitxor", 2, false, expr},
-	Cast_:    {"cast", 2, false, expr},
-	Chr_:     {"chr", 1, false, expr},
-	Default_: {"default", 1, false, expr},
-	Floor_:   {"floor", 1, false, expr},
-	Flt_:     {"flt", 1, false, expr},
-	LdCmd_:   {"ldcmd", 2, false, expr},
-	LdMod_:   {"ldmod", 1, false, expr},
-	Len_:     {"len", 1, false, expr},
-	LenN_:    {"len", 2, false, expr},
-	Long_:    {"long", 1, false, expr},
-	Max_:     {"max", 1, false, expr},
-	MaxN_:    {"max", 2, false, expr},
-	Min_:     {"min", 1, false, expr},
-	MinN_:    {"min", 2, false, expr},
-	Odd_:     {"odd", 1, false, expr},
-	Ord_:     {"ord", 1, false, expr},
-	Short_:   {"short", 1, false, expr},
-	Size_:    {"size", 1, false, expr},
-	StrLen_:  {"strlen", 1, false, expr},
-	WChr_:    {"wchr", 1, false, expr},
+	Abs_:     {"abs"},
+	Cap_:     {"cap"},
+	BitAnd_:  {"bitand"},
+	BitAsr_:  {"bitasr"},
+	BitNot_:  {"bitnot"},
+	BitOr_:   {"bitor"},
+	Bits_:    {"bits"},
+	BitShl_:  {"bitshl"},
+	BitShr_:  {"bitshr"},
+	BitXor_:  {"bitxor"},
+	Cast_:    {"cast"},
+	Chr_:     {"chr"},
+	Default_: {"default"},
+	Floor_:   {"floor"},
+	Flt_:     {"flt"},
+	LdCmd_:   {"ldcmd"},
+	LdMod_:   {"ldmod"},
+	Len_:     {"len"},
+	Long_:    {"long"},
+	Max_:     {"max"},
+	Min_:     {"min"},
+	Odd_:     {"odd"},
+	Ord_:     {"ord"},
+	Short_:   {"short"},
+	Size_:    {"size"},
+	StrLen_:  {"strlen"},
+	WChr_:    {"wchr"},
 
 	// Deprecated predeclared functions for backward compatibility
-	ASh_:    {"ash", 2, false, expr},
-	ASr_:    {"asr", 2, false, expr},
-	Entier_: {"entier", 1, false, expr},
-	Lsl_:    {"lsl", 2, false, expr},
-	Ror_:    {"ror", 2, false, expr},
+	ASh_:    {"ash"},
+	ASr_:    {"asr"},
+	Entier_: {"entier"},
+	Lsl_:    {"lsl"},
+	Ror_:    {"ror"},
 }
 
 func defPredeclaredProcedures() {
