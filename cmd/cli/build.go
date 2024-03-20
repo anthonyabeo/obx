@@ -65,7 +65,7 @@ func runBuild(ctx *cli.Context) (err error) {
 	}
 
 	obx := ast.NewOberon()
-	scopes := map[string]*scope.Scope{}
+	scopes := map[string]scope.Scope{}
 	for _, unit := range obx.Units() {
 		scopes[unit.Name()] = nil
 	}

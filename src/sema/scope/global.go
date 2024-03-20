@@ -6,7 +6,7 @@ import (
 )
 
 var offset = 0
-var Global *Scope
+var Global Scope
 
 var Typ = []*types.Basic{
 	types.Invalid: types.NewBasicType(types.Invalid, 0, "invalid type"),

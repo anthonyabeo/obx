@@ -10,16 +10,16 @@ import (
 
 type Record struct {
 	base   *Record
-	fields map[string]scope.Symbol
+	fields *scope.RecordSymTable
 }
 
-func NewRecordType(fields map[string]scope.Symbol, base *Record) *Record {
+func NewRecordType(fields *scope.RecordSymTable, base *Record) *Record {
 	return &Record{base, fields}
 }
 
 func (r Record) String() string {
 	var fields []string
-	for name, sym := range r.fields {
+	for name, sym := range r.fields.Elems() {
 		fields = append(fields, fmt.Sprintf("%s: %s", name, sym.Type()))
 	}
 
@@ -32,7 +32,7 @@ func (r Record) Underlying() types.Type {
 
 func (r Record) Width() int {
 	var w int
-	for _, field := range r.fields {
+	for _, field := range r.fields.Elems() {
 		w += field.Type().Width()
 	}
 

@@ -16,11 +16,11 @@ type Visitor struct {
 	errors lexer.ErrorList
 
 	ast    *ast.Oberon
-	env    *scope.Scope
-	scopes map[string]*scope.Scope
+	env    scope.Scope
+	scopes map[string]scope.Scope
 }
 
-func NewVisitor(scopes map[string]*scope.Scope) *Visitor {
+func NewVisitor(scopes map[string]scope.Scope) *Visitor {
 	return &Visitor{scopes: scopes}
 }
 
@@ -386,7 +386,7 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 	case *ast.DotOp:
 		switch ty := des.QualifiedIdent.Type().(type) {
 		case *Record:
-			sym := ty.fields[sel.Field.Name]
+			sym := ty.fields.Lookup(sel.Field.Name)
 			if sym == nil {
 				v.error(sel.Field.Pos(), fmt.Sprintf("'%s' is not a field in '%s'", sel.Field, ty))
 			}
@@ -400,14 +400,8 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 			}
 
 			var sym scope.Symbol
-			sym = record.fields[sel.Field.Name]
+			sym = record.fields.Lookup(sel.Field.Name)
 			if sym != nil {
-				des.EType = sym.Type()
-				return
-			}
-
-			if sym == nil && record.base != nil {
-				sym = record.base.fields[sel.Field.Name]
 				des.EType = sym.Type()
 				return
 			}
@@ -885,8 +879,9 @@ func (v *Visitor) VisitPointerType(p *ast.PointerType) {
 
 func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 	var (
-		base   *Record
-		baseOk bool
+		base     *Record
+		baseOk   bool
+		baseFlds *scope.RecordSymTable
 	)
 
 	// entering a new scope. store the current offset and reset v.offset to be used in the new scope
@@ -909,9 +904,11 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 			msg := fmt.Sprintf("cannot extend from a '%s' which is not a (pointer to) record-type", r.BaseType.Type())
 			v.error(r.BaseType.Pos(), msg)
 		}
+
+		baseFlds = base.fields
 	}
 
-	ty := NewRecordType(map[string]scope.Symbol{}, base)
+	ty := NewRecordType(scope.NewRecordScope(baseFlds, v.env), base)
 
 	for _, field := range r.Fields {
 		field.Type.Accept(v)
@@ -921,12 +918,10 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 		}
 
 		for _, id := range field.IdList {
-			if obj := ty.fields[id.Name]; obj != nil {
+			obj := ty.fields.Insert(scope.NewVar(id.NamePos, id.Name, field.Type.Type(), id.IProps, v.offset))
+			if obj != nil {
 				msg := fmt.Sprintf("field name '%s' already declared at '%v'", id.Name, obj.Pos())
 				v.error(id.NamePos, msg)
-			} else {
-				ty.fields[id.Name] = scope.NewVar(id.NamePos, id.Name, field.Type.Type(), id.IProps, v.offset)
-				v.offset += field.Type.Type().Width()
 			}
 		}
 	}
@@ -969,12 +964,8 @@ func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
 
 		switch ty := head.Rcv.Type.Type().(type) {
 		case *Record:
-			if ty.fields == nil {
-				ty.fields = make(map[string]scope.Symbol)
-			}
-
 			sig := ast.NewSignature(head.Rcv, head.FP)
-			ty.fields[head.Name.Name] = scope.NewProcedure(head.Name.NamePos, head.Name.Name, sig, head.Name.IProps, v.offset)
+			ty.fields.Insert(scope.NewProcedure(head.Name.NamePos, head.Name.Name, sig, head.Name.IProps, v.offset))
 		case *types.PtrType:
 			rec, recOk := ty.UTy.(*Record)
 			if !recOk {
@@ -982,12 +973,8 @@ func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
 				v.error(head.Rcv.Type.Pos(), msg)
 			}
 
-			if rec.fields == nil {
-				rec.fields = make(map[string]scope.Symbol)
-			}
-
 			sig := ast.NewSignature(head.Rcv, head.FP)
-			rec.fields[head.Name.Name] = scope.NewProcedure(head.Name.NamePos, head.Name.Name, sig, head.Name.IProps, v.offset)
+			rec.fields.Insert(scope.NewProcedure(head.Name.NamePos, head.Name.Name, sig, head.Name.IProps, v.offset))
 		default:
 			msg := fmt.Sprintf("receiver must be a (pointer to) record type, got '%s'", ty)
 			v.error(head.Rcv.Type.Pos(), msg)
@@ -1032,6 +1019,10 @@ func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
 }
 
 func (v *Visitor) VisitImport(imp *ast.Import) {
+	if len(imp.Meta) > 0 {
+
+	}
+
 	scp := v.scopes[imp.Name.Name]
 	v.env.Insert(scope.NewModule(nil, imp.Alias.Name, scp))
 	v.env.Insert(scope.NewModule(nil, imp.Name.Name, scp))

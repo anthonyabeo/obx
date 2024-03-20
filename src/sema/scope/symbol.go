@@ -23,7 +23,7 @@ const (
 // Symbol
 // ---------------------------------------
 type Symbol interface {
-	Parent() *Scope       // scope in which this object is declared; nil for methods and struct fields
+	Parent() Scope        // scope in which this object is declared; nil for methods and struct fields
 	Pos() *token.Position // position of object identifier in declaration
 	Name() string         // package local object name
 	Kind() SymKind
@@ -31,7 +31,7 @@ type Symbol interface {
 	Offset() int           // offset of this symbol from the base address of its parent data area
 	Props() ast.IdentProps // reports whether the name ends with a + or -
 	String() string        // String returns a human-readable string of the object.
-	setParent(*Scope)      // setParent sets the parent scope of the object.
+	setParent(Scope)       // setParent sets the parent scope of the object.
 
 	Alloca() *ir.AllocaInst
 	SetAlloca(*ir.AllocaInst)
@@ -39,7 +39,7 @@ type Symbol interface {
 
 // A symbol implements the common parts of an Object.
 type symbol struct {
-	parent *Scope
+	parent Scope
 	pos    *token.Position
 	name   string
 	kind   SymKind
@@ -49,12 +49,12 @@ type symbol struct {
 	alloc  *ir.AllocaInst
 }
 
-func (sym *symbol) Parent() *Scope                { return sym.parent }
+func (sym *symbol) Parent() Scope                 { return sym.parent }
 func (sym *symbol) Name() string                  { return sym.name }
 func (sym *symbol) Kind() SymKind                 { return sym.kind }
 func (sym *symbol) Type() types.Type              { return sym.typ }
 func (sym *symbol) Pos() *token.Position          { return sym.pos }
-func (sym *symbol) setParent(parent *Scope)       { sym.parent = parent }
+func (sym *symbol) setParent(parent Scope)        { sym.parent = parent }
 func (sym *symbol) Props() ast.IdentProps         { return sym.props }
 func (sym *symbol) SetAlloca(inst *ir.AllocaInst) { sym.alloc = inst }
 func (sym *symbol) Alloca() *ir.AllocaInst        { return sym.alloc }
@@ -146,10 +146,10 @@ func (c *Const) Value() ast.Expression { return c.value }
 // -----------------------
 type Module struct {
 	symbol
-	Scope *Scope
+	Scope Scope
 }
 
-func NewModule(pos *token.Position, name string, scp *Scope) *Module {
+func NewModule(pos *token.Position, name string, scp Scope) *Module {
 	return &Module{
 		symbol{nil, pos, name, MOD, Typ[types.Invalid], 0, 0, nil}, scp}
 }
