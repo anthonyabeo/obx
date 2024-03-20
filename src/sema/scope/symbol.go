@@ -27,7 +27,8 @@ type Symbol interface {
 	Pos() *token.Position // position of object identifier in declaration
 	Name() string         // package local object name
 	Kind() SymKind
-	Type() types.Type      // object type
+	Type() types.Type // object type
+	SetType(ty types.Type)
 	Offset() int           // offset of this symbol from the base address of its parent data area
 	Props() ast.IdentProps // reports whether the name ends with a + or -
 	String() string        // String returns a human-readable string of the object.
@@ -53,6 +54,7 @@ func (sym *symbol) Parent() Scope                 { return sym.parent }
 func (sym *symbol) Name() string                  { return sym.name }
 func (sym *symbol) Kind() SymKind                 { return sym.kind }
 func (sym *symbol) Type() types.Type              { return sym.typ }
+func (sym *symbol) SetType(ty types.Type)         { sym.typ = ty }
 func (sym *symbol) Pos() *token.Position          { return sym.pos }
 func (sym *symbol) setParent(parent Scope)        { sym.parent = parent }
 func (sym *symbol) Props() ast.IdentProps         { return sym.props }
@@ -151,7 +153,8 @@ type Module struct {
 
 func NewModule(pos *token.Position, name string, scp Scope) *Module {
 	return &Module{
-		symbol{nil, pos, name, MOD, Typ[types.Invalid], 0, 0, nil}, scp}
+		Scope:  scp,
+		symbol: symbol{nil, pos, name, MOD, Typ[types.Invalid], 0, 0, nil}}
 }
 
 func (m *Module) String() string { panic("not implemented") }

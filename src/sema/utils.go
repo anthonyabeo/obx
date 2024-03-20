@@ -296,7 +296,7 @@ func (v *Visitor) checkFuncBuiltin(b *scope.Builtin, call *ast.FuncCall) {
 	case scope.LdCmd_:
 	case scope.LdMod_:
 	case scope.Len_:
-		if len(call.ActualParams) != 1 || len(call.ActualParams) != 2 {
+		if len(call.ActualParams) != 1 && len(call.ActualParams) != 2 {
 			v.error(call.Pos(), fmt.Sprintf("invalid number of arguments to procedure call '%v'", proc.Name))
 		}
 
@@ -414,7 +414,7 @@ func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcCall) {
 		b, bOk := call.ActualParams[0].Type().(*types.Basic)
 		_, enumOk := call.ActualParams[0].Type().(*types.Enum)
 
-		if !bOk || b.Info() != types.IsInteger || !enumOk {
+		if (!bOk || b.Info() != types.IsInteger) && !enumOk {
 			msg := fmt.Sprintf("argument to inc '%s' must be integer or enum type; got '%s'",
 				call.ActualParams[0], call.ActualParams[0].Type())
 			v.error(call.ActualParams[0].Pos(), msg)
