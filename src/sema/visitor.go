@@ -723,11 +723,11 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 
 func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 	if decl.Head.Rcv == nil {
-		if obj := v.env.Lookup(decl.Head.Name.Name); obj != nil {
+		sig := ast.NewSignature(decl.Head.Rcv, decl.Head.FP)
+		obj := v.env.Insert(scope.NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props(), v.offset))
+		if obj != nil {
 			v.error(decl.Pos(), fmt.Sprintf("name %s already declared at %v", obj.String(), obj.Pos()))
 		} else {
-			sig := ast.NewSignature(decl.Head.Rcv, decl.Head.FP)
-			v.env.Insert(scope.NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props(), v.offset))
 			v.offset += 8
 		}
 	}
@@ -763,10 +763,10 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 	decl.Type.Accept(v)
 
 	for _, ident := range decl.IdentList {
-		if obj := v.env.Lookup(ident.Name); obj != nil {
+		obj := v.env.Insert(scope.NewVar(ident.Pos(), ident.Name, decl.Type.Type(), ident.Props(), v.offset))
+		if obj != nil {
 			v.error(decl.Pos(), fmt.Sprintf("variable name '%s' already declared at '%v'", obj.String(), obj.Pos()))
 		} else {
-			v.env.Insert(scope.NewVar(ident.Pos(), ident.Name, decl.Type.Type(), ident.Props(), v.offset))
 			v.offset += decl.Type.Type().Width()
 		}
 	}
@@ -775,22 +775,23 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 func (v *Visitor) VisitConstDecl(decl *ast.ConstDecl) {
 	decl.Value.Accept(v)
 
-	if obj := v.env.Lookup(decl.Name.Name); obj != nil {
+	obj := v.env.Insert(scope.NewConst(decl.Name.NamePos, decl.Name.Name, decl.Value.Type(), decl.Name.Props(), decl.Value, v.offset))
+	if obj != nil {
 		msg := fmt.Sprintf("name '%s' already declared at '%v'", obj.String(), obj.Pos())
 		v.error(decl.Pos(), msg)
 	} else {
-		v.env.Insert(scope.NewConst(decl.Name.NamePos, decl.Name.Name, decl.Value.Type(), decl.Name.Props(), decl.Value, v.offset))
 		v.offset += decl.Value.Type().Width()
 	}
 }
 
 func (v *Visitor) VisitTypeDecl(decl *ast.TypeDecl) {
 	decl.DenotedType.Accept(v)
-	if obj := v.env.Lookup(decl.Name.Name); obj != nil {
+
+	obj := v.env.Insert(scope.NewTypeName(decl.Type, decl.Name.Name, decl.DenotedType.Type(), decl.Name.Props(), v.offset))
+	if obj != nil {
 		msg := fmt.Sprintf("name '%s' already declared at '%v'", obj.String(), obj.Pos())
 		v.error(decl.Pos(), msg)
 	} else {
-		v.env.Insert(scope.NewTypeName(decl.Type, decl.Name.Name, decl.DenotedType.Type(), decl.Name.Props(), v.offset))
 		v.offset += decl.DenotedType.Type().Width()
 	}
 }
@@ -940,17 +941,17 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 	ty := types.NewEnumType(variants)
 
 	for i, c := range e.Variants {
-		if obj := v.env.Lookup(c.Name); obj != nil {
+		value := &ast.BasicLit{
+			Kind:  token.INT,
+			Val:   strconv.Itoa(i),
+			EType: types.NewBasicType(types.Int, types.IsInteger, "integer"),
+		}
+
+		obj := v.env.Insert(scope.NewConst(c.NamePos, c.Name, ty, c.Props(), value, v.offset))
+		if obj != nil {
 			msg := fmt.Sprintf("name '%s' already declared at '%v'", c.Name, obj.Pos())
 			v.error(c.NamePos, msg)
 		} else {
-			value := &ast.BasicLit{
-				Kind:  token.INT,
-				Val:   strconv.Itoa(i),
-				EType: types.NewBasicType(types.Int, types.IsInteger, "integer"),
-			}
-
-			v.env.Insert(scope.NewConst(c.NamePos, c.Name, ty, c.Props(), value, v.offset))
 			v.offset += value.EType.Width()
 		}
 	}

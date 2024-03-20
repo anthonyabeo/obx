@@ -15,11 +15,11 @@ type Visitor struct {
 	builder *ir.Builder
 	module  *ir.Module
 
-	env    *scope.Scope
-	scopes map[string]*scope.Scope
+	env    scope.Scope
+	scopes map[string]scope.Scope
 }
 
-func NewVisitor(scopes map[string]*scope.Scope) *Visitor {
+func NewVisitor(scopes map[string]scope.Scope) *Visitor {
 	return &Visitor{
 		scopes:  scopes,
 		builder: ir.NewBuilder(),

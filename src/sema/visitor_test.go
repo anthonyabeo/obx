@@ -41,7 +41,7 @@ end Main
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
-	scopes := map[string]*scope.Scope{}
+	scopes := map[string]scope.Scope{}
 	for _, unit := range obx.Units() {
 		scopes[unit.Name()] = nil
 	}
@@ -74,7 +74,7 @@ end Main
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
-	scopes := map[string]*scope.Scope{}
+	scopes := map[string]scope.Scope{}
 	for _, unit := range obx.Units() {
 		scopes[unit.Name()] = nil
 	}
@@ -109,7 +109,7 @@ end Main
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
-	scopes := map[string]*scope.Scope{}
+	scopes := map[string]scope.Scope{}
 	for _, unit := range obx.Units() {
 		scopes[unit.Name()] = nil
 	}
@@ -178,7 +178,7 @@ end Main
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
-	scopes := map[string]*scope.Scope{}
+	scopes := map[string]scope.Scope{}
 	for _, unit := range obx.Units() {
 		scopes[unit.Name()] = nil
 	}
