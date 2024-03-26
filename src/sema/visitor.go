@@ -54,18 +54,18 @@ func (v *Visitor) VisitModule(m *ast.Module) {
 	v.scopes[m.BName.Name] = scp
 	v.env = scp
 
-	for _, metaP := range m.MetaParams {
-		if metaP.TyConst != nil {
-			metaP.TyConst.Accept(v)
+	for _, metaParam := range m.MetaParams {
+		if metaParam.TyConst != nil {
+			metaParam.TyConst.Accept(v)
 		}
 
-		switch metaP.Mode {
+		switch metaParam.Mode {
 		case token.CONST:
 		default:
-			for _, ty := range metaP.Ids {
-				var tyConst types.Type = nil
-				if metaP.TyConst != nil {
-					tyConst = metaP.TyConst.Type()
+			for _, ty := range metaParam.Ids {
+				var tyConst types.Type
+				if metaParam.TyConst != nil {
+					tyConst = metaParam.TyConst.Type()
 				}
 
 				genTy := types.NewGenericType(ty.Name, tyConst)
