@@ -3,6 +3,7 @@ package parser
 import (
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/diagnostics"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -33,13 +34,13 @@ end Main`
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := NewParser(lex)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
 	unit := p.Parse()
 
-	if len(p.errors) > 0 {
+	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.errors {
-			t.Log(err)
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
 		}
 	}
 
@@ -63,12 +64,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := NewParser(lex)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
 	unit := p.Parse()
-	if len(p.errors) > 0 {
+
+	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.errors {
-			t.Log(err)
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
 		}
 	}
 
@@ -142,12 +144,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := NewParser(lex)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
 	unit := p.Parse()
-	if len(p.errors) > 0 {
+
+	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.errors {
-			t.Log(err)
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
 		}
 	}
 
@@ -188,12 +191,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := NewParser(lex)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
 	unit := p.Parse()
-	if len(p.errors) > 0 {
+
+	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.errors {
-			t.Log(err)
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
 		}
 	}
 
@@ -237,12 +241,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := NewParser(lex)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
 	unit := p.Parse()
-	if len(p.errors) > 0 {
+
+	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.errors {
-			t.Log(err)
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
 		}
 	}
 
@@ -301,12 +306,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := NewParser(lex)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
 	unit := p.Parse()
-	if len(p.errors) > 0 {
+
+	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.errors {
-			t.Log(err)
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
 		}
 	}
 
@@ -367,12 +373,13 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := NewParser(lex)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
 	unit := p.Parse()
-	if len(p.errors) > 0 {
+
+	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.errors {
-			t.Log(err)
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
 		}
 	}
 
@@ -432,12 +439,13 @@ end Drawing
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := NewParser(lex)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
 	unit := p.Parse()
-	if len(p.errors) > 0 {
+
+	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.errors {
-			t.Log(err)
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
 		}
 	}
 
@@ -524,12 +532,13 @@ end Drawing
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := NewParser(lex)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
 	unit := p.Parse()
-	if len(p.errors) > 0 {
+
+	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.errors {
-			t.Log(err)
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
 		}
 	}
 

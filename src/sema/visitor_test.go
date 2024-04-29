@@ -3,6 +3,7 @@ package sema
 import (
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/diagnostics"
 	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
@@ -37,7 +38,8 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := parser.NewParser(lex)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
@@ -46,12 +48,12 @@ end Main
 		scopes[unit.Name()] = nil
 	}
 
-	sema := NewVisitor(scopes)
+	sema := NewVisitor(scopes, errReporter)
 	unit.Accept(sema)
 
-	if len(sema.errors) > 0 {
+	if sema.err.ErrCount() > 0 {
 		t.Error("found semantic errors")
-		for _, err := range sema.errors {
+		for _, err := range sema.err.Errors() {
 			t.Log(err.Error())
 		}
 	}
@@ -70,7 +72,8 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := parser.NewParser(lex)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
@@ -79,11 +82,12 @@ end Main
 		scopes[unit.Name()] = nil
 	}
 
-	sema := NewVisitor(scopes)
+	sema := NewVisitor(scopes, errReporter)
 	unit.Accept(sema)
-	if len(sema.errors) > 0 {
+
+	if sema.err.ErrCount() > 0 {
 		t.Error("found semantic errors")
-		for _, err := range sema.errors {
+		for _, err := range sema.err.Errors() {
 			t.Log(err.Error())
 		}
 	}
@@ -105,7 +109,8 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := parser.NewParser(lex)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
@@ -114,11 +119,12 @@ end Main
 		scopes[unit.Name()] = nil
 	}
 
-	sema := NewVisitor(scopes)
+	sema := NewVisitor(scopes, errReporter)
 	unit.Accept(sema)
-	if len(sema.errors) > 0 {
+
+	if sema.err.ErrCount() > 0 {
 		t.Error("found semantic errors")
-		for _, err := range sema.errors {
+		for _, err := range sema.err.Errors() {
 			t.Log(err.Error())
 		}
 	}
@@ -174,7 +180,8 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := parser.NewParser(lex)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
@@ -183,11 +190,12 @@ end Main
 		scopes[unit.Name()] = nil
 	}
 
-	sema := NewVisitor(scopes)
+	sema := NewVisitor(scopes, errReporter)
 	unit.Accept(sema)
-	if len(sema.errors) > 0 {
+
+	if sema.err.ErrCount() > 0 {
 		t.Error("found semantic errors")
-		for _, err := range sema.errors {
+		for _, err := range sema.err.Errors() {
 			t.Log(err.Error())
 		}
 	}

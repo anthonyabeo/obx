@@ -1,11 +1,12 @@
 package translate
 
 import (
-	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/diagnostics"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/sema/scope"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -27,7 +28,8 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := parser.NewParser(lex)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
@@ -37,7 +39,7 @@ end Main
 		scopes[unit.Name()] = nil
 	}
 
-	s := sema.NewVisitor(scopes)
+	s := sema.NewVisitor(scopes, errReporter)
 	unit.Accept(s)
 
 	cgen := NewVisitor(scopes)
@@ -66,7 +68,8 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := parser.NewParser(lex)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
@@ -76,7 +79,7 @@ end Main
 		scopes[unit.Name()] = nil
 	}
 
-	s := sema.NewVisitor(scopes)
+	s := sema.NewVisitor(scopes, errReporter)
 	unit.Accept(s)
 
 	cgen := NewVisitor(scopes)
@@ -106,7 +109,8 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := parser.NewParser(lex)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
@@ -116,7 +120,7 @@ end Main
 		scopes[unit.Name()] = nil
 	}
 
-	s := sema.NewVisitor(scopes)
+	s := sema.NewVisitor(scopes, errReporter)
 	unit.Accept(s)
 
 	cgen := NewVisitor(scopes)
@@ -148,7 +152,8 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := parser.NewParser(lex)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
@@ -158,7 +163,7 @@ end Main
 		scopes[unit.Name()] = nil
 	}
 
-	s := sema.NewVisitor(scopes)
+	s := sema.NewVisitor(scopes, errReporter)
 	unit.Accept(s)
 
 	cgen := NewVisitor(scopes)
@@ -187,7 +192,8 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := parser.NewParser(lex)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
@@ -197,7 +203,7 @@ end Main
 		scopes[unit.Name()] = nil
 	}
 
-	s := sema.NewVisitor(scopes)
+	s := sema.NewVisitor(scopes, errReporter)
 	unit.Accept(s)
 
 	cgen := NewVisitor(scopes)
@@ -226,7 +232,8 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := parser.NewParser(lex)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
@@ -236,7 +243,7 @@ end Main
 		scopes[unit.Name()] = nil
 	}
 
-	s := sema.NewVisitor(scopes)
+	s := sema.NewVisitor(scopes, errReporter)
 	unit.Accept(s)
 
 	cgen := NewVisitor(scopes)
@@ -267,7 +274,8 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := parser.NewParser(lex)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
@@ -277,7 +285,7 @@ end Main
 		scopes[unit.Name()] = nil
 	}
 
-	s := sema.NewVisitor(scopes)
+	s := sema.NewVisitor(scopes, errReporter)
 	unit.Accept(s)
 
 	cgen := NewVisitor(scopes)
@@ -308,7 +316,8 @@ end Main
 	file := token.NewFile("test.obx", len([]byte(input)))
 	lex := lexer.NewLexer(file, []byte(input))
 
-	p := parser.NewParser(lex)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx := ast.NewOberon()
@@ -318,7 +327,7 @@ end Main
 		scopes[unit.Name()] = nil
 	}
 
-	s := sema.NewVisitor(scopes)
+	s := sema.NewVisitor(scopes, errReporter)
 	unit.Accept(s)
 
 	cgen := NewVisitor(scopes)

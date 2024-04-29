@@ -1,14 +1,15 @@
 package parser
 
 import (
+	"github.com/anthonyabeo/obx/src/diagnostics"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Parser struct {
-	errors lexer.ErrorList
-	lex    *lexer.Lexer
+	err diagnostics.ErrReporter
+	lex *lexer.Lexer
 
 	// Next token
 	tok token.Token
@@ -19,24 +20,11 @@ type Parser struct {
 	syncCnt int             // number of parser.advance calls without progress
 }
 
-func NewParser(lex *lexer.Lexer) *Parser {
-	p := &Parser{lex: lex}
+func NewParser(lex *lexer.Lexer, rpt diagnostics.ErrReporter) *Parser {
+	p := &Parser{lex: lex, err: rpt}
 	p.next()
 
 	return p
-}
-
-func (p *Parser) error(pos *token.Position, msg string) {
-	n := len(p.errors)
-	if n > 10 {
-		for _, err := range p.errors {
-			println(err.Error())
-		}
-
-		panic("too many errors")
-	}
-
-	p.errors.Append(pos, msg)
 }
 
 func (p *Parser) errorExpected(pos *token.Position, msg string) {
@@ -50,7 +38,7 @@ func (p *Parser) errorExpected(pos *token.Position, msg string) {
 		}
 	}
 
-	p.error(pos, msg)
+	p.err.AddError(pos, msg)
 }
 
 func (p *Parser) match(tok token.Token) {
@@ -63,10 +51,6 @@ func (p *Parser) match(tok token.Token) {
 
 func (p *Parser) next() {
 	p.tok, p.lit, p.pos = p.lex.Lex()
-}
-
-func (p *Parser) Errors() lexer.ErrorList {
-	return p.errors
 }
 
 func (p *Parser) Parse() (unit ast.Unit) {
@@ -533,7 +517,7 @@ func (p *Parser) fieldList() *ast.FieldList {
 }
 
 // advance consumes tokens until the current token p.tok
-// is in the 'to' set, or token.EOF. For error recovery.
+// is in the 'to' set, or token.EOF. For diagnostics recovery.
 func (p *Parser) advance(to map[token.Token]bool) {
 	for ; p.tok != token.EOF; p.next() {
 		if to[p.tok] {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 
+	"github.com/anthonyabeo/obx/src/diagnostics"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -60,7 +61,7 @@ func runBuild(ctx *cli.Context) (err error) {
 	if len(path) == 0 {
 		path, err = os.Getwd()
 		if err != nil {
-			panic("error finding the current working directory")
+			panic("diagnostics finding the current working directory")
 		}
 	}
 
@@ -70,11 +71,12 @@ func runBuild(ctx *cli.Context) (err error) {
 		scopes[unit.Name()] = nil
 	}
 
-	_ = ParseModule(obx, module, path)
+	errReporter := diagnostics.NewStdErrReporter(10)
+	_ = ParseModule(obx, module, path, errReporter)
 
 	tsOrd := topologicalSort(obx)
 
-	vst := sema.NewVisitor(scopes)
+	vst := sema.NewVisitor(scopes, errReporter)
 	for _, name := range tsOrd {
 		unit := obx.Units()[name]
 		unit.Accept(vst)
@@ -86,7 +88,7 @@ func runBuild(ctx *cli.Context) (err error) {
 func GetModule(module, path string) (mod *Module, err error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return nil, fmt.Errorf("error reading directory '%s': %s", path, err)
+		return nil, fmt.Errorf("diagnostics reading directory '%s': %s", path, err)
 	}
 
 	for _, e := range entries {
@@ -94,7 +96,7 @@ func GetModule(module, path string) (mod *Module, err error) {
 			filePath := filepath.Join(path, fmt.Sprintf("%s.obx", module))
 			input, err := os.ReadFile(filePath)
 			if err != nil {
-				log.Fatalf("error opening file '%s': %s", e.Name(), err)
+				log.Fatalf("diagnostics opening file '%s': %s", e.Name(), err)
 			}
 
 			mod = &Module{file: filePath, input: input}
@@ -105,7 +107,7 @@ func GetModule(module, path string) (mod *Module, err error) {
 	return
 }
 
-func ParseModule(obx *ast.Oberon, module, path string) ast.Unit {
+func ParseModule(obx *ast.Oberon, module, path string, errReporter diagnostics.ErrReporter) ast.Unit {
 	mod, err := GetModule(module, path)
 	if err != nil {
 		log.Println(err)
@@ -115,7 +117,7 @@ func ParseModule(obx *ast.Oberon, module, path string) ast.Unit {
 	file := token.NewFile(mod.file, len(mod.input))
 	lex := lexer.NewLexer(file, mod.input)
 
-	p := parser.NewParser(lex)
+	p := parser.NewParser(lex, errReporter)
 	unit := p.Parse()
 
 	obx.AddUnit(unit.Name(), unit)
@@ -135,7 +137,7 @@ func ParseModule(obx *ast.Oberon, module, path string) ast.Unit {
 		}
 
 		if _, processed := obx.Units()[imp.Name.Name]; !processed {
-			u := ParseModule(obx, imp.Name.Name, importPath)
+			u := ParseModule(obx, imp.Name.Name, importPath, errReporter)
 			obx.AddEdge(u.Name(), unit.Name())
 		} else {
 			obx.TopOrd = append(obx.TopOrd, fmt.Sprintf("%s/%s.obx", importPath, imp.Name.Name))
