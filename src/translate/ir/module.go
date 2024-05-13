@@ -31,7 +31,7 @@ func (m *Module) GetOrInsertFunction(name string, ty *FunctionType, link Linkage
 		name,
 		link,
 		ty,
-		BasicBlockList{},
+		NewCFG(),
 		m,
 		uses,
 	}

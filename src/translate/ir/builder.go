@@ -3,7 +3,8 @@ package ir
 import "fmt"
 
 type Builder struct {
-	BB *BasicBlock // the current BasicBlock where instructions are inserted
+	BB  *BasicBlock       // the current BasicBlock where instructions are inserted
+	CFG *ControlFlowGraph // A graph modelling control-flow for the current function
 }
 
 func NewBuilder() *Builder {
@@ -254,9 +255,9 @@ func (b *Builder) CreateCondBr(cond Value, ifTrue, ifFalse *BasicBlock) *BranchI
 	br := CreateCondBrInst(cond, ifTrue, ifFalse)
 	b.BB.instr.PushBack(br)
 
-	b.BB.AddSuccessors(ifTrue, ifFalse)
-	ifTrue.AddPredecessors(b.BB)
-	ifFalse.AddPredecessors(b.BB)
+	b.CFG.AddSucc(b.BB.name, ifTrue, ifFalse)
+	b.CFG.AddPred(ifTrue.name, b.BB)
+	b.CFG.AddPred(ifFalse.name, b.BB)
 
 	return br
 }
@@ -265,8 +266,8 @@ func (b *Builder) CreateBr(dst *BasicBlock) *BranchInst {
 	br := CreateBr(dst)
 	b.BB.instr.PushBack(br)
 
-	b.BB.AddSuccessors(dst)
-	dst.AddPredecessors(b.BB)
+	b.CFG.AddSucc(b.BB.name, dst)
+	b.CFG.AddPred(dst.name, b.BB)
 
 	return br
 }

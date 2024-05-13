@@ -13,24 +13,13 @@ const (
 	External
 )
 
-// BasicBlockList defines the type of the list of basic blocks
-// of a Function. It is a map of strings to BasicBlocks
-type BasicBlockList map[string]*BasicBlock
-
-// AddNewBasicBlock adds a new BasicBlock and updates the successors
-// and predecessors accordingly to maintain the CFG.
-func (bb BasicBlockList) AddNewBasicBlock(BBName string, BB *BasicBlock) { bb[BBName] = BB }
-
-// Block returns a block using its name or nil if not such block exists
-func (bb BasicBlockList) Block(name string) *BasicBlock { return bb[name] }
-
 // Function ...
 // -----------------------------
 type Function struct {
 	name   string
 	link   LinkageKind
 	ty     *FunctionType
-	blocks BasicBlockList
+	cfg    *ControlFlowGraph
 	module *Module
 
 	useList *list.List
@@ -54,7 +43,7 @@ func (f Function) String() string {
 	buf := &bytes.Buffer{}
 
 	buf.WriteString(fmt.Sprintf("define %s @%s() {\n", f.ty.retTy, f.name))
-	for _, bb := range f.Blocks() {
+	for _, bb := range f.cfg.Nodes {
 		buf.WriteString(bb.String())
 	}
 	buf.WriteString("}")
@@ -63,11 +52,8 @@ func (f Function) String() string {
 }
 func (f Function) HasInternalLinkage() bool { return f.link == Internal }
 func (f Function) HasExternalLinkage() bool { return f.link == External }
-func (f Function) EntryBlock() *BasicBlock  { return f.blocks.Block("entry") }
-func (f Function) Blocks() []*BasicBlock {
-	return TrvQueue(f.blocks.Block("entry"))
-}
-func (f Function) SymbolTable() {}
+func (f Function) SymbolTable()             {}
+func (f Function) CFG() *ControlFlowGraph   { return f.cfg }
 
 // Argument ...
 // ---------------------
@@ -99,8 +85,6 @@ type BasicBlock struct {
 	ty     *LabelType
 	parent *Function
 	instr  list.List
-	succ   BasicBlockList
-	pred   BasicBlockList
 }
 
 func CreateBasicBlock(name string, parent *Function) *BasicBlock {
@@ -113,11 +97,9 @@ func CreateBasicBlock(name string, parent *Function) *BasicBlock {
 		ty:     &LabelType{name: name},
 		parent: parent,
 		instr:  list.List{},
-		succ:   BasicBlockList{},
-		pred:   BasicBlockList{},
 	}
 
-	parent.blocks.AddNewBasicBlock(name, blk)
+	parent.cfg.Nodes[name] = blk
 
 	return blk
 }
@@ -143,20 +125,4 @@ func (b BasicBlock) String() string {
 	return s
 }
 func (b BasicBlock) Parent() *Function { return b.parent }
-func (b BasicBlock) AddSuccessors(successors ...*BasicBlock) {
-	for _, BB := range successors {
-		if _, ok := b.succ[BB.name]; ok {
-			return
-		}
-		b.succ[BB.name] = BB
-	}
-}
-func (b BasicBlock) AddPredecessors(predecessors ...*BasicBlock) {
-	for _, BB := range predecessors {
-		if _, ok := b.pred[BB.name]; ok {
-			return
-		}
-		b.pred[BB.name] = BB
-	}
-}
-func (b BasicBlock) Instr() list.List { return b.instr }
+func (b BasicBlock) Instr() list.List  { return b.instr }
