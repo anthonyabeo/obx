@@ -1,30 +1,80 @@
 package ir
 
-func TrvQueue(entry *BasicBlock) (list []*BasicBlock) {
-	visited := make(map[string]bool, 0)
+import (
+	"bytes"
+	"fmt"
+	"strings"
+)
 
-	q := make([]*BasicBlock, 0)
-	q = append(q, entry)
-	list = append(list, entry)
+type ControlFlowGraph struct {
+	Entry, Exit *BasicBlock
+	Nodes       map[string]*BasicBlock
+	Succ        map[string][]*BasicBlock
+	Pred        map[string][]*BasicBlock
+}
 
-	visited[entry.name] = true
+func NewCFG() *ControlFlowGraph {
+	return &ControlFlowGraph{
+		Nodes: map[string]*BasicBlock{},
+		Succ:  map[string][]*BasicBlock{},
+		Pred:  map[string][]*BasicBlock{},
+	}
+}
 
-	// while the queue is not empty
-	for len(q) != 0 {
-		// dequeue the first item
-		blk := q[0]
-		q = q[1:]
+func (cfg *ControlFlowGraph) AddNewNode() {
 
-		// for each of its successors, if it's not visited, do something with it.
-		// then append it to the queue
-		for _, succ := range blk.succ {
-			if !visited[succ.name] {
-				q = append(q, succ)
-				list = append(list, succ)
-				visited[succ.name] = true
-			}
-		}
+}
+
+func (cfg *ControlFlowGraph) AddSucc(BlkName string, Successors ...*BasicBlock) {
+	for _, succ := range Successors {
+		cfg.Succ[BlkName] = append(cfg.Succ[BlkName], succ)
+	}
+}
+
+func (cfg *ControlFlowGraph) AddPred(BlkName string, Predecessors ...*BasicBlock) {
+	for _, pred := range Predecessors {
+		cfg.Pred[BlkName] = append(cfg.Pred[BlkName], pred)
+	}
+}
+
+func (cfg *ControlFlowGraph) IsJoinNode(blk string) bool {
+	return len(cfg.Succ[blk]) > 1
+}
+
+func (cfg *ControlFlowGraph) IsBrNode(blk string) bool {
+	return len(cfg.Pred[blk]) > 1
+}
+
+func (cfg *ControlFlowGraph) String() string {
+	var nodes, succ, pred []string
+	for _, blk := range cfg.Nodes {
+		nodes = append(nodes, blk.name)
 	}
 
-	return
+	for name, bb := range cfg.Succ {
+		var blks []string
+		for _, blk := range bb {
+			blks = append(blks, blk.name)
+		}
+
+		succ = append(succ, fmt.Sprintf("\n\t\t\t%s: %s", name, blks))
+	}
+
+	for name, bb := range cfg.Pred {
+		var blks []string
+		for _, blk := range bb {
+			blks = append(blks, blk.name)
+		}
+
+		pred = append(pred, fmt.Sprintf("\n\t\t\t%s: %s", name, blks))
+	}
+
+	buf := &bytes.Buffer{}
+	buf.WriteString("flowgraph = {\n\t")
+	buf.WriteString(fmt.Sprintf("\tNodes = {%s},\n\t", strings.Join(nodes, ", ")))
+	buf.WriteString(fmt.Sprintf("\tSucc = {%s\n\t\t},\n\t", strings.Join(succ, ", ")))
+	buf.WriteString(fmt.Sprintf("\tPred = {%s\n\t\t},\n\t", strings.Join(pred, ", ")))
+	buf.WriteString("}")
+
+	return buf.String()
 }
