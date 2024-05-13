@@ -44,6 +44,8 @@ func (v *Visitor) VisitModule(m *ast.Module) {
 		v.module,
 	)
 
+	v.builder.CFG = Main.CFG()
+
 	EntryBB := ir.CreateBasicBlock("entry", Main)
 	v.builder.SetInsertPoint(EntryBB)
 
