@@ -6,6 +6,27 @@ import (
 	"strings"
 )
 
+type SetOfBBs map[string]bool
+
+func (s SetOfBBs) Add(blk string) {
+	if _, exists := s[blk]; !exists {
+		s[blk] = true
+	}
+}
+func (s SetOfBBs) Contains(blk *BasicBlock) bool { return s[blk.Name()] }
+func (s SetOfBBs) Empty() bool                   { return len(s) == 0 }
+func (s SetOfBBs) String() string {
+	buf := &bytes.Buffer{}
+	buf.WriteString("{")
+	for bb := range s {
+		buf.WriteString(bb)
+		buf.WriteString(", ")
+	}
+
+	buf.WriteString("}")
+	return buf.String()
+}
+
 type ControlFlowGraph struct {
 	Entry, Exit *BasicBlock
 	Nodes       map[string]*BasicBlock
