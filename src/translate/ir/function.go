@@ -87,6 +87,10 @@ type BasicBlock struct {
 	instr  list.List
 }
 
+func NewBasicBlock(name string) *BasicBlock {
+	return &BasicBlock{name: name}
+}
+
 func CreateBasicBlock(name string, parent *Function) *BasicBlock {
 	if name == "" {
 		name = NextTemp()
