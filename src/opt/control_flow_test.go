@@ -30,27 +30,27 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 			"entry": entry,
 			"exit":  exit,
 		},
-		Succ: map[string][]*ir.BasicBlock{
-			"entry": {b1},
-			"B1":    {b2, b3},
-			"B2":    {b4},
-			"B3":    {b4},
-			"B4":    {b5, b6},
-			"B5":    {b7},
-			"B6":    {exit, b1},
-			"B7":    {exit, b5},
+		Succ: map[string][]string{
+			"entry": {"B1"},
+			"B1":    {"B2", "B3"},
+			"B2":    {"B4"},
+			"B3":    {"B4"},
+			"B4":    {"B5", "B6"},
+			"B5":    {"B7"},
+			"B6":    {"exit", "B1"},
+			"B7":    {"exit", "B5"},
 			"exit":  {},
 		},
-		Pred: map[string][]*ir.BasicBlock{
+		Pred: map[string][]string{
 			"entry": {},
-			"B1":    {b6, entry},
-			"B2":    {b1},
-			"B3":    {b1},
-			"B4":    {b2, b3},
-			"B5":    {b7, b4},
-			"B6":    {b4},
-			"B7":    {b5},
-			"exit":  {b6, b7},
+			"B1":    {"B6", "entry"},
+			"B2":    {"B1"},
+			"B3":    {"B1"},
+			"B4":    {"B2", "B3"},
+			"B5":    {"B7", "B4"},
+			"B6":    {"B4"},
+			"B7":    {"B5"},
+			"exit":  {"B6", "B7"},
 		},
 	}
 
@@ -77,7 +77,7 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 		}
 
 		for i := 0; i < len(tt.blks); i++ {
-			if !ebb[tt.blks[i]] {
+			if _, exist := ebb[tt.blks[i]]; !exist {
 				t.Errorf("expected %s to be in the EBB of root %s. It doesn't", tt.blks[i], tt.root)
 			}
 		}
