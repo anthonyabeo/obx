@@ -6,15 +6,17 @@ import (
 	"strings"
 )
 
-type SetOfBBs map[string]bool
+type SetOfBBs map[string]*BasicBlock
 
-func (s SetOfBBs) Add(blk string) {
-	if _, exists := s[blk]; !exists {
-		s[blk] = true
+func (s SetOfBBs) Add(blocks ...*BasicBlock) {
+	for _, blk := range blocks {
+		if _, exists := s[blk.name]; !exists {
+			s[blk.name] = blk
+		}
 	}
 }
-func (s SetOfBBs) Contains(blk *BasicBlock) bool { return s[blk.Name()] }
-func (s SetOfBBs) Empty() bool                   { return len(s) == 0 }
+func (s SetOfBBs) Contains(blk string) bool { return s[blk] != nil }
+func (s SetOfBBs) Empty() bool              { return len(s) == 0 }
 func (s SetOfBBs) String() string {
 	buf := &bytes.Buffer{}
 	buf.WriteString("{")
@@ -26,19 +28,57 @@ func (s SetOfBBs) String() string {
 	buf.WriteString("}")
 	return buf.String()
 }
+func (s SetOfBBs) Union(other SetOfBBs) SetOfBBs {
+	set := SetOfBBs{}
+	for _, BB := range s {
+		set.Add(BB)
+	}
+	for _, BB := range other {
+		set.Add(BB)
+	}
+
+	return set
+}
+func (s SetOfBBs) Intersection(other SetOfBBs) SetOfBBs {
+	intersect := SetOfBBs{}
+	if len(s) > len(other) {
+		s, other = other, s
+	}
+	for name, BB := range s {
+		if _, exists := other[name]; !exists {
+			intersect[name] = BB
+		}
+	}
+
+	return intersect
+}
+func (s SetOfBBs) Equal(other SetOfBBs) bool {
+	if len(s) != len(other) {
+		return false
+	}
+
+	for name := range s {
+		if _, exist := other[name]; !exist {
+			return false
+		}
+	}
+
+	return true
+}
+func (s SetOfBBs) Len() int { return len(s) }
 
 type ControlFlowGraph struct {
 	Entry, Exit *BasicBlock
-	Nodes       map[string]*BasicBlock
-	Succ        map[string][]*BasicBlock
-	Pred        map[string][]*BasicBlock
+	Nodes       SetOfBBs
+	Succ        map[string][]string
+	Pred        map[string][]string
 }
 
 func NewCFG() *ControlFlowGraph {
 	return &ControlFlowGraph{
 		Nodes: map[string]*BasicBlock{},
-		Succ:  map[string][]*BasicBlock{},
-		Pred:  map[string][]*BasicBlock{},
+		Succ:  map[string][]string{},
+		Pred:  map[string][]string{},
 	}
 }
 
@@ -48,13 +88,13 @@ func (cfg *ControlFlowGraph) AddNewNode() {
 
 func (cfg *ControlFlowGraph) AddSucc(BlkName string, Successors ...*BasicBlock) {
 	for _, succ := range Successors {
-		cfg.Succ[BlkName] = append(cfg.Succ[BlkName], succ)
+		cfg.Succ[BlkName] = append(cfg.Succ[BlkName], succ.name)
 	}
 }
 
 func (cfg *ControlFlowGraph) AddPred(BlkName string, Predecessors ...*BasicBlock) {
 	for _, pred := range Predecessors {
-		cfg.Pred[BlkName] = append(cfg.Pred[BlkName], pred)
+		cfg.Pred[BlkName] = append(cfg.Pred[BlkName], pred.name)
 	}
 }
 
@@ -75,7 +115,7 @@ func (cfg *ControlFlowGraph) String() string {
 	for name, bb := range cfg.Succ {
 		var blks []string
 		for _, blk := range bb {
-			blks = append(blks, blk.name)
+			blks = append(blks, blk)
 		}
 
 		succ = append(succ, fmt.Sprintf("\n\t\t\t%s: %s", name, blks))
@@ -84,7 +124,7 @@ func (cfg *ControlFlowGraph) String() string {
 	for name, bb := range cfg.Pred {
 		var blks []string
 		for _, blk := range bb {
-			blks = append(blks, blk.name)
+			blks = append(blks, blk)
 		}
 
 		pred = append(pred, fmt.Sprintf("\n\t\t\t%s: %s", name, blks))
