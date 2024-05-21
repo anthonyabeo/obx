@@ -45,7 +45,7 @@ func (s SetOfBBs) Intersection(other SetOfBBs) SetOfBBs {
 		s, other = other, s
 	}
 	for name, BB := range s {
-		if _, exists := other[name]; !exists {
+		if _, exists := other[name]; exists {
 			intersect[name] = BB
 		}
 	}
@@ -80,10 +80,6 @@ func NewCFG() *ControlFlowGraph {
 		Succ:  map[string][]string{},
 		Pred:  map[string][]string{},
 	}
-}
-
-func (cfg *ControlFlowGraph) AddNewNode() {
-
 }
 
 func (cfg *ControlFlowGraph) AddSucc(BlkName string, Successors ...*BasicBlock) {
