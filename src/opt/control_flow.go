@@ -49,33 +49,24 @@ func Dominator(cfg *ir.ControlFlowGraph, r *ir.BasicBlock) map[string]ir.SetOfBB
 		Dominance[name] = cfg.Nodes
 	}
 
-	var nodes []string
-	nodes = append(nodes, cfg.Succ[r.Name()]...)
-	visited := map[string]bool{r.Name(): true}
-
 	for change {
 		change = false
-		for _, name := range nodes {
-			T := cfg.Nodes
 
+		for name := range cfg.Nodes {
+			if name == r.Name() {
+				continue
+			}
+
+			Nodes := cfg.Nodes
 			for _, pred := range cfg.Pred[name] {
-				T = T.Intersection(Dominance[pred])
+				Nodes = Nodes.Intersection(Dominance[pred])
 			}
+			Nodes.Add(cfg.Nodes[name])
 
-			T.Add(cfg.Nodes[name])
-			if !T.Equal(Dominance[name]) {
+			if !Nodes.Equal(Dominance[name]) {
 				change = true
-				Dominance[name] = T
+				Dominance[name] = Nodes
 			}
-
-			for _, n := range cfg.Succ[name] {
-				if _, found := visited[n]; !found {
-					nodes = append(nodes, n)
-					visited[n] = true
-				}
-			}
-
-			nodes = nodes[1:]
 		}
 	}
 
