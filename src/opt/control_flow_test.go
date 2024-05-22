@@ -215,3 +215,62 @@ func TestComputeDominance2(t *testing.T) {
 	}
 
 }
+
+func TestComputeImmediateDominance(t *testing.T) {
+	entry := ir.NewBasicBlock("entry")
+	b1 := ir.NewBasicBlock("B1")
+	b2 := ir.NewBasicBlock("B2")
+	b3 := ir.NewBasicBlock("B3")
+	exit := ir.NewBasicBlock("exit")
+
+	cfg := &ir.ControlFlowGraph{
+		Entry: nil,
+		Exit:  nil,
+		Nodes: map[string]*ir.BasicBlock{
+			"B1":    b1,
+			"B2":    b2,
+			"B3":    b3,
+			"entry": entry,
+			"exit":  exit,
+		},
+		Succ: map[string][]string{
+			"entry": {"B1", "B2"},
+			"B1":    {"B3"},
+			"B2":    {"B3"},
+			"B3":    {"exit"},
+			"exit":  {},
+		},
+		Pred: map[string][]string{
+			"entry": {},
+			"B1":    {"entry"},
+			"B2":    {"entry"},
+			"B3":    {"B1", "B2"},
+			"exit":  {"B3"},
+		},
+	}
+
+	dom := Dominator(cfg, entry)
+	iDom := ImmDominator(cfg, entry, dom)
+
+	tests := []struct {
+		name string
+		blk  string
+	}{
+		{"B1", "entry"},
+		{"B2", "entry"},
+		{"B3", "entry"},
+		{"exit", "B3"},
+	}
+
+	for _, tt := range tests {
+		if _, found := iDom[tt.name]; !found {
+			t.Errorf("no value for IDom(%s)", tt.name)
+			continue
+		}
+
+		if tt.blk != iDom[tt.name].Name() {
+			t.Errorf("expected IDom(%s) --> %s; got %s instead",
+				tt.name, tt.blk, iDom[tt.name])
+		}
+	}
+}
