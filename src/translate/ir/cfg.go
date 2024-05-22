@@ -66,6 +66,10 @@ func (s SetOfBBs) Equal(other SetOfBBs) bool {
 	return true
 }
 func (s SetOfBBs) Len() int { return len(s) }
+func (s SetOfBBs) Remove(blk string) SetOfBBs {
+	delete(s, blk)
+	return s
+}
 
 type ControlFlowGraph struct {
 	Entry, Exit *BasicBlock
