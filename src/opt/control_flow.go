@@ -73,6 +73,40 @@ func Dominator(cfg *ir.ControlFlowGraph, r *ir.BasicBlock) map[string]ir.SetOfBB
 	return Dominance
 }
 
-func ImmDominator() {
+func ImmDominator(cfg *ir.ControlFlowGraph, r *ir.BasicBlock, Dominance map[string]ir.SetOfBBs) map[string]*ir.BasicBlock {
+	IDom := make(map[string]*ir.BasicBlock)
+	Tmp := make(map[string]ir.SetOfBBs)
 
+	for name := range cfg.Nodes {
+		Tmp[name] = Dominance[name].Remove(name)
+	}
+
+	for name := range cfg.Nodes {
+		if name == r.Name() {
+			continue
+		}
+
+		for s := range Tmp[name] {
+			for t := range Tmp[name] {
+				if t == s {
+					continue
+				}
+
+				if Tmp[s].Contains(t) {
+					Tmp[name].Remove(t)
+				}
+			}
+		}
+
+	}
+
+	for name := range cfg.Nodes {
+		if name == r.Name() {
+			continue
+		}
+
+		IDom[name] = Tmp[name].Pop()
+	}
+
+	return IDom
 }
