@@ -70,6 +70,17 @@ func (s SetOfBBs) Remove(blk string) SetOfBBs {
 	delete(s, blk)
 	return s
 }
+func (s SetOfBBs) Pop() *BasicBlock {
+	var v *BasicBlock
+
+	for key, value := range s {
+		v = value
+		delete(s, key)
+		break
+	}
+
+	return v
+}
 
 type ControlFlowGraph struct {
 	Entry, Exit *BasicBlock
