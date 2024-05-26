@@ -389,8 +389,53 @@ func (v *Visitor) VisitCaseStmt(stmt *ast.CaseStmt) {
 }
 
 func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
-	//TODO implement me
-	panic("implement me")
+	BB := v.builder.GetInsertBlock()
+
+	BodyBB := ir.CreateBasicBlock("body", BB.Parent())
+	ContBB := ir.CreateBasicBlock("cont", BB.Parent())
+
+	IterVar := v.env.Lookup(stmt.CtlVar.Name).Alloca()
+	if IterVar == nil {
+		panic(fmt.Sprintf("stack allocation for name '%s' not found", stmt.CtlVar.Name))
+	}
+
+	stmt.InitVal.Accept(v)
+	stmt.FinalVal.Accept(v)
+	FinalV := stmt.FinalVal.Value()
+
+	v.builder.CreateStore(stmt.InitVal.Value(), IterVar)
+
+	CtlVar := v.builder.CreateLoad(IterVar.AllocatedTy(), IterVar, "")
+	CondV := v.builder.CreateCmp(ir.SLt, CtlVar, FinalV, "")
+
+	v.builder.CreateCondBr(CondV, BodyBB, ContBB)
+
+	// IR-Codegen for loop body
+	v.builder.SetInsertPoint(BodyBB)
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
+	v.builder.SetInsertPoint(BodyBB)
+
+	// update control variable
+	var inc ir.Value
+	if stmt.By != nil {
+		stmt.By.Accept(v)
+		inc = stmt.By.Value()
+	} else {
+		inc = ir.NewConstantInt(ir.Int64Type, 1, true, "")
+	}
+
+	CtlVar = v.builder.CreateLoad(IterVar.AllocatedTy(), IterVar, "")
+	Val := v.builder.CreateAdd(CtlVar, inc, "")
+	v.builder.CreateStore(Val, IterVar)
+
+	CondV = v.builder.CreateCmp(ir.SLt, IterVar, FinalV, "")
+
+	v.builder.CreateCondBr(CondV, BodyBB, ContBB)
+
+	// point the builder which block to go to next
+	v.builder.SetInsertPoint(ContBB)
 }
 
 func (v *Visitor) VisitExitStmt(stmt *ast.ExitStmt) {
