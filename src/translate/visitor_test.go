@@ -370,3 +370,41 @@ end Main
 	cgen := NewVisitor(scopes)
 	unit.Accept(cgen)
 }
+
+func TestIRCodegenForStatementWithStep(t *testing.T) {
+	input := `module Main
+var a, b, step, total: integer
+
+begin
+    b := 10
+	total := 0
+	step := 3
+
+	for a := 0 to b by step do 
+		total := total + 1 
+	end
+
+	assert(total = 55)
+end Main
+`
+
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := lexer.NewLexer(file, []byte(input))
+
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
+	unit := p.Parse()
+
+	obx := ast.NewOberon()
+
+	scopes := map[string]scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	s := sema.NewVisitor(scopes, errReporter)
+	unit.Accept(s)
+
+	cgen := NewVisitor(scopes)
+	unit.Accept(cgen)
+}
