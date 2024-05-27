@@ -274,3 +274,112 @@ func TestComputeImmediateDominance(t *testing.T) {
 		}
 	}
 }
+
+func TestComputeNaturalLoop(t *testing.T) {
+	entry := ir.NewBasicBlock("entry")
+	b1 := ir.NewBasicBlock("B1")
+	b2 := ir.NewBasicBlock("B2")
+	b3 := ir.NewBasicBlock("B3")
+	exit := ir.NewBasicBlock("exit")
+
+	cfg := &ir.ControlFlowGraph{
+		Entry: entry,
+		Exit:  exit,
+		Nodes: map[string]*ir.BasicBlock{
+			"B1":    b1,
+			"B2":    b2,
+			"B3":    b3,
+			"entry": entry,
+			"exit":  exit,
+		},
+		Succ: map[string][]string{
+			"entry": {"B1"},
+			"B1":    {"B2"},
+			"B2":    {"B2", "B3"},
+			"B3":    {"exit", "B1"},
+			"exit":  {},
+		},
+		Pred: map[string][]string{
+			"entry": {},
+			"B1":    {"entry", "B3"},
+			"B2":    {"B1", "B2"},
+			"B3":    {"B2"},
+			"exit":  {"B3"},
+		},
+	}
+
+	nat := NaturalLoop(cfg, "B3", "B1")
+
+	tests := []string{"B1", "B2", "B3"}
+	for _, tt := range tests {
+		if nat[tt] == nil || nat[tt].Name() != tt {
+			t.Errorf("'%s' should not be part of the natural loop of B3->B1", tt)
+		}
+	}
+}
+
+func TestComputeNaturalLoop2(t *testing.T) {
+	entry := ir.NewBasicBlock("entry")
+	b1 := ir.NewBasicBlock("B1")
+	b2 := ir.NewBasicBlock("B2")
+	b3 := ir.NewBasicBlock("B3")
+	b4 := ir.NewBasicBlock("B4")
+	b5 := ir.NewBasicBlock("B5")
+	b6 := ir.NewBasicBlock("B6")
+	b7 := ir.NewBasicBlock("B7")
+	exit := ir.NewBasicBlock("exit")
+
+	cfg := &ir.ControlFlowGraph{
+		Entry: nil,
+		Exit:  nil,
+		Nodes: map[string]*ir.BasicBlock{
+			"B1":    b1,
+			"B2":    b2,
+			"B3":    b3,
+			"B4":    b4,
+			"B5":    b5,
+			"B6":    b6,
+			"B7":    b7,
+			"entry": entry,
+			"exit":  exit,
+		},
+		Succ: map[string][]string{
+			"entry": {"B1"},
+			"B1":    {"B2", "B3"},
+			"B2":    {"B4"},
+			"B3":    {"B4"},
+			"B4":    {"B5", "B6"},
+			"B5":    {"B7"},
+			"B6":    {"exit", "B1"},
+			"B7":    {"exit", "B5"},
+			"exit":  {},
+		},
+		Pred: map[string][]string{
+			"entry": {},
+			"B1":    {"B6", "entry"},
+			"B2":    {"B1"},
+			"B3":    {"B1"},
+			"B4":    {"B2", "B3"},
+			"B5":    {"B7", "B4"},
+			"B6":    {"B4"},
+			"B7":    {"B5"},
+			"exit":  {"B6", "B7"},
+		},
+	}
+
+	nat := NaturalLoop(cfg, "B6", "B1")
+	tests := []string{"B1", "B2", "B3", "B4", "B6"}
+	for _, tt := range tests {
+		if nat[tt] == nil || nat[tt].Name() != tt {
+			t.Errorf("'%s' should not be part of the natural loop of B3->B1", tt)
+		}
+	}
+
+	natLoop := NaturalLoop(cfg, "B7", "B5")
+	tests = []string{"B7", "B5"}
+	for _, tt := range tests {
+		if natLoop[tt] == nil || natLoop[tt].Name() != tt {
+			t.Errorf("'%s' should not be part of the natural loop of B3->B1", tt)
+		}
+	}
+}
