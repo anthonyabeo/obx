@@ -110,3 +110,28 @@ func ImmDominator(cfg *ir.ControlFlowGraph, r *ir.BasicBlock, Dominance map[stri
 
 	return IDom
 }
+
+func NaturalLoop(cfg *ir.ControlFlowGraph, m, n string) ir.SetOfBBs {
+	Stack := make([]string, 0)
+	Loop := ir.SetOfBBs{}
+	Loop.Add(cfg.Nodes[m], cfg.Nodes[n])
+
+	if m != n {
+		Stack = append(Stack, m)
+	}
+
+	for len(Stack) != 0 {
+		p := Stack[len(Stack)-1]
+		Stack = Stack[:len(Stack)-1]
+
+		for _, q := range cfg.Pred[p] {
+			if !Loop.Contains(q) {
+				Loop.Add(cfg.Nodes[q])
+				Stack = append(Stack, q)
+			}
+		}
+
+	}
+
+	return Loop
+}
