@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+// BitVector
+// -----------------------------
+type BitVector byte
+
+// SetOfBBs
+// -----------------------------------------------------------------------
 type SetOfBBs map[string]*BasicBlock
 
 func (s SetOfBBs) Add(blocks ...*BasicBlock) {
@@ -82,6 +88,8 @@ func (s SetOfBBs) Pop() *BasicBlock {
 	return v
 }
 
+// ControlFlowGraph
+// ----------------------------------------------------------------
 type ControlFlowGraph struct {
 	Entry, Exit *BasicBlock
 	Nodes       SetOfBBs
@@ -149,4 +157,33 @@ func (cfg *ControlFlowGraph) String() string {
 	buf.WriteString("}")
 
 	return buf.String()
+}
+
+func (cfg *ControlFlowGraph) PostOrder() []string {
+	visited := map[string]bool{}
+	order := make([]string, 0)
+
+	cfg.dfs("entry", visited, &order)
+	return order
+}
+
+func (cfg *ControlFlowGraph) dfs(node string, visited map[string]bool, order *[]string) {
+	visited[node] = true
+	for _, succ := range cfg.Succ[node] {
+		if _, found := visited[succ]; !found {
+			cfg.dfs(succ, visited, order)
+		}
+	}
+
+	*order = append(*order, node)
+}
+
+func (cfg *ControlFlowGraph) ReversePostOrder() []string {
+	pOrder := cfg.PostOrder()
+	var revOrder []string
+	for i := len(pOrder) - 1; i >= 0; i-- {
+		revOrder = append(revOrder, pOrder[i])
+	}
+
+	return revOrder
 }
