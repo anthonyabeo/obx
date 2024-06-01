@@ -18,8 +18,8 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 	exit := ir.NewBasicBlock("exit")
 
 	cfg := &ir.ControlFlowGraph{
-		Entry: nil,
-		Exit:  nil,
+		Entry: entry,
+		Exit:  exit,
 		Nodes: map[string]*ir.BasicBlock{
 			"B1":    b1,
 			"B2":    b2,
@@ -97,8 +97,8 @@ func TestComputeDominance(t *testing.T) {
 	exit := ir.NewBasicBlock("exit")
 
 	cfg := &ir.ControlFlowGraph{
-		Entry: nil,
-		Exit:  nil,
+		Entry: entry,
+		Exit:  exit,
 		Nodes: map[string]*ir.BasicBlock{
 			"B1":    b1,
 			"B2":    b2,
@@ -165,8 +165,8 @@ func TestComputeDominance2(t *testing.T) {
 	exit := ir.NewBasicBlock("exit")
 
 	cfg := &ir.ControlFlowGraph{
-		Entry: nil,
-		Exit:  nil,
+		Entry: entry,
+		Exit:  exit,
 		Nodes: map[string]*ir.BasicBlock{
 			"B1":    b1,
 			"B2":    b2,
@@ -224,8 +224,8 @@ func TestComputeImmediateDominance(t *testing.T) {
 	exit := ir.NewBasicBlock("exit")
 
 	cfg := &ir.ControlFlowGraph{
-		Entry: nil,
-		Exit:  nil,
+		Entry: entry,
+		Exit:  exit,
 		Nodes: map[string]*ir.BasicBlock{
 			"B1":    b1,
 			"B2":    b2,
@@ -330,8 +330,8 @@ func TestComputeNaturalLoop2(t *testing.T) {
 	exit := ir.NewBasicBlock("exit")
 
 	cfg := &ir.ControlFlowGraph{
-		Entry: nil,
-		Exit:  nil,
+		Entry: entry,
+		Exit:  exit,
 		Nodes: map[string]*ir.BasicBlock{
 			"B1":    b1,
 			"B2":    b2,
