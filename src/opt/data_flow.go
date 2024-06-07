@@ -70,6 +70,8 @@ func IterativeDataFlow(cfg *ir.ControlFlowGraph, F map[string]func(ir.BitVector)
 	return DFIn
 }
 
+// IterativeDataflowDragonBook an iterative data-flow algorithm for the reaching definitions problem.
+// as defined at https://en.wikipedia.org/wiki/Reaching_definition
 func IterativeDataflowDragonBook(cfg *ir.ControlFlowGraph, GEN, KILL map[string]ir.BitVector) (map[string]ir.BitVector, map[string]ir.BitVector) {
 	rpo := cfg.ReversePostOrder()
 	rpo = rpo[1:]
