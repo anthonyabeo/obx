@@ -118,11 +118,11 @@ func (cfg *ControlFlowGraph) AddPred(BlkName string, Predecessors ...*BasicBlock
 }
 
 func (cfg *ControlFlowGraph) IsJoinNode(blk string) bool {
-	return len(cfg.Succ[blk]) > 1
+	return len(cfg.Pred[blk]) > 1
 }
 
 func (cfg *ControlFlowGraph) IsBrNode(blk string) bool {
-	return len(cfg.Pred[blk]) > 1
+	return len(cfg.Succ[blk]) > 1
 }
 
 func (cfg *ControlFlowGraph) String() string {
