@@ -36,44 +36,7 @@ func ComputeAllExtBB(cfg *ir.ControlFlowGraph, src *ir.BasicBlock) map[string]ir
 	return AllEBBs
 }
 
-func Dominator(cfg *ir.ControlFlowGraph, r *ir.BasicBlock) map[string]ir.SetOfBBs {
-	change := true
-	Dominance := map[string]ir.SetOfBBs{}
-	Dominance[r.Name()] = ir.SetOfBBs{r.Name(): r}
-
-	for name := range cfg.Nodes {
-		if name == r.Name() {
-			continue
-		}
-
-		Dominance[name] = cfg.Nodes
-	}
-
-	for change {
-		change = false
-
-		for name := range cfg.Nodes {
-			if name == r.Name() {
-				continue
-			}
-
-			Nodes := cfg.Nodes
-			for _, pred := range cfg.Pred[name] {
-				Nodes = Nodes.Intersection(Dominance[pred])
-			}
-			Nodes.Add(cfg.Nodes[name])
-
-			if !Nodes.Equal(Dominance[name]) {
-				change = true
-				Dominance[name] = Nodes
-			}
-		}
-	}
-
-	return Dominance
-}
-
-func ImmDominator(cfg *ir.ControlFlowGraph, r *ir.BasicBlock, Dominance map[string]ir.SetOfBBs) map[string]*ir.BasicBlock {
+func ImmDominator(cfg *ir.ControlFlowGraph, Dominance map[string]ir.SetOfBBs) ir.SetOfBBs {
 	IDom := make(map[string]*ir.BasicBlock)
 	Tmp := make(map[string]ir.SetOfBBs)
 
@@ -82,7 +45,7 @@ func ImmDominator(cfg *ir.ControlFlowGraph, r *ir.BasicBlock, Dominance map[stri
 	}
 
 	for name := range cfg.Nodes {
-		if name == r.Name() {
+		if name == cfg.Entry.Name() {
 			continue
 		}
 
@@ -101,7 +64,7 @@ func ImmDominator(cfg *ir.ControlFlowGraph, r *ir.BasicBlock, Dominance map[stri
 	}
 
 	for name := range cfg.Nodes {
-		if name == r.Name() {
+		if name == cfg.Entry.Name() {
 			continue
 		}
 
@@ -109,6 +72,74 @@ func ImmDominator(cfg *ir.ControlFlowGraph, r *ir.BasicBlock, Dominance map[stri
 	}
 
 	return IDom
+}
+
+func Dominance(cfg *ir.ControlFlowGraph) map[string]ir.SetOfBBs {
+	Dom := map[string]ir.SetOfBBs{}
+	Dom[cfg.Entry.Name()] = ir.SetOfBBs{cfg.Entry.Name(): cfg.Entry}
+
+	for name := range cfg.Nodes {
+		if name == cfg.Entry.Name() {
+			continue
+		}
+
+		Dom[name] = cfg.Nodes
+	}
+
+	changed := true
+	for changed {
+		changed = false
+
+		for name := range cfg.Nodes {
+			if name == cfg.Entry.Name() {
+				continue
+			}
+
+			Nodes := cfg.Nodes
+			for _, pred := range cfg.Pred[name] {
+				Nodes = Nodes.Intersection(Dom[pred])
+			}
+			Nodes.Add(cfg.Nodes[name])
+
+			if !Nodes.Equal(Dom[name]) {
+				changed = true
+				Dom[name] = Nodes
+			}
+		}
+	}
+
+	return Dom
+}
+
+func DominanceFrontier(cfg *ir.ControlFlowGraph) map[string]ir.SetOfBBs {
+	DF := map[string]ir.SetOfBBs{}
+	for name := range cfg.Nodes {
+		DF[name] = ir.SetOfBBs{}
+	}
+
+	Dom := Dominance(cfg)
+	IDom := ImmDominator(cfg, Dom)
+
+	for name := range cfg.Nodes {
+		if !cfg.IsJoinNode(name) {
+			continue
+		}
+
+		for _, pred := range cfg.Pred[name] {
+			runner := pred
+
+			for runner != IDom[name].Name() {
+				DF[runner].Add(cfg.Nodes[name])
+				if _, exists := IDom[runner]; exists {
+					runner = IDom[runner].Name()
+				}
+
+			}
+		}
+
+	}
+
+	return DF
 }
 
 func NaturalLoop(cfg *ir.ControlFlowGraph, m, n string) ir.SetOfBBs {
