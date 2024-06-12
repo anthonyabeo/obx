@@ -108,11 +108,11 @@ func CreateBasicBlock(name string, parent *Function) *BasicBlock {
 	return blk
 }
 
-func (b BasicBlock) Type() Type          { return b.ty }
-func (b BasicBlock) Name() string        { return b.name }
-func (b BasicBlock) SetName(name string) { b.name = name }
-func (b BasicBlock) HasName() bool       { return b.name != "" }
-func (b BasicBlock) String() string {
+func (b *BasicBlock) Type() Type          { return b.ty }
+func (b *BasicBlock) Name() string        { return b.name }
+func (b *BasicBlock) SetName(name string) { b.name = name }
+func (b *BasicBlock) HasName() bool       { return b.name != "" }
+func (b *BasicBlock) String() string {
 	s := fmt.Sprintf("%%%s:\n\t", b.name)
 
 	l := b.instr
@@ -128,5 +128,8 @@ func (b BasicBlock) String() string {
 
 	return s
 }
-func (b BasicBlock) Parent() *Function { return b.parent }
-func (b BasicBlock) Instr() list.List  { return b.instr }
+func (b *BasicBlock) Parent() *Function { return b.parent }
+func (b *BasicBlock) Instr() *list.List { return &b.instr }
+func (b *BasicBlock) InsertInstrBegin(inst Instruction) {
+	b.instr.InsertBefore(inst, b.instr.Front())
+}
