@@ -87,6 +87,15 @@ func (s SetOfBBs) Pop() *BasicBlock {
 
 	return v
 }
+func (s SetOfBBs) Clone() SetOfBBs {
+	targetMap := SetOfBBs{}
+
+	for key, value := range s {
+		targetMap[key] = value
+	}
+
+	return targetMap
+}
 
 // ControlFlowGraph
 // ----------------------------------------------------------------
