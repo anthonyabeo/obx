@@ -44,10 +44,18 @@ func (v *Visitor) VisitModule(m *ast.Module) {
 		v.module,
 	)
 
+	var (
+		EntryBB = ir.CreateBasicBlock("entry", Main)
+		MainBB  = ir.CreateBasicBlock("main", Main)
+	)
+
 	v.builder.CFG = Main.CFG()
 
-	EntryBB := ir.CreateBasicBlock("entry", Main)
 	v.builder.SetInsertPoint(EntryBB)
+	v.builder.CreateBr(MainBB)
+	v.builder.CFG.Entry = EntryBB
+
+	v.builder.SetInsertPoint(MainBB)
 
 	for _, decl := range m.DeclSeq {
 		decl.Accept(v)
