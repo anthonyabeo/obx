@@ -431,8 +431,8 @@ func (r ReturnInst) IsBitBinOp() bool { return bit_binop_begin < r.op && r.op < 
 type BranchInst struct {
 	op      Opcode
 	cond    Value
-	ifTrue  *BasicBlock
-	ifFalse *BasicBlock
+	IfTrue  *BasicBlock
+	IfFalse *BasicBlock
 
 	numSucc int
 
@@ -505,9 +505,9 @@ func (b BranchInst) String() string {
 	var s string
 
 	if b.IsConditional() {
-		s = fmt.Sprintf("br %s %s, label %%%s, label %%%s", b.cond.Type(), b.cond.Name(), b.ifTrue.name, b.ifFalse.name)
+		s = fmt.Sprintf("br %s %s, label %%%s, label %%%s", b.cond.Type(), b.cond.Name(), b.IfTrue.name, b.IfFalse.name)
 	} else {
-		s = fmt.Sprintf("br label %%%s", b.ifTrue.name)
+		s = fmt.Sprintf("br label %%%s", b.IfTrue.name)
 	}
 
 	return s
@@ -523,6 +523,17 @@ type PHINode struct {
 	numIncomingPaths uint
 
 	useList *list.List
+}
+
+func CreateEmptyPHINode(name string) *PHINode {
+	if name == "" {
+		name = NextTemp()
+	}
+
+	return &PHINode{
+		op:   Phi,
+		name: name,
+	}
 }
 
 func CreatePHINode(ty Type, numIncomingPaths uint, name string) *PHINode {
