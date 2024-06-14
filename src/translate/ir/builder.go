@@ -65,6 +65,8 @@ func (b *Builder) CreateAdd(lhs, rhs Value, name string) Value {
 	}
 
 	add := CreateAdd(ResTy, lhs, rhs, name)
+	lhs.AddUse(add)
+	rhs.AddUse(add)
 	b.BB.instr.PushBack(add)
 
 	return add
@@ -118,6 +120,8 @@ func (b *Builder) CreateSub(lhs, rhs Value, name string) Value {
 	}
 
 	sub := CreateSub(ResTy, lhs, rhs, name)
+	lhs.AddUse(sub)
+	rhs.AddUse(sub)
 	b.BB.instr.PushBack(sub)
 
 	return sub
@@ -146,6 +150,8 @@ func (b *Builder) CreateXOR(lhs, rhs Value, name string) Value {
 	ResTy = LHSTy
 
 	xor := CreateXOR(ResTy, lhs, rhs, name)
+	lhs.AddUse(xor)
+	rhs.AddUse(xor)
 	b.BB.instr.PushBack(xor)
 
 	return xor
@@ -155,6 +161,7 @@ func (b *Builder) CreateRet(v Value) *ReturnInst {
 	var ret *ReturnInst
 	if v != nil {
 		ret = CreateRet(v.Type(), v)
+		v.AddUse(ret)
 	} else {
 		ret = CreateRet(VoidType, nil)
 	}
@@ -234,6 +241,9 @@ func (b *Builder) CreateAlloca(ty Type, name string) *AllocaInst {
 
 func (b *Builder) CreateCall(fty *FunctionType, callee Value, args []Value, name string) *CallInstr {
 	call := CreateCall(fty, callee, args, name)
+	for _, argV := range args {
+		argV.AddUse(call)
+	}
 	b.BB.instr.PushBack(call)
 
 	return call
@@ -258,6 +268,7 @@ func (b *Builder) CreateLoad(ty Type, ptr Value, name string) *LoadInst {
 
 func (b *Builder) CreateCondBr(cond Value, ifTrue, ifFalse *BasicBlock) *BranchInst {
 	br := CreateCondBrInst(cond, ifTrue, ifFalse)
+	cond.AddUse(br)
 	b.BB.instr.PushBack(br)
 
 	b.CFG.AddSucc(b.BB.name, ifTrue, ifFalse)
@@ -293,6 +304,7 @@ func (b *Builder) CreateNeg(v Value, name string) Value {
 
 func (b *Builder) CreateNot(v Value, name string) Value {
 	not := b.CreateXOR(v, GetAllOnesValue(v.Type()), name)
+	v.AddUse(not)
 	b.BB.instr.PushBack(not)
 
 	return not
