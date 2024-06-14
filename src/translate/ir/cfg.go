@@ -196,3 +196,14 @@ func (cfg *ControlFlowGraph) ReversePostOrder() []string {
 
 	return revOrder
 }
+
+func (cfg *ControlFlowGraph) Replace(to Instruction, replace Value) {
+	for use := to.OperandList().Front(); use != nil; use = use.Next() {
+		useInstr := use.Value.(Instruction)
+		for i := 1; i < useInstr.NumOperands()+1; i++ {
+			if useInstr.Operand(i).Name() == to.Name() {
+				useInstr.SetOperand(i, replace)
+			}
+		}
+	}
+}
