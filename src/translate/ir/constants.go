@@ -24,17 +24,17 @@ type ConstantInt struct {
 	useList *list.List
 }
 
-func (c ConstantInt) SetOperand(i int, v Value) { panic("unimplemented") }
-func (c ConstantInt) AddUse(v Value)            { c.useList.PushBack(v) }
-func (c ConstantInt) NumOperands() int          { return c.useList.Len() }
-func (c ConstantInt) Operand(int) Value         { panic("[internal] int constant has no operands") }
-func (c ConstantInt) OperandList() *list.List   { return c.useList }
-func (c ConstantInt) NumUses() int              { return c.useList.Len() }
-func (c ConstantInt) String() string            { return fmt.Sprintf("%s %d", c.Type(), c.value) }
-func (c ConstantInt) Type() Type                { return c.ty }
-func (c ConstantInt) Name() string              { return c.name }
-func (c ConstantInt) SetName(name string)       { c.name = name }
-func (c ConstantInt) HasName() bool             { return c.name != "" }
+func (c ConstantInt) SetOperand(int, Value)   {}
+func (c ConstantInt) AddUse(v Value)          { c.useList.PushBack(v) }
+func (c ConstantInt) NumOperands() int        { return c.useList.Len() }
+func (c ConstantInt) Operand(int) Value       { panic("[internal] int constant has no operands") }
+func (c ConstantInt) OperandList() *list.List { return c.useList }
+func (c ConstantInt) NumUses() int            { return c.useList.Len() }
+func (c ConstantInt) String() string          { return fmt.Sprintf("%s %d", c.Type(), c.value) }
+func (c ConstantInt) Type() Type              { return c.ty }
+func (c ConstantInt) Name() string            { return c.name }
+func (c ConstantInt) SetName(name string)     { c.name = name }
+func (c ConstantInt) HasName() bool           { return c.name != "" }
 
 func NewConstantInt(ty Type, value uint64, signed bool, name string) *ConstantInt {
 	if name == "" {

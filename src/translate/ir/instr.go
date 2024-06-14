@@ -155,15 +155,21 @@ type BinaryOp struct {
 	useList *list.List
 }
 
-func (b BinaryOp) AddUse(v Value) { b.useList.PushBack(v) }
-func (b BinaryOp) SetOperand(idx int, op Value) {
-	//TODO implement me
-	panic("implement me")
+func (b *BinaryOp) AddUse(v Value) { b.useList.PushBack(v) }
+func (b *BinaryOp) SetOperand(idx int, op Value) {
+	switch idx {
+	case 1:
+		b.left = op
+	case 2:
+		b.right = op
+	default:
+		panic(fmt.Sprintf("[internal] invalid index '%d' for instruction '%s'", idx, b))
+	}
 }
-func (b BinaryOp) NumUses() int            { return b.useList.Len() }
-func (b BinaryOp) OperandList() *list.List { return b.useList }
-func (b BinaryOp) NumOperands() int        { return 2 }
-func (b BinaryOp) Operand(idx int) Value {
+func (b *BinaryOp) NumUses() int            { return b.useList.Len() }
+func (b *BinaryOp) OperandList() *list.List { return b.useList }
+func (b *BinaryOp) NumOperands() int        { return 2 }
+func (b *BinaryOp) Operand(idx int) Value {
 	if idx < 1 || idx > 2 {
 		panic(fmt.Sprintf("[internal] invalid index '%d' for instruction '%s'", idx, b))
 	}
@@ -174,17 +180,17 @@ func (b BinaryOp) Operand(idx int) Value {
 
 	return b.right
 }
-func (b BinaryOp) Type() Type          { return b.evalTy }
-func (b BinaryOp) Name() string        { return "%" + b.name }
-func (b BinaryOp) SetName(name string) { b.name = name }
-func (b BinaryOp) HasName() bool       { return b.name != "" }
-func (b BinaryOp) Opcode() Opcode      { return b.op }
-func (b BinaryOp) IsTerm() bool        { return termop_begin < b.op && b.op < termop_end }
-func (b BinaryOp) IsBinaryOp() bool    { return binop_begin < b.op && b.op < binop_end }
-func (b BinaryOp) IsOtherOp() bool     { return other_op_begin < b.op && b.op < other_op_end }
-func (b BinaryOp) IsMemOp() bool       { return memop_begin < b.op && b.op < memop_end }
-func (b BinaryOp) IsBitBinOp() bool    { return bit_binop_begin < b.op && b.op < bit_binop_end }
-func (b BinaryOp) String() string {
+func (b *BinaryOp) Type() Type          { return b.evalTy }
+func (b *BinaryOp) Name() string        { return "%" + b.name }
+func (b *BinaryOp) SetName(name string) { b.name = name }
+func (b *BinaryOp) HasName() bool       { return b.name != "" }
+func (b *BinaryOp) Opcode() Opcode      { return b.op }
+func (b *BinaryOp) IsTerm() bool        { return termop_begin < b.op && b.op < termop_end }
+func (b *BinaryOp) IsBinaryOp() bool    { return binop_begin < b.op && b.op < binop_end }
+func (b *BinaryOp) IsOtherOp() bool     { return other_op_begin < b.op && b.op < other_op_end }
+func (b *BinaryOp) IsMemOp() bool       { return memop_begin < b.op && b.op < memop_end }
+func (b *BinaryOp) IsBitBinOp() bool    { return bit_binop_begin < b.op && b.op < bit_binop_end }
+func (b *BinaryOp) String() string {
 	return fmt.Sprintf("%s = %s %s %s, %s", b.Name(), b.op, b.evalTy, b.left.Name(), b.right.Name())
 }
 
@@ -376,11 +382,8 @@ func CreateAlloca(ty Type, numElems int, align int, name string) *AllocaInst {
 	return alloc
 }
 
-func (a AllocaInst) AddUse(v Value) { a.useList.PushBack(v) }
-func (a AllocaInst) SetOperand(idx int, op Value) {
-	//TODO implement me
-	panic("implement me")
-}
+func (a AllocaInst) AddUse(v Value)          { a.useList.PushBack(v) }
+func (a AllocaInst) SetOperand(int, Value)   {}
 func (a AllocaInst) NumUses() int            { return a.useList.Len() }
 func (a AllocaInst) NumOperands() int        { return 0 }
 func (a AllocaInst) Operand(int) Value       { panic("alloca instruction has no operands") }
@@ -442,26 +445,29 @@ func CreateRetVoid() *ReturnInst {
 	}
 }
 
-func (r ReturnInst) AddUse(v Value) { r.useList.PushBack(v) }
-func (r ReturnInst) SetOperand(idx int, op Value) {
-	//TODO implement me
-	panic("implement me")
+func (r *ReturnInst) AddUse(v Value) { r.useList.PushBack(v) }
+func (r *ReturnInst) SetOperand(idx int, op Value) {
+	if idx != 1 {
+		panic(fmt.Sprintf("[internal] invalid index '%d' for instruction '%s'", idx, r))
+	}
+
+	r.value = op
 }
-func (r ReturnInst) NumUses() int     { return r.useList.Len() }
-func (r ReturnInst) NumOperands() int { return 1 }
-func (r ReturnInst) Operand(idx int) Value {
+func (r *ReturnInst) NumUses() int     { return r.useList.Len() }
+func (r *ReturnInst) NumOperands() int { return 1 }
+func (r *ReturnInst) Operand(idx int) Value {
 	if idx != 1 {
 		panic("[internal] return instruction has 1 operand")
 	}
 
 	return r.value
 }
-func (r ReturnInst) OperandList() *list.List { return r.useList }
-func (r ReturnInst) Type() Type              { return r.ty }
-func (r ReturnInst) Name() string            { return "" }
-func (r ReturnInst) SetName(s string)        {}
-func (r ReturnInst) HasName() bool           { return false }
-func (r ReturnInst) String() string {
+func (r *ReturnInst) OperandList() *list.List { return r.useList }
+func (r *ReturnInst) Type() Type              { return r.ty }
+func (r *ReturnInst) Name() string            { return "" }
+func (r *ReturnInst) SetName(string)          {}
+func (r *ReturnInst) HasName() bool           { return false }
+func (r *ReturnInst) String() string {
 	s := fmt.Sprintf("%s %s", r.op, r.ty)
 	if r.value != nil {
 		s += " " + r.value.Name()
@@ -469,12 +475,12 @@ func (r ReturnInst) String() string {
 
 	return s
 }
-func (r ReturnInst) Opcode() Opcode   { return r.op }
-func (r ReturnInst) IsTerm() bool     { return termop_begin < r.op && r.op < termop_end }
-func (r ReturnInst) IsBinaryOp() bool { return binop_begin < r.op && r.op < binop_end }
-func (r ReturnInst) IsMemOp() bool    { return memop_begin < r.op && r.op < memop_end }
-func (r ReturnInst) IsOtherOp() bool  { return other_op_begin < r.op && r.op < other_op_end }
-func (r ReturnInst) IsBitBinOp() bool { return bit_binop_begin < r.op && r.op < bit_binop_end }
+func (r *ReturnInst) Opcode() Opcode   { return r.op }
+func (r *ReturnInst) IsTerm() bool     { return termop_begin < r.op && r.op < termop_end }
+func (r *ReturnInst) IsBinaryOp() bool { return binop_begin < r.op && r.op < binop_end }
+func (r *ReturnInst) IsMemOp() bool    { return memop_begin < r.op && r.op < memop_end }
+func (r *ReturnInst) IsOtherOp() bool  { return other_op_begin < r.op && r.op < other_op_end }
+func (r *ReturnInst) IsBitBinOp() bool { return bit_binop_begin < r.op && r.op < bit_binop_end }
 
 // BranchInst ...
 // ---------------------
@@ -517,19 +523,26 @@ func CreateBr(dst *BasicBlock) *BranchInst {
 	}
 }
 
-func (b BranchInst) AddUse(v Value) { b.useList.PushBack(v) }
-func (b BranchInst) SetOperand(idx int, op Value) {
-	//TODO implement me
-	panic("implement me")
+func (b *BranchInst) AddUse(v Value) { b.useList.PushBack(v) }
+func (b *BranchInst) SetOperand(idx int, op Value) {
+	if !b.IsConditional() {
+		panic("[internal] unconditional branch has no operands")
+	}
+
+	if idx != 1 {
+		panic("[internal] conditional branch has only one operand")
+	}
+
+	b.cond = op
 }
-func (b BranchInst) NumUses() int { return b.useList.Len() }
-func (b BranchInst) NumOperands() int {
+func (b *BranchInst) NumUses() int { return b.useList.Len() }
+func (b *BranchInst) NumOperands() int {
 	if b.IsConditional() {
 		return 1
 	}
 	return 0
 }
-func (b BranchInst) Operand(idx int) Value {
+func (b *BranchInst) Operand(idx int) Value {
 	if !b.IsConditional() {
 		panic("[internal] unconditional branch has no operands")
 	}
@@ -540,23 +553,22 @@ func (b BranchInst) Operand(idx int) Value {
 
 	return b.cond
 }
-func (b BranchInst) OperandList() *list.List  { return b.useList }
-func (b BranchInst) Type() Type               { return nil }
-func (b BranchInst) Name() string             { return "" }
-func (b BranchInst) SetName(string)           {}
-func (b BranchInst) HasName() bool            { return false }
-func (b BranchInst) Opcode() Opcode           { return b.op }
-func (b BranchInst) IsTerm() bool             { return termop_begin < b.op && b.op < termop_end }
-func (b BranchInst) IsBinaryOp() bool         { return binop_begin < b.op && b.op < binop_end }
-func (b BranchInst) IsMemOp() bool            { return memop_begin < b.op && b.op < memop_end }
-func (b BranchInst) IsOtherOp() bool          { return other_op_begin < b.op && b.op < other_op_end }
-func (b BranchInst) IsBitBinOp() bool         { return bit_binop_begin < b.op && b.op < bit_binop_end }
-func (b BranchInst) NumSuccessors() int       { return b.numSucc }
-func (b BranchInst) IsConditional() bool      { return b.cond != nil && b.numSucc == 2 }
-func (b BranchInst) SetSuccessor(*BasicBlock) {}
-func (b BranchInst) SetCond(cond Value)       { b.cond = cond }
-func (b BranchInst) Cond() Value              { return b.cond }
-func (b BranchInst) String() string {
+func (b *BranchInst) OperandList() *list.List { return b.useList }
+func (b *BranchInst) Type() Type              { return nil }
+func (b *BranchInst) Name() string            { return "" }
+func (b *BranchInst) SetName(string)          {}
+func (b *BranchInst) HasName() bool           { return false }
+func (b *BranchInst) Opcode() Opcode          { return b.op }
+func (b *BranchInst) IsTerm() bool            { return termop_begin < b.op && b.op < termop_end }
+func (b *BranchInst) IsBinaryOp() bool        { return binop_begin < b.op && b.op < binop_end }
+func (b *BranchInst) IsMemOp() bool           { return memop_begin < b.op && b.op < memop_end }
+func (b *BranchInst) IsOtherOp() bool         { return other_op_begin < b.op && b.op < other_op_end }
+func (b *BranchInst) IsBitBinOp() bool        { return bit_binop_begin < b.op && b.op < bit_binop_end }
+func (b *BranchInst) NumSuccessors() int      { return b.numSucc }
+func (b *BranchInst) IsConditional() bool     { return b.cond != nil && b.numSucc == 2 }
+func (b *BranchInst) SetCond(cond Value)      { b.cond = cond }
+func (b *BranchInst) Cond() Value             { return b.cond }
+func (b *BranchInst) String() string {
 	var s string
 
 	if b.IsConditional() {
@@ -608,13 +620,10 @@ func CreatePHINode(ty Type, numIncomingPaths uint, name string) *PHINode {
 	}
 }
 
-func (phi *PHINode) AddUse(v Value) { phi.useList.PushBack(v) }
-func (phi *PHINode) SetOperand(idx int, op Value) {
-	//TODO implement me
-	panic("implement me")
-}
-func (phi *PHINode) NumUses() int     { return phi.useList.Len() }
-func (phi *PHINode) NumOperands() int { return len(phi.incoming) }
+func (phi *PHINode) AddUse(v Value)        { phi.useList.PushBack(v) }
+func (phi *PHINode) SetOperand(int, Value) {}
+func (phi *PHINode) NumUses() int          { return phi.useList.Len() }
+func (phi *PHINode) NumOperands() int      { return len(phi.incoming) }
 func (phi *PHINode) Operand(idx int) Value {
 	if idx < 0 || idx > len(phi.incoming) {
 		panic("[internal] invalid index for operand")
