@@ -36,12 +36,17 @@ type CallInstr struct {
 	useList *list.List
 }
 
-func (c CallInstr) NumUses() int { return c.useList.Len() }
+func (c CallInstr) AddUse(v Value) { c.useList.PushBack(v) }
+func (c CallInstr) NumUses() int   { return c.useList.Len() }
 func (c CallInstr) NumOperands() int {
 	//TODO implement me
 	panic("implement me")
 }
 func (c CallInstr) Operand(i int) Value {
+	//TODO implement me
+	panic("implement me")
+}
+func (c CallInstr) SetOperand(idx int, op Value) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -88,9 +93,20 @@ type ICmpInstr struct {
 	useList *list.List
 }
 
-func (c ICmpInstr) NumUses() int     { return c.useList.Len() }
-func (c ICmpInstr) NumOperands() int { return 2 }
-func (c ICmpInstr) Operand(idx int) Value {
+func (c *ICmpInstr) AddUse(v Value) { c.useList.PushBack(v) }
+func (c *ICmpInstr) SetOperand(idx int, op Value) {
+	switch idx {
+	case 1:
+		c.x = op
+	case 2:
+		c.y = op
+	default:
+		panic(fmt.Sprintf("[internal] invalid index '%d' for instruction '%s'", idx, c))
+	}
+}
+func (c *ICmpInstr) NumUses() int     { return c.useList.Len() }
+func (c *ICmpInstr) NumOperands() int { return 2 }
+func (c *ICmpInstr) Operand(idx int) Value {
 	if idx < 1 || idx > 2 {
 		panic(fmt.Sprintf("[internal] invalid index '%d' for instruction '%s'", idx, c))
 	}
@@ -101,18 +117,18 @@ func (c ICmpInstr) Operand(idx int) Value {
 
 	return c.y
 }
-func (c ICmpInstr) OperandList() *list.List { return c.useList }
-func (c ICmpInstr) Type() Type              { return c.evalTy }
-func (c ICmpInstr) Name() string            { return "%" + c.name }
-func (c ICmpInstr) SetName(name string)     { c.name = name }
-func (c ICmpInstr) HasName() bool           { return c.name != "" }
-func (c ICmpInstr) IsTerm() bool            { return termop_begin < c.pred && c.pred < termop_end }
-func (c ICmpInstr) IsBinaryOp() bool        { return binop_begin < c.pred && c.pred < binop_end }
-func (c ICmpInstr) IsOtherOp() bool         { return other_op_begin < c.pred && c.pred < other_op_end }
-func (c ICmpInstr) IsMemOp() bool           { return memop_begin < c.pred && c.pred < memop_end }
-func (c ICmpInstr) IsBitBinOp() bool        { return bit_binop_begin < c.pred && c.pred < bit_binop_end }
-func (c ICmpInstr) Opcode() Opcode          { return c.pred }
-func (c ICmpInstr) String() string {
+func (c *ICmpInstr) OperandList() *list.List { return c.useList }
+func (c *ICmpInstr) Type() Type              { return c.evalTy }
+func (c *ICmpInstr) Name() string            { return "%" + c.name }
+func (c *ICmpInstr) SetName(name string)     { c.name = name }
+func (c *ICmpInstr) HasName() bool           { return c.name != "" }
+func (c *ICmpInstr) IsTerm() bool            { return termop_begin < c.pred && c.pred < termop_end }
+func (c *ICmpInstr) IsBinaryOp() bool        { return binop_begin < c.pred && c.pred < binop_end }
+func (c *ICmpInstr) IsOtherOp() bool         { return other_op_begin < c.pred && c.pred < other_op_end }
+func (c *ICmpInstr) IsMemOp() bool           { return memop_begin < c.pred && c.pred < memop_end }
+func (c *ICmpInstr) IsBitBinOp() bool        { return bit_binop_begin < c.pred && c.pred < bit_binop_end }
+func (c *ICmpInstr) Opcode() Opcode          { return c.pred }
+func (c *ICmpInstr) String() string {
 	return fmt.Sprintf("%s = icmp %s %s %s, %s", c.Name(), c.pred, c.opdTy, c.x.Name(), c.y.Name())
 }
 
@@ -139,6 +155,11 @@ type BinaryOp struct {
 	useList *list.List
 }
 
+func (b BinaryOp) AddUse(v Value) { b.useList.PushBack(v) }
+func (b BinaryOp) SetOperand(idx int, op Value) {
+	//TODO implement me
+	panic("implement me")
+}
 func (b BinaryOp) NumUses() int            { return b.useList.Len() }
 func (b BinaryOp) OperandList() *list.List { return b.useList }
 func (b BinaryOp) NumOperands() int        { return 2 }
@@ -203,36 +224,44 @@ func CreateXOR(ty Type, left, right Value, name string) *BinaryOp {
 // LoadInst ...
 // ----------------
 type LoadInst struct {
-	op   Opcode
-	ptr  Value
-	typ  Type
-	name string
+	op  Opcode
+	Ptr Value
+	typ Type
+	To  string
 
-	useList *list.List
+	UseList *list.List
 }
 
-func (l LoadInst) NumUses() int     { return l.useList.Len() }
-func (l LoadInst) NumOperands() int { return 1 }
-func (l LoadInst) Operand(idx int) Value {
+func (l *LoadInst) AddUse(v Value) { l.UseList.PushBack(v) }
+func (l *LoadInst) SetOperand(idx int, op Value) {
 	if idx != 1 {
 		panic(fmt.Sprintf("[internal] invalid index '%d' for instruction '%s'", idx, l))
 	}
 
-	return l.ptr
+	l.Ptr = op
 }
-func (l LoadInst) OperandList() *list.List { return l.useList }
-func (l LoadInst) Type() Type              { return l.typ }
-func (l LoadInst) Name() string            { return "%" + l.name }
-func (l LoadInst) SetName(name string)     { l.name = name }
-func (l LoadInst) HasName() bool           { return l.name != "" }
-func (l LoadInst) Opcode() Opcode          { return l.op }
-func (l LoadInst) IsTerm() bool            { return termop_begin < l.op && l.op < termop_end }
-func (l LoadInst) IsBinaryOp() bool        { return binop_begin < l.op && l.op < binop_end }
-func (l LoadInst) IsOtherOp() bool         { return other_op_begin < l.op && l.op < other_op_end }
-func (l LoadInst) IsMemOp() bool           { return memop_begin < l.op && l.op < memop_end }
-func (l LoadInst) IsBitBinOp() bool        { return bit_binop_begin < l.op && l.op < bit_binop_end }
-func (l LoadInst) String() string {
-	srcStr := fmt.Sprintf("%s %s", l.ptr.Type(), l.ptr.Name())
+func (l *LoadInst) NumUses() int     { return l.UseList.Len() }
+func (l *LoadInst) NumOperands() int { return 1 }
+func (l *LoadInst) Operand(idx int) Value {
+	if idx != 1 {
+		panic(fmt.Sprintf("[internal] invalid index '%d' for instruction '%s'", idx, l))
+	}
+
+	return l.Ptr
+}
+func (l *LoadInst) OperandList() *list.List { return l.UseList }
+func (l *LoadInst) Type() Type              { return l.typ }
+func (l *LoadInst) Name() string            { return "%" + l.To }
+func (l *LoadInst) SetName(name string)     { l.To = name }
+func (l *LoadInst) HasName() bool           { return l.To != "" }
+func (l *LoadInst) Opcode() Opcode          { return l.op }
+func (l *LoadInst) IsTerm() bool            { return termop_begin < l.op && l.op < termop_end }
+func (l *LoadInst) IsBinaryOp() bool        { return binop_begin < l.op && l.op < binop_end }
+func (l *LoadInst) IsOtherOp() bool         { return other_op_begin < l.op && l.op < other_op_end }
+func (l *LoadInst) IsMemOp() bool           { return memop_begin < l.op && l.op < memop_end }
+func (l *LoadInst) IsBitBinOp() bool        { return bit_binop_begin < l.op && l.op < bit_binop_end }
+func (l *LoadInst) String() string {
+	srcStr := fmt.Sprintf("%s %s", l.Ptr.Type(), l.Ptr.Name())
 	return fmt.Sprintf("%s = load %s, %s", l.Name(), l.typ, srcStr)
 }
 
@@ -244,46 +273,57 @@ func CreateLoad(typ Type, src Value, name string) *LoadInst {
 	uses := list.New()
 	uses.Init()
 
-	return &LoadInst{typ: typ, op: Load, ptr: src, name: name, useList: uses}
+	return &LoadInst{typ: typ, op: Load, Ptr: src, To: name, UseList: uses}
 }
 
 // StoreInst ...
 // -------------------
 type StoreInst struct {
 	op    Opcode
-	value Value
-	dst   Value
+	Value Value
+	Dst   Value
 
 	useList *list.List
 }
 
-func (s StoreInst) NumUses() int     { return s.useList.Len() }
-func (s StoreInst) NumOperands() int { return 2 }
-func (s StoreInst) Operand(idx int) Value {
+func (s *StoreInst) AddUse(v Value) { s.useList.PushBack(v) }
+func (s *StoreInst) SetOperand(idx int, op Value) {
+	switch idx {
+	case 1:
+		s.Value = op
+	case 2:
+		s.Dst = op
+	default:
+		panic(fmt.Sprintf("[internal] invalid index '%d' for instruction '%s'", idx, s))
+	}
+}
+func (s *StoreInst) NumUses() int     { return s.useList.Len() }
+func (s *StoreInst) NumOperands() int { return 2 }
+func (s *StoreInst) Operand(idx int) Value {
 	if idx < 1 || idx > 2 {
 		panic(fmt.Sprintf("[internal] invalid index '%d' for instruction '%s'", idx, s))
 	}
 
 	if idx == 1 {
-		return s.value
+		return s.Value
 	}
 
-	return s.dst
+	return s.Dst
 }
-func (s StoreInst) OperandList() *list.List { return s.useList }
-func (s StoreInst) Type() Type              { return nil }
-func (s StoreInst) Name() string            { return "" }
-func (s StoreInst) SetName(string)          {}
-func (s StoreInst) HasName() bool           { return false }
-func (s StoreInst) Opcode() Opcode          { return s.op }
-func (s StoreInst) IsTerm() bool            { return termop_begin < s.op && s.op < termop_end }
-func (s StoreInst) IsBinaryOp() bool        { return binop_begin < s.op && s.op < binop_end }
-func (s StoreInst) IsOtherOp() bool         { return other_op_begin < s.op && s.op < other_op_end }
-func (s StoreInst) IsMemOp() bool           { return memop_begin < s.op && s.op < memop_end }
-func (s StoreInst) IsBitBinOp() bool        { return bit_binop_begin < s.op && s.op < bit_binop_end }
-func (s StoreInst) String() string {
-	valueStr := fmt.Sprintf("%s %s", s.value.Type(), s.value.Name())
-	dstStr := fmt.Sprintf("%s %s", s.dst.Type(), s.dst.Name())
+func (s *StoreInst) OperandList() *list.List { return s.useList }
+func (s *StoreInst) Type() Type              { return nil }
+func (s *StoreInst) Name() string            { return "" }
+func (s *StoreInst) SetName(string)          {}
+func (s *StoreInst) HasName() bool           { return false }
+func (s *StoreInst) Opcode() Opcode          { return s.op }
+func (s *StoreInst) IsTerm() bool            { return termop_begin < s.op && s.op < termop_end }
+func (s *StoreInst) IsBinaryOp() bool        { return binop_begin < s.op && s.op < binop_end }
+func (s *StoreInst) IsOtherOp() bool         { return other_op_begin < s.op && s.op < other_op_end }
+func (s *StoreInst) IsMemOp() bool           { return memop_begin < s.op && s.op < memop_end }
+func (s *StoreInst) IsBitBinOp() bool        { return bit_binop_begin < s.op && s.op < bit_binop_end }
+func (s *StoreInst) String() string {
+	valueStr := fmt.Sprintf("%s %s", s.Value.Type(), s.Value.Name())
+	dstStr := fmt.Sprintf("%s %s", s.Dst.Type(), s.Dst.Name())
 
 	return fmt.Sprintf("store %s, %s", valueStr, dstStr)
 }
@@ -294,8 +334,8 @@ func CreateStore(value, dst Value) *StoreInst {
 
 	return &StoreInst{
 		op:      Store,
-		value:   value,
-		dst:     dst,
+		Value:   value,
+		Dst:     dst,
 		useList: uses,
 	}
 }
@@ -336,6 +376,11 @@ func CreateAlloca(ty Type, numElems int, align int, name string) *AllocaInst {
 	return alloc
 }
 
+func (a AllocaInst) AddUse(v Value) { a.useList.PushBack(v) }
+func (a AllocaInst) SetOperand(idx int, op Value) {
+	//TODO implement me
+	panic("implement me")
+}
 func (a AllocaInst) NumUses() int            { return a.useList.Len() }
 func (a AllocaInst) NumOperands() int        { return 0 }
 func (a AllocaInst) Operand(int) Value       { panic("alloca instruction has no operands") }
@@ -397,6 +442,11 @@ func CreateRetVoid() *ReturnInst {
 	}
 }
 
+func (r ReturnInst) AddUse(v Value) { r.useList.PushBack(v) }
+func (r ReturnInst) SetOperand(idx int, op Value) {
+	//TODO implement me
+	panic("implement me")
+}
 func (r ReturnInst) NumUses() int     { return r.useList.Len() }
 func (r ReturnInst) NumOperands() int { return 1 }
 func (r ReturnInst) Operand(idx int) Value {
@@ -467,6 +517,11 @@ func CreateBr(dst *BasicBlock) *BranchInst {
 	}
 }
 
+func (b BranchInst) AddUse(v Value) { b.useList.PushBack(v) }
+func (b BranchInst) SetOperand(idx int, op Value) {
+	//TODO implement me
+	panic("implement me")
+}
 func (b BranchInst) NumUses() int { return b.useList.Len() }
 func (b BranchInst) NumOperands() int {
 	if b.IsConditional() {
@@ -553,6 +608,11 @@ func CreatePHINode(ty Type, numIncomingPaths uint, name string) *PHINode {
 	}
 }
 
+func (phi *PHINode) AddUse(v Value) { phi.useList.PushBack(v) }
+func (phi *PHINode) SetOperand(idx int, op Value) {
+	//TODO implement me
+	panic("implement me")
+}
 func (phi *PHINode) NumUses() int     { return phi.useList.Len() }
 func (phi *PHINode) NumOperands() int { return len(phi.incoming) }
 func (phi *PHINode) Operand(idx int) Value {
@@ -564,7 +624,7 @@ func (phi *PHINode) Operand(idx int) Value {
 }
 func (phi *PHINode) OperandList() *list.List { return phi.useList }
 func (phi *PHINode) Type() Type              { return phi.ty }
-func (phi *PHINode) Name() string            { return "%" + phi.name }
+func (phi *PHINode) Name() string            { return phi.name }
 func (phi *PHINode) SetName(name string)     { phi.name = name }
 func (phi *PHINode) HasName() bool           { return phi.name != "" }
 func (phi *PHINode) String() string {
@@ -583,6 +643,10 @@ func (phi *PHINode) IsOtherOp() bool  { return other_op_begin < phi.op && phi.op
 func (phi *PHINode) IsBitBinOp() bool { return bit_binop_begin < phi.op && phi.op < bit_binop_end }
 func (phi *PHINode) AddIncoming(v Value, blk *BasicBlock) {
 	phi.incoming = append(phi.incoming, PHINodeIncoming{v, blk})
+	phi.numIncomingPaths++
+	if phi.ty == nil {
+		phi.ty = v.Type()
+	}
 }
 
 type PHINodeIncoming struct {
