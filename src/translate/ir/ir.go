@@ -100,6 +100,8 @@ type Value interface {
 	HasName() bool
 	String() string
 	NumUses() int
+	AddUse(Value)
+	SetOperand(int, Value)
 }
 
 type User interface {
