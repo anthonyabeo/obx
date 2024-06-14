@@ -218,6 +218,8 @@ func (b *Builder) CreateCmp(pred Opcode, lhs, rhs Value, name string) Value {
 	}
 
 	icmp := CreateICmp(ResTy, pred, lhs, rhs, name)
+	lhs.AddUse(icmp)
+	rhs.AddUse(icmp)
 	b.BB.instr.PushBack(icmp)
 
 	return icmp
@@ -239,6 +241,8 @@ func (b *Builder) CreateCall(fty *FunctionType, callee Value, args []Value, name
 
 func (b *Builder) CreateStore(Val, Dst Value) *StoreInst {
 	store := CreateStore(Val, Dst)
+	Val.AddUse(store)
+	Dst.AddUse(store)
 	b.BB.instr.PushBack(store)
 
 	return store
@@ -246,6 +250,7 @@ func (b *Builder) CreateStore(Val, Dst Value) *StoreInst {
 
 func (b *Builder) CreateLoad(ty Type, ptr Value, name string) *LoadInst {
 	load := CreateLoad(ty, ptr, name)
+	ptr.AddUse(load)
 	b.BB.instr.PushBack(load)
 
 	return load
