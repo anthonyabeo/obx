@@ -2,16 +2,14 @@ package main
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/anthonyabeo/obx/cmd/cli"
+	"os"
 )
 
 func main() {
-	args := os.Args[1:]
-
-	if err := cli.Run(args); err != nil {
+	if err := cli.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+
 }

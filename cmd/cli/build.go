@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/urfave/cli/v2"
+	"github.com/spf13/cobra"
 
 	"github.com/anthonyabeo/obx/src/diagnostics"
 	"github.com/anthonyabeo/obx/src/sema"
@@ -19,70 +19,43 @@ import (
 )
 
 var buildArgs struct {
-	entry  string
-	path   string
-	output string
+	Entry  string
+	Path   string
+	Output string
+	Opt    []string
 }
 
-var buildCmd = &cli.Command{
-	Name:        "build",
-	Description: "compile module or definition (along with its dependencies) into an object file",
-	Usage:       "build [flags]",
-	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:        "entry",
-			Aliases:     []string{"e"},
-			Required:    true,
-			Destination: &buildArgs.entry,
-			Usage:       "the module that specify the entrypoint into the program",
-		},
-		&cli.StringFlag{
-			Name:        "path",
-			Aliases:     []string{"p"},
-			Required:    false,
-			Destination: &buildArgs.path,
-			Usage:       "the filesystem path to the 'entry' module. Defaults to the current directory",
-		},
-		&cli.StringFlag{
-			Name:        "output",
-			Aliases:     []string{"o"},
-			Required:    false,
-			Destination: &buildArgs.output,
-			Usage:       "the name of the output file to produce",
-		},
-	},
-	Action: runBuild,
-}
+var buildCmd = &cobra.Command{
+	Use:   "build",
+	Short: "compile module or definition (along with its dependencies) into an object file",
+	Run: func(cmd *cobra.Command, args []string) {
+		module, err := cmd.Flags().GetString("entry")
+		path, err := cmd.Flags().GetString("path")
 
-func runBuild(ctx *cli.Context) (err error) {
-	module := ctx.Value("e").(string)
-	path := ctx.Value("p").(string)
-
-	if len(path) == 0 {
-		path, err = os.Getwd()
-		if err != nil {
-			panic("diagnostics finding the current working directory")
+		if len(path) == 0 {
+			path, err = os.Getwd()
+			if err != nil {
+				panic("diagnostics finding the current working directory")
+			}
 		}
-	}
 
-	obx := ast.NewOberon()
-	scopes := map[string]scope.Scope{}
-	for _, unit := range obx.Units() {
-		scopes[unit.Name()] = nil
-	}
+		obx := ast.NewOberon()
+		scopes := map[string]scope.Scope{}
+		for _, unit := range obx.Units() {
+			scopes[unit.Name()] = nil
+		}
 
-	errReporter := diagnostics.NewStdErrReporter(10)
-	_ = ParseModule(obx, module, path, errReporter)
+		errReporter := diagnostics.NewStdErrReporter(10)
+		_ = ParseModule(obx, module, path, errReporter)
 
-	tsOrd := topologicalSort(obx)
+		tsOrd := topologicalSort(obx)
 
-	vst := sema.NewVisitor(scopes, errReporter)
-	for _, name := range tsOrd {
-		unit := obx.Units()[name]
-		unit.Accept(vst)
-	}
-
-	return nil
+		vst := sema.NewVisitor(scopes, errReporter)
+		for _, name := range tsOrd {
+			unit := obx.Units()[name]
+			unit.Accept(vst)
+		}
+	},
 }
 
 func GetModule(module, path string) (mod *Module, err error) {

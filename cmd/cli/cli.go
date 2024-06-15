@@ -1,23 +1,15 @@
 package cli
 
-import (
-	"log"
+import "github.com/spf13/cobra"
 
-	"github.com/urfave/cli/v2"
-)
+func Run() error {
+	buildCmd.Flags().StringVarP(&buildArgs.Entry, "entry", "e", "", "the module that specify the entrypoint into the program")
+	buildCmd.Flags().StringVarP(&buildArgs.Path, "path", "p", "", "the filesystem path to the 'entry' module. Defaults to the current directory")
+	buildCmd.Flags().StringVarP(&buildArgs.Output, "output", "o", "", "the name of the output file to produce")
+	buildCmd.Flags().StringArrayVar(&buildArgs.Opt, "opt", []string{}, "list of optimizations to perform")
 
-func Run(args []string) error {
-	app := &cli.App{
-		Name:  "obx",
-		Usage: "Oberon+ Compiler",
-		Commands: []*cli.Command{
-			buildCmd,
-		},
-	}
+	var rootCmd = &cobra.Command{Use: "obx"}
+	rootCmd.AddCommand(buildCmd)
 
-	if err := app.Run(args); err != nil {
-		log.Fatal(err)
-	}
-
-	return nil
+	return rootCmd.Execute()
 }
