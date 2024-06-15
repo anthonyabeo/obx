@@ -21,20 +21,21 @@ do so before running the `install` command.
 
 
 ### Usage
-```shell
-$ obx help
+```
+$ obx -h
 
-NAME:
-   obx - Oberon+ Compiler
+Usage:
+  obx [command]
 
-USAGE:
-   obx [global options] command [command options] 
+Available Commands:
+  build       compile module or definition (along with its dependencies) into an object file
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
 
-COMMANDS:
-   build    build [flags]
-   help, h  Shows a list of commands or help for one command
+Flags:
+  -h, --help   help for obx
 
-GLOBAL OPTIONS:
-   --help, -h  show help
+Use "obx [command] --help" for more information about a command.
+
 
 ```
