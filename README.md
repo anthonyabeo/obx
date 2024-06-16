@@ -36,6 +36,51 @@ Flags:
   -h, --help   help for obx
 
 Use "obx [command] --help" for more information about a command.
+```
 
+### Example
+The program below is in the `Main.obx` file in `/examples/if-else`.
+```
+module Main
+    var a, b, max: integer
 
+begin
+    a := 5
+    b := 10
+
+    if a > b then
+        max := a
+    else
+        max := b
+    end
+
+    assert(max = 10)
+end Main
+```
+
+```shell
+$ obx build -e Main -p ./examples/if-else --emit-ir --opt mem2reg
+```
+Output:
+```
+define i32 @main() {
+%entry:
+    br label %main
+
+%main:
+    %2 = icmp ugt i32 5, 10
+    br i1 %2, label %if.then, label %if.else
+
+%if.then:
+    br label %cont
+
+%if.else:
+    br label %cont
+    
+%cont:
+    %max = phi i32 [ 5, %if.then ], [ 10, %if.else ]
+    %6 = icmp eq i32 %max, 10
+    %assert = call void assert(i1 %6)
+    ret i32 0
+}
 ```
