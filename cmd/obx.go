@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/cmd/cli"
 	"os"
+
+	"github.com/anthonyabeo/obx/cmd/cli"
 )
 
 func main() {
