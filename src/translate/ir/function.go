@@ -30,18 +30,32 @@ func CreateFunction(ty *FunctionType, link LinkageKind, name string, module *Mod
 	return F
 }
 
-func (f Function) SetOperand(i int, v Value) { panic("unimplemented") }
-func (f Function) AddUse(v Value)            { f.useList.PushBack(v) }
-func (f Function) NumOperands() int          { return f.useList.Len() }
-func (f Function) Operand(int) Value         { panic("[internal] functions have no operands") }
-func (f Function) OperandList() *list.List   { return f.useList }
-func (f Function) Parent() *Module           { return f.module }
-func (f Function) NumUses() int              { return f.useList.Len() }
-func (f Function) Type() Type                { return f.ty }
-func (f Function) Name() string              { return f.name }
-func (f Function) SetName(name string)       { f.name = name }
-func (f Function) HasName() bool             { return f.name != "" }
-func (f Function) String() string {
+func CreatePreDeclaredFunction(ty *FunctionType, link LinkageKind, name string, module *Module) *Function {
+	uses := list.New()
+	uses.Init()
+
+	return &Function{
+		name:    name,
+		link:    link,
+		ty:      ty,
+		cfg:     NewCFG(),
+		module:  module,
+		useList: uses,
+	}
+}
+
+func (f *Function) SetOperand(i int, v Value) { panic("unimplemented") }
+func (f *Function) AddUse(v Value)            { f.useList.PushBack(v) }
+func (f *Function) NumOperands() int          { return f.useList.Len() }
+func (f *Function) Operand(int) Value         { panic("[internal] functions have no operands") }
+func (f *Function) OperandList() *list.List   { return f.useList }
+func (f *Function) Parent() *Module           { return f.module }
+func (f *Function) NumUses() int              { return f.useList.Len() }
+func (f *Function) Type() Type                { return f.ty }
+func (f *Function) Name() string              { return f.name }
+func (f *Function) SetName(name string)       { f.name = name }
+func (f *Function) HasName() bool             { return f.name != "" }
+func (f *Function) String() string {
 	buf := &bytes.Buffer{}
 
 	buf.WriteString(fmt.Sprintf("define %s @%s() {\n", f.ty.retTy, f.name))
@@ -52,10 +66,10 @@ func (f Function) String() string {
 
 	return buf.String()
 }
-func (f Function) HasInternalLinkage() bool { return f.link == Internal }
-func (f Function) HasExternalLinkage() bool { return f.link == External }
-func (f Function) SymbolTable()             {}
-func (f Function) CFG() *ControlFlowGraph   { return f.cfg }
+func (f *Function) HasInternalLinkage() bool { return f.link == Internal }
+func (f *Function) HasExternalLinkage() bool { return f.link == External }
+func (f *Function) SymbolTable()             {}
+func (f *Function) CFG() *ControlFlowGraph   { return f.cfg }
 
 // Argument ...
 // ---------------------

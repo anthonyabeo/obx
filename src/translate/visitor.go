@@ -13,7 +13,7 @@ import (
 
 type Visitor struct {
 	builder *ir.Builder
-	module  *ir.Module
+	Module  *ir.Module
 
 	env    scope.Scope
 	scopes map[string]scope.Scope
@@ -35,13 +35,13 @@ func (v *Visitor) VisitOberon(ob *ast.Oberon) {
 func (v *Visitor) VisitModule(m *ast.Module) {
 	v.env = v.scopes[m.BName.Name]
 
-	v.module = ir.NewModule(m.BName.Name)
+	v.Module = ir.NewModule(m.BName.Name)
 
 	Main := ir.CreateFunction(
 		ir.CreateFunctionType([]ir.Type{}, ir.Int32Type, false),
 		ir.Internal,
 		"main",
-		v.module,
+		v.Module,
 	)
 
 	var (
@@ -119,7 +119,7 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 		args = append(args, arg.Value())
 	}
 
-	F := v.module.GetFunction(call.Callee.String())
+	F := v.Module.GetFunction(call.Callee.String())
 	if F == nil {
 		panic(fmt.Sprintf("[internal] undeclared function '%s'", call.Callee.String()))
 	}
@@ -275,7 +275,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 	av := &AddrVisitor{Visitor{
 		builder: v.builder,
-		module:  v.module,
+		Module:  v.Module,
 		env:     v.env,
 	}}
 
@@ -310,7 +310,7 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 
 	v.builder.CreateCall(
 		ir.CreateFunctionType(fArgs, ir.VoidType, false),
-		v.module.GetFunction(call.Callee.String()), args,
+		v.Module.GetFunction(call.Callee.String()), args,
 		call.Callee.String(),
 	)
 }

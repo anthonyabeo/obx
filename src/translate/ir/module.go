@@ -49,8 +49,8 @@ func (m *Module) GetFunction(name string) (F *Function) {
 	case "main":
 		F = m.env[name].(*Function)
 
-	default:
-		F = CreateFunction(
+	case "assert":
+		F = CreatePreDeclaredFunction(
 			CreateFunctionType([]Type{Int1Type}, VoidType, false),
 			External,
 			"assert",
