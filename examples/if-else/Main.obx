@@ -1,0 +1,15 @@
+module Main
+	var a, b, max: integer
+
+begin
+	a := 5
+    b := 10
+
+	if a > b then
+		max := a
+	else
+		max := b
+	end
+
+    assert(max = 10)
+end Main
