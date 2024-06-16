@@ -10,12 +10,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/anthonyabeo/obx/src/diagnostics"
+	"github.com/anthonyabeo/obx/src/opt"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 	"github.com/anthonyabeo/obx/src/syntax/token"
+	"github.com/anthonyabeo/obx/src/translate"
 )
 
 var buildArgs struct {
@@ -23,6 +25,7 @@ var buildArgs struct {
 	Path   string
 	Output string
 	Opt    []string
+	EmitIR bool
 }
 
 var buildCmd = &cobra.Command{
@@ -31,6 +34,8 @@ var buildCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		module, err := cmd.Flags().GetString("entry")
 		path, err := cmd.Flags().GetString("path")
+		emitIR, err := cmd.Flags().GetBool("emit-ir")
+		opts, err := cmd.Flags().GetStringArray("opt")
 
 		if len(path) == 0 {
 			path, err = os.Getwd()
@@ -54,6 +59,35 @@ var buildCmd = &cobra.Command{
 		for _, name := range tsOrd {
 			unit := obx.Units()[name]
 			unit.Accept(vst)
+		}
+
+		tVst := translate.NewVisitor(scopes)
+		for _, name := range tsOrd {
+			unit := obx.Units()[name]
+			unit.Accept(tVst)
+		}
+
+		if len(opts) > 0 {
+			for _, op := range opts {
+				switch op {
+				case "mem2reg":
+					for _, f := range tVst.Module.GetFunctionList() {
+						cfg := f.CFG()
+						opt.ComputePhiInsertLocations(cfg)
+
+						stack := &opt.Stack{}
+						vst := map[string]bool{}
+						opt.RegisterPromotion(cfg, cfg.Entry, vst, stack)
+					}
+				case "dce":
+				}
+			}
+		}
+
+		if emitIR {
+			for _, f := range tVst.Module.GetFunctionList() {
+				fmt.Println(f)
+			}
 		}
 	},
 }
