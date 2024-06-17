@@ -26,10 +26,18 @@ func NewVisitor(scopes map[string]scope.Scope) *Visitor {
 	}
 }
 
-func (v *Visitor) VisitOberon(ob *ast.Oberon) {
-	for _, m := range ob.Units() {
-		m.Accept(v)
+func (v *Visitor) VisitOberon(*ast.Oberon) {}
+
+func (v *Visitor) Translate(ob *ast.Oberon, order []string) *ir.Program {
+	p := &ir.Program{}
+
+	for _, name := range order {
+		unit := ob.Units()[name]
+		unit.Accept(v)
+		p.AddModule(v.Module)
 	}
+
+	return p
 }
 
 func (v *Visitor) VisitModule(m *ast.Module) {
