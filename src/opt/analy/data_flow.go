@@ -1,4 +1,4 @@
-package opt
+package analy
 
 import (
 	"github.com/anthonyabeo/obx/src/translate/ir"
