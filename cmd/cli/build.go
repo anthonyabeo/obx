@@ -55,34 +55,21 @@ var buildCmd = &cobra.Command{
 
 		tsOrd := topologicalSort(obx)
 
+		// Semantics Analysis
 		vst := sema.NewVisitor(scopes, errReporter)
 		for _, name := range tsOrd {
 			unit := obx.Units()[name]
 			unit.Accept(vst)
 		}
 
+		// Translation to IR
 		tVst := translate.NewVisitor(scopes)
-		for _, name := range tsOrd {
-			unit := obx.Units()[name]
-			unit.Accept(tVst)
-		}
+		program := tVst.Translate(obx, tsOrd)
 
-		if len(opts) > 0 {
-			for _, op := range opts {
-				switch op {
-				case "mem2reg":
-					for _, f := range tVst.Module.GetFunctionList() {
-						cfg := f.CFG()
-						opt.ComputePhiInsertLocations(cfg)
-
-						stack := &opt.Stack{}
-						vst := map[string]bool{}
-						opt.RegisterPromotion(cfg, cfg.Entry, vst, stack)
-					}
-				case "dce":
-				}
-			}
-		}
+		// Optimisation
+		pm := opt.NewPassManager()
+		pm.AddPasses(opts...)
+		pm.Run(program)
 
 		if emitIR {
 			for _, f := range tVst.Module.GetFunctionList() {
