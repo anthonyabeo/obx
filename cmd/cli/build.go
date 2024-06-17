@@ -40,7 +40,7 @@ var buildCmd = &cobra.Command{
 		if len(path) == 0 {
 			path, err = os.Getwd()
 			if err != nil {
-				panic("diagnostics finding the current working directory")
+				panic("error: cannot find the current working directory")
 			}
 		}
 
