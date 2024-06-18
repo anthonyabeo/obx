@@ -2,7 +2,8 @@
 Obx is an implementation of the [Oberon+](https://oberon-lang.github.io/) compiler.
 
 ## Get Started
-Obx is implemented in Go. You should have recent Go toolchain (Go >= 1.18) installed on your system. 
+Obx is implemented in Go. You should have recent Go toolchain (Go >= 1.18) installed on your system. You can download
+and install Go from the [website here](https://go.dev/doc/install).
 
 ### Build
 ```shell
