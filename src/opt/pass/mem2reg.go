@@ -137,7 +137,7 @@ func ComputePhiInsertLocations(cfg *ir.ControlFlowGraph) map[string]ir.SetOfBBs 
 					locations[variable.Name()].Add(BB)
 				}
 
-				if storeBlocks.Contains(Name) {
+				if !storeBlocks.Contains(Name) {
 					workList.Add(BB)
 				}
 			}
