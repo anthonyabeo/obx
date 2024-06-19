@@ -40,48 +40,50 @@ Use "obx [command] --help" for more information about a command.
 ```
 
 ### Example
-The program below is in the `Main.obx` file in `/examples/if-else`.
+The program below is in the `examples/basics/Main.obx` file.
 ```
 module Main
-    var a, b, max: integer
+var a, b, total: integer
 
 begin
-    a := 5
     b := 10
-
-    if a > b then
-        max := a
-    else
-        max := b
+    total := 0
+    
+    for a := 0 to b do
+        total := total + 1
     end
-
-    assert(max = 10)
+    
+    assert(total = 55)
 end Main
 ```
 
 ```shell
-$ obx build -e Main -p ./examples/if-else --emit-ir --opt mem2reg
+$ obx build -e Main -p ./examples/basics --emit-ir --opt mem2reg
 ```
 Output:
 ```
 define i32 @main() {
 %entry:
-    br label %main
+        br label %main
 
 %main:
-    %2 = icmp ugt i32 5, 10
-    br i1 %2, label %if.then, label %if.else
+        %2 = icmp slt i32 0, 10
+        br i1 %2, label %body, label %cont
 
-%if.then:
-    br label %cont
+%body:
+        %a = phi i32 [ 0, %main ], [ %6, %body ]
+        %total = phi i32 [ 0, %main ], [ %4, %body ]
+        %4 = add i32 %total, 1
+        %6 = add i32 %a, 1
+        %7 = icmp slt i32 %a, 10
+        br i1 %7, label %body, label %cont
 
-%if.else:
-    br label %cont
-    
 %cont:
-    %max = phi i32 [ 5, %if.then ], [ 10, %if.else ]
-    %6 = icmp eq i32 %max, 10
-    %assert = call void assert(i1 %6)
-    ret i32 0
+        %a = phi i32 [ %6, %body ], [ 0, %main ]
+        %total = phi i32 [ %4, %body ], [ 0, %main ]
+        %9 = icmp eq i32 %total, 55
+        %assert = call void assert(i1 %9)
+        ret i32 0
 }
+
 ```
