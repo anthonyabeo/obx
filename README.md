@@ -58,32 +58,40 @@ end Main
 ```
 
 ```shell
-$ obx build -e Main -p ./examples/basics --emit-ir --opt mem2reg
+$ obx build -e Main -p ./examples/basics --emit-ir
 ```
 Output:
 ```
 define i32 @main() {
 %entry:
-        br label %main
+    br label %main
 
 %main:
-        %2 = icmp slt i32 0, 10
-        br i1 %2, label %body, label %cont
+    %a = alloca i32
+    %b = alloca i32
+    %total = alloca i32
+    store i32 10, ptr %b
+    store i32 0, ptr %total
+    %0 = load i32, ptr %b
+    store i32 0, ptr %a
+    %1 = load i32, ptr %a
+    %2 = icmp slt i32 %1, %0
+    br i1 %2, label %body, label %cont
 
 %body:
-        %a = phi i32 [ 0, %main ], [ %6, %body ]
-        %total = phi i32 [ 0, %main ], [ %4, %body ]
-        %4 = add i32 %total, 1
-        %6 = add i32 %a, 1
-        %7 = icmp slt i32 %a, 10
-        br i1 %7, label %body, label %cont
+    %3 = load i32, ptr %total
+    %4 = add i32 %3, 1
+    store i32 %4, ptr %total
+    %5 = load i32, ptr %a
+    %6 = add i32 %5, 1
+    store i32 %6, ptr %a
+    %7 = icmp slt i32 %a, %0
+    br i1 %7, label %body, label %cont
 
 %cont:
-        %a = phi i32 [ %6, %body ], [ 0, %main ]
-        %total = phi i32 [ %4, %body ], [ 0, %main ]
-        %9 = icmp eq i32 %total, 55
-        %assert = call void assert(i1 %9)
-        ret i32 0
+    %8 = load i32, ptr %total
+    %9 = icmp eq i32 %8, 55
+    %assert = call void assert(i1 %9)
+    ret i32 0
 }
-
 ```
