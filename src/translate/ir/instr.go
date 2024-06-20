@@ -36,19 +36,30 @@ type CallInstr struct {
 	useList *list.List
 }
 
-func (c CallInstr) AddUse(v Value) { c.useList.PushBack(v) }
-func (c CallInstr) NumUses() int   { return c.useList.Len() }
-func (c CallInstr) NumOperands() int {
-	//TODO implement me
-	panic("implement me")
+func (c CallInstr) AddUse(v Value)   { c.useList.PushBack(v) }
+func (c CallInstr) NumUses() int     { return c.useList.Len() }
+func (c CallInstr) NumOperands() int { return 1 + len(c.args) }
+func (c CallInstr) Operand(idx int) Value {
+	if idx < 1 || idx > c.NumOperands() {
+		panic(fmt.Sprintf("[internal] invalid index '%d' for instruction '%s'", idx, c))
+	}
+
+	if idx == 1 {
+		return c.callee
+	}
+
+	return c.args[idx-2]
 }
-func (c CallInstr) Operand(i int) Value {
-	//TODO implement me
-	panic("implement me")
-}
-func (c CallInstr) SetOperand(idx int, op Value) {
-	//TODO implement me
-	panic("implement me")
+func (c CallInstr) SetOperand(idx int, v Value) {
+	if idx < 1 || idx > c.NumOperands() {
+		panic(fmt.Sprintf("[internal] invalid index '%d' for instruction '%s'", idx, c))
+	}
+
+	if idx == 1 {
+		c.callee = v
+	}
+
+	c.args[idx-2] = v
 }
 func (c CallInstr) OperandList() *list.List { return c.useList }
 func (c CallInstr) Type() Type              { return c.fty }

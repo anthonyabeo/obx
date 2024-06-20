@@ -101,7 +101,7 @@ type BasicBlock struct {
 	ty     *LabelType
 	parent *Function
 	instr  *list.List
-	Phi    []*PHINode
+	Phi    map[string][]*PHINode
 }
 
 func NewBasicBlock(name string) *BasicBlock {
@@ -120,6 +120,7 @@ func CreateBasicBlock(name string, parent *Function) *BasicBlock {
 		ty:     &LabelType{name: name},
 		parent: parent,
 		instr:  instr,
+		Phi:    map[string][]*PHINode{},
 	}
 
 	parent.cfg.Nodes[name] = blk
