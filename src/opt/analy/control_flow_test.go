@@ -8,16 +8,86 @@ import (
 
 func TestComputingExtendedBasicBlocks(t *testing.T) {
 	entry := ir.NewBasicBlock("entry")
+	b0 := ir.NewBasicBlock("B0")
 	b1 := ir.NewBasicBlock("B1")
 	b2 := ir.NewBasicBlock("B2")
 	b3 := ir.NewBasicBlock("B3")
 	b4 := ir.NewBasicBlock("B4")
 	b5 := ir.NewBasicBlock("B5")
 	b6 := ir.NewBasicBlock("B6")
+
+	cfg := &ir.ControlFlowGraph{
+		Entry: b0,
+		Exit:  nil,
+		Nodes: map[string]*ir.BasicBlock{
+			"entry": entry,
+			"B0":    b0,
+			"B1":    b1,
+			"B2":    b2,
+			"B3":    b3,
+			"B4":    b4,
+			"B5":    b5,
+			"B6":    b6,
+		},
+		Succ: map[string][]string{
+			"entry": {"B0"},
+			"B0":    {"B1", "B3"},
+			"B1":    {"B2"},
+			"B2":    {"B0"},
+			"B3":    {"B4", "B6"},
+			"B4":    {"B5"},
+			"B5":    {"B2"},
+			"B6":    {"B5"},
+		},
+		Pred: map[string][]string{
+			"B0": {},
+			"B1": {"B0"},
+			"B2": {"B1", "B5"},
+			"B3": {"B0"},
+			"B4": {"B3"},
+			"B5": {"B6", "B4"},
+			"B6": {"B3"},
+		},
+	}
+
+	tests := []struct {
+		root string
+		blks []string
+	}{
+		{"B0", []string{"B0", "B1", "B3", "B4", "B6"}},
+		{"B5", []string{"B5"}},
+		{"B2", []string{"B2"}},
+	}
+
+	extBBs := ExtendedBasicBlocks(cfg, b0)
+	for _, tt := range tests {
+		ebb, found := extBBs[tt.root]
+		if !found {
+			t.Errorf("no EBB found for root '%s'", tt.root)
+		}
+
+		if len(tt.blks) != len(ebb) {
+			t.Errorf("expected an EBB of size %d, got %d", len(tt.blks), len(ebb))
+		}
+
+		for i := 0; i < len(tt.blks); i++ {
+			if _, exist := ebb[tt.blks[i]]; !exist {
+				t.Errorf("expected %s to be in the EBB of root %s. It doesn't", tt.blks[i], tt.root)
+			}
+		}
+	}
+
+	entry = ir.NewBasicBlock("entry")
+	b1 = ir.NewBasicBlock("B1")
+	b2 = ir.NewBasicBlock("B2")
+	b3 = ir.NewBasicBlock("B3")
+	b4 = ir.NewBasicBlock("B4")
+	b5 = ir.NewBasicBlock("B5")
+	b6 = ir.NewBasicBlock("B6")
 	b7 := ir.NewBasicBlock("B7")
 	exit := ir.NewBasicBlock("exit")
 
-	cfg := &ir.ControlFlowGraph{
+	cfg = &ir.ControlFlowGraph{
 		Entry: entry,
 		Exit:  exit,
 		Nodes: map[string]*ir.BasicBlock{
@@ -55,18 +125,18 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 		},
 	}
 
-	tests := []struct {
+	tests = []struct {
 		root string
 		blks []string
 	}{
 		{"entry", []string{"entry"}},
-		{"B1", []string{"B1", "B2", "B2"}},
+		{"B1", []string{"B1", "B2", "B3"}},
 		{"B4", []string{"B4", "B6"}},
 		{"B5", []string{"B5", "B7"}},
 		{"exit", []string{"exit"}},
 	}
 
-	extBBs := ComputeAllExtBB(cfg, entry)
+	extBBs = ExtendedBasicBlocks(cfg, entry)
 	for _, tt := range tests {
 		ebb, found := extBBs[tt.root]
 		if !found {

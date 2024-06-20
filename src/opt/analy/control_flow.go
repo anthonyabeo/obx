@@ -1,39 +1,37 @@
 package analy
 
-import "github.com/anthonyabeo/obx/src/translate/ir"
+import (
+	"github.com/anthonyabeo/obx/src/adt"
+	"github.com/anthonyabeo/obx/src/translate/ir"
+)
 
-func BuildExtBB(cfg *ir.ControlFlowGraph, src *ir.BasicBlock, EBBRoots *[]string) ir.SetOfBBs {
-	set := ir.SetOfBBs{}
-	compExtBBs(cfg, src, set, EBBRoots)
+func ExtendedBasicBlocks(cfg *ir.ControlFlowGraph, src *ir.BasicBlock) map[string]ir.SetOfBBs {
+	ebbs := map[string]ir.SetOfBBs{}
 
-	return set
+	roots := adt.NewQueue[string]()
+	roots.Enqueue(src.Name())
+	for !roots.Empty() {
+		x := roots.Dequeue()
+		if _, exists := ebbs[x]; !exists {
+			s := ir.SetOfBBs{}
+			extBasicBlocks(cfg, cfg.Nodes[x], roots, s)
+			ebbs[x] = s
+		}
+	}
+
+	return ebbs
 }
 
-func compExtBBs(cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, ebb ir.SetOfBBs, EBBRoots *[]string) {
-	ebb.Add(blk)
+func extBasicBlocks(cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, roots *adt.Queue[string], s ir.SetOfBBs) {
+	s.Add(blk)
+
 	for _, bb := range cfg.Succ[blk.Name()] {
-		if len(cfg.Pred[bb]) == 1 && !ebb.Contains(bb) {
-			compExtBBs(cfg, cfg.Nodes[bb], ebb, EBBRoots)
+		if len(cfg.Pred[bb]) == 1 && !s.Contains(bb) {
+			extBasicBlocks(cfg, cfg.Nodes[bb], roots, s)
 		} else {
-			*EBBRoots = append(*EBBRoots, bb)
+			roots.Enqueue(bb)
 		}
 	}
-}
-
-func ComputeAllExtBB(cfg *ir.ControlFlowGraph, src *ir.BasicBlock) map[string]ir.SetOfBBs {
-	AllEBBs := map[string]ir.SetOfBBs{}
-	EBBRoots := []string{src.Name()}
-
-	for len(EBBRoots) != 0 {
-		x := EBBRoots[0]
-		EBBRoots = EBBRoots[1:]
-
-		if _, exists := AllEBBs[x]; !exists {
-			AllEBBs[x] = BuildExtBB(cfg, cfg.Nodes[x], &EBBRoots)
-		}
-	}
-
-	return AllEBBs
 }
 
 func ImmDominator(cfg *ir.ControlFlowGraph, Dominance map[string]ir.SetOfBBs) ir.SetOfBBs {
@@ -143,25 +141,22 @@ func DominanceFrontier(cfg *ir.ControlFlowGraph) map[string]ir.SetOfBBs {
 }
 
 func NaturalLoop(cfg *ir.ControlFlowGraph, m, n string) ir.SetOfBBs {
-	Stack := make([]string, 0)
+	Stack := adt.NewStack[string]()
 	Loop := ir.SetOfBBs{}
 	Loop.Add(cfg.Nodes[m], cfg.Nodes[n])
 
 	if m != n {
-		Stack = append(Stack, m)
+		Stack.Push(m)
 	}
 
-	for len(Stack) != 0 {
-		p := Stack[len(Stack)-1]
-		Stack = Stack[:len(Stack)-1]
-
+	for !Stack.Empty() {
+		p := Stack.Pop()
 		for _, q := range cfg.Pred[p] {
 			if !Loop.Contains(q) {
 				Loop.Add(cfg.Nodes[q])
-				Stack = append(Stack, q)
+				Stack.Push(q)
 			}
 		}
-
 	}
 
 	return Loop
