@@ -1,9 +1,12 @@
 package pass
 
 import (
+	"github.com/anthonyabeo/obx/src/adt"
 	"github.com/anthonyabeo/obx/src/opt/analy"
 	"github.com/anthonyabeo/obx/src/translate/ir"
 )
+
+type MapOfBlockValuePair map[string]*BlockValuePair
 
 type Mem2Reg struct {
 	name string
@@ -14,7 +17,7 @@ func (m Mem2Reg) Run(program *ir.Program) bool {
 	for _, module := range program.Modules {
 		for _, f := range module.GetFunctionList() {
 			cfg := f.CFG()
-			stack := &Stack{}
+			stack := adt.NewStack[MapOfBlockValuePair]()
 			vst := map[string]bool{}
 
 			ComputePhiInsertLocations(cfg)
@@ -27,13 +30,15 @@ func (m Mem2Reg) Run(program *ir.Program) bool {
 
 // RegisterPromotion
 // ---------------------------------------------------------------
-func RegisterPromotion(cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, vst map[string]bool, stack *Stack) {
-	for _, phi := range blk.Phi {
-		Block, V := stack.BlockValuePair(phi.Name())
-		phi.AddIncoming(V, Block)
+func RegisterPromotion[T MapOfBlockValuePair](cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, vst map[string]bool, stack *adt.Stack[T]) {
+	for v, nodes := range blk.Phi {
+		for _, phi := range nodes {
+			Block, V := GetBlockValuePair(stack, v)
+			phi.AddIncoming(V, Block)
 
-		top := stack.Top()
-		top[phi.Name()] = &BlockValuePair{blk: blk, val: phi}
+			top := stack.Top()
+			top[phi.Name()] = &BlockValuePair{blk: blk, val: phi}
+		}
 	}
 
 	if _, found := vst[blk.Name()]; found {
@@ -47,16 +52,16 @@ func RegisterPromotion(cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, vst map[str
 		case *ir.BranchInst:
 			if !instr.IsConditional() {
 				stack.Push(map[string]*BlockValuePair{})
-				RegisterPromotion(cfg, instr.IfTrue, vst, stack)
+				RegisterPromotion[T](cfg, instr.IfTrue, vst, stack)
 				return
 			}
 
 			stack.Push(map[string]*BlockValuePair{})
-			RegisterPromotion(cfg, instr.IfTrue, vst, stack)
+			RegisterPromotion[T](cfg, instr.IfTrue, vst, stack)
 			stack.Pop()
 
 			stack.Push(map[string]*BlockValuePair{})
-			RegisterPromotion(cfg, instr.IfFalse, vst, stack)
+			RegisterPromotion[T](cfg, instr.IfFalse, vst, stack)
 			stack.Pop()
 
 			inst = inst.Next()
@@ -68,7 +73,7 @@ func RegisterPromotion(cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, vst map[str
 			inst = next
 
 		case *ir.LoadInst:
-			_, LoadV := stack.BlockValuePair(instr.Ptr.Name())
+			_, LoadV := GetBlockValuePair(stack, instr.Ptr.Name())
 
 			next := inst.Next()
 			blk.RemoveInstr(inst)
@@ -148,7 +153,7 @@ func ComputePhiInsertLocations(cfg *ir.ControlFlowGraph) map[string]ir.SetOfBBs 
 		for _, BB := range BBs {
 			phi := ir.CreateEmptyPHINode(variable)
 			BB.InsertInstrBegin(phi)
-			BB.Phi = append(BB.Phi, phi)
+			BB.Phi[variable] = append(BB.Phi[variable], phi)
 		}
 	}
 
@@ -162,39 +167,63 @@ type BlockValuePair struct {
 	val ir.Value
 }
 
-// Stack
-// ---------------------------------------------------------------
-type Stack struct {
-	data []map[string]*BlockValuePair
-}
-
-func (s *Stack) Push(tup map[string]*BlockValuePair) {
-	s.data = append(s.data, tup)
-}
-
-func (s *Stack) Pop() map[string]*BlockValuePair {
-	item := s.data[len(s.data)-1]
-	s.data = s.data[:len(s.data)-1]
-
-	return item
-}
-
-func (s *Stack) Top() map[string]*BlockValuePair {
-	if len(s.data) > 0 {
-		return s.data[len(s.data)-1]
-	}
-	return nil
-}
-
-func (s *Stack) Size() int { return len(s.data) }
-
-func (s *Stack) BlockValuePair(f string) (*ir.BasicBlock, ir.Value) {
+func GetBlockValuePair[T MapOfBlockValuePair](s *adt.Stack[T], f string) (*ir.BasicBlock, ir.Value) {
 	for i := s.Size() - 1; i >= 0; i-- {
-		frame := s.data[i]
+		frame := s.Items[i]
 		if tuple, ok := frame[f]; ok {
 			return tuple.blk, tuple.val
 		}
 	}
 
 	return nil, nil
+}
+
+// ComputeGlobalNames
+// ---------------------------------------------------------------
+func ComputeGlobalNames(cfg *ir.ControlFlowGraph) ([]string, map[string]ir.SetOfBBs) {
+	Globals := make([]string, 0)
+	Blocks := map[string]ir.SetOfBBs{}
+
+	for _, BB := range cfg.Nodes {
+		VarKill := map[string]bool{}
+
+		for i := BB.Instr().Front(); i != nil; i = i.Next() {
+			inst := i.Value.(ir.Instruction)
+			for i := 1; i < inst.NumOperands()+1; i++ {
+				if _, contains := VarKill[inst.Operand(i).Name()]; contains {
+					Globals = append(Globals, inst.Operand(i).Name())
+				}
+			}
+
+			VarKill[inst.Name()] = true
+			if _, ok := Blocks[inst.Name()]; !ok {
+				Blocks[inst.Name()] = ir.SetOfBBs{}
+				Blocks[inst.Name()].Add(BB)
+			} else {
+				Blocks[inst.Name()].Add(BB)
+			}
+		}
+	}
+
+	return Globals, Blocks
+}
+
+// InsertPhiFunctions
+// -----------------------------------------------------------------
+func InsertPhiFunctions(Globals []string, Blocks, DF map[string]ir.SetOfBBs) {
+	for _, name := range Globals {
+		WorkList := Blocks[name]
+		for !WorkList.Empty() {
+			block := WorkList.Pop()
+			for _, BB := range DF[block.Name()] {
+				if len(BB.Phi[name]) == 0 {
+					phi := ir.CreateEmptyPHINode("")
+					BB.InsertInstrBegin(phi)
+					BB.Phi[name] = append(BB.Phi[name], phi)
+
+					WorkList.Add(BB)
+				}
+			}
+		}
+	}
 }
