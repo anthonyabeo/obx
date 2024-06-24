@@ -31,9 +31,9 @@ func (m Mem2Reg) Run(program *ir.Program) bool {
 // RegisterPromotion
 // ---------------------------------------------------------------
 func RegisterPromotion[T MapOfBlockValuePair](cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, vst map[string]bool, stack *adt.Stack[T]) {
-	for v, nodes := range blk.Phi {
+	for _, nodes := range blk.Phi {
 		for _, phi := range nodes {
-			Block, V := GetBlockValuePair(stack, v)
+			Block, V := GetBlockValuePair(stack, phi.Name())
 			phi.AddIncoming(V, Block)
 
 			top := stack.Top()
@@ -124,7 +124,7 @@ func GetBlocksThatContainStore(cfg *ir.ControlFlowGraph, dst string) ir.SetOfBBs
 	return storeBlocks
 }
 
-func ComputePhiInsertLocations(cfg *ir.ControlFlowGraph) map[string]ir.SetOfBBs {
+func ComputePhiInsertLocations(cfg *ir.ControlFlowGraph) {
 	locations := map[string]ir.SetOfBBs{}
 
 	DF := analy.DominanceFrontier(cfg)
@@ -136,14 +136,16 @@ func ComputePhiInsertLocations(cfg *ir.ControlFlowGraph) map[string]ir.SetOfBBs 
 			block := workList.Pop()
 
 			for Name, BB := range DF[block.Name()] {
-				if _, exists := locations[variable.Name()]; !exists {
-					locations[variable.Name()] = ir.SetOfBBs{BB.Name(): BB}
-				} else {
-					locations[variable.Name()].Add(BB)
-				}
+				if len(locations[variable.Name()]) == 0 {
+					if _, exists := locations[variable.Name()]; !exists {
+						locations[variable.Name()] = ir.SetOfBBs{BB.Name(): BB}
+					} else {
+						locations[variable.Name()].Add(BB)
+					}
 
-				if !storeBlocks.Contains(Name) {
-					workList.Add(BB)
+					if !storeBlocks.Contains(Name) {
+						workList.Add(BB)
+					}
 				}
 			}
 		}
@@ -157,7 +159,6 @@ func ComputePhiInsertLocations(cfg *ir.ControlFlowGraph) map[string]ir.SetOfBBs 
 		}
 	}
 
-	return locations
 }
 
 // BlockValuePair
