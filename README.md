@@ -95,3 +95,33 @@ define i32 @main() {
     ret i32 0
 }
 ```
+
+Run the `mem2reg` pass to remove the unnecessary `load` and `store` operations
+
+```shell
+$ obx build -e Main -p ./examples/basics --emit-ir --opt mem2reg 
+```
+```
+define i32 @main() {
+%entry:
+    br label %main
+
+%main:
+    %2 = icmp slt i32 0, 10
+    br i1 %2, label %body, label %cont
+
+%body:
+    %total = phi i32 [ 0, %main ], [ %4, %body ]
+    %a = phi i32 [ 0, %main ], [ %6, %body ]
+    %4 = add i32 %total, 1
+    %6 = add i32 %a, 1
+    %7 = icmp slt i32 %a, 10
+    br i1 %7, label %body, label %cont
+
+%cont:
+    %9 = icmp eq i32 %4, 55
+    %assert = call void assert(i1 %9)
+    ret i32 0
+}
+
+```
