@@ -108,7 +108,7 @@ type ControlFlowGraph struct {
 
 func NewCFG() *ControlFlowGraph {
 	return &ControlFlowGraph{
-		Nodes: map[string]*BasicBlock{},
+		Nodes: SetOfBBs{},
 		Succ:  map[string][]string{},
 		Pred:  map[string][]string{},
 	}
