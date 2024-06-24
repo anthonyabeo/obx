@@ -81,7 +81,7 @@ func Dominance(cfg *ir.ControlFlowGraph) map[string]ir.SetOfBBs {
 			continue
 		}
 
-		Dom[name] = cfg.Nodes
+		Dom[name] = cfg.Nodes.Clone()
 	}
 
 	changed := true
