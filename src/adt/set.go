@@ -58,9 +58,9 @@ func (h *HashSet[T]) Intersect(s Set[T]) Set[T] {
 
 		h, s = s, h
 	}
-	for bb, exist := range h.elems {
-		if _, exists := h.elems[bb]; exists {
-			in.elems[bb] = exist
+	for bb := range h.elems {
+		if s.Contains(bb) {
+			in.elems[bb] = true
 		}
 	}
 
