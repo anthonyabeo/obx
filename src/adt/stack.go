@@ -7,7 +7,7 @@ type Stack[T any] struct {
 	t     int
 }
 
-func NewStack[T any]() *Stack[T] { return &Stack[T]{Items: make([]T, Capacity)} }
+func NewStack[T any]() *Stack[T] { return &Stack[T]{Items: make([]T, Capacity), t: -1} }
 
 func (s *Stack[T]) Empty() bool { return s.t == -1 }
 func (s *Stack[T]) Size() int   { return s.t + 1 }
