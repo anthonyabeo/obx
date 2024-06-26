@@ -4,125 +4,40 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+
+	"github.com/anthonyabeo/obx/src/adt"
 )
 
 // BitVector
 // -----------------------------
 type BitVector byte
 
-// SetOfBBs
-// -----------------------------------------------------------------------
-type SetOfBBs map[string]*BasicBlock
-
-func (s SetOfBBs) Add(blocks ...*BasicBlock) {
-	for _, blk := range blocks {
-		if _, exists := s[blk.name]; !exists {
-			s[blk.name] = blk
-		}
-	}
-}
-func (s SetOfBBs) Contains(blk string) bool { return s[blk] != nil }
-func (s SetOfBBs) Empty() bool              { return len(s) == 0 }
-func (s SetOfBBs) String() string {
-	buf := &bytes.Buffer{}
-	buf.WriteString("{")
-	for bb := range s {
-		buf.WriteString(bb)
-		buf.WriteString(", ")
-	}
-
-	buf.WriteString("}")
-	return buf.String()
-}
-func (s SetOfBBs) Union(other SetOfBBs) SetOfBBs {
-	set := SetOfBBs{}
-	for _, BB := range s {
-		set.Add(BB)
-	}
-	for _, BB := range other {
-		set.Add(BB)
-	}
-
-	return set
-}
-func (s SetOfBBs) Intersection(other SetOfBBs) SetOfBBs {
-	intersect := SetOfBBs{}
-	if len(s) > len(other) {
-		s, other = other, s
-	}
-	for name, BB := range s {
-		if _, exists := other[name]; exists {
-			intersect[name] = BB
-		}
-	}
-
-	return intersect
-}
-func (s SetOfBBs) Equal(other SetOfBBs) bool {
-	if len(s) != len(other) {
-		return false
-	}
-
-	for name := range s {
-		if _, exist := other[name]; !exist {
-			return false
-		}
-	}
-
-	return true
-}
-func (s SetOfBBs) Len() int { return len(s) }
-func (s SetOfBBs) Remove(blk string) SetOfBBs {
-	delete(s, blk)
-	return s
-}
-func (s SetOfBBs) Pop() *BasicBlock {
-	var v *BasicBlock
-
-	for key, value := range s {
-		v = value
-		delete(s, key)
-		break
-	}
-
-	return v
-}
-func (s SetOfBBs) Clone() SetOfBBs {
-	targetMap := SetOfBBs{}
-
-	for key, value := range s {
-		targetMap[key] = value
-	}
-
-	return targetMap
-}
-
 // ControlFlowGraph
 // ----------------------------------------------------------------
 type ControlFlowGraph struct {
 	Entry, Exit *BasicBlock
-	Nodes       SetOfBBs
-	Succ        map[string][]string
-	Pred        map[string][]string
+	Nodes       *adt.HashSet[*BasicBlock]
+	Succ        map[string][]*BasicBlock
+	Pred        map[string][]*BasicBlock
 }
 
 func NewCFG() *ControlFlowGraph {
 	return &ControlFlowGraph{
-		Nodes: SetOfBBs{},
-		Succ:  map[string][]string{},
-		Pred:  map[string][]string{},
+		Nodes: adt.NewHashSet[*BasicBlock](),
+		Succ:  map[string][]*BasicBlock{},
+		Pred:  map[string][]*BasicBlock{},
 	}
 }
 
 func (cfg *ControlFlowGraph) AddSucc(BlkName string, Successors ...*BasicBlock) {
 	for _, succ := range Successors {
-		cfg.Succ[BlkName] = append(cfg.Succ[BlkName], succ.name)
+		cfg.Succ[BlkName] = append(cfg.Succ[BlkName], succ)
 	}
 }
 
 func (cfg *ControlFlowGraph) AddPred(BlkName string, Predecessors ...*BasicBlock) {
 	for _, pred := range Predecessors {
-		cfg.Pred[BlkName] = append(cfg.Pred[BlkName], pred.name)
+		cfg.Pred[BlkName] = append(cfg.Pred[BlkName], pred)
 	}
 }
 
@@ -136,14 +51,14 @@ func (cfg *ControlFlowGraph) IsBrNode(blk string) bool {
 
 func (cfg *ControlFlowGraph) String() string {
 	var nodes, succ, pred []string
-	for _, blk := range cfg.Nodes {
+	for _, blk := range cfg.Nodes.Elems() {
 		nodes = append(nodes, blk.name)
 	}
 
 	for name, bb := range cfg.Succ {
 		var blks []string
 		for _, blk := range bb {
-			blks = append(blks, blk)
+			blks = append(blks, blk.name)
 		}
 
 		succ = append(succ, fmt.Sprintf("\n\t\t\t%s: %s", name, blks))
@@ -152,7 +67,7 @@ func (cfg *ControlFlowGraph) String() string {
 	for name, bb := range cfg.Pred {
 		var blks []string
 		for _, blk := range bb {
-			blks = append(blks, blk)
+			blks = append(blks, blk.name)
 		}
 
 		pred = append(pred, fmt.Sprintf("\n\t\t\t%s: %s", name, blks))
@@ -168,18 +83,18 @@ func (cfg *ControlFlowGraph) String() string {
 	return buf.String()
 }
 
-func (cfg *ControlFlowGraph) PostOrder() []string {
+func (cfg *ControlFlowGraph) PostOrder() []*BasicBlock {
 	visited := map[string]bool{}
-	order := make([]string, 0)
+	order := make([]*BasicBlock, 0)
 
-	cfg.dfs("entry", visited, &order)
+	cfg.dfs(cfg.Entry, visited, &order)
 	return order
 }
 
-func (cfg *ControlFlowGraph) dfs(node string, visited map[string]bool, order *[]string) {
-	visited[node] = true
-	for _, succ := range cfg.Succ[node] {
-		if _, found := visited[succ]; !found {
+func (cfg *ControlFlowGraph) dfs(node *BasicBlock, visited map[string]bool, order *[]*BasicBlock) {
+	visited[node.name] = true
+	for _, succ := range cfg.Succ[node.name] {
+		if _, found := visited[succ.name]; !found {
 			cfg.dfs(succ, visited, order)
 		}
 	}
@@ -187,9 +102,9 @@ func (cfg *ControlFlowGraph) dfs(node string, visited map[string]bool, order *[]
 	*order = append(*order, node)
 }
 
-func (cfg *ControlFlowGraph) ReversePostOrder() []string {
+func (cfg *ControlFlowGraph) ReversePostOrder() []*BasicBlock {
 	pOrder := cfg.PostOrder()
-	var revOrder []string
+	var revOrder []*BasicBlock
 	for i := len(pOrder) - 1; i >= 0; i-- {
 		revOrder = append(revOrder, pOrder[i])
 	}

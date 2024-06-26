@@ -5,103 +5,104 @@ import (
 	"github.com/anthonyabeo/obx/src/translate/ir"
 )
 
-func ExtendedBasicBlocks(cfg *ir.ControlFlowGraph, src *ir.BasicBlock) map[string]ir.SetOfBBs {
-	ebbs := map[string]ir.SetOfBBs{}
+func ExtendedBasicBlocks(cfg *ir.ControlFlowGraph, src *ir.BasicBlock) map[string]*adt.HashSet[*ir.BasicBlock] {
+	ebbs := make(map[string]*adt.HashSet[*ir.BasicBlock])
+	roots := adt.NewQueue[*ir.BasicBlock]()
 
-	roots := adt.NewQueue[string]()
-	roots.Enqueue(src.Name())
+	roots.Enqueue(src)
 	for !roots.Empty() {
-		x := roots.Dequeue()
-		if _, exists := ebbs[x]; !exists {
-			s := ir.SetOfBBs{}
-			extBasicBlocks(cfg, cfg.Nodes[x], roots, s)
-			ebbs[x] = s
+		BB := roots.Dequeue()
+		if _, exists := ebbs[BB.Name()]; !exists {
+			s := adt.NewHashSet[*ir.BasicBlock]()
+			extBasicBlocks(cfg, BB, roots, s)
+			ebbs[BB.Name()] = s
 		}
 	}
 
 	return ebbs
 }
 
-func extBasicBlocks(cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, roots *adt.Queue[string], s ir.SetOfBBs) {
+func extBasicBlocks(cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, roots *adt.Queue[*ir.BasicBlock], s *adt.HashSet[*ir.BasicBlock]) {
 	s.Add(blk)
 
 	for _, bb := range cfg.Succ[blk.Name()] {
-		if len(cfg.Pred[bb]) == 1 && !s.Contains(bb) {
-			extBasicBlocks(cfg, cfg.Nodes[bb], roots, s)
+		if len(cfg.Pred[bb.Name()]) == 1 && !s.Contains(bb) {
+			extBasicBlocks(cfg, bb, roots, s)
 		} else {
 			roots.Enqueue(bb)
 		}
 	}
 }
 
-func ImmDominator(cfg *ir.ControlFlowGraph, Dominance map[string]ir.SetOfBBs) ir.SetOfBBs {
+func ImmDominator(cfg *ir.ControlFlowGraph, Dominance map[string]adt.Set[*ir.BasicBlock]) map[string]*ir.BasicBlock {
 	IDom := make(map[string]*ir.BasicBlock)
-	Tmp := make(map[string]ir.SetOfBBs)
+	Tmp := make(map[string]adt.Set[*ir.BasicBlock])
 
-	for name := range cfg.Nodes {
-		Tmp[name] = Dominance[name].Remove(name)
+	for _, BB := range cfg.Nodes.Elems() {
+		Tmp[BB.Name()] = Dominance[BB.Name()].Remove(BB)
 	}
 
-	for name := range cfg.Nodes {
-		if name == cfg.Entry.Name() {
+	for _, BB := range cfg.Nodes.Elems() {
+		if BB.Name() == cfg.Entry.Name() {
 			continue
 		}
 
-		for s := range Tmp[name] {
-			for t := range Tmp[name] {
+		for _, s := range Tmp[BB.Name()].Elems() {
+			for _, t := range Tmp[BB.Name()].Elems() {
 				if t == s {
 					continue
 				}
 
-				if Tmp[s].Contains(t) {
-					Tmp[name].Remove(t)
+				if Tmp[s.Name()].Contains(t) {
+					Tmp[BB.Name()].Remove(t)
 				}
 			}
 		}
-
 	}
 
-	for name := range cfg.Nodes {
-		if name == cfg.Entry.Name() {
+	for _, BB := range cfg.Nodes.Elems() {
+		if BB.Name() == cfg.Entry.Name() {
 			continue
 		}
 
-		IDom[name] = Tmp[name].Pop()
+		IDom[BB.Name()] = Tmp[BB.Name()].Pop()
 	}
 
 	return IDom
 }
 
-func Dominance(cfg *ir.ControlFlowGraph) map[string]ir.SetOfBBs {
-	Dom := map[string]ir.SetOfBBs{}
-	Dom[cfg.Entry.Name()] = ir.SetOfBBs{cfg.Entry.Name(): cfg.Entry}
+func Dominance(cfg *ir.ControlFlowGraph) map[string]adt.Set[*ir.BasicBlock] {
+	Dom := make(map[string]adt.Set[*ir.BasicBlock])
 
-	for name := range cfg.Nodes {
-		if name == cfg.Entry.Name() {
+	entrySet := adt.NewHashSet[*ir.BasicBlock]()
+	entrySet.Add(cfg.Entry)
+	Dom[cfg.Entry.Name()] = entrySet
+
+	for _, BB := range cfg.Nodes.Elems() {
+		if BB.Name() == cfg.Entry.Name() {
 			continue
 		}
 
-		Dom[name] = cfg.Nodes.Clone()
+		Dom[BB.Name()] = cfg.Nodes.Clone()
 	}
 
 	changed := true
 	for changed {
 		changed = false
 
-		for name := range cfg.Nodes {
-			if name == cfg.Entry.Name() {
-				continue
-			}
+		workList := adt.NewQueueFrom[*ir.BasicBlock](cfg.ReversePostOrder()[1:])
+		for !workList.Empty() {
+			BB := workList.Dequeue()
 
-			Nodes := cfg.Nodes
-			for _, pred := range cfg.Pred[name] {
-				Nodes = Nodes.Intersection(Dom[pred])
+			var Temp adt.Set[*ir.BasicBlock] = cfg.Nodes
+			for _, pred := range cfg.Pred[BB.Name()] {
+				Temp = Temp.Intersect(Dom[pred.Name()])
 			}
-			Nodes.Add(cfg.Nodes[name])
+			Temp.Add(BB)
 
-			if !Nodes.Equal(Dom[name]) {
+			if !Temp.Equal(Dom[BB.Name()]) {
+				Dom[BB.Name()] = Temp
 				changed = true
-				Dom[name] = Nodes
 			}
 		}
 	}
@@ -109,41 +110,39 @@ func Dominance(cfg *ir.ControlFlowGraph) map[string]ir.SetOfBBs {
 	return Dom
 }
 
-func DominanceFrontier(cfg *ir.ControlFlowGraph) map[string]ir.SetOfBBs {
-	DF := map[string]ir.SetOfBBs{}
-	for name := range cfg.Nodes {
-		DF[name] = ir.SetOfBBs{}
+func DominanceFrontier(cfg *ir.ControlFlowGraph) map[string]adt.Set[*ir.BasicBlock] {
+	DF := make(map[string]adt.Set[*ir.BasicBlock])
+	for _, BB := range cfg.Nodes.Elems() {
+		DF[BB.Name()] = adt.NewHashSet[*ir.BasicBlock]()
 	}
 
 	Dom := Dominance(cfg)
 	IDom := ImmDominator(cfg, Dom)
 
-	for name := range cfg.Nodes {
-		if !cfg.IsJoinNode(name) {
+	for _, BB := range cfg.Nodes.Elems() {
+		if !cfg.IsJoinNode(BB.Name()) {
 			continue
 		}
 
-		for _, pred := range cfg.Pred[name] {
+		for _, pred := range cfg.Pred[BB.Name()] {
 			runner := pred
 
-			for runner != IDom[name].Name() {
-				DF[runner].Add(cfg.Nodes[name])
-				if _, exists := IDom[runner]; exists {
-					runner = IDom[runner].Name()
+			for runner.Name() != IDom[BB.Name()].Name() {
+				DF[runner.Name()].Add(BB)
+				if _, exists := IDom[runner.Name()]; exists {
+					runner = IDom[runner.Name()]
 				}
-
 			}
 		}
-
 	}
 
 	return DF
 }
 
-func NaturalLoop(cfg *ir.ControlFlowGraph, m, n string) ir.SetOfBBs {
-	Stack := adt.NewStack[string]()
-	Loop := ir.SetOfBBs{}
-	Loop.Add(cfg.Nodes[m], cfg.Nodes[n])
+func NaturalLoop(cfg *ir.ControlFlowGraph, m, n *ir.BasicBlock) adt.Set[*ir.BasicBlock] {
+	Stack := adt.NewStack[*ir.BasicBlock]()
+	Loop := adt.NewHashSet[*ir.BasicBlock]()
+	Loop.Add(m, n)
 
 	if m != n {
 		Stack.Push(m)
@@ -151,9 +150,9 @@ func NaturalLoop(cfg *ir.ControlFlowGraph, m, n string) ir.SetOfBBs {
 
 	for !Stack.Empty() {
 		p := Stack.Pop()
-		for _, q := range cfg.Pred[p] {
+		for _, q := range cfg.Pred[p.Name()] {
 			if !Loop.Contains(q) {
-				Loop.Add(cfg.Nodes[q])
+				Loop.Add(q)
 				Stack.Push(q)
 			}
 		}

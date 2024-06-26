@@ -59,7 +59,7 @@ func (f *Function) String() string {
 	buf := &bytes.Buffer{}
 
 	buf.WriteString(fmt.Sprintf("define %s @%s() {\n", f.ty.retTy, f.name))
-	for _, bb := range f.cfg.Nodes {
+	for _, bb := range f.cfg.Nodes.Elems() {
 		buf.WriteString(bb.String())
 	}
 	buf.WriteString("}")
@@ -123,8 +123,7 @@ func CreateBasicBlock(name string, parent *Function) *BasicBlock {
 		Phi:    map[string][]*PHINode{},
 	}
 
-	parent.cfg.Nodes[name] = blk
-
+	parent.cfg.Nodes.Add(blk)
 	return blk
 }
 

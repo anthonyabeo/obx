@@ -16,40 +16,29 @@ func TestIterativeDataFlow(t *testing.T) {
 	b6 := ir.NewBasicBlock("B6")
 	exit := ir.NewBasicBlock("exit")
 
-	cfg := &ir.ControlFlowGraph{
-		Entry: entry,
-		Exit:  exit,
-		Nodes: map[string]*ir.BasicBlock{
-			"B1":    b1,
-			"B2":    b2,
-			"B3":    b3,
-			"B4":    b4,
-			"B5":    b5,
-			"B6":    b6,
-			"entry": entry,
-			"exit":  exit,
-		},
-		Succ: map[string][]string{
-			"entry": {"B1"},
-			"B1":    {"B2", "B3"},
-			"B2":    {"exit"},
-			"B3":    {"B4"},
-			"B4":    {"B5", "B6"},
-			"B5":    {"exit"},
-			"B6":    {"B4"},
-			"exit":  {},
-		},
-		Pred: map[string][]string{
-			"entry": {},
-			"B1":    {"entry"},
-			"B2":    {"B1"},
-			"B3":    {"B1"},
-			"B4":    {"B3", "B6"},
-			"B5":    {"B4"},
-			"B6":    {"B4"},
-			"exit":  {"B2", "B5"},
-		},
-	}
+	cfg := ir.NewCFG()
+	cfg.Entry = entry
+	cfg.Exit = exit
+
+	cfg.Nodes.Add(entry, b1, b2, b3, b4, b5, b6, exit)
+
+	cfg.AddSucc("entry", b1)
+	cfg.AddSucc("B1", b2, b3)
+	cfg.AddSucc("B2", exit)
+	cfg.AddSucc("B3", b4)
+	cfg.AddSucc("B4", b5, b6)
+	cfg.AddSucc("B5", exit)
+	cfg.AddSucc("B6", b4)
+	cfg.AddSucc("exit")
+
+	cfg.AddPred("entry")
+	cfg.AddPred("B1", entry)
+	cfg.AddPred("B2", b1)
+	cfg.AddPred("B3", b1)
+	cfg.AddPred("B4", b3, b6)
+	cfg.AddPred("B5", b4)
+	cfg.AddPred("B6", b4)
+	cfg.AddPred("exit", b2, b5)
 
 	tests := []struct {
 		name string
@@ -94,34 +83,25 @@ func TestIterativeDataflowDragonBook(t *testing.T) {
 	b4 := ir.NewBasicBlock("B4")
 	exit := ir.NewBasicBlock("exit")
 
-	cfg := &ir.ControlFlowGraph{
-		Entry: entry,
-		Exit:  exit,
-		Nodes: map[string]*ir.BasicBlock{
-			"B1":    b1,
-			"B2":    b2,
-			"B3":    b3,
-			"B4":    b4,
-			"entry": entry,
-			"exit":  exit,
-		},
-		Succ: map[string][]string{
-			"entry": {"B1"},
-			"B1":    {"B2"},
-			"B2":    {"B3", "B4"},
-			"B3":    {"B4"},
-			"B4":    {"exit"},
-			"exit":  {},
-		},
-		Pred: map[string][]string{
-			"entry": {},
-			"B1":    {"entry"},
-			"B2":    {"B1", "B4"},
-			"B3":    {"B2"},
-			"B4":    {"B2", "B3"},
-			"exit":  {"B4"},
-		},
-	}
+	cfg := ir.NewCFG()
+	cfg.Entry = entry
+	cfg.Exit = exit
+
+	cfg.Nodes.Add(entry, b1, b2, b3, b4, exit)
+
+	cfg.AddSucc("entry", b1)
+	cfg.AddSucc("B1", b2)
+	cfg.AddSucc("B2", b3, b4)
+	cfg.AddSucc("B3", b4)
+	cfg.AddSucc("B4", exit)
+	cfg.AddSucc("exit")
+
+	cfg.AddPred("entry")
+	cfg.AddPred("B1", entry)
+	cfg.AddPred("B2", b1, b4)
+	cfg.AddPred("B3", b2)
+	cfg.AddPred("B4", b2, b3)
+	cfg.AddPred("exit", b4)
 
 	tests := []struct {
 		name string

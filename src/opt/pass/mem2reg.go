@@ -93,7 +93,7 @@ func RegisterPromotion[T MapOfBlockValuePair](cfg *ir.ControlFlowGraph, blk *ir.
 func GetAllocInstr(cfg *ir.ControlFlowGraph) []*ir.AllocaInst {
 	var Alloc []*ir.AllocaInst
 
-	for _, BB := range cfg.Nodes {
+	for _, BB := range cfg.Nodes.Elems() {
 		Instr := BB.Instr()
 		for inst := Instr.Front(); inst != nil; inst = inst.Next() {
 			alloc, ok := inst.Value.(*ir.AllocaInst)
@@ -108,10 +108,10 @@ func GetAllocInstr(cfg *ir.ControlFlowGraph) []*ir.AllocaInst {
 	return Alloc
 }
 
-func GetBlocksThatContainStore(cfg *ir.ControlFlowGraph, dst string) ir.SetOfBBs {
-	storeBlocks := ir.SetOfBBs{}
+func GetBlocksThatContainStore(cfg *ir.ControlFlowGraph, dst string) adt.Set[*ir.BasicBlock] {
+	storeBlocks := adt.NewHashSet[*ir.BasicBlock]()
 
-	for _, BB := range cfg.Nodes {
+	for _, BB := range cfg.Nodes.Elems() {
 		Instr := BB.Instr()
 		for inst := Instr.Front(); inst != nil; inst = inst.Next() {
 			if store, ok := inst.Value.(*ir.StoreInst); ok && store.Operand(2).Name() == dst {
@@ -125,25 +125,29 @@ func GetBlocksThatContainStore(cfg *ir.ControlFlowGraph, dst string) ir.SetOfBBs
 }
 
 func ComputePhiInsertLocations(cfg *ir.ControlFlowGraph) {
-	locations := map[string]ir.SetOfBBs{}
+	locations := make(map[string]adt.Set[*ir.BasicBlock])
 
 	DF := analy.DominanceFrontier(cfg)
 	for _, variable := range GetAllocInstr(cfg) {
+		locations[variable.Name()] = adt.NewHashSet[*ir.BasicBlock]()
+
 		storeBlocks := GetBlocksThatContainStore(cfg, variable.Name())
 		workList := storeBlocks.Clone()
 
 		for !workList.Empty() {
 			block := workList.Pop()
 
-			for Name, BB := range DF[block.Name()] {
-				if len(locations[variable.Name()]) == 0 {
+			for _, BB := range DF[block.Name()].Elems() {
+				if locations[variable.Name()].Empty() {
 					if _, exists := locations[variable.Name()]; !exists {
-						locations[variable.Name()] = ir.SetOfBBs{BB.Name(): BB}
+						set := adt.NewHashSet[*ir.BasicBlock]()
+						set.Add(BB)
+						locations[variable.Name()] = set
 					} else {
 						locations[variable.Name()].Add(BB)
 					}
 
-					if !storeBlocks.Contains(Name) {
+					if !storeBlocks.Contains(BB) {
 						workList.Add(BB)
 					}
 				}
@@ -152,7 +156,7 @@ func ComputePhiInsertLocations(cfg *ir.ControlFlowGraph) {
 	}
 
 	for variable, BBs := range locations {
-		for _, BB := range BBs {
+		for _, BB := range BBs.Elems() {
 			phi := ir.CreateEmptyPHINode(variable)
 			BB.InsertInstrBegin(phi)
 			BB.Phi[variable] = append(BB.Phi[variable], phi)
@@ -181,11 +185,11 @@ func GetBlockValuePair[T MapOfBlockValuePair](s *adt.Stack[T], f string) (*ir.Ba
 
 // ComputeGlobalNames
 // ---------------------------------------------------------------
-func ComputeGlobalNames(cfg *ir.ControlFlowGraph) ([]string, map[string]ir.SetOfBBs) {
+func ComputeGlobalNames(cfg *ir.ControlFlowGraph) ([]string, map[string]adt.Set[*ir.BasicBlock]) {
 	Globals := make([]string, 0)
-	Blocks := map[string]ir.SetOfBBs{}
+	Blocks := map[string]adt.Set[*ir.BasicBlock]{}
 
-	for _, BB := range cfg.Nodes {
+	for _, BB := range cfg.Nodes.Elems() {
 		VarKill := map[string]bool{}
 
 		for i := BB.Instr().Front(); i != nil; i = i.Next() {
@@ -198,7 +202,7 @@ func ComputeGlobalNames(cfg *ir.ControlFlowGraph) ([]string, map[string]ir.SetOf
 
 			VarKill[inst.Name()] = true
 			if _, ok := Blocks[inst.Name()]; !ok {
-				Blocks[inst.Name()] = ir.SetOfBBs{}
+				Blocks[inst.Name()] = adt.NewHashSet[*ir.BasicBlock]()
 				Blocks[inst.Name()].Add(BB)
 			} else {
 				Blocks[inst.Name()].Add(BB)
@@ -211,12 +215,12 @@ func ComputeGlobalNames(cfg *ir.ControlFlowGraph) ([]string, map[string]ir.SetOf
 
 // InsertPhiFunctions
 // -----------------------------------------------------------------
-func InsertPhiFunctions(Globals []string, Blocks, DF map[string]ir.SetOfBBs) {
+func InsertPhiFunctions(Globals []string, Blocks, DF map[string]adt.Set[*ir.BasicBlock]) {
 	for _, name := range Globals {
 		WorkList := Blocks[name]
 		for !WorkList.Empty() {
 			block := WorkList.Pop()
-			for _, BB := range DF[block.Name()] {
+			for _, BB := range DF[block.Name()].Elems() {
 				if len(BB.Phi[name]) == 0 {
 					phi := ir.CreateEmptyPHINode("")
 					BB.InsertInstrBegin(phi)

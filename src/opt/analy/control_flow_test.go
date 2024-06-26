@@ -16,47 +16,35 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 	b5 := ir.NewBasicBlock("B5")
 	b6 := ir.NewBasicBlock("B6")
 
-	cfg := &ir.ControlFlowGraph{
-		Entry: b0,
-		Exit:  nil,
-		Nodes: map[string]*ir.BasicBlock{
-			"entry": entry,
-			"B0":    b0,
-			"B1":    b1,
-			"B2":    b2,
-			"B3":    b3,
-			"B4":    b4,
-			"B5":    b5,
-			"B6":    b6,
-		},
-		Succ: map[string][]string{
-			"entry": {"B0"},
-			"B0":    {"B1", "B3"},
-			"B1":    {"B2"},
-			"B2":    {"B0"},
-			"B3":    {"B4", "B6"},
-			"B4":    {"B5"},
-			"B5":    {"B2"},
-			"B6":    {"B5"},
-		},
-		Pred: map[string][]string{
-			"B0": {},
-			"B1": {"B0"},
-			"B2": {"B1", "B5"},
-			"B3": {"B0"},
-			"B4": {"B3"},
-			"B5": {"B6", "B4"},
-			"B6": {"B3"},
-		},
-	}
+	cfg := ir.NewCFG()
+	cfg.Entry = entry
+
+	cfg.Nodes.Add(entry, b0, b1, b2, b3, b4, b5, b6)
+
+	cfg.AddSucc("entry", b0)
+	cfg.AddSucc("B0", b1, b3)
+	cfg.AddSucc("B1", b2)
+	cfg.AddSucc("B2", b0)
+	cfg.AddSucc("B3", b4, b6)
+	cfg.AddSucc("B4", b5)
+	cfg.AddSucc("B5", b2)
+	cfg.AddSucc("B6", b5)
+
+	cfg.AddPred("B0")
+	cfg.AddPred("B1", b0)
+	cfg.AddPred("B2", b1, b5)
+	cfg.AddPred("B3", b0)
+	cfg.AddPred("B4", b3)
+	cfg.AddPred("B5", b6, b4)
+	cfg.AddPred("B6", b3)
 
 	tests := []struct {
 		root string
-		blks []string
+		blks []*ir.BasicBlock
 	}{
-		{"B0", []string{"B0", "B1", "B3", "B4", "B6"}},
-		{"B5", []string{"B5"}},
-		{"B2", []string{"B2"}},
+		{"B0", []*ir.BasicBlock{b0, b1, b3, b4, b6}},
+		{"B5", []*ir.BasicBlock{b5}},
+		{"B2", []*ir.BasicBlock{b2}},
 	}
 
 	extBBs := ExtendedBasicBlocks(cfg, b0)
@@ -66,13 +54,14 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 			t.Errorf("no EBB found for root '%s'", tt.root)
 		}
 
-		if len(tt.blks) != len(ebb) {
-			t.Errorf("expected an EBB of size %d, got %d", len(tt.blks), len(ebb))
+		if len(tt.blks) != ebb.Size() {
+			t.Errorf("expected an EBB of size %d, got %d", len(tt.blks), ebb.Size())
 		}
 
 		for i := 0; i < len(tt.blks); i++ {
-			if _, exist := ebb[tt.blks[i]]; !exist {
+			if !ebb.Contains(tt.blks[i]) {
 				t.Errorf("expected %s to be in the EBB of root %s. It doesn't", tt.blks[i], tt.root)
+
 			}
 		}
 	}
@@ -87,53 +76,41 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 	b7 := ir.NewBasicBlock("B7")
 	exit := ir.NewBasicBlock("exit")
 
-	cfg = &ir.ControlFlowGraph{
-		Entry: entry,
-		Exit:  exit,
-		Nodes: map[string]*ir.BasicBlock{
-			"B1":    b1,
-			"B2":    b2,
-			"B3":    b3,
-			"B4":    b4,
-			"B5":    b5,
-			"B6":    b6,
-			"B7":    b7,
-			"entry": entry,
-			"exit":  exit,
-		},
-		Succ: map[string][]string{
-			"entry": {"B1"},
-			"B1":    {"B2", "B3"},
-			"B2":    {"B4"},
-			"B3":    {"B4"},
-			"B4":    {"B5", "B6"},
-			"B5":    {"B7"},
-			"B6":    {"exit", "B1"},
-			"B7":    {"exit", "B5"},
-			"exit":  {},
-		},
-		Pred: map[string][]string{
-			"entry": {},
-			"B1":    {"B6", "entry"},
-			"B2":    {"B1"},
-			"B3":    {"B1"},
-			"B4":    {"B2", "B3"},
-			"B5":    {"B7", "B4"},
-			"B6":    {"B4"},
-			"B7":    {"B5"},
-			"exit":  {"B6", "B7"},
-		},
-	}
+	cfg = ir.NewCFG()
+	cfg.Entry = entry
+	cfg.Exit = exit
+
+	cfg.Nodes.Add(entry, b1, b2, b3, b4, b5, b6, b7, exit)
+
+	cfg.AddSucc("entry", b1)
+	cfg.AddSucc("B1", b2, b3)
+	cfg.AddSucc("B2", b4)
+	cfg.AddSucc("B3", b4)
+	cfg.AddSucc("B4", b5, b6)
+	cfg.AddSucc("B5", b7)
+	cfg.AddSucc("B6", exit, b1)
+	cfg.AddSucc("B7", exit, b5)
+	cfg.AddSucc("exit")
+
+	cfg.AddPred("entry")
+	cfg.AddPred("B1", b6, entry)
+	cfg.AddPred("B2", b1)
+	cfg.AddPred("B3", b1)
+	cfg.AddPred("B4", b2, b3)
+	cfg.AddPred("B5", b7, b4)
+	cfg.AddPred("B6", b4)
+	cfg.AddPred("B7", b5)
+	cfg.AddPred("exit", b6, b7)
 
 	tests = []struct {
 		root string
-		blks []string
+		blks []*ir.BasicBlock
 	}{
-		{"entry", []string{"entry"}},
-		{"B1", []string{"B1", "B2", "B3"}},
-		{"B4", []string{"B4", "B6"}},
-		{"B5", []string{"B5", "B7"}},
-		{"exit", []string{"exit"}},
+		{"entry", []*ir.BasicBlock{entry}},
+		{"B1", []*ir.BasicBlock{b1, b2, b3}},
+		{"B4", []*ir.BasicBlock{b4, b6}},
+		{"B5", []*ir.BasicBlock{b5, b7}},
+		{"exit", []*ir.BasicBlock{exit}},
 	}
 
 	extBBs = ExtendedBasicBlocks(cfg, entry)
@@ -143,13 +120,14 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 			t.Errorf("no EBB found for root '%s'", tt.root)
 		}
 
-		if len(tt.blks) != len(ebb) {
-			t.Errorf("expected an EBB of size %d, got %d", len(tt.blks), len(ebb))
+		if len(tt.blks) != ebb.Size() {
+			t.Errorf("expected an EBB of size %d, got %d", len(tt.blks), ebb.Size())
 		}
 
 		for i := 0; i < len(tt.blks); i++ {
-			if _, exist := ebb[tt.blks[i]]; !exist {
+			if !ebb.Contains(tt.blks[i]) {
 				t.Errorf("expected %s to be in the EBB of root %s. It doesn't", tt.blks[i], tt.root)
+
 			}
 		}
 	}
@@ -166,63 +144,51 @@ func TestComputeDominance(t *testing.T) {
 	b7 := ir.NewBasicBlock("B7")
 	exit := ir.NewBasicBlock("exit")
 
-	cfg := &ir.ControlFlowGraph{
-		Entry: entry,
-		Exit:  exit,
-		Nodes: map[string]*ir.BasicBlock{
-			"B1":    b1,
-			"B2":    b2,
-			"B3":    b3,
-			"B4":    b4,
-			"B5":    b5,
-			"B6":    b6,
-			"B7":    b7,
-			"entry": entry,
-			"exit":  exit,
-		},
-		Succ: map[string][]string{
-			"entry": {"B1"},
-			"B1":    {"B2", "B3"},
-			"B2":    {"B4"},
-			"B3":    {"B4"},
-			"B4":    {"B5", "B6"},
-			"B5":    {"B7"},
-			"B6":    {"exit", "B1"},
-			"B7":    {"exit", "B5"},
-			"exit":  {},
-		},
-		Pred: map[string][]string{
-			"entry": {},
-			"B1":    {"B6", "entry"},
-			"B2":    {"B1"},
-			"B3":    {"B1"},
-			"B4":    {"B2", "B3"},
-			"B5":    {"B7", "B4"},
-			"B6":    {"B4"},
-			"B7":    {"B5"},
-			"exit":  {"B6", "B7"},
-		},
-	}
+	cfg := ir.NewCFG()
+	cfg.Entry = entry
+	cfg.Exit = exit
+
+	cfg.Nodes.Add(entry, b1, b2, b3, b4, b5, b6, b7, exit)
+
+	cfg.AddSucc("entry", b1)
+	cfg.AddSucc("B1", b2, b3)
+	cfg.AddSucc("B2", b4)
+	cfg.AddSucc("B3", b4)
+	cfg.AddSucc("B4", b5, b6)
+	cfg.AddSucc("B5", b7)
+	cfg.AddSucc("B6", exit, b1)
+	cfg.AddSucc("B7", exit, b5)
+	cfg.AddSucc("exit")
+
+	cfg.AddPred("entry")
+	cfg.AddPred("B1", b6, entry)
+	cfg.AddPred("B2", b1)
+	cfg.AddPred("B3", b1)
+	cfg.AddPred("B4", b2, b3)
+	cfg.AddPred("B5", b7, b4)
+	cfg.AddPred("B6", b4)
+	cfg.AddPred("B7", b5)
+	cfg.AddPred("exit", b6, b7)
 
 	tests := []struct {
 		name   string
-		blocks []string
+		blocks []*ir.BasicBlock
 	}{
-		{"entry", []string{"entry"}},
-		{"B1", []string{"entry", "B1"}},
-		{"B2", []string{"entry", "B1", "B2"}},
-		{"B3", []string{"entry", "B1", "B3"}},
-		{"B4", []string{"entry", "B1", "B4"}},
-		{"B5", []string{"entry", "B1", "B4", "B5"}},
-		{"B6", []string{"entry", "B1", "B4", "B6"}},
-		{"B7", []string{"entry", "B1", "B4", "B5", "B7"}},
-		{"exit", []string{"entry", "B1", "B4", "exit"}},
+		{"entry", []*ir.BasicBlock{entry}},
+		{"B1", []*ir.BasicBlock{entry, b1}},
+		{"B2", []*ir.BasicBlock{entry, b1, b2}},
+		{"B3", []*ir.BasicBlock{entry, b1, b3}},
+		{"B4", []*ir.BasicBlock{entry, b1, b4}},
+		{"B5", []*ir.BasicBlock{entry, b1, b4, b5}},
+		{"B6", []*ir.BasicBlock{entry, b1, b4, b6}},
+		{"B7", []*ir.BasicBlock{entry, b1, b4, b5, b7}},
+		{"exit", []*ir.BasicBlock{entry, b1, b4, exit}},
 	}
 
 	dom := Dominance(cfg)
 	for _, tt := range tests {
-		if len(tt.blocks) != len(dom[tt.name]) {
-			t.Errorf("expected a dom set of size %d, got %d", len(tt.blocks), len(dom[tt.name]))
+		if len(tt.blocks) != dom[tt.name].Size() {
+			t.Errorf("expected a dom set of size %d, got %d", len(tt.blocks), dom[tt.name].Size())
 		}
 
 		for i := 0; i < len(tt.blocks); i++ {
@@ -241,56 +207,49 @@ func TestComputeDominance2(t *testing.T) {
 	b3 := ir.NewBasicBlock("B3")
 	exit := ir.NewBasicBlock("exit")
 
-	cfg := &ir.ControlFlowGraph{
-		Entry: entry,
-		Exit:  exit,
-		Nodes: map[string]*ir.BasicBlock{
-			"B1":    b1,
-			"B2":    b2,
-			"B3":    b3,
-			"entry": entry,
-			"exit":  exit,
-		},
-		Succ: map[string][]string{
-			"entry": {"B1", "B2"},
-			"B1":    {"B3"},
-			"B2":    {"B3"},
-			"B3":    {"exit"},
-			"exit":  {},
-		},
-		Pred: map[string][]string{
-			"entry": {},
-			"B1":    {"entry"},
-			"B2":    {"entry"},
-			"B3":    {"B1", "B2"},
-			"exit":  {"B3"},
-		},
-	}
+	cfg := ir.NewCFG()
+	cfg.Entry = entry
+	cfg.Exit = exit
+
+	cfg.Nodes.Add(entry, b1, b2, b3, exit)
+
+	cfg.AddSucc("entry", b1, b2)
+	cfg.AddSucc("B1", b3)
+	cfg.AddSucc("B2", b3)
+	cfg.AddSucc("B3", exit)
+	cfg.AddSucc("exit")
+
+	cfg.AddPred("entry")
+	cfg.AddPred("B1", entry)
+	cfg.AddPred("B2", entry)
+	cfg.AddPred("B3", b1, b2)
+	cfg.AddPred("exit", b3)
 
 	tests := []struct {
-		name string
-		blks []string
+		name   string
+		blocks []*ir.BasicBlock
 	}{
-		{"entry", []string{"entry"}},
-		{"B1", []string{"entry", "B1"}},
-		{"B2", []string{"entry", "B2"}},
-		{"B3", []string{"entry", "B3"}},
-		{"exit", []string{"entry", "B3", "exit"}},
+		{"entry", []*ir.BasicBlock{entry}},
+		{"B1", []*ir.BasicBlock{entry, b1}},
+		{"B2", []*ir.BasicBlock{entry, b2}},
+		{"B3", []*ir.BasicBlock{entry, b3}},
+		{"exit", []*ir.BasicBlock{entry, b3, exit}},
 	}
 
 	dom := Dominance(cfg)
 	for _, tt := range tests {
-		if len(tt.blks) != len(dom[tt.name]) {
-			t.Errorf("expected a dom set of size %d, got %d", len(tt.blks), len(dom[tt.name]))
+		if len(tt.blocks) != dom[tt.name].Size() {
+			t.Errorf("expected a dom set of size %d, got %d", len(tt.blocks), dom[tt.name].Size())
 		}
 
-		for i := 0; i < len(tt.blks); i++ {
-			if _, exist := dom[tt.blks[i]]; !exist {
-				t.Errorf("expected %s to be in the DOM of %s. It doesn't", tt.blks[i], tt.name)
+		for i := 0; i < len(tt.blocks); i++ {
+			set, exists := dom[tt.name]
+			if !exists || !set.Contains(tt.blocks[i]) {
+				t.Errorf("expected %s to be in the DOM of %s. It doesn't", tt.blocks[i], tt.name)
+
 			}
 		}
 	}
-
 }
 
 func TestComputeDominance3(t *testing.T) {
@@ -304,63 +263,51 @@ func TestComputeDominance3(t *testing.T) {
 	b7 := ir.NewBasicBlock("B7")
 	b8 := ir.NewBasicBlock("B8")
 
-	cfg := &ir.ControlFlowGraph{
-		Entry: b0,
-		Exit:  b4,
-		Nodes: map[string]*ir.BasicBlock{
-			"B0": b0,
-			"B1": b1,
-			"B2": b2,
-			"B3": b3,
-			"B4": b4,
-			"B5": b5,
-			"B6": b6,
-			"B7": b7,
-			"B8": b8,
-		},
-		Succ: map[string][]string{
-			"B0": {"B1"},
-			"B1": {"B2", "B5"},
-			"B2": {"B3"},
-			"B3": {"B4", "B1"},
-			"B4": {},
-			"B5": {"B6", "B8"},
-			"B6": {"B7"},
-			"B7": {"B3"},
-			"B8": {"B7"},
-		},
-		Pred: map[string][]string{
-			"B0": {},
-			"B1": {"B0", "B3"},
-			"B2": {"B1"},
-			"B3": {"B2", "B7"},
-			"B4": {"B3"},
-			"B5": {"B1"},
-			"B6": {"B5"},
-			"B7": {"B6", "B8"},
-			"B8": {"B5"},
-		},
-	}
+	cfg := ir.NewCFG()
+	cfg.Entry = b0
+	cfg.Exit = b4
+
+	cfg.Nodes.Add(b0, b1, b2, b3, b4, b5, b6, b7, b8)
+
+	cfg.AddSucc("B0", b1)
+	cfg.AddSucc("B1", b2, b5)
+	cfg.AddSucc("B2", b3)
+	cfg.AddSucc("B3", b1, b4)
+	cfg.AddSucc("B4")
+	cfg.AddSucc("B5", b6, b8)
+	cfg.AddSucc("B6", b7)
+	cfg.AddSucc("B7", b3)
+	cfg.AddSucc("B8", b7)
+
+	cfg.AddPred("B0")
+	cfg.AddPred("B1", b0, b3)
+	cfg.AddPred("B2", b1)
+	cfg.AddPred("B3", b2, b7)
+	cfg.AddPred("B4", b3)
+	cfg.AddPred("B5", b1)
+	cfg.AddPred("B6", b5)
+	cfg.AddPred("B7", b6, b8)
+	cfg.AddPred("B8", b5)
 
 	tests := []struct {
 		name   string
-		blocks []string
+		blocks []*ir.BasicBlock
 	}{
-		{"B0", []string{"B0"}},
-		{"B1", []string{"B0", "B1"}},
-		{"B2", []string{"B0", "B1", "B2"}},
-		{"B3", []string{"B0", "B1", "B3"}},
-		{"B4", []string{"B0", "B1", "B3", "B4"}},
-		{"B5", []string{"B0", "B1", "B5"}},
-		{"B6", []string{"B0", "B1", "B5", "B6"}},
-		{"B7", []string{"B0", "B1", "B5", "B7"}},
-		{"B8", []string{"B0", "B1", "B5", "B8"}},
+		{"B0", []*ir.BasicBlock{b0}},
+		{"B1", []*ir.BasicBlock{b0, b1}},
+		{"B2", []*ir.BasicBlock{b0, b1, b2}},
+		{"B3", []*ir.BasicBlock{b0, b1, b3}},
+		{"B4", []*ir.BasicBlock{b0, b1, b3, b4}},
+		{"B5", []*ir.BasicBlock{b0, b1, b5}},
+		{"B6", []*ir.BasicBlock{b0, b1, b5, b6}},
+		{"B7", []*ir.BasicBlock{b0, b1, b5, b7}},
+		{"B8", []*ir.BasicBlock{b0, b1, b5, b8}},
 	}
 
 	Dom := Dominance(cfg)
 	for _, tt := range tests {
-		if len(tt.blocks) != len(Dom[tt.name]) {
-			t.Errorf("expected a dom set of size %d, got %d", len(tt.blocks), len(Dom[tt.name]))
+		if len(tt.blocks) != Dom[tt.name].Size() {
+			t.Errorf("expected a dom set of size %d, got %d", len(tt.blocks), Dom[tt.name].Size())
 		}
 
 		for i := 0; i < len(tt.blocks); i++ {
@@ -379,31 +326,23 @@ func TestComputeImmediateDominance(t *testing.T) {
 	b3 := ir.NewBasicBlock("B3")
 	exit := ir.NewBasicBlock("exit")
 
-	cfg := &ir.ControlFlowGraph{
-		Entry: entry,
-		Exit:  exit,
-		Nodes: map[string]*ir.BasicBlock{
-			"B1":    b1,
-			"B2":    b2,
-			"B3":    b3,
-			"entry": entry,
-			"exit":  exit,
-		},
-		Succ: map[string][]string{
-			"entry": {"B1", "B2"},
-			"B1":    {"B3"},
-			"B2":    {"B3"},
-			"B3":    {"exit"},
-			"exit":  {},
-		},
-		Pred: map[string][]string{
-			"entry": {},
-			"B1":    {"entry"},
-			"B2":    {"entry"},
-			"B3":    {"B1", "B2"},
-			"exit":  {"B3"},
-		},
-	}
+	cfg := ir.NewCFG()
+	cfg.Entry = entry
+	cfg.Exit = exit
+
+	cfg.Nodes.Add(entry, b1, b2, b3, exit)
+
+	cfg.AddSucc("entry", b1, b2)
+	cfg.AddSucc("B1", b3)
+	cfg.AddSucc("B2", b3)
+	cfg.AddSucc("B3", exit)
+	cfg.AddSucc("exit")
+
+	cfg.AddPred("entry")
+	cfg.AddPred("B1", entry)
+	cfg.AddPred("B2", entry)
+	cfg.AddPred("B3", b1, b2)
+	cfg.AddPred("exit", b3)
 
 	dom := Dominance(cfg)
 	iDom := ImmDominator(cfg, dom)
@@ -438,37 +377,29 @@ func TestComputeNaturalLoop(t *testing.T) {
 	b3 := ir.NewBasicBlock("B3")
 	exit := ir.NewBasicBlock("exit")
 
-	cfg := &ir.ControlFlowGraph{
-		Entry: entry,
-		Exit:  exit,
-		Nodes: map[string]*ir.BasicBlock{
-			"B1":    b1,
-			"B2":    b2,
-			"B3":    b3,
-			"entry": entry,
-			"exit":  exit,
-		},
-		Succ: map[string][]string{
-			"entry": {"B1"},
-			"B1":    {"B2"},
-			"B2":    {"B2", "B3"},
-			"B3":    {"exit", "B1"},
-			"exit":  {},
-		},
-		Pred: map[string][]string{
-			"entry": {},
-			"B1":    {"entry", "B3"},
-			"B2":    {"B1", "B2"},
-			"B3":    {"B2"},
-			"exit":  {"B3"},
-		},
-	}
+	cfg := ir.NewCFG()
+	cfg.Entry = entry
+	cfg.Exit = exit
 
-	nat := NaturalLoop(cfg, "B3", "B1")
+	cfg.Nodes.Add(entry, b1, b2, b3, exit)
 
-	tests := []string{"B1", "B2", "B3"}
+	cfg.AddSucc("entry", b1, b2)
+	cfg.AddSucc("B1", b3)
+	cfg.AddSucc("B2", b3)
+	cfg.AddSucc("B3", exit)
+	cfg.AddSucc("exit")
+
+	cfg.AddPred("entry")
+	cfg.AddPred("B1", entry)
+	cfg.AddPred("B2", entry)
+	cfg.AddPred("B3", b1, b2)
+	cfg.AddPred("exit", b3)
+
+	nat := NaturalLoop(cfg, b3, b1)
+
+	tests := []*ir.BasicBlock{b1, b2, b3}
 	for _, tt := range tests {
-		if nat[tt] == nil || nat[tt].Name() != tt {
+		if !nat.Contains(tt) {
 			t.Errorf("'%s' should not be part of the natural loop of B3->B1", tt)
 		}
 	}
@@ -485,56 +416,44 @@ func TestComputeNaturalLoop2(t *testing.T) {
 	b7 := ir.NewBasicBlock("B7")
 	exit := ir.NewBasicBlock("exit")
 
-	cfg := &ir.ControlFlowGraph{
-		Entry: entry,
-		Exit:  exit,
-		Nodes: map[string]*ir.BasicBlock{
-			"B1":    b1,
-			"B2":    b2,
-			"B3":    b3,
-			"B4":    b4,
-			"B5":    b5,
-			"B6":    b6,
-			"B7":    b7,
-			"entry": entry,
-			"exit":  exit,
-		},
-		Succ: map[string][]string{
-			"entry": {"B1"},
-			"B1":    {"B2", "B3"},
-			"B2":    {"B4"},
-			"B3":    {"B4"},
-			"B4":    {"B5", "B6"},
-			"B5":    {"B7"},
-			"B6":    {"exit", "B1"},
-			"B7":    {"exit", "B5"},
-			"exit":  {},
-		},
-		Pred: map[string][]string{
-			"entry": {},
-			"B1":    {"B6", "entry"},
-			"B2":    {"B1"},
-			"B3":    {"B1"},
-			"B4":    {"B2", "B3"},
-			"B5":    {"B7", "B4"},
-			"B6":    {"B4"},
-			"B7":    {"B5"},
-			"exit":  {"B6", "B7"},
-		},
-	}
+	cfg := ir.NewCFG()
+	cfg.Entry = entry
+	cfg.Exit = exit
 
-	nat := NaturalLoop(cfg, "B6", "B1")
-	tests := []string{"B1", "B2", "B3", "B4", "B6"}
+	cfg.Nodes.Add(entry, b1, b2, b3, b4, b5, b6, b7, exit)
+
+	cfg.AddSucc("entry", b1)
+	cfg.AddSucc("B1", b2, b3)
+	cfg.AddSucc("B2", b4)
+	cfg.AddSucc("B3", b4)
+	cfg.AddSucc("B4", b5, b6)
+	cfg.AddSucc("B5", b7)
+	cfg.AddSucc("B6", exit, b1)
+	cfg.AddSucc("B7", exit, b5)
+	cfg.AddSucc("exit")
+
+	cfg.AddPred("entry")
+	cfg.AddPred("B1", b6, entry)
+	cfg.AddPred("B2", b1)
+	cfg.AddPred("B3", b1)
+	cfg.AddPred("B4", b2, b3)
+	cfg.AddPred("B5", b7, b4)
+	cfg.AddPred("B6", b4)
+	cfg.AddPred("B7", b5)
+	cfg.AddPred("exit", b6, b7)
+
+	nat := NaturalLoop(cfg, b6, b1)
+	tests := []*ir.BasicBlock{b1, b2, b3, b4, b6}
 	for _, tt := range tests {
-		if nat[tt] == nil || nat[tt].Name() != tt {
+		if !nat.Contains(tt) {
 			t.Errorf("'%s' should not be part of the natural loop of B3->B1", tt)
 		}
 	}
 
-	natLoop := NaturalLoop(cfg, "B7", "B5")
-	tests = []string{"B7", "B5"}
+	natLoop := NaturalLoop(cfg, b7, b5)
+	tests = []*ir.BasicBlock{b7, b5}
 	for _, tt := range tests {
-		if natLoop[tt] == nil || natLoop[tt].Name() != tt {
+		if !natLoop.Contains(tt) {
 			t.Errorf("'%s' should not be part of the natural loop of B3->B1", tt)
 		}
 	}
@@ -551,63 +470,51 @@ func TestDominanceFrontier(t *testing.T) {
 	b7 := ir.NewBasicBlock("B7")
 	b8 := ir.NewBasicBlock("B8")
 
-	cfg := &ir.ControlFlowGraph{
-		Entry: b0,
-		Exit:  b4,
-		Nodes: map[string]*ir.BasicBlock{
-			"B0": b0,
-			"B1": b1,
-			"B2": b2,
-			"B3": b3,
-			"B4": b4,
-			"B5": b5,
-			"B6": b6,
-			"B7": b7,
-			"B8": b8,
-		},
-		Succ: map[string][]string{
-			"B0": {"B1"},
-			"B1": {"B2", "B5"},
-			"B2": {"B3"},
-			"B3": {"B4", "B1"},
-			"B4": {},
-			"B5": {"B6", "B8"},
-			"B6": {"B7"},
-			"B7": {"B3"},
-			"B8": {"B7"},
-		},
-		Pred: map[string][]string{
-			"B0": {},
-			"B1": {"B0", "B3"},
-			"B2": {"B1"},
-			"B3": {"B2", "B7"},
-			"B4": {"B3"},
-			"B5": {"B1"},
-			"B6": {"B5"},
-			"B7": {"B6", "B8"},
-			"B8": {"B5"},
-		},
-	}
+	cfg := ir.NewCFG()
+	cfg.Entry = b0
+	cfg.Exit = b4
+
+	cfg.Nodes.Add(b0, b1, b2, b3, b4, b5, b6, b7, b8)
+
+	cfg.AddSucc("B0", b1)
+	cfg.AddSucc("B1", b2, b5)
+	cfg.AddSucc("B2", b3)
+	cfg.AddSucc("B3", b1, b4)
+	cfg.AddSucc("B4")
+	cfg.AddSucc("B5", b6, b8)
+	cfg.AddSucc("B6", b7)
+	cfg.AddSucc("B7", b3)
+	cfg.AddSucc("B8", b7)
+
+	cfg.AddPred("B0")
+	cfg.AddPred("B1", b0, b3)
+	cfg.AddPred("B2", b1)
+	cfg.AddPred("B3", b2, b7)
+	cfg.AddPred("B4", b3)
+	cfg.AddPred("B5", b1)
+	cfg.AddPred("B6", b5)
+	cfg.AddPred("B7", b6, b8)
+	cfg.AddPred("B8", b5)
 
 	tests := []struct {
 		name   string
-		blocks []string
+		blocks []*ir.BasicBlock
 	}{
-		{"B0", []string{}},
-		{"B1", []string{"B1"}},
-		{"B2", []string{"B3"}},
-		{"B3", []string{"B1"}},
-		{"B4", []string{}},
-		{"B5", []string{"B3"}},
-		{"B6", []string{"B7"}},
-		{"B7", []string{"B3"}},
-		{"B8", []string{"B7"}},
+		{"B0", []*ir.BasicBlock{}},
+		{"B1", []*ir.BasicBlock{b1}},
+		{"B2", []*ir.BasicBlock{b3}},
+		{"B3", []*ir.BasicBlock{b1}},
+		{"B4", []*ir.BasicBlock{}},
+		{"B5", []*ir.BasicBlock{b3}},
+		{"B6", []*ir.BasicBlock{b7}},
+		{"B7", []*ir.BasicBlock{b3}},
+		{"B8", []*ir.BasicBlock{b7}},
 	}
 
 	DF := DominanceFrontier(cfg)
 	for _, tt := range tests {
-		if len(tt.blocks) != len(DF[tt.name]) {
-			t.Errorf("expected a dom set of size %d, got %d", len(tt.blocks), len(DF[tt.name]))
+		if len(tt.blocks) != DF[tt.name].Size() {
+			t.Errorf("expected a dom set of size %d, got %d", len(tt.blocks), DF[tt.name].Size())
 		}
 
 		for i := 0; i < len(tt.blocks); i++ {

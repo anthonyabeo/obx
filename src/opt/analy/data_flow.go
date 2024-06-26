@@ -1,33 +1,9 @@
 package analy
 
 import (
+	"github.com/anthonyabeo/obx/src/adt"
 	"github.com/anthonyabeo/obx/src/translate/ir"
 )
-
-// WorkList
-// ----------------------------------------------
-type WorkList struct {
-	queue []string
-}
-
-func NewWorkList(elems []string) *WorkList {
-	return &WorkList{queue: elems}
-}
-
-func (w *WorkList) Add(elem string) {
-	w.queue = append(w.queue, elem)
-}
-
-func (w *WorkList) Dequeue() string {
-	elem := w.queue[0]
-	w.queue = w.queue[1:]
-
-	return elem
-}
-
-func (w *WorkList) Empty() bool {
-	return len(w.queue) == 0
-}
 
 // IterativeDataFlow implements an iterative data-flow algorithm for the
 // reaching definitions problem.
@@ -40,12 +16,12 @@ func IterativeDataFlow(cfg *ir.ControlFlowGraph, F map[string]func(ir.BitVector)
 	rpo := cfg.ReversePostOrder()
 	rpo = rpo[1:]
 
-	workList := NewWorkList(rpo)
+	workList := adt.NewQueueFrom[*ir.BasicBlock](rpo)
 
 	DFIn := map[string]ir.BitVector{"entry": Init}
-	for name := range cfg.Nodes {
-		if name != "entry" {
-			DFIn[name] = ir.BitVector(255)
+	for _, BB := range cfg.Nodes.Elems() {
+		if BB.Name() != "entry" {
+			DFIn[BB.Name()] = ir.BitVector(255)
 		}
 	}
 
@@ -53,16 +29,16 @@ func IterativeDataFlow(cfg *ir.ControlFlowGraph, F map[string]func(ir.BitVector)
 		B := workList.Dequeue()
 
 		TotalEffect := ir.BitVector(0)
-		for _, name := range cfg.Pred[B] {
-			in := DFIn[name]
-			Effect := F[name](in)
+		for _, name := range cfg.Pred[B.Name()] {
+			in := DFIn[name.Name()]
+			Effect := F[name.Name()](in)
 			TotalEffect |= Effect
 		}
 
-		if DFIn[B] != TotalEffect {
-			DFIn[B] = TotalEffect
-			for _, succ := range cfg.Succ[B] {
-				workList.Add(succ)
+		if DFIn[B.Name()] != TotalEffect {
+			DFIn[B.Name()] = TotalEffect
+			for _, succ := range cfg.Succ[B.Name()] {
+				workList.Enqueue(succ)
 			}
 		}
 	}
@@ -76,28 +52,28 @@ func IterativeDataflowDragonBook(cfg *ir.ControlFlowGraph, GEN, KILL map[string]
 	rpo := cfg.ReversePostOrder()
 	rpo = rpo[1:]
 
-	workList := NewWorkList(rpo)
+	workList := adt.NewQueueFrom[*ir.BasicBlock](rpo)
 
 	IN := map[string]ir.BitVector{}
 	OUT := map[string]ir.BitVector{}
-	for name := range cfg.Nodes {
-		OUT[name] = ir.BitVector(0)
+	for _, BB := range cfg.Nodes.Elems() {
+		OUT[BB.Name()] = ir.BitVector(0)
 	}
 
 	for !workList.Empty() {
 		B := workList.Dequeue()
 
-		IN[B] = ir.BitVector(0)
-		for _, name := range cfg.Pred[B] {
-			IN[B] |= OUT[name]
+		IN[B.Name()] = ir.BitVector(0)
+		for _, name := range cfg.Pred[B.Name()] {
+			IN[B.Name()] |= OUT[name.Name()]
 		}
 
-		prevOut := OUT[B]
-		OUT[B] = GEN[B] | (IN[B] & ^KILL[B])
+		prevOut := OUT[B.Name()]
+		OUT[B.Name()] = GEN[B.Name()] | (IN[B.Name()] & ^KILL[B.Name()])
 
-		if prevOut != OUT[B] {
-			for _, succ := range cfg.Succ[B] {
-				workList.Add(succ)
+		if prevOut != OUT[B.Name()] {
+			for _, succ := range cfg.Succ[B.Name()] {
+				workList.Enqueue(succ)
 			}
 		}
 	}
