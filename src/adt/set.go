@@ -1,6 +1,10 @@
 package adt
 
-import "fmt"
+import (
+	"fmt"
+	"golang.org/x/exp/constraints"
+	"math"
+)
 
 type Set[T comparable] interface {
 	Union(Set[T]) Set[T]
@@ -133,4 +137,100 @@ func (h *HashSet[T]) Equal(other Set[T]) bool {
 	}
 
 	return true
+}
+
+// BitVector
+// -----------------------------------------------
+type BitVector[T constraints.Unsigned] struct {
+	set T
+}
+
+func (b BitVector[T]) Union(s Set[T]) Set[T] {
+	bits, ok := s.(BitVector[T])
+	if !ok {
+		panic(fmt.Sprintf("expected an argument of type 'BitVector', got '%T'", s))
+	}
+
+	return BitVector[T]{set: b.set | bits.set}
+}
+
+func (b BitVector[T]) Intersect(s Set[T]) Set[T] {
+	bits, ok := s.(BitVector[T])
+	if !ok {
+		panic(fmt.Sprintf("expected an argument of type 'BitVector', got '%T'", s))
+	}
+
+	return BitVector[T]{set: b.set & bits.set}
+}
+
+func (b BitVector[T]) Diff(s Set[T]) Set[T] {
+	bits, ok := s.(BitVector[T])
+	if !ok {
+		panic(fmt.Sprintf("expected an argument of type 'BitVector', got '%T'", s))
+	}
+
+	return BitVector[T]{set: b.set & ^bits.set}
+}
+
+func (b BitVector[T]) Size() int {
+	b.set = b.set - ((b.set >> 1) & 0x55555555)
+	b.set = (b.set & 0x33333333) + ((b.set >> 2) & 0x33333333)
+	b.set = (b.set + (b.set >> 4)) & 0x0F0F0F0F
+	b.set = b.set + (b.set >> 8)
+	b.set = b.set + (b.set >> 16)
+
+	return int(b.set & 0x0000003F)
+}
+
+func (b BitVector[T]) Add(t ...T) {
+	for _, k := range t {
+		b.set = b.set | (1 << k)
+	}
+}
+
+func (b BitVector[T]) Remove(t ...T) Set[T] {
+	for _, k := range t {
+		b.set = b.set & ^(1 << k)
+	}
+
+	return b
+}
+
+func (b BitVector[T]) Contains(t T) bool {
+	return b.set&(1<<(t-1)) != 0
+}
+
+func (b BitVector[T]) Clone() Set[T] {
+	return BitVector[T]{set: b.set}
+}
+
+func (b BitVector[T]) Empty() bool {
+	return b.set == 0
+}
+
+func (b BitVector[T]) Elems() (elems []T) {
+	temp := b.set
+	for temp != 0 {
+		t := T(math.Log2(float64(temp & (^temp + 1))))
+		temp = temp & (temp - 1)
+		elems = append(elems, t)
+	}
+
+	return
+}
+
+func (b BitVector[T]) Pop() T {
+	t := T(math.Log2(float64(b.set & (^b.set + 1))))
+	b.set = b.set & (b.set - 1)
+
+	return t
+}
+
+func (b BitVector[T]) Equal(s Set[T]) bool {
+	bits, ok := s.(BitVector[T])
+	if !ok {
+		panic(fmt.Sprintf("expected an argument of type 'BitVector', got '%T'", s))
+	}
+
+	return b.set == bits.set
 }
