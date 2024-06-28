@@ -173,13 +173,15 @@ func (b BitVector[T]) Diff(s Set[T]) Set[T] {
 }
 
 func (b BitVector[T]) Size() int {
-	b.set = b.set - ((b.set >> 1) & 0x55555555)
-	b.set = (b.set & 0x33333333) + ((b.set >> 2) & 0x33333333)
-	b.set = (b.set + (b.set >> 4)) & 0x0F0F0F0F
-	b.set = b.set + (b.set >> 8)
-	b.set = b.set + (b.set >> 16)
+	n := 0
+	x := b.set
 
-	return int(b.set & 0x0000003F)
+	for x != 0 {
+		n = n + 1
+		x = x & (x - 1)
+	}
+
+	return n
 }
 
 func (b BitVector[T]) Add(t ...T) {
