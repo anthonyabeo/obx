@@ -145,34 +145,38 @@ type BitVector[T constraints.Unsigned] struct {
 	set T
 }
 
-func (b BitVector[T]) Union(s Set[T]) Set[T] {
-	bits, ok := s.(BitVector[T])
+func NewBitVectorSet[T constraints.Unsigned](init T) *BitVector[T] {
+	return &BitVector[T]{set: init}
+}
+
+func (b *BitVector[T]) Union(s Set[T]) Set[T] {
+	bits, ok := s.(*BitVector[T])
 	if !ok {
 		panic(fmt.Sprintf("expected an argument of type 'BitVector', got '%T'", s))
 	}
 
-	return BitVector[T]{set: b.set | bits.set}
+	return &BitVector[T]{set: b.set | bits.set}
 }
 
-func (b BitVector[T]) Intersect(s Set[T]) Set[T] {
-	bits, ok := s.(BitVector[T])
+func (b *BitVector[T]) Intersect(s Set[T]) Set[T] {
+	bits, ok := s.(*BitVector[T])
 	if !ok {
 		panic(fmt.Sprintf("expected an argument of type 'BitVector', got '%T'", s))
 	}
 
-	return BitVector[T]{set: b.set & bits.set}
+	return &BitVector[T]{set: b.set & bits.set}
 }
 
-func (b BitVector[T]) Diff(s Set[T]) Set[T] {
-	bits, ok := s.(BitVector[T])
+func (b *BitVector[T]) Diff(s Set[T]) Set[T] {
+	bits, ok := s.(*BitVector[T])
 	if !ok {
 		panic(fmt.Sprintf("expected an argument of type 'BitVector', got '%T'", s))
 	}
 
-	return BitVector[T]{set: b.set & ^bits.set}
+	return &BitVector[T]{set: b.set & ^bits.set}
 }
 
-func (b BitVector[T]) Size() int {
+func (b *BitVector[T]) Size() int {
 	n := 0
 	x := b.set
 
@@ -184,13 +188,13 @@ func (b BitVector[T]) Size() int {
 	return n
 }
 
-func (b BitVector[T]) Add(t ...T) {
+func (b *BitVector[T]) Add(t ...T) {
 	for _, k := range t {
 		b.set = b.set | (1 << k)
 	}
 }
 
-func (b BitVector[T]) Remove(t ...T) Set[T] {
+func (b *BitVector[T]) Remove(t ...T) Set[T] {
 	for _, k := range t {
 		b.set = b.set & ^(1 << k)
 	}
@@ -198,19 +202,19 @@ func (b BitVector[T]) Remove(t ...T) Set[T] {
 	return b
 }
 
-func (b BitVector[T]) Contains(t T) bool {
+func (b *BitVector[T]) Contains(t T) bool {
 	return b.set&(1<<(t-1)) != 0
 }
 
-func (b BitVector[T]) Clone() Set[T] {
-	return BitVector[T]{set: b.set}
+func (b *BitVector[T]) Clone() Set[T] {
+	return &BitVector[T]{set: b.set}
 }
 
-func (b BitVector[T]) Empty() bool {
+func (b *BitVector[T]) Empty() bool {
 	return b.set == 0
 }
 
-func (b BitVector[T]) Elems() (elems []T) {
+func (b *BitVector[T]) Elems() (elems []T) {
 	temp := b.set
 	for temp != 0 {
 		t := T(math.Log2(float64(temp & (^temp + 1))))
@@ -221,15 +225,15 @@ func (b BitVector[T]) Elems() (elems []T) {
 	return
 }
 
-func (b BitVector[T]) Pop() T {
+func (b *BitVector[T]) Pop() T {
 	t := T(math.Log2(float64(b.set & (^b.set + 1))))
 	b.set = b.set & (b.set - 1)
 
 	return t
 }
 
-func (b BitVector[T]) Equal(s Set[T]) bool {
-	bits, ok := s.(BitVector[T])
+func (b *BitVector[T]) Equal(s Set[T]) bool {
+	bits, ok := s.(*BitVector[T])
 	if !ok {
 		panic(fmt.Sprintf("expected an argument of type 'BitVector', got '%T'", s))
 	}
