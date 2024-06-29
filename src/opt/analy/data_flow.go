@@ -80,3 +80,49 @@ func IterativeDataflowDragonBook(cfg *ir.ControlFlowGraph, GEN, KILL map[string]
 
 	return IN, OUT
 }
+
+func ReachingDefinition(cfg *ir.ControlFlowGraph, GEN, KILL map[string]adt.Set[uint]) (map[string]adt.Set[uint], map[string]adt.Set[uint]) {
+	rpo := cfg.ReversePostOrder()
+	rpo = rpo[1:]
+
+	workList := adt.NewQueueFrom[*ir.BasicBlock](rpo)
+
+	IN := map[string]adt.Set[uint]{}
+	OUT := map[string]adt.Set[uint]{}
+	for _, BB := range cfg.Nodes.Elems() {
+		OUT[BB.Name()] = &adt.BitVector[uint]{}
+	}
+
+	for !workList.Empty() {
+		B := workList.Dequeue()
+
+		IN[B.Name()] = &adt.BitVector[uint]{}
+		for _, name := range cfg.Pred[B.Name()] {
+			IN[B.Name()] = IN[B.Name()].Union(OUT[name.Name()])
+		}
+
+		prevOut := OUT[B.Name()]
+		diff := IN[B.Name()].Diff(KILL[B.Name()])
+		OUT[B.Name()] = GEN[B.Name()].Union(diff)
+
+		if prevOut != OUT[B.Name()] {
+			for _, succ := range cfg.Succ[B.Name()] {
+				workList.Enqueue(succ)
+			}
+		}
+	}
+
+	return IN, OUT
+}
+
+func LiveVariable(cfg *ir.ControlFlowGraph) {
+
+}
+
+func AvailableExpressions(cfg *ir.ControlFlowGraph) {
+
+}
+
+func AnticipableExpressions(cfg *ir.ControlFlowGraph) {
+
+}
