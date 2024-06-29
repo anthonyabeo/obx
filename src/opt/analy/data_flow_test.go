@@ -1,6 +1,7 @@
 package analy
 
 import (
+	"github.com/anthonyabeo/obx/src/adt"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/translate/ir"
@@ -135,6 +136,71 @@ func TestIterativeDataflowDragonBook(t *testing.T) {
 	_, OUT := IterativeDataflowDragonBook(cfg, GEN, KILL)
 	for _, tt := range tests {
 		if OUT[tt.name] != tt.out {
+			t.Errorf("error for '%s'. Expected '%b', got '%b'", tt.name, tt.out, OUT[tt.name])
+		}
+	}
+}
+
+func TestReachingDefinition(t *testing.T) {
+	entry := ir.NewBasicBlock("entry")
+	b1 := ir.NewBasicBlock("B1")
+	b2 := ir.NewBasicBlock("B2")
+	b3 := ir.NewBasicBlock("B3")
+	b4 := ir.NewBasicBlock("B4")
+	exit := ir.NewBasicBlock("exit")
+
+	cfg := ir.NewCFG()
+	cfg.Entry = entry
+	cfg.Exit = exit
+
+	cfg.Nodes.Add(entry, b1, b2, b3, b4, exit)
+
+	cfg.AddSucc("entry", b1)
+	cfg.AddSucc("B1", b2)
+	cfg.AddSucc("B2", b3, b4)
+	cfg.AddSucc("B3", b4)
+	cfg.AddSucc("B4", exit)
+	cfg.AddSucc("exit")
+
+	cfg.AddPred("entry")
+	cfg.AddPred("B1", entry)
+	cfg.AddPred("B2", b1, b4)
+	cfg.AddPred("B3", b2)
+	cfg.AddPred("B4", b2, b3)
+	cfg.AddPred("exit", b4)
+
+	tests := []struct {
+		name string
+		out  *adt.BitVector[uint]
+	}{
+		{"entry", adt.NewBitVectorSet[uint](0b00000000)},
+		{"B1", adt.NewBitVectorSet[uint](0b0_1110000)},
+		{"B2", adt.NewBitVectorSet[uint](0b0_001_1110)},
+		{"B3", adt.NewBitVectorSet[uint](0b0_000_1110)},
+		{"B4", adt.NewBitVectorSet[uint](0b0_001_0111)},
+		{"exit", adt.NewBitVectorSet[uint](0b0_001_0111)},
+	}
+
+	GEN := map[string]adt.Set[uint]{
+		"entry": adt.NewBitVectorSet[uint](0),
+		"B1":    adt.NewBitVectorSet[uint](0b01110000),
+		"B2":    adt.NewBitVectorSet[uint](0b00001100),
+		"B3":    adt.NewBitVectorSet[uint](0b00000010),
+		"B4":    adt.NewBitVectorSet[uint](0b00000001),
+		"exit":  adt.NewBitVectorSet[uint](0),
+	}
+	KILL := map[string]adt.Set[uint]{
+		"entry": adt.NewBitVectorSet[uint](0),
+		"B1":    adt.NewBitVectorSet[uint](0b00001111),
+		"B2":    adt.NewBitVectorSet[uint](0b01100001),
+		"B3":    adt.NewBitVectorSet[uint](0b00010000),
+		"B4":    adt.NewBitVectorSet[uint](0b01001000),
+		"exit":  adt.NewBitVectorSet[uint](0),
+	}
+
+	_, OUT := ReachingDefinition(cfg, GEN, KILL)
+	for _, tt := range tests {
+		if !OUT[tt.name].Equal(tt.out) {
 			t.Errorf("error for '%s'. Expected '%b', got '%b'", tt.name, tt.out, OUT[tt.name])
 		}
 	}
