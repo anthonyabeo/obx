@@ -115,14 +115,75 @@ func ReachingDefinition(cfg *ir.ControlFlowGraph, GEN, KILL map[string]adt.Set[u
 	return IN, OUT
 }
 
-func LiveVariable(cfg *ir.ControlFlowGraph) {
+func LiveVariable(cfg *ir.ControlFlowGraph, DEF, USE map[string]adt.Set[uint]) (map[string]adt.Set[uint], map[string]adt.Set[uint]) {
+	rpo := cfg.Reverse().ReversePostOrder()
+	rpo = rpo[1:]
 
+	workList := adt.NewQueueFrom[*ir.BasicBlock](rpo)
+
+	IN := map[string]adt.Set[uint]{}
+	OUT := map[string]adt.Set[uint]{}
+	for _, BB := range cfg.Nodes.Elems() {
+		IN[BB.Name()] = &adt.BitVector[uint]{}
+	}
+
+	changed := true
+	for changed {
+		changed = false
+
+		for !workList.Empty() {
+			B := workList.Dequeue()
+
+			OUT[B.Name()] = &adt.BitVector[uint]{}
+			for _, S := range cfg.Succ[B.Name()] {
+				OUT[B.Name()] = OUT[B.Name()].Union(IN[S.Name()])
+			}
+
+			prevIN := IN[B.Name()]
+			IN[B.Name()] = USE[B.Name()].Union(OUT[B.Name()].Diff(DEF[B.Name()]))
+			if !prevIN.Equal(IN[B.Name()]) {
+				changed = true
+			}
+
+		}
+	}
+
+	return IN, OUT
 }
 
-func AvailableExpressions(cfg *ir.ControlFlowGraph) {
+func AvailableExpressions(cfg *ir.ControlFlowGraph, GEN, KILL map[string]adt.Set[uint]) (map[string]adt.Set[uint], map[string]adt.Set[uint]) {
+	rpo := cfg.ReversePostOrder()
+	rpo = rpo[1:]
 
+	workList := adt.NewQueueFrom[*ir.BasicBlock](rpo)
+
+	IN := map[string]adt.Set[uint]{}
+	OUT := map[string]adt.Set[uint]{}
+	for _, BB := range cfg.Nodes.Elems() {
+		OUT[BB.Name()] = &adt.BitVector[uint]{}
+	}
+
+	for !workList.Empty() {
+		B := workList.Dequeue()
+
+		IN[B.Name()] = &adt.BitVector[uint]{}
+		for _, P := range cfg.Pred[B.Name()] {
+			IN[B.Name()] = IN[B.Name()].Intersect(OUT[P.Name()])
+		}
+
+		prevOut := OUT[B.Name()]
+		OUT[B.Name()] = GEN[B.Name()].Union(IN[B.Name()].Diff(KILL[B.Name()]))
+
+		if prevOut != OUT[B.Name()] {
+			for _, S := range cfg.Succ[B.Name()] {
+				workList.Enqueue(S)
+			}
+		}
+	}
+
+	return IN, OUT
 }
 
-func AnticipableExpressions(cfg *ir.ControlFlowGraph) {
+func AnticipatableExpressions(cfg *ir.ControlFlowGraph) {
 
 }
