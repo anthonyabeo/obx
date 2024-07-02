@@ -112,6 +112,10 @@ func (cfg *ControlFlowGraph) ReversePostOrder() []*BasicBlock {
 	return revOrder
 }
 
+func (cfg *ControlFlowGraph) Reverse() *ControlFlowGraph {
+	panic("not implemented")
+}
+
 func (cfg *ControlFlowGraph) Replace(to Instruction, replace Value) {
 	for use := to.OperandList().Front(); use != nil; use = use.Next() {
 		useInstr := use.Value.(Instruction)
