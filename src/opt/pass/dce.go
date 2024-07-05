@@ -153,5 +153,11 @@ func removeEmptyBlock(i, j *ir.BasicBlock, cfg *ir.ControlFlowGraph) {
 }
 
 func hoistBranch(i, j *ir.BasicBlock, cfg *ir.ControlFlowGraph) {
-	cfg.Succ[i.Name()].Add(j)
+	for _, s := range cfg.Succ[j.Name()].Elems() {
+		cfg.Succ[i.Name()].Add(s)
+		cfg.Pred[s.Name()].Add(i)
+	}
+
+	cfg.Succ[i.Name()].Remove(j)
+	cfg.Pred[j.Name()].Remove(i)
 }
