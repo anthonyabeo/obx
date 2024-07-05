@@ -29,7 +29,7 @@ func IterativeDataFlow(cfg *ir.ControlFlowGraph, F map[string]func(ir.BitVector)
 		B := workList.Dequeue()
 
 		TotalEffect := ir.BitVector(0)
-		for _, name := range cfg.Pred[B.Name()] {
+		for _, name := range cfg.Pred[B.Name()].Elems() {
 			in := DFIn[name.Name()]
 			Effect := F[name.Name()](in)
 			TotalEffect |= Effect
@@ -37,7 +37,7 @@ func IterativeDataFlow(cfg *ir.ControlFlowGraph, F map[string]func(ir.BitVector)
 
 		if DFIn[B.Name()] != TotalEffect {
 			DFIn[B.Name()] = TotalEffect
-			for _, succ := range cfg.Succ[B.Name()] {
+			for _, succ := range cfg.Succ[B.Name()].Elems() {
 				workList.Enqueue(succ)
 			}
 		}
@@ -64,7 +64,7 @@ func IterativeDataflowDragonBook(cfg *ir.ControlFlowGraph, GEN, KILL map[string]
 		B := workList.Dequeue()
 
 		IN[B.Name()] = ir.BitVector(0)
-		for _, name := range cfg.Pred[B.Name()] {
+		for _, name := range cfg.Pred[B.Name()].Elems() {
 			IN[B.Name()] |= OUT[name.Name()]
 		}
 
@@ -72,7 +72,7 @@ func IterativeDataflowDragonBook(cfg *ir.ControlFlowGraph, GEN, KILL map[string]
 		OUT[B.Name()] = GEN[B.Name()] | (IN[B.Name()] & ^KILL[B.Name()])
 
 		if prevOut != OUT[B.Name()] {
-			for _, succ := range cfg.Succ[B.Name()] {
+			for _, succ := range cfg.Succ[B.Name()].Elems() {
 				workList.Enqueue(succ)
 			}
 		}
@@ -97,7 +97,7 @@ func ReachingDefinition(cfg *ir.ControlFlowGraph, GEN, KILL map[string]adt.Set[u
 		B := workList.Dequeue()
 
 		IN[B.Name()] = &adt.BitVector[uint]{}
-		for _, name := range cfg.Pred[B.Name()] {
+		for _, name := range cfg.Pred[B.Name()].Elems() {
 			IN[B.Name()] = IN[B.Name()].Union(OUT[name.Name()])
 		}
 
@@ -106,7 +106,7 @@ func ReachingDefinition(cfg *ir.ControlFlowGraph, GEN, KILL map[string]adt.Set[u
 		OUT[B.Name()] = GEN[B.Name()].Union(diff)
 
 		if prevOut != OUT[B.Name()] {
-			for _, succ := range cfg.Succ[B.Name()] {
+			for _, succ := range cfg.Succ[B.Name()].Elems() {
 				workList.Enqueue(succ)
 			}
 		}

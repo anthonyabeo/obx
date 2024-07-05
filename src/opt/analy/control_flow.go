@@ -25,8 +25,8 @@ func ExtendedBasicBlocks(cfg *ir.ControlFlowGraph, src *ir.BasicBlock) map[strin
 func extBasicBlocks(cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, roots *adt.Queue[*ir.BasicBlock], s *adt.HashSet[*ir.BasicBlock]) {
 	s.Add(blk)
 
-	for _, bb := range cfg.Succ[blk.Name()] {
-		if len(cfg.Pred[bb.Name()]) == 1 && !s.Contains(bb) {
+	for _, bb := range cfg.Succ[blk.Name()].Elems() {
+		if cfg.Pred[bb.Name()].Size() == 1 && !s.Contains(bb) {
 			extBasicBlocks(cfg, bb, roots, s)
 		} else {
 			roots.Enqueue(bb)
@@ -95,7 +95,7 @@ func Dominance(cfg *ir.ControlFlowGraph) map[string]adt.Set[*ir.BasicBlock] {
 			BB := workList.Dequeue()
 
 			var Temp adt.Set[*ir.BasicBlock] = cfg.Nodes
-			for _, pred := range cfg.Pred[BB.Name()] {
+			for _, pred := range cfg.Pred[BB.Name()].Elems() {
 				Temp = Temp.Intersect(Dom[pred.Name()])
 			}
 			Temp.Add(BB)
@@ -124,7 +124,7 @@ func DominanceFrontier(cfg *ir.ControlFlowGraph) map[string]adt.Set[*ir.BasicBlo
 			continue
 		}
 
-		for _, pred := range cfg.Pred[BB.Name()] {
+		for _, pred := range cfg.Pred[BB.Name()].Elems() {
 			runner := pred
 
 			for runner.Name() != IDom[BB.Name()].Name() {
@@ -150,7 +150,7 @@ func NaturalLoop(cfg *ir.ControlFlowGraph, m, n *ir.BasicBlock) adt.Set[*ir.Basi
 
 	for !Stack.Empty() {
 		p := Stack.Pop()
-		for _, q := range cfg.Pred[p.Name()] {
+		for _, q := range cfg.Pred[p.Name()].Elems() {
 			if !Loop.Contains(q) {
 				Loop.Add(q)
 				Stack.Push(q)

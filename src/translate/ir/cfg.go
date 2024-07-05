@@ -16,37 +16,43 @@ type BitVector byte
 // ----------------------------------------------------------------
 type ControlFlowGraph struct {
 	Entry, Exit *BasicBlock
-	Nodes       *adt.HashSet[*BasicBlock]
-	Succ        map[string][]*BasicBlock
-	Pred        map[string][]*BasicBlock
+	Nodes       adt.Set[*BasicBlock]
+	Succ        map[string]*adt.HashSet[*BasicBlock]
+	Pred        map[string]*adt.HashSet[*BasicBlock]
 }
 
 func NewCFG() *ControlFlowGraph {
 	return &ControlFlowGraph{
 		Nodes: adt.NewHashSet[*BasicBlock](),
-		Succ:  map[string][]*BasicBlock{},
-		Pred:  map[string][]*BasicBlock{},
+		Succ:  make(map[string]*adt.HashSet[*BasicBlock]),
+		Pred:  make(map[string]*adt.HashSet[*BasicBlock]),
 	}
 }
 
 func (cfg *ControlFlowGraph) AddSucc(BlkName string, Successors ...*BasicBlock) {
-	for _, succ := range Successors {
-		cfg.Succ[BlkName] = append(cfg.Succ[BlkName], succ)
+	if cfg.Succ[BlkName] == nil {
+		cfg.Succ[BlkName] = adt.NewHashSet[*BasicBlock]()
 	}
+	cfg.Succ[BlkName].Add(Successors...)
 }
 
 func (cfg *ControlFlowGraph) AddPred(BlkName string, Predecessors ...*BasicBlock) {
-	for _, pred := range Predecessors {
-		cfg.Pred[BlkName] = append(cfg.Pred[BlkName], pred)
+	if cfg.Pred[BlkName] == nil {
+		cfg.Pred[BlkName] = adt.NewHashSet[*BasicBlock]()
 	}
+	cfg.Pred[BlkName].Add(Predecessors...)
 }
 
 func (cfg *ControlFlowGraph) IsJoinNode(blk string) bool {
-	return len(cfg.Pred[blk]) > 1
+	if cfg.Pred[blk] != nil {
+		return cfg.Pred[blk].Size() > 1
+	}
+
+	return false
 }
 
 func (cfg *ControlFlowGraph) IsBrNode(blk string) bool {
-	return len(cfg.Succ[blk]) > 1
+	return cfg.Succ[blk].Size() > 1
 }
 
 func (cfg *ControlFlowGraph) String() string {
@@ -56,25 +62,25 @@ func (cfg *ControlFlowGraph) String() string {
 	}
 
 	for name, bb := range cfg.Succ {
-		var blks []string
-		for _, blk := range bb {
-			blks = append(blks, blk.name)
+		var blocks []string
+		for _, blk := range bb.Elems() {
+			blocks = append(blocks, blk.name)
 		}
 
-		succ = append(succ, fmt.Sprintf("\n\t\t\t%s: %s", name, blks))
+		succ = append(succ, fmt.Sprintf("\n\t\t\t%s: %s", name, blocks))
 	}
 
 	for name, bb := range cfg.Pred {
-		var blks []string
-		for _, blk := range bb {
-			blks = append(blks, blk.name)
+		var blocks []string
+		for _, blk := range bb.Elems() {
+			blocks = append(blocks, blk.name)
 		}
 
-		pred = append(pred, fmt.Sprintf("\n\t\t\t%s: %s", name, blks))
+		pred = append(pred, fmt.Sprintf("\n\t\t\t%s: %s", name, blocks))
 	}
 
 	buf := &bytes.Buffer{}
-	buf.WriteString("flowgraph = {\n\t")
+	buf.WriteString("flow-graph = {\n\t")
 	buf.WriteString(fmt.Sprintf("\tNodes = {%s},\n\t", strings.Join(nodes, ", ")))
 	buf.WriteString(fmt.Sprintf("\tSucc = {%s\n\t\t},\n\t", strings.Join(succ, ", ")))
 	buf.WriteString(fmt.Sprintf("\tPred = {%s\n\t\t},\n\t", strings.Join(pred, ", ")))
@@ -93,9 +99,11 @@ func (cfg *ControlFlowGraph) PostOrder() []*BasicBlock {
 
 func (cfg *ControlFlowGraph) dfs(node *BasicBlock, visited map[string]bool, order *[]*BasicBlock) {
 	visited[node.name] = true
-	for _, succ := range cfg.Succ[node.name] {
-		if _, found := visited[succ.name]; !found {
-			cfg.dfs(succ, visited, order)
+	if cfg.Succ[node.name] != nil {
+		for _, succ := range cfg.Succ[node.name].Elems() {
+			if _, found := visited[succ.name]; !found {
+				cfg.dfs(succ, visited, order)
+			}
 		}
 	}
 
@@ -129,28 +137,24 @@ func (cfg *ControlFlowGraph) Replace(to Instruction, replace Value) {
 
 func (cfg *ControlFlowGraph) DeleteBlocks(blocks ...*BasicBlock) {
 	cfg.Nodes.Remove(blocks...)
-	for idx, block := range blocks {
+	for _, block := range blocks {
 		delete(cfg.Succ, block.Name())
 		delete(cfg.Pred, block.Name())
 
 		for _, succ := range cfg.Succ {
-			for _, bb := range succ {
+			for _, bb := range succ.Elems() {
 				if bb == block {
-					succ = removeBlock[*BasicBlock](succ, idx)
+					succ.Remove(block)
 				}
 			}
 		}
 
 		for _, pred := range cfg.Pred {
-			for _, bb := range pred {
+			for _, bb := range pred.Elems() {
 				if bb == block {
-					pred = removeBlock[*BasicBlock](pred, idx)
+					pred.Remove(block)
 				}
 			}
 		}
 	}
-}
-
-func removeBlock[T any](slice []T, s int) []T {
-	return append(slice[:s], slice[s+1:]...)
 }
