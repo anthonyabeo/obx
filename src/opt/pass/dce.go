@@ -2,6 +2,8 @@ package pass
 
 import (
 	"fmt"
+
+	"github.com/anthonyabeo/obx/src/adt"
 	"github.com/anthonyabeo/obx/src/translate/ir"
 )
 
@@ -38,10 +40,15 @@ func eliminateUselessControlFlow(cfg *ir.ControlFlowGraph) {
 func makePass(cfg *ir.ControlFlowGraph, post []*ir.BasicBlock) bool {
 	for _, BB := range post {
 		if BB == cfg.Entry {
+			jmp := BB.LastInst().(*ir.BranchInst)
+			if jmp == nil || jmp.IsConditional() {
+				panic("last (and only) instruction in 'entry' block should be an unconditional branch")
+			}
+
+			jmp.IfTrue = cfg.Succ["entry"].Pop()
 			continue
 		}
 
-		//BB := cfg.Nodes[blk]
 		lastInst, ok := BB.LastInst().(*ir.BranchInst)
 		if !ok {
 			continue
@@ -61,7 +68,7 @@ func makePass(cfg *ir.ControlFlowGraph, post []*ir.BasicBlock) bool {
 				return true
 			}
 
-			if len(cfg.Pred[Dst.Name()]) == 1 {
+			if cfg.Pred[Dst.Name()].Size() == 1 {
 				mergeBlocks(BB, Dst, cfg)
 				return true
 			}
@@ -71,7 +78,6 @@ func makePass(cfg *ir.ControlFlowGraph, post []*ir.BasicBlock) bool {
 				hoistBranch(BB, Dst, cfg)
 				return true
 			}
-
 		}
 	}
 
@@ -81,8 +87,8 @@ func makePass(cfg *ir.ControlFlowGraph, post []*ir.BasicBlock) bool {
 func mergeBlocks(pred, succ *ir.BasicBlock, cfg *ir.ControlFlowGraph) *ir.BasicBlock {
 	// create a new block to hold the content of 'pred' and 'succ'
 	mergeBlock := ir.CreateBasicBlock("merge", pred.Parent())
-	cfg.Succ["merge"] = make([]*ir.BasicBlock, 0)
-	cfg.Pred["merge"] = make([]*ir.BasicBlock, 0)
+	cfg.Succ["merge"] = adt.NewHashSet[*ir.BasicBlock]()
+	cfg.Pred["merge"] = adt.NewHashSet[*ir.BasicBlock]()
 
 	// copy the instructions from pred (minus the last branch instruction) and succ
 	// to the new block
@@ -100,16 +106,19 @@ func mergeBlocks(pred, succ *ir.BasicBlock, cfg *ir.ControlFlowGraph) *ir.BasicB
 
 	// flow-graph accounting
 	// the predecessors of pred become the predecessors of mergeBlock
-	for _, p := range cfg.Pred[pred.Name()] {
-		cfg.Pred[mergeBlock.Name()] = append(cfg.Pred[mergeBlock.Name()], p)
-		cfg.Succ[p.Name()] = append(cfg.Succ[p.Name()], mergeBlock)
+	if cfg.Pred[pred.Name()] != nil {
+		for _, p := range cfg.Pred[pred.Name()].Elems() {
+			cfg.Pred[mergeBlock.Name()].Add(p)
+			cfg.Succ[p.Name()].Add(mergeBlock)
+		}
 	}
 
 	// the successors of succ become the successors of mergeBlock
-	for _, s := range cfg.Succ[succ.Name()] {
-
-		cfg.Succ[mergeBlock.Name()] = append(cfg.Succ[mergeBlock.Name()], s)
-		cfg.Pred[s.Name()] = append(cfg.Pred[s.Name()], mergeBlock)
+	if cfg.Succ[succ.Name()] != nil {
+		for _, s := range cfg.Succ[succ.Name()].Elems() {
+			cfg.Succ[mergeBlock.Name()].Add(s)
+			cfg.Pred[s.Name()].Add(mergeBlock)
+		}
 	}
 
 	cfg.DeleteBlocks(pred, succ)
@@ -118,36 +127,31 @@ func mergeBlocks(pred, succ *ir.BasicBlock, cfg *ir.ControlFlowGraph) *ir.BasicB
 }
 
 func removeEmptyBlock(i, j *ir.BasicBlock, cfg *ir.ControlFlowGraph) {
-	for _, p := range cfg.Pred[i.Name()] {
-		cfg.Pred[j.Name()] = append(cfg.Pred[j.Name()], p)
-	}
+	if cfg.Pred[i.Name()] != nil {
+		for _, p := range cfg.Pred[i.Name()].Elems() {
+			cfg.Pred[j.Name()].Add(p)
+			cfg.Succ[p.Name()].Add(j)
 
-	for _, p := range cfg.Pred[i.Name()] {
-		cfg.Succ[p.Name()] = append(cfg.Succ[p.Name()], j)
-	}
-
-	for _, Pred := range cfg.Pred[i.Name()] {
-		lastInst, ok := Pred.LastInst().(*ir.BranchInst)
-		if !ok {
-			panic(fmt.Sprintf("last instruction must be a branch, got '%s'", lastInst))
-		}
-
-		if lastInst.IsConditional() {
-			if i == lastInst.IfTrue {
-				lastInst.IfTrue = j
-			} else {
-				lastInst.IfFalse = j
+			lastInst, ok := p.LastInst().(*ir.BranchInst)
+			if !ok {
+				panic(fmt.Sprintf("last instruction must be a branch, got '%s'", lastInst))
 			}
-		} else {
-			lastInst.IfTrue = j
+
+			if lastInst.IsConditional() {
+				if i == lastInst.IfTrue {
+					lastInst.IfTrue = j
+				} else {
+					lastInst.IfFalse = j
+				}
+			} else {
+				lastInst.IfTrue = j
+			}
 		}
 	}
 
 	cfg.DeleteBlocks(i)
-
 }
 
 func hoistBranch(i, j *ir.BasicBlock, cfg *ir.ControlFlowGraph) {
-	cfg.Succ[i.Name()] = nil
-	cfg.Succ[i.Name()] = append(cfg.Succ[i.Name()], j)
+	cfg.Succ[i.Name()].Add(j)
 }
