@@ -9,11 +9,12 @@ import (
 type MapOfBlockValuePair map[string]*BlockValuePair
 
 type Mem2Reg struct {
-	name string
+	Nom string
 }
 
-func (m Mem2Reg) Name() string { return m.name }
-func (m Mem2Reg) Run(program *ir.Program) bool {
+func (m Mem2Reg) Name() string { return m.Nom }
+
+func (m Mem2Reg) Run(program *ir.Program) {
 	for _, module := range program.Modules {
 		for _, f := range module.GetFunctionList() {
 			cfg := f.CFG()
@@ -25,7 +26,7 @@ func (m Mem2Reg) Run(program *ir.Program) bool {
 		}
 	}
 
-	return true
+	//return true
 }
 
 // RegisterPromotion

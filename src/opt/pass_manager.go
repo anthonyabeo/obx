@@ -7,25 +7,39 @@ import (
 
 type Pass interface {
 	Name() string
-	Run(program *ir.Program) bool
+	Run(program *ir.Program)
 }
 
 type PassManager struct {
-	passes map[string]Pass
+	passes []Pass
+	set    map[string]bool
 }
 
 func NewPassManager() *PassManager {
-	return &PassManager{passes: map[string]Pass{}}
+	return &PassManager{set: map[string]bool{}}
 }
 
 func (pm *PassManager) AddPass(pass Pass) {
-	if _, exits := pm.passes[pass.Name()]; !exits {
-		pm.passes[pass.Name()] = pass
+	if _, exits := pm.set[pass.Name()]; !exits {
+		pm.set[pass.Name()] = true
+		pm.passes = append(pm.passes, pass)
 	}
 }
 
+func (pm *PassManager) dequeue() Pass {
+	p := pm.passes[0]
+	pm.passes = pm.passes[1:]
+
+	return p
+}
+
 func (pm *PassManager) Run(program *ir.Program) {
-	for _, p := range pm.passes {
+	//for _, p := range pm.passes {
+	//	p.Run(program)
+	//}
+
+	for len(pm.passes) > 0 {
+		p := pm.dequeue()
 		p.Run(program)
 	}
 }
@@ -46,8 +60,8 @@ var declPasses map[string]Pass
 
 func init() {
 	declPasses = map[string]Pass{
-		"mem2reg":    &pass.Mem2Reg{},
-		"dce":        &pass.DeadCodeElimination{},
+		"mem2reg":    &pass.Mem2Reg{Nom: "mem2reg"},
+		"dce":        &pass.DeadCodeElimination{Nom: "dce"},
 		"const_prop": &pass.ConstantPropagation{},
 	}
 }

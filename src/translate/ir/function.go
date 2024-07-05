@@ -151,3 +151,17 @@ func (b *BasicBlock) Parent() *Function                 { return b.parent }
 func (b *BasicBlock) Instr() *list.List                 { return b.instr }
 func (b *BasicBlock) InsertInstrBegin(inst Instruction) { b.instr.InsertBefore(inst, b.instr.Front()) }
 func (b *BasicBlock) RemoveInstr(rem *list.Element)     { b.instr.Remove(rem) }
+func (b *BasicBlock) Empty() bool {
+	if b.instr.Len() != 1 {
+		return false
+	}
+
+	br, ok := b.instr.Front().Value.(*BranchInst)
+	return ok && !br.IsConditional()
+}
+func (b *BasicBlock) LastInst() Instruction  { return b.instr.Back().Value.(Instruction) }
+func (b *BasicBlock) AddInstr(i Instruction) { b.instr.PushBack(i) }
+func (b *BasicBlock) LastInstIsCondBr() bool {
+	br, ok := b.LastInst().(*BranchInst)
+	return ok && br.IsConditional()
+}

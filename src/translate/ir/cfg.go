@@ -126,3 +126,31 @@ func (cfg *ControlFlowGraph) Replace(to Instruction, replace Value) {
 		}
 	}
 }
+
+func (cfg *ControlFlowGraph) DeleteBlocks(blocks ...*BasicBlock) {
+	cfg.Nodes.Remove(blocks...)
+	for idx, block := range blocks {
+		delete(cfg.Succ, block.Name())
+		delete(cfg.Pred, block.Name())
+
+		for _, succ := range cfg.Succ {
+			for _, bb := range succ {
+				if bb == block {
+					succ = removeBlock[*BasicBlock](succ, idx)
+				}
+			}
+		}
+
+		for _, pred := range cfg.Pred {
+			for _, bb := range pred {
+				if bb == block {
+					pred = removeBlock[*BasicBlock](pred, idx)
+				}
+			}
+		}
+	}
+}
+
+func removeBlock[T any](slice []T, s int) []T {
+	return append(slice[:s], slice[s+1:]...)
+}
