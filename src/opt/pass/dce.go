@@ -24,6 +24,7 @@ func (dce DeadCodeElimination) Run(program *ir.Program) {
 func eliminateUselessCode(cfg *ir.ControlFlowGraph) {
 
 }
+
 func eliminateUselessControlFlow(cfg *ir.ControlFlowGraph) {
 	changed := true
 	for changed {
@@ -36,6 +37,10 @@ func eliminateUselessControlFlow(cfg *ir.ControlFlowGraph) {
 
 func makePass(cfg *ir.ControlFlowGraph, post []*ir.BasicBlock) bool {
 	for _, BB := range post {
+		if BB == cfg.Entry {
+			continue
+		}
+
 		//BB := cfg.Nodes[blk]
 		lastInst, ok := BB.LastInst().(*ir.BranchInst)
 		if !ok {
@@ -57,7 +62,7 @@ func makePass(cfg *ir.ControlFlowGraph, post []*ir.BasicBlock) bool {
 			}
 
 			if len(cfg.Pred[Dst.Name()]) == 1 {
-				merge(BB, Dst, cfg)
+				mergeBlocks(BB, Dst, cfg)
 				return true
 			}
 
@@ -73,7 +78,7 @@ func makePass(cfg *ir.ControlFlowGraph, post []*ir.BasicBlock) bool {
 	return false
 }
 
-func merge(pred, succ *ir.BasicBlock, cfg *ir.ControlFlowGraph) *ir.BasicBlock {
+func mergeBlocks(pred, succ *ir.BasicBlock, cfg *ir.ControlFlowGraph) *ir.BasicBlock {
 	// create a new block to hold the content of 'pred' and 'succ'
 	mergeBlock := ir.CreateBasicBlock("merge", pred.Parent())
 	cfg.Succ["merge"] = make([]*ir.BasicBlock, 0)
@@ -97,11 +102,14 @@ func merge(pred, succ *ir.BasicBlock, cfg *ir.ControlFlowGraph) *ir.BasicBlock {
 	// the predecessors of pred become the predecessors of mergeBlock
 	for _, p := range cfg.Pred[pred.Name()] {
 		cfg.Pred[mergeBlock.Name()] = append(cfg.Pred[mergeBlock.Name()], p)
+		cfg.Succ[p.Name()] = append(cfg.Succ[p.Name()], mergeBlock)
 	}
 
 	// the successors of succ become the successors of mergeBlock
 	for _, s := range cfg.Succ[succ.Name()] {
+
 		cfg.Succ[mergeBlock.Name()] = append(cfg.Succ[mergeBlock.Name()], s)
+		cfg.Pred[s.Name()] = append(cfg.Pred[s.Name()], mergeBlock)
 	}
 
 	cfg.DeleteBlocks(pred, succ)
