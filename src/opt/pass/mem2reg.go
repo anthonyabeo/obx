@@ -1,12 +1,12 @@
 package pass
 
 import (
+	"fmt"
+
 	"github.com/anthonyabeo/obx/src/adt"
 	"github.com/anthonyabeo/obx/src/opt/analy"
-	"github.com/anthonyabeo/obx/src/translate/ir"
+	"github.com/anthonyabeo/obx/src/translate/tacil"
 )
-
-type MapOfBlockValuePair map[string]*BlockValuePair
 
 type Mem2Reg struct {
 	Nom string
@@ -14,199 +14,51 @@ type Mem2Reg struct {
 
 func (m Mem2Reg) Name() string { return m.Nom }
 
-func (m Mem2Reg) Run(program *ir.Program) {
+func (m Mem2Reg) Run(program *tacil.Program) {
 	for _, module := range program.Modules {
 		for _, f := range module.GetFunctionList() {
 			cfg := f.CFG()
-			stack := adt.NewStack[MapOfBlockValuePair]()
-			vst := map[string]bool{}
 
-			ComputePhiInsertLocations(cfg)
-			RegisterPromotion(cfg, cfg.Entry, vst, stack)
+			DF := analy.DominanceFrontier(cfg)
+
+			Globals, Blocks := ComputeGlobalNames(cfg)
+			InsertPhiFunctions(Globals, Blocks, DF)
+			Rename(Globals, cfg)
 		}
 	}
-
-	//return true
-}
-
-// RegisterPromotion
-// ---------------------------------------------------------------
-func RegisterPromotion[T MapOfBlockValuePair](cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, vst map[string]bool, stack *adt.Stack[T]) {
-	for _, nodes := range blk.Phi {
-		for _, phi := range nodes {
-			Block, V := GetBlockValuePair(stack, phi.Name())
-			phi.AddIncoming(V, Block)
-
-			top := stack.Top()
-			top[phi.Name()] = &BlockValuePair{blk: blk, val: phi}
-		}
-	}
-
-	if _, found := vst[blk.Name()]; found {
-		return
-	}
-
-	vst[blk.Name()] = true
-	l := blk.Instr()
-	for inst := l.Front(); inst != nil; {
-		switch instr := inst.Value.(type) {
-		case *ir.BranchInst:
-			if !instr.IsConditional() {
-				stack.Push(map[string]*BlockValuePair{})
-				RegisterPromotion[T](cfg, instr.IfTrue, vst, stack)
-				return
-			}
-
-			stack.Push(map[string]*BlockValuePair{})
-			RegisterPromotion[T](cfg, instr.IfTrue, vst, stack)
-			stack.Pop()
-
-			stack.Push(map[string]*BlockValuePair{})
-			RegisterPromotion[T](cfg, instr.IfFalse, vst, stack)
-			stack.Pop()
-
-			inst = inst.Next()
-		case *ir.StoreInst:
-			stack.Top()[instr.Dst.Name()] = &BlockValuePair{blk: blk, val: instr.Value}
-
-			next := inst.Next()
-			blk.RemoveInstr(inst)
-			inst = next
-
-		case *ir.LoadInst:
-			_, LoadV := GetBlockValuePair(stack, instr.Ptr.Name())
-
-			next := inst.Next()
-			blk.RemoveInstr(inst)
-			inst = next
-
-			cfg.Replace(instr, LoadV)
-		case *ir.AllocaInst:
-			next := inst.Next()
-			blk.RemoveInstr(inst)
-			inst = next
-		default:
-			inst = inst.Next()
-		}
-	}
-}
-
-func GetAllocInstr(cfg *ir.ControlFlowGraph) []*ir.AllocaInst {
-	var Alloc []*ir.AllocaInst
-
-	for _, BB := range cfg.Nodes.Elems() {
-		Instr := BB.Instr()
-		for inst := Instr.Front(); inst != nil; inst = inst.Next() {
-			alloc, ok := inst.Value.(*ir.AllocaInst)
-			if !ok {
-				continue
-			}
-
-			Alloc = append(Alloc, alloc)
-		}
-	}
-
-	return Alloc
-}
-
-func GetBlocksThatContainStore(cfg *ir.ControlFlowGraph, dst string) adt.Set[*ir.BasicBlock] {
-	storeBlocks := adt.NewHashSet[*ir.BasicBlock]()
-
-	for _, BB := range cfg.Nodes.Elems() {
-		Instr := BB.Instr()
-		for inst := Instr.Front(); inst != nil; inst = inst.Next() {
-			if store, ok := inst.Value.(*ir.StoreInst); ok && store.Operand(2).Name() == dst {
-				storeBlocks.Add(BB)
-				break
-			}
-		}
-	}
-
-	return storeBlocks
-}
-
-func ComputePhiInsertLocations(cfg *ir.ControlFlowGraph) {
-	locations := make(map[string]adt.Set[*ir.BasicBlock])
-
-	DF := analy.DominanceFrontier(cfg)
-	for _, variable := range GetAllocInstr(cfg) {
-		locations[variable.Name()] = adt.NewHashSet[*ir.BasicBlock]()
-
-		storeBlocks := GetBlocksThatContainStore(cfg, variable.Name())
-		workList := storeBlocks.Clone()
-
-		for !workList.Empty() {
-			block := workList.Pop()
-
-			for _, BB := range DF[block.Name()].Elems() {
-				if locations[variable.Name()].Empty() {
-					if _, exists := locations[variable.Name()]; !exists {
-						set := adt.NewHashSet[*ir.BasicBlock]()
-						set.Add(BB)
-						locations[variable.Name()] = set
-					} else {
-						locations[variable.Name()].Add(BB)
-					}
-
-					if !storeBlocks.Contains(BB) {
-						workList.Add(BB)
-					}
-				}
-			}
-		}
-	}
-
-	for variable, BBs := range locations {
-		for _, BB := range BBs.Elems() {
-			phi := ir.CreateEmptyPHINode(variable)
-			BB.InsertInstrBegin(phi)
-			BB.Phi[variable] = append(BB.Phi[variable], phi)
-		}
-	}
-
-}
-
-// BlockValuePair
-// ---------------------------------------------------------------
-type BlockValuePair struct {
-	blk *ir.BasicBlock
-	val ir.Value
-}
-
-func GetBlockValuePair[T MapOfBlockValuePair](s *adt.Stack[T], f string) (*ir.BasicBlock, ir.Value) {
-	for i := s.Size() - 1; i >= 0; i-- {
-		frame := s.Items[i]
-		if tuple, ok := frame[f]; ok {
-			return tuple.blk, tuple.val
-		}
-	}
-
-	return nil, nil
 }
 
 // ComputeGlobalNames
 // ---------------------------------------------------------------
-func ComputeGlobalNames(cfg *ir.ControlFlowGraph) ([]string, map[string]adt.Set[*ir.BasicBlock]) {
-	Globals := make([]string, 0)
-	Blocks := map[string]adt.Set[*ir.BasicBlock]{}
+func ComputeGlobalNames(cfg *tacil.ControlFlowGraph) (map[string]bool, map[string]adt.Set[Pair]) {
+	Globals := map[string]bool{}
+	Blocks := map[string]adt.Set[Pair]{}
 
 	for _, BB := range cfg.Nodes.Elems() {
 		VarKill := map[string]bool{}
 
 		for i := BB.Instr().Front(); i != nil; i = i.Next() {
-			inst := i.Value.(ir.Instruction)
-			for i := 1; i < inst.NumOperands()+1; i++ {
-				if _, contains := VarKill[inst.Operand(i).Name()]; contains {
-					Globals = append(Globals, inst.Operand(i).Name())
-				}
-			}
+			if assign, ok := i.Value.(*tacil.Assign); ok {
+				for i := 1; i < assign.Value.NumOperands()+1; i++ {
+					operand := assign.Value.Operand(i)
+					if !operand.HasName() {
+						continue
+					}
 
-			VarKill[inst.Name()] = true
-			if _, ok := Blocks[inst.Name()]; !ok {
-				Blocks[inst.Name()] = adt.NewHashSet[*ir.BasicBlock]()
-				Blocks[inst.Name()].Add(BB)
-			} else {
-				Blocks[inst.Name()].Add(BB)
+					if !VarKill[operand.Name()] {
+						Globals[operand.Name()] = true
+					}
+				}
+
+				VarKill[assign.Dst.Name()] = true
+				if _, ok := Blocks[assign.Dst.Name()]; !ok {
+					Blocks[assign.Dst.Name()] = adt.NewHashSet[Pair]()
+				}
+
+				Blocks[assign.Dst.Name()].Add(Pair{
+					expr:  assign.Dst,
+					block: BB,
+				})
 			}
 		}
 	}
@@ -214,22 +66,135 @@ func ComputeGlobalNames(cfg *ir.ControlFlowGraph) ([]string, map[string]adt.Set[
 	return Globals, Blocks
 }
 
+// Pair
+// ---------------------------
+type Pair struct {
+	expr  tacil.Expr
+	block *tacil.BasicBlock
+}
+
 // InsertPhiFunctions
 // -----------------------------------------------------------------
-func InsertPhiFunctions(Globals []string, Blocks, DF map[string]adt.Set[*ir.BasicBlock]) {
-	for _, name := range Globals {
+func InsertPhiFunctions(Globals map[string]bool, Blocks map[string]adt.Set[Pair], DF map[string]adt.Set[*tacil.BasicBlock]) {
+	for name := range Globals {
 		WorkList := Blocks[name]
-		for !WorkList.Empty() {
-			block := WorkList.Pop()
-			for _, BB := range DF[block.Name()].Elems() {
-				if len(BB.Phi[name]) == 0 {
-					phi := ir.CreateEmptyPHINode("")
-					BB.InsertInstrBegin(phi)
-					BB.Phi[name] = append(BB.Phi[name], phi)
 
-					WorkList.Add(BB)
+		workList := adt.NewQueue[*tacil.BasicBlock]()
+		for _, inc := range WorkList.Elems() {
+			workList.Enqueue(inc.block)
+		}
+
+		for !workList.Empty() {
+			inc := WorkList.Pop()
+			blk := workList.Dequeue()
+			for _, BB := range DF[blk.Name()].Elems() {
+				var phi *tacil.PHINode
+				if BB.Phi[inc.expr.Name()] == nil {
+					phi = tacil.CreateEmptyPHINode()
+					phi.AddIncoming(inc.expr, inc.block)
+
+					assign := tacil.CreateAssign(phi, tacil.NewTemp(inc.expr.Name()))
+					BB.InsertInstrBegin(assign)
+					BB.Phi[inc.expr.Name()] = assign
+
+					workList.Enqueue(BB)
+				} else {
+					BB.Phi[inc.expr.Name()].Value.(*tacil.PHINode).AddIncoming(inc.expr, inc.block)
 				}
 			}
 		}
 	}
+}
+
+// Rename
+// -----------------------------
+func Rename(Globals map[string]bool, cfg *tacil.ControlFlowGraph) {
+	counter := make(map[string]int)
+	stack := make(map[string]*adt.Stack[string])
+	vst := make(map[string]bool)
+
+	for name := range Globals {
+		counter[name] = 0
+		stack[name] = adt.NewStack[string]()
+	}
+
+	rename(Globals, vst, cfg.Entry, counter, stack, cfg)
+}
+
+func rename(Globals map[string]bool, vst map[string]bool, block *tacil.BasicBlock, counter map[string]int, stack map[string]*adt.Stack[string], cfg *tacil.ControlFlowGraph) {
+	if vst[block.Name()] {
+		return
+	}
+	vst[block.Name()] = true
+
+	for name, phi := range block.Phi {
+		nom := newName(name, counter, stack)
+		phi.Dst.SetName(nom)
+	}
+
+	for i := block.Instr().Front(); i != nil; i = i.Next() {
+		assign, ok := i.Value.(*tacil.Assign)
+		if !ok {
+			continue
+		}
+
+		for j := 1; j < assign.Value.NumOperands()+1; j++ {
+			operand := assign.Value.Operand(j)
+			if Globals[operand.Name()] {
+				operand.SetName(stack[operand.Name()].Top())
+			}
+		}
+
+		if Globals[assign.Dst.Name()] {
+			assign.Dst.SetName(newName(assign.Dst.Name(), counter, stack))
+		}
+	}
+
+	// for each successor of b in the CFG do
+	//		fill in φ-function parameters
+	if cfg.Succ[block.Name()] != nil {
+		for _, s := range cfg.Succ[block.Name()].Elems() {
+			for name, assign := range s.Phi {
+				if phi, ok := assign.Dst.(*tacil.PHINode); ok {
+					for _, inc := range phi.Incoming {
+						if inc.Blk == block {
+							inc.V.SetName(stack[name].Top())
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if cfg.Succ[block.Name()] != nil {
+		for _, s := range cfg.Succ[block.Name()].Elems() {
+			rename(Globals, vst, s, counter, stack, cfg)
+		}
+	}
+
+	for i := block.Instr().Front(); i != nil; i = i.Next() {
+		switch instr := i.Value.(type) {
+		case *tacil.Assign:
+			if stack[instr.Dst.Name()] != nil {
+				stack[instr.Dst.Name()].Pop()
+			}
+
+		case *tacil.PHINode:
+			if stack[instr.Name()] != nil {
+				stack[instr.Name()].Pop()
+			}
+		default:
+			continue
+		}
+	}
+}
+
+func newName(name string, counter map[string]int, stack map[string]*adt.Stack[string]) string {
+	i := counter[name]
+	counter[name] += 1
+
+	nom := fmt.Sprintf("%s%d", name, i)
+	stack[name].Push(nom)
+
+	return nom
 }
