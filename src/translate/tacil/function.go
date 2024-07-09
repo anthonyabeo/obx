@@ -1,4 +1,4 @@
-package ir
+package tacil
 
 import (
 	"bytes"
@@ -44,17 +44,12 @@ func CreatePreDeclaredFunction(ty *FunctionType, link LinkageKind, name string, 
 	}
 }
 
-func (f *Function) SetOperand(i int, v Value) { panic("unimplemented") }
-func (f *Function) AddUse(v Value)            { f.useList.PushBack(v) }
-func (f *Function) NumOperands() int          { return f.useList.Len() }
-func (f *Function) Operand(int) Value         { panic("[internal] functions have no operands") }
-func (f *Function) OperandList() *list.List   { return f.useList }
-func (f *Function) Parent() *Module           { return f.module }
-func (f *Function) NumUses() int              { return f.useList.Len() }
-func (f *Function) Type() Type                { return f.ty }
-func (f *Function) Name() string              { return f.name }
-func (f *Function) SetName(name string)       { f.name = name }
-func (f *Function) HasName() bool             { return f.name != "" }
+func (f *Function) Parent() *Module     { return f.module }
+func (f *Function) NumUses() int        { return f.useList.Len() }
+func (f *Function) Type() Type          { return f.ty }
+func (f *Function) Name() string        { return f.name }
+func (f *Function) SetName(name string) { f.name = name }
+func (f *Function) HasName() bool       { return f.name != "" }
 func (f *Function) String() string {
 	buf := &bytes.Buffer{}
 
@@ -70,6 +65,7 @@ func (f *Function) HasInternalLinkage() bool { return f.link == Internal }
 func (f *Function) HasExternalLinkage() bool { return f.link == External }
 func (f *Function) SymbolTable()             {}
 func (f *Function) CFG() *ControlFlowGraph   { return f.cfg }
+func (f *Function) OrigName() string         { panic("") }
 
 // Argument ...
 // ---------------------
@@ -101,7 +97,7 @@ type BasicBlock struct {
 	ty     *LabelType
 	parent *Function
 	instr  *list.List
-	Phi    map[string][]*PHINode
+	Phi    map[string]*Assign
 }
 
 func NewBasicBlock(name string) *BasicBlock {
@@ -109,10 +105,6 @@ func NewBasicBlock(name string) *BasicBlock {
 }
 
 func CreateBasicBlock(name string, parent *Function) *BasicBlock {
-	if name == "" {
-		name = NextTemp()
-	}
-
 	instr := list.New()
 	instr.Init()
 	blk := &BasicBlock{
@@ -120,7 +112,7 @@ func CreateBasicBlock(name string, parent *Function) *BasicBlock {
 		ty:     &LabelType{name: name},
 		parent: parent,
 		instr:  instr,
-		Phi:    map[string][]*PHINode{},
+		Phi:    map[string]*Assign{},
 	}
 
 	parent.cfg.Nodes.Add(blk)
@@ -134,34 +126,32 @@ func (b *BasicBlock) HasName() bool       { return b.name != "" }
 func (b *BasicBlock) String() string {
 	s := fmt.Sprintf("%%%s:\n\t", b.name)
 
-	l := b.instr
-	for inst := l.Front(); inst != nil; {
+	for inst := b.instr.Front(); inst != nil; inst = inst.Next() {
+		i := inst.Value.(Stmt)
 		if inst.Next() != nil {
-			s += fmt.Sprintf("%s\n\t", inst.Value)
+			s += fmt.Sprintf("%s\n\t", i)
 		} else {
-			s += fmt.Sprintf("%s\n\n", inst.Value)
+			s += fmt.Sprintf("%s\n\n", i)
 		}
-
-		inst = inst.Next()
 	}
 
 	return s
 }
-func (b *BasicBlock) Parent() *Function                 { return b.parent }
-func (b *BasicBlock) Instr() *list.List                 { return b.instr }
-func (b *BasicBlock) InsertInstrBegin(inst Instruction) { b.instr.InsertBefore(inst, b.instr.Front()) }
-func (b *BasicBlock) RemoveInstr(rem *list.Element)     { b.instr.Remove(rem) }
+func (b *BasicBlock) Parent() *Function             { return b.parent }
+func (b *BasicBlock) Instr() *list.List             { return b.instr }
+func (b *BasicBlock) InsertInstrBegin(inst Stmt)    { b.instr.InsertBefore(inst, b.instr.Front()) }
+func (b *BasicBlock) RemoveInstr(rem *list.Element) { b.instr.Remove(rem) }
 func (b *BasicBlock) Empty() bool {
 	if b.instr.Len() != 1 {
 		return false
 	}
 
-	br, ok := b.instr.Front().Value.(*BranchInst)
-	return ok && !br.IsConditional()
+	_, ok := b.instr.Front().Value.(*Jump)
+	return ok
 }
-func (b *BasicBlock) LastInst() Instruction  { return b.instr.Back().Value.(Instruction) }
-func (b *BasicBlock) AddInstr(i Instruction) { b.instr.PushBack(i) }
+func (b *BasicBlock) LastInst() Stmt  { return b.instr.Back().Value.(Stmt) }
+func (b *BasicBlock) AddInstr(i Stmt) { b.instr.PushBack(i) }
 func (b *BasicBlock) LastInstIsCondBr() bool {
-	br, ok := b.LastInst().(*BranchInst)
-	return ok && br.IsConditional()
+	_, ok := b.LastInst().(*CondBr)
+	return ok
 }

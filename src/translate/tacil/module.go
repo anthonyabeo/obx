@@ -1,8 +1,8 @@
-package ir
+package tacil
 
 import "container/list"
 
-type ValueSymbolTable map[string]Value
+type ValueSymbolTable map[string]*Function
 
 type Module struct {
 	name  string
@@ -20,8 +20,7 @@ func (m *Module) GetFunctionList() []*Function {
 
 func (m *Module) GetOrInsertFunction(name string, ty *FunctionType, link LinkageKind) *Function {
 	if Func, found := m.env[name]; found {
-		F, _ := Func.(*Function)
-		return F
+		return Func
 	}
 
 	uses := list.New()
@@ -47,7 +46,7 @@ func (m *Module) GetFunction(name string) (F *Function) {
 
 	switch name {
 	case "main":
-		F = m.env[name].(*Function)
+		F = m.env[name]
 
 	case "assert":
 		F = CreatePreDeclaredFunction(

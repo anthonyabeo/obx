@@ -1,4 +1,4 @@
-package ir
+package tacil
 
 type Program struct {
 	Modules []*Module

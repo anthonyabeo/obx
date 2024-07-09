@@ -135,7 +135,7 @@ func LiveVariable(cfg *ir.ControlFlowGraph, DEF, USE map[string]adt.Set[uint]) (
 			B := workList.Dequeue()
 
 			OUT[B.Name()] = &adt.BitVector[uint]{}
-			for _, S := range cfg.Succ[B.Name()] {
+			for _, S := range cfg.Succ[B.Name()].Elems() {
 				OUT[B.Name()] = OUT[B.Name()].Union(IN[S.Name()])
 			}
 
@@ -167,7 +167,7 @@ func AvailableExpressions(cfg *ir.ControlFlowGraph, GEN, KILL map[string]adt.Set
 		B := workList.Dequeue()
 
 		IN[B.Name()] = &adt.BitVector[uint]{}
-		for _, P := range cfg.Pred[B.Name()] {
+		for _, P := range cfg.Pred[B.Name()].Elems() {
 			IN[B.Name()] = IN[B.Name()].Intersect(OUT[P.Name()])
 		}
 
@@ -175,7 +175,7 @@ func AvailableExpressions(cfg *ir.ControlFlowGraph, GEN, KILL map[string]adt.Set
 		OUT[B.Name()] = GEN[B.Name()].Union(IN[B.Name()].Diff(KILL[B.Name()]))
 
 		if prevOut != OUT[B.Name()] {
-			for _, S := range cfg.Succ[B.Name()] {
+			for _, S := range cfg.Succ[B.Name()].Elems() {
 				workList.Enqueue(S)
 			}
 		}

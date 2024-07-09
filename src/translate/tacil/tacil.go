@@ -1,9 +1,6 @@
-package ir
+package tacil
 
-import (
-	"container/list"
-	"strconv"
-)
+import "fmt"
 
 type Opcode int
 
@@ -17,9 +14,8 @@ var opcodes = [...]string{
 	Mul: "mul",
 	Div: "div",
 
-	Alloca: "alloca",
-	Load:   "load",
-	Store:  "store",
+	Load:  "load",
+	Store: "store",
 
 	Xor:  "xor",
 	Or:   "or",
@@ -44,6 +40,7 @@ var opcodes = [...]string{
 
 	Br:  "br",
 	Ret: "ret",
+	Jmp: "jmp",
 }
 
 const (
@@ -90,42 +87,31 @@ const (
 	termop_begin
 	Br
 	Ret
+	Jmp
 	termop_end
 )
 
-type Value interface {
-	Type() Type
+type Expr interface {
+	expr()
 	Name() string
 	SetName(string)
 	HasName() bool
-	String() string
-	NumUses() int
-	AddUse(Value)
-	SetOperand(int, Value)
+	Operand(int) Expr
+	NumOperands() int
+	//Type() Type
+	fmt.Stringer
 }
 
-type User interface {
-	Value
-	NumOperands() int
-	Operand(int) Value
-	OperandList() *list.List
+type Stmt interface {
+	stmt()
+	fmt.Stringer
 }
 
 var tmp = 0
 
 func NextTemp() string {
-	t := strconv.Itoa(tmp)
+	t := fmt.Sprintf("t%d", tmp)
 	tmp += 1
 
 	return t
-}
-
-// GlobalValue denotes the base type of Global Variables and Functions
-// ----------------------
-type GlobalValue interface {
-	Value
-	Constant
-	HasInternalLinkage() bool
-	HasExternalLinkage() bool
-	Parent() *Module
 }
