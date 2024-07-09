@@ -63,8 +63,8 @@ var buildCmd = &cobra.Command{
 		}
 
 		// Translation to IR
-		tVst := translate.NewVisitor(scopes)
-		program := tVst.Translate(obx, tsOrd)
+		ir := translate.NewVisitor(scopes)
+		program := ir.Translate(obx, tsOrd)
 
 		// Optimisation
 		pm := opt.NewPassManager()
@@ -72,7 +72,7 @@ var buildCmd = &cobra.Command{
 		pm.Run(program)
 
 		if emitIR {
-			for _, f := range tVst.Module.GetFunctionList() {
+			for _, f := range ir.Module().GetFunctionList() {
 				fmt.Println(f)
 			}
 		}
