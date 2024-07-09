@@ -124,37 +124,26 @@ func (cfg *ControlFlowGraph) Reverse() *ControlFlowGraph {
 	panic("not implemented")
 }
 
-//func (cfg *ControlFlowGraph) Replace(to Instruction, replace Value) {
-//	for use := to.OperandList().Front(); use != nil; use = use.Next() {
-//		useInstr := use.Value.(Instruction)
-//		for i := 1; i < useInstr.NumOperands()+1; i++ {
-//			if useInstr.Operand(i).Name() == to.Name() {
-//				useInstr.SetOperand(i, replace)
-//			}
-//		}
-//	}
-//}
-//
-//func (cfg *ControlFlowGraph) DeleteBlocks(blocks ...*BasicBlock) {
-//	cfg.Nodes.Remove(blocks...)
-//	for _, block := range blocks {
-//		delete(cfg.Succ, block.Name())
-//		delete(cfg.Pred, block.Name())
-//
-//		for _, succ := range cfg.Succ {
-//			for _, bb := range succ.Elems() {
-//				if bb == block {
-//					succ.Remove(block)
-//				}
-//			}
-//		}
-//
-//		for _, pred := range cfg.Pred {
-//			for _, bb := range pred.Elems() {
-//				if bb == block {
-//					pred.Remove(block)
-//				}
-//			}
-//		}
-//	}
-//}
+func (cfg *ControlFlowGraph) DeleteBlocks(blocks ...*BasicBlock) {
+	cfg.Nodes.Remove(blocks...)
+	for _, block := range blocks {
+		delete(cfg.Succ, block.Name())
+		delete(cfg.Pred, block.Name())
+
+		for _, succ := range cfg.Succ {
+			for _, bb := range succ.Elems() {
+				if bb == block {
+					succ.Remove(block)
+				}
+			}
+		}
+
+		for _, pred := range cfg.Pred {
+			for _, bb := range pred.Elems() {
+				if bb == block {
+					pred.Remove(block)
+				}
+			}
+		}
+	}
+}
