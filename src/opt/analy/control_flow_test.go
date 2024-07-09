@@ -1,22 +1,21 @@
 package analy
 
 import (
+	"github.com/anthonyabeo/obx/src/translate/tacil"
 	"testing"
-
-	"github.com/anthonyabeo/obx/src/translate/ir"
 )
 
 func TestComputingExtendedBasicBlocks(t *testing.T) {
-	entry := ir.NewBasicBlock("entry")
-	b0 := ir.NewBasicBlock("B0")
-	b1 := ir.NewBasicBlock("B1")
-	b2 := ir.NewBasicBlock("B2")
-	b3 := ir.NewBasicBlock("B3")
-	b4 := ir.NewBasicBlock("B4")
-	b5 := ir.NewBasicBlock("B5")
-	b6 := ir.NewBasicBlock("B6")
+	entry := tacil.NewBasicBlock("entry")
+	b0 := tacil.NewBasicBlock("B0")
+	b1 := tacil.NewBasicBlock("B1")
+	b2 := tacil.NewBasicBlock("B2")
+	b3 := tacil.NewBasicBlock("B3")
+	b4 := tacil.NewBasicBlock("B4")
+	b5 := tacil.NewBasicBlock("B5")
+	b6 := tacil.NewBasicBlock("B6")
 
-	cfg := ir.NewCFG()
+	cfg := tacil.NewCFG()
 	cfg.Entry = entry
 
 	cfg.Nodes.Add(entry, b0, b1, b2, b3, b4, b5, b6)
@@ -40,11 +39,11 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 
 	tests := []struct {
 		root string
-		blks []*ir.BasicBlock
+		blks []*tacil.BasicBlock
 	}{
-		{"B0", []*ir.BasicBlock{b0, b1, b3, b4, b6}},
-		{"B5", []*ir.BasicBlock{b5}},
-		{"B2", []*ir.BasicBlock{b2}},
+		{"B0", []*tacil.BasicBlock{b0, b1, b3, b4, b6}},
+		{"B5", []*tacil.BasicBlock{b5}},
+		{"B2", []*tacil.BasicBlock{b2}},
 	}
 
 	extBBs := ExtendedBasicBlocks(cfg, b0)
@@ -66,17 +65,17 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 		}
 	}
 
-	entry = ir.NewBasicBlock("entry")
-	b1 = ir.NewBasicBlock("B1")
-	b2 = ir.NewBasicBlock("B2")
-	b3 = ir.NewBasicBlock("B3")
-	b4 = ir.NewBasicBlock("B4")
-	b5 = ir.NewBasicBlock("B5")
-	b6 = ir.NewBasicBlock("B6")
-	b7 := ir.NewBasicBlock("B7")
-	exit := ir.NewBasicBlock("exit")
+	entry = tacil.NewBasicBlock("entry")
+	b1 = tacil.NewBasicBlock("B1")
+	b2 = tacil.NewBasicBlock("B2")
+	b3 = tacil.NewBasicBlock("B3")
+	b4 = tacil.NewBasicBlock("B4")
+	b5 = tacil.NewBasicBlock("B5")
+	b6 = tacil.NewBasicBlock("B6")
+	b7 := tacil.NewBasicBlock("B7")
+	exit := tacil.NewBasicBlock("exit")
 
-	cfg = ir.NewCFG()
+	cfg = tacil.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
@@ -104,13 +103,13 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 
 	tests = []struct {
 		root string
-		blks []*ir.BasicBlock
+		blks []*tacil.BasicBlock
 	}{
-		{"entry", []*ir.BasicBlock{entry}},
-		{"B1", []*ir.BasicBlock{b1, b2, b3}},
-		{"B4", []*ir.BasicBlock{b4, b6}},
-		{"B5", []*ir.BasicBlock{b5, b7}},
-		{"exit", []*ir.BasicBlock{exit}},
+		{"entry", []*tacil.BasicBlock{entry}},
+		{"B1", []*tacil.BasicBlock{b1, b2, b3}},
+		{"B4", []*tacil.BasicBlock{b4, b6}},
+		{"B5", []*tacil.BasicBlock{b5, b7}},
+		{"exit", []*tacil.BasicBlock{exit}},
 	}
 
 	extBBs = ExtendedBasicBlocks(cfg, entry)
@@ -134,17 +133,17 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 }
 
 func TestComputeDominance(t *testing.T) {
-	entry := ir.NewBasicBlock("entry")
-	b1 := ir.NewBasicBlock("B1")
-	b2 := ir.NewBasicBlock("B2")
-	b3 := ir.NewBasicBlock("B3")
-	b4 := ir.NewBasicBlock("B4")
-	b5 := ir.NewBasicBlock("B5")
-	b6 := ir.NewBasicBlock("B6")
-	b7 := ir.NewBasicBlock("B7")
-	exit := ir.NewBasicBlock("exit")
+	entry := tacil.NewBasicBlock("entry")
+	b1 := tacil.NewBasicBlock("B1")
+	b2 := tacil.NewBasicBlock("B2")
+	b3 := tacil.NewBasicBlock("B3")
+	b4 := tacil.NewBasicBlock("B4")
+	b5 := tacil.NewBasicBlock("B5")
+	b6 := tacil.NewBasicBlock("B6")
+	b7 := tacil.NewBasicBlock("B7")
+	exit := tacil.NewBasicBlock("exit")
 
-	cfg := ir.NewCFG()
+	cfg := tacil.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
@@ -172,17 +171,17 @@ func TestComputeDominance(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		blocks []*ir.BasicBlock
+		blocks []*tacil.BasicBlock
 	}{
-		{"entry", []*ir.BasicBlock{entry}},
-		{"B1", []*ir.BasicBlock{entry, b1}},
-		{"B2", []*ir.BasicBlock{entry, b1, b2}},
-		{"B3", []*ir.BasicBlock{entry, b1, b3}},
-		{"B4", []*ir.BasicBlock{entry, b1, b4}},
-		{"B5", []*ir.BasicBlock{entry, b1, b4, b5}},
-		{"B6", []*ir.BasicBlock{entry, b1, b4, b6}},
-		{"B7", []*ir.BasicBlock{entry, b1, b4, b5, b7}},
-		{"exit", []*ir.BasicBlock{entry, b1, b4, exit}},
+		{"entry", []*tacil.BasicBlock{entry}},
+		{"B1", []*tacil.BasicBlock{entry, b1}},
+		{"B2", []*tacil.BasicBlock{entry, b1, b2}},
+		{"B3", []*tacil.BasicBlock{entry, b1, b3}},
+		{"B4", []*tacil.BasicBlock{entry, b1, b4}},
+		{"B5", []*tacil.BasicBlock{entry, b1, b4, b5}},
+		{"B6", []*tacil.BasicBlock{entry, b1, b4, b6}},
+		{"B7", []*tacil.BasicBlock{entry, b1, b4, b5, b7}},
+		{"exit", []*tacil.BasicBlock{entry, b1, b4, exit}},
 	}
 
 	dom := Dominance(cfg)
@@ -201,13 +200,13 @@ func TestComputeDominance(t *testing.T) {
 }
 
 func TestComputeDominance2(t *testing.T) {
-	entry := ir.NewBasicBlock("entry")
-	b1 := ir.NewBasicBlock("B1")
-	b2 := ir.NewBasicBlock("B2")
-	b3 := ir.NewBasicBlock("B3")
-	exit := ir.NewBasicBlock("exit")
+	entry := tacil.NewBasicBlock("entry")
+	b1 := tacil.NewBasicBlock("B1")
+	b2 := tacil.NewBasicBlock("B2")
+	b3 := tacil.NewBasicBlock("B3")
+	exit := tacil.NewBasicBlock("exit")
 
-	cfg := ir.NewCFG()
+	cfg := tacil.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
@@ -227,13 +226,13 @@ func TestComputeDominance2(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		blocks []*ir.BasicBlock
+		blocks []*tacil.BasicBlock
 	}{
-		{"entry", []*ir.BasicBlock{entry}},
-		{"B1", []*ir.BasicBlock{entry, b1}},
-		{"B2", []*ir.BasicBlock{entry, b2}},
-		{"B3", []*ir.BasicBlock{entry, b3}},
-		{"exit", []*ir.BasicBlock{entry, b3, exit}},
+		{"entry", []*tacil.BasicBlock{entry}},
+		{"B1", []*tacil.BasicBlock{entry, b1}},
+		{"B2", []*tacil.BasicBlock{entry, b2}},
+		{"B3", []*tacil.BasicBlock{entry, b3}},
+		{"exit", []*tacil.BasicBlock{entry, b3, exit}},
 	}
 
 	dom := Dominance(cfg)
@@ -253,17 +252,17 @@ func TestComputeDominance2(t *testing.T) {
 }
 
 func TestComputeDominance3(t *testing.T) {
-	b0 := ir.NewBasicBlock("B0")
-	b1 := ir.NewBasicBlock("B1")
-	b2 := ir.NewBasicBlock("B2")
-	b3 := ir.NewBasicBlock("B3")
-	b4 := ir.NewBasicBlock("B4")
-	b5 := ir.NewBasicBlock("B5")
-	b6 := ir.NewBasicBlock("B6")
-	b7 := ir.NewBasicBlock("B7")
-	b8 := ir.NewBasicBlock("B8")
+	b0 := tacil.NewBasicBlock("B0")
+	b1 := tacil.NewBasicBlock("B1")
+	b2 := tacil.NewBasicBlock("B2")
+	b3 := tacil.NewBasicBlock("B3")
+	b4 := tacil.NewBasicBlock("B4")
+	b5 := tacil.NewBasicBlock("B5")
+	b6 := tacil.NewBasicBlock("B6")
+	b7 := tacil.NewBasicBlock("B7")
+	b8 := tacil.NewBasicBlock("B8")
 
-	cfg := ir.NewCFG()
+	cfg := tacil.NewCFG()
 	cfg.Entry = b0
 	cfg.Exit = b4
 
@@ -291,17 +290,17 @@ func TestComputeDominance3(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		blocks []*ir.BasicBlock
+		blocks []*tacil.BasicBlock
 	}{
-		{"B0", []*ir.BasicBlock{b0}},
-		{"B1", []*ir.BasicBlock{b0, b1}},
-		{"B2", []*ir.BasicBlock{b0, b1, b2}},
-		{"B3", []*ir.BasicBlock{b0, b1, b3}},
-		{"B4", []*ir.BasicBlock{b0, b1, b3, b4}},
-		{"B5", []*ir.BasicBlock{b0, b1, b5}},
-		{"B6", []*ir.BasicBlock{b0, b1, b5, b6}},
-		{"B7", []*ir.BasicBlock{b0, b1, b5, b7}},
-		{"B8", []*ir.BasicBlock{b0, b1, b5, b8}},
+		{"B0", []*tacil.BasicBlock{b0}},
+		{"B1", []*tacil.BasicBlock{b0, b1}},
+		{"B2", []*tacil.BasicBlock{b0, b1, b2}},
+		{"B3", []*tacil.BasicBlock{b0, b1, b3}},
+		{"B4", []*tacil.BasicBlock{b0, b1, b3, b4}},
+		{"B5", []*tacil.BasicBlock{b0, b1, b5}},
+		{"B6", []*tacil.BasicBlock{b0, b1, b5, b6}},
+		{"B7", []*tacil.BasicBlock{b0, b1, b5, b7}},
+		{"B8", []*tacil.BasicBlock{b0, b1, b5, b8}},
 	}
 
 	Dom := Dominance(cfg)
@@ -320,13 +319,13 @@ func TestComputeDominance3(t *testing.T) {
 }
 
 func TestComputeImmediateDominance(t *testing.T) {
-	entry := ir.NewBasicBlock("entry")
-	b1 := ir.NewBasicBlock("B1")
-	b2 := ir.NewBasicBlock("B2")
-	b3 := ir.NewBasicBlock("B3")
-	exit := ir.NewBasicBlock("exit")
+	entry := tacil.NewBasicBlock("entry")
+	b1 := tacil.NewBasicBlock("B1")
+	b2 := tacil.NewBasicBlock("B2")
+	b3 := tacil.NewBasicBlock("B3")
+	exit := tacil.NewBasicBlock("exit")
 
-	cfg := ir.NewCFG()
+	cfg := tacil.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
@@ -371,13 +370,13 @@ func TestComputeImmediateDominance(t *testing.T) {
 }
 
 func TestComputeNaturalLoop(t *testing.T) {
-	entry := ir.NewBasicBlock("entry")
-	b1 := ir.NewBasicBlock("B1")
-	b2 := ir.NewBasicBlock("B2")
-	b3 := ir.NewBasicBlock("B3")
-	exit := ir.NewBasicBlock("exit")
+	entry := tacil.NewBasicBlock("entry")
+	b1 := tacil.NewBasicBlock("B1")
+	b2 := tacil.NewBasicBlock("B2")
+	b3 := tacil.NewBasicBlock("B3")
+	exit := tacil.NewBasicBlock("exit")
 
-	cfg := ir.NewCFG()
+	cfg := tacil.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
@@ -397,7 +396,7 @@ func TestComputeNaturalLoop(t *testing.T) {
 
 	nat := NaturalLoop(cfg, b3, b1)
 
-	tests := []*ir.BasicBlock{b1, b2, b3}
+	tests := []*tacil.BasicBlock{b1, b2, b3}
 	for _, tt := range tests {
 		if !nat.Contains(tt) {
 			t.Errorf("'%s' should not be part of the natural loop of B3->B1", tt)
@@ -406,17 +405,17 @@ func TestComputeNaturalLoop(t *testing.T) {
 }
 
 func TestComputeNaturalLoop2(t *testing.T) {
-	entry := ir.NewBasicBlock("entry")
-	b1 := ir.NewBasicBlock("B1")
-	b2 := ir.NewBasicBlock("B2")
-	b3 := ir.NewBasicBlock("B3")
-	b4 := ir.NewBasicBlock("B4")
-	b5 := ir.NewBasicBlock("B5")
-	b6 := ir.NewBasicBlock("B6")
-	b7 := ir.NewBasicBlock("B7")
-	exit := ir.NewBasicBlock("exit")
+	entry := tacil.NewBasicBlock("entry")
+	b1 := tacil.NewBasicBlock("B1")
+	b2 := tacil.NewBasicBlock("B2")
+	b3 := tacil.NewBasicBlock("B3")
+	b4 := tacil.NewBasicBlock("B4")
+	b5 := tacil.NewBasicBlock("B5")
+	b6 := tacil.NewBasicBlock("B6")
+	b7 := tacil.NewBasicBlock("B7")
+	exit := tacil.NewBasicBlock("exit")
 
-	cfg := ir.NewCFG()
+	cfg := tacil.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
@@ -443,7 +442,7 @@ func TestComputeNaturalLoop2(t *testing.T) {
 	cfg.AddPred("exit", b6, b7)
 
 	nat := NaturalLoop(cfg, b6, b1)
-	tests := []*ir.BasicBlock{b1, b2, b3, b4, b6}
+	tests := []*tacil.BasicBlock{b1, b2, b3, b4, b6}
 	for _, tt := range tests {
 		if !nat.Contains(tt) {
 			t.Errorf("'%s' should not be part of the natural loop of B3->B1", tt)
@@ -451,7 +450,7 @@ func TestComputeNaturalLoop2(t *testing.T) {
 	}
 
 	natLoop := NaturalLoop(cfg, b7, b5)
-	tests = []*ir.BasicBlock{b7, b5}
+	tests = []*tacil.BasicBlock{b7, b5}
 	for _, tt := range tests {
 		if !natLoop.Contains(tt) {
 			t.Errorf("'%s' should not be part of the natural loop of B3->B1", tt)
@@ -460,17 +459,17 @@ func TestComputeNaturalLoop2(t *testing.T) {
 }
 
 func TestDominanceFrontier(t *testing.T) {
-	b0 := ir.NewBasicBlock("B0")
-	b1 := ir.NewBasicBlock("B1")
-	b2 := ir.NewBasicBlock("B2")
-	b3 := ir.NewBasicBlock("B3")
-	b4 := ir.NewBasicBlock("B4")
-	b5 := ir.NewBasicBlock("B5")
-	b6 := ir.NewBasicBlock("B6")
-	b7 := ir.NewBasicBlock("B7")
-	b8 := ir.NewBasicBlock("B8")
+	b0 := tacil.NewBasicBlock("B0")
+	b1 := tacil.NewBasicBlock("B1")
+	b2 := tacil.NewBasicBlock("B2")
+	b3 := tacil.NewBasicBlock("B3")
+	b4 := tacil.NewBasicBlock("B4")
+	b5 := tacil.NewBasicBlock("B5")
+	b6 := tacil.NewBasicBlock("B6")
+	b7 := tacil.NewBasicBlock("B7")
+	b8 := tacil.NewBasicBlock("B8")
 
-	cfg := ir.NewCFG()
+	cfg := tacil.NewCFG()
 	cfg.Entry = b0
 	cfg.Exit = b4
 
@@ -498,17 +497,17 @@ func TestDominanceFrontier(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		blocks []*ir.BasicBlock
+		blocks []*tacil.BasicBlock
 	}{
-		{"B0", []*ir.BasicBlock{}},
-		{"B1", []*ir.BasicBlock{b1}},
-		{"B2", []*ir.BasicBlock{b3}},
-		{"B3", []*ir.BasicBlock{b1}},
-		{"B4", []*ir.BasicBlock{}},
-		{"B5", []*ir.BasicBlock{b3}},
-		{"B6", []*ir.BasicBlock{b7}},
-		{"B7", []*ir.BasicBlock{b3}},
-		{"B8", []*ir.BasicBlock{b7}},
+		{"B0", []*tacil.BasicBlock{}},
+		{"B1", []*tacil.BasicBlock{b1}},
+		{"B2", []*tacil.BasicBlock{b3}},
+		{"B3", []*tacil.BasicBlock{b1}},
+		{"B4", []*tacil.BasicBlock{}},
+		{"B5", []*tacil.BasicBlock{b3}},
+		{"B6", []*tacil.BasicBlock{b7}},
+		{"B7", []*tacil.BasicBlock{b3}},
+		{"B8", []*tacil.BasicBlock{b7}},
 	}
 
 	DF := DominanceFrontier(cfg)

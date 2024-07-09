@@ -2,18 +2,18 @@ package analy
 
 import (
 	"github.com/anthonyabeo/obx/src/adt"
-	"github.com/anthonyabeo/obx/src/translate/ir"
+	"github.com/anthonyabeo/obx/src/translate/tacil"
 )
 
-func ExtendedBasicBlocks(cfg *ir.ControlFlowGraph, src *ir.BasicBlock) map[string]*adt.HashSet[*ir.BasicBlock] {
-	ebbs := make(map[string]*adt.HashSet[*ir.BasicBlock])
-	roots := adt.NewQueue[*ir.BasicBlock]()
+func ExtendedBasicBlocks(cfg *tacil.ControlFlowGraph, src *tacil.BasicBlock) map[string]*adt.HashSet[*tacil.BasicBlock] {
+	ebbs := make(map[string]*adt.HashSet[*tacil.BasicBlock])
+	roots := adt.NewQueue[*tacil.BasicBlock]()
 
 	roots.Enqueue(src)
 	for !roots.Empty() {
 		BB := roots.Dequeue()
 		if _, exists := ebbs[BB.Name()]; !exists {
-			s := adt.NewHashSet[*ir.BasicBlock]()
+			s := adt.NewHashSet[*tacil.BasicBlock]()
 			extBasicBlocks(cfg, BB, roots, s)
 			ebbs[BB.Name()] = s
 		}
@@ -22,7 +22,7 @@ func ExtendedBasicBlocks(cfg *ir.ControlFlowGraph, src *ir.BasicBlock) map[strin
 	return ebbs
 }
 
-func extBasicBlocks(cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, roots *adt.Queue[*ir.BasicBlock], s *adt.HashSet[*ir.BasicBlock]) {
+func extBasicBlocks(cfg *tacil.ControlFlowGraph, blk *tacil.BasicBlock, roots *adt.Queue[*tacil.BasicBlock], s *adt.HashSet[*tacil.BasicBlock]) {
 	s.Add(blk)
 
 	for _, bb := range cfg.Succ[blk.Name()].Elems() {
@@ -34,9 +34,9 @@ func extBasicBlocks(cfg *ir.ControlFlowGraph, blk *ir.BasicBlock, roots *adt.Que
 	}
 }
 
-func ImmDominator(cfg *ir.ControlFlowGraph, Dominance map[string]adt.Set[*ir.BasicBlock]) map[string]*ir.BasicBlock {
-	IDom := make(map[string]*ir.BasicBlock)
-	Tmp := make(map[string]adt.Set[*ir.BasicBlock])
+func ImmDominator(cfg *tacil.ControlFlowGraph, Dominance map[string]adt.Set[*tacil.BasicBlock]) map[string]*tacil.BasicBlock {
+	IDom := make(map[string]*tacil.BasicBlock)
+	Tmp := make(map[string]adt.Set[*tacil.BasicBlock])
 
 	for _, BB := range cfg.Nodes.Elems() {
 		Tmp[BB.Name()] = Dominance[BB.Name()].Remove(BB)
@@ -71,10 +71,10 @@ func ImmDominator(cfg *ir.ControlFlowGraph, Dominance map[string]adt.Set[*ir.Bas
 	return IDom
 }
 
-func Dominance(cfg *ir.ControlFlowGraph) map[string]adt.Set[*ir.BasicBlock] {
-	Dom := make(map[string]adt.Set[*ir.BasicBlock])
+func Dominance(cfg *tacil.ControlFlowGraph) map[string]adt.Set[*tacil.BasicBlock] {
+	Dom := make(map[string]adt.Set[*tacil.BasicBlock])
 
-	entrySet := adt.NewHashSet[*ir.BasicBlock]()
+	entrySet := adt.NewHashSet[*tacil.BasicBlock]()
 	entrySet.Add(cfg.Entry)
 	Dom[cfg.Entry.Name()] = entrySet
 
@@ -90,11 +90,11 @@ func Dominance(cfg *ir.ControlFlowGraph) map[string]adt.Set[*ir.BasicBlock] {
 	for changed {
 		changed = false
 
-		workList := adt.NewQueueFrom[*ir.BasicBlock](cfg.ReversePostOrder()[1:])
+		workList := adt.NewQueueFrom[*tacil.BasicBlock](cfg.ReversePostOrder()[1:])
 		for !workList.Empty() {
 			BB := workList.Dequeue()
 
-			var Temp adt.Set[*ir.BasicBlock] = cfg.Nodes
+			var Temp adt.Set[*tacil.BasicBlock] = cfg.Nodes
 			for _, pred := range cfg.Pred[BB.Name()].Elems() {
 				Temp = Temp.Intersect(Dom[pred.Name()])
 			}
@@ -110,10 +110,10 @@ func Dominance(cfg *ir.ControlFlowGraph) map[string]adt.Set[*ir.BasicBlock] {
 	return Dom
 }
 
-func DominanceFrontier(cfg *ir.ControlFlowGraph) map[string]adt.Set[*ir.BasicBlock] {
-	DF := make(map[string]adt.Set[*ir.BasicBlock])
+func DominanceFrontier(cfg *tacil.ControlFlowGraph) map[string]adt.Set[*tacil.BasicBlock] {
+	DF := make(map[string]adt.Set[*tacil.BasicBlock])
 	for _, BB := range cfg.Nodes.Elems() {
-		DF[BB.Name()] = adt.NewHashSet[*ir.BasicBlock]()
+		DF[BB.Name()] = adt.NewHashSet[*tacil.BasicBlock]()
 	}
 
 	Dom := Dominance(cfg)
@@ -139,9 +139,9 @@ func DominanceFrontier(cfg *ir.ControlFlowGraph) map[string]adt.Set[*ir.BasicBlo
 	return DF
 }
 
-func NaturalLoop(cfg *ir.ControlFlowGraph, m, n *ir.BasicBlock) adt.Set[*ir.BasicBlock] {
-	Stack := adt.NewStack[*ir.BasicBlock]()
-	Loop := adt.NewHashSet[*ir.BasicBlock]()
+func NaturalLoop(cfg *tacil.ControlFlowGraph, m, n *tacil.BasicBlock) adt.Set[*tacil.BasicBlock] {
+	Stack := adt.NewStack[*tacil.BasicBlock]()
+	Loop := adt.NewHashSet[*tacil.BasicBlock]()
 	Loop.Add(m, n)
 
 	if m != n {

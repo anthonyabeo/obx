@@ -3,9 +3,8 @@ package tacil
 import (
 	"container/list"
 	"fmt"
-	"strings"
-
 	"strconv"
+	"strings"
 )
 
 // ConstantInt ...

@@ -1,23 +1,23 @@
 package analy
 
 import (
-	"github.com/anthonyabeo/obx/src/adt"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/translate/ir"
+	"github.com/anthonyabeo/obx/src/adt"
+	"github.com/anthonyabeo/obx/src/translate/tacil"
 )
 
 func TestIterativeDataFlow(t *testing.T) {
-	entry := ir.NewBasicBlock("entry")
-	b1 := ir.NewBasicBlock("B1")
-	b2 := ir.NewBasicBlock("B2")
-	b3 := ir.NewBasicBlock("B3")
-	b4 := ir.NewBasicBlock("B4")
-	b5 := ir.NewBasicBlock("B5")
-	b6 := ir.NewBasicBlock("B6")
-	exit := ir.NewBasicBlock("exit")
+	entry := tacil.NewBasicBlock("entry")
+	b1 := tacil.NewBasicBlock("B1")
+	b2 := tacil.NewBasicBlock("B2")
+	b3 := tacil.NewBasicBlock("B3")
+	b4 := tacil.NewBasicBlock("B4")
+	b5 := tacil.NewBasicBlock("B5")
+	b6 := tacil.NewBasicBlock("B6")
+	exit := tacil.NewBasicBlock("exit")
 
-	cfg := ir.NewCFG()
+	cfg := tacil.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
@@ -43,7 +43,7 @@ func TestIterativeDataFlow(t *testing.T) {
 
 	tests := []struct {
 		name string
-		out  ir.BitVector
+		out  tacil.BitVector
 	}{
 		{"entry", 0b00000000},
 		{"B1", 0b00000000},
@@ -55,15 +55,15 @@ func TestIterativeDataFlow(t *testing.T) {
 		{"exit", 0b11111111},
 	}
 
-	Init := ir.BitVector(0)
-	FlowFunctions := map[string]func(ir.BitVector) ir.BitVector{
-		"entry": func(vec ir.BitVector) ir.BitVector { return vec },
-		"B1":    func(vec ir.BitVector) ir.BitVector { return 0b11100000 | vec },
-		"B2":    func(vec ir.BitVector) ir.BitVector { return vec },
-		"B3":    func(vec ir.BitVector) ir.BitVector { return 0b00010000 | vec },
-		"B4":    func(vec ir.BitVector) ir.BitVector { return vec },
-		"B5":    func(vec ir.BitVector) ir.BitVector { return vec },
-		"B6":    func(vec ir.BitVector) ir.BitVector { return 0b00001111 | vec },
+	Init := tacil.BitVector(0)
+	FlowFunctions := map[string]func(tacil.BitVector) tacil.BitVector{
+		"entry": func(vec tacil.BitVector) tacil.BitVector { return vec },
+		"B1":    func(vec tacil.BitVector) tacil.BitVector { return 0b11100000 | vec },
+		"B2":    func(vec tacil.BitVector) tacil.BitVector { return vec },
+		"B3":    func(vec tacil.BitVector) tacil.BitVector { return 0b00010000 | vec },
+		"B4":    func(vec tacil.BitVector) tacil.BitVector { return vec },
+		"B5":    func(vec tacil.BitVector) tacil.BitVector { return vec },
+		"B6":    func(vec tacil.BitVector) tacil.BitVector { return 0b00001111 | vec },
 	}
 
 	DFIn := IterativeDataFlow(cfg, FlowFunctions, Init)
@@ -77,14 +77,14 @@ func TestIterativeDataFlow(t *testing.T) {
 }
 
 func TestIterativeDataflowDragonBook(t *testing.T) {
-	entry := ir.NewBasicBlock("entry")
-	b1 := ir.NewBasicBlock("B1")
-	b2 := ir.NewBasicBlock("B2")
-	b3 := ir.NewBasicBlock("B3")
-	b4 := ir.NewBasicBlock("B4")
-	exit := ir.NewBasicBlock("exit")
+	entry := tacil.NewBasicBlock("entry")
+	b1 := tacil.NewBasicBlock("B1")
+	b2 := tacil.NewBasicBlock("B2")
+	b3 := tacil.NewBasicBlock("B3")
+	b4 := tacil.NewBasicBlock("B4")
+	exit := tacil.NewBasicBlock("exit")
 
-	cfg := ir.NewCFG()
+	cfg := tacil.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
@@ -106,7 +106,7 @@ func TestIterativeDataflowDragonBook(t *testing.T) {
 
 	tests := []struct {
 		name string
-		out  ir.BitVector
+		out  tacil.BitVector
 	}{
 		{"entry", 0b00000000},
 		{"B1", 0b0_1110000},
@@ -116,7 +116,7 @@ func TestIterativeDataflowDragonBook(t *testing.T) {
 		{"exit", 0b0_001_0111},
 	}
 
-	GEN := map[string]ir.BitVector{
+	GEN := map[string]tacil.BitVector{
 		"entry": 0,
 		"B1":    0b01110000,
 		"B2":    0b00001100,
@@ -124,7 +124,7 @@ func TestIterativeDataflowDragonBook(t *testing.T) {
 		"B4":    0b00000001,
 		"exit":  0,
 	}
-	KILL := map[string]ir.BitVector{
+	KILL := map[string]tacil.BitVector{
 		"entry": 0,
 		"B1":    0b00001111,
 		"B2":    0b01100001,
@@ -142,14 +142,14 @@ func TestIterativeDataflowDragonBook(t *testing.T) {
 }
 
 func TestReachingDefinition(t *testing.T) {
-	entry := ir.NewBasicBlock("entry")
-	b1 := ir.NewBasicBlock("B1")
-	b2 := ir.NewBasicBlock("B2")
-	b3 := ir.NewBasicBlock("B3")
-	b4 := ir.NewBasicBlock("B4")
-	exit := ir.NewBasicBlock("exit")
+	entry := tacil.NewBasicBlock("entry")
+	b1 := tacil.NewBasicBlock("B1")
+	b2 := tacil.NewBasicBlock("B2")
+	b3 := tacil.NewBasicBlock("B3")
+	b4 := tacil.NewBasicBlock("B4")
+	exit := tacil.NewBasicBlock("exit")
 
-	cfg := ir.NewCFG()
+	cfg := tacil.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 

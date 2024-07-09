@@ -2,12 +2,12 @@ package opt
 
 import (
 	"github.com/anthonyabeo/obx/src/opt/pass"
-	"github.com/anthonyabeo/obx/src/translate/ir"
+	"github.com/anthonyabeo/obx/src/translate/tacil"
 )
 
 type Pass interface {
 	Name() string
-	Run(program *ir.Program)
+	Run(program *tacil.Program)
 }
 
 type PassManager struct {
@@ -33,11 +33,7 @@ func (pm *PassManager) dequeue() Pass {
 	return p
 }
 
-func (pm *PassManager) Run(program *ir.Program) {
-	//for _, p := range pm.passes {
-	//	p.Run(program)
-	//}
-
+func (pm *PassManager) Run(program *tacil.Program) {
 	for len(pm.passes) > 0 {
 		p := pm.dequeue()
 		p.Run(program)
@@ -60,8 +56,8 @@ var declPasses map[string]Pass
 
 func init() {
 	declPasses = map[string]Pass{
-		"mem2reg":    &pass.Mem2Reg{Nom: "mem2reg"},
-		"dce":        &pass.DeadCodeElimination{Nom: "dce"},
+		"mem2reg": &pass.Mem2Reg{Nom: "mem2reg"},
+		//"dce":        &pass.DeadCodeElimination{Nom: "dce"},
 		"const_prop": &pass.ConstantPropagation{},
 	}
 }

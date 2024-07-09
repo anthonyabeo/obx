@@ -5,7 +5,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/token"
-	"github.com/anthonyabeo/obx/src/translate/ir"
+	"github.com/anthonyabeo/obx/src/translate/tacil"
 )
 
 type Node interface {
@@ -24,7 +24,7 @@ type Expression interface {
 	Node
 	expr()
 	Type() types.Type
-	Value() ir.Value
+	Value() tacil.Expr
 }
 
 type Declaration interface {
@@ -35,7 +35,7 @@ type Declaration interface {
 type Type interface {
 	Node
 	Type() types.Type
-	IRType() ir.Type
+	IRType() tacil.Type
 }
 
 type Unit interface {

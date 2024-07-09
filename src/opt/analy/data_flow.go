@@ -2,7 +2,7 @@ package analy
 
 import (
 	"github.com/anthonyabeo/obx/src/adt"
-	"github.com/anthonyabeo/obx/src/translate/ir"
+	"github.com/anthonyabeo/obx/src/translate/tacil"
 )
 
 // IterativeDataFlow implements an iterative data-flow algorithm for the
@@ -12,23 +12,23 @@ import (
 // initial value of the 'entry' node and F: BV^8 -> BV^8, a set of flow functions
 // as explained in Muchnick 8.4
 // ----------------------------------------------
-func IterativeDataFlow(cfg *ir.ControlFlowGraph, F map[string]func(ir.BitVector) ir.BitVector, Init ir.BitVector) map[string]ir.BitVector {
+func IterativeDataFlow(cfg *tacil.ControlFlowGraph, F map[string]func(tacil.BitVector) tacil.BitVector, Init tacil.BitVector) map[string]tacil.BitVector {
 	rpo := cfg.ReversePostOrder()
 	rpo = rpo[1:]
 
-	workList := adt.NewQueueFrom[*ir.BasicBlock](rpo)
+	workList := adt.NewQueueFrom[*tacil.BasicBlock](rpo)
 
-	DFIn := map[string]ir.BitVector{"entry": Init}
+	DFIn := map[string]tacil.BitVector{"entry": Init}
 	for _, BB := range cfg.Nodes.Elems() {
 		if BB.Name() != "entry" {
-			DFIn[BB.Name()] = ir.BitVector(255)
+			DFIn[BB.Name()] = tacil.BitVector(255)
 		}
 	}
 
 	for !workList.Empty() {
 		B := workList.Dequeue()
 
-		TotalEffect := ir.BitVector(0)
+		TotalEffect := tacil.BitVector(0)
 		for _, name := range cfg.Pred[B.Name()].Elems() {
 			in := DFIn[name.Name()]
 			Effect := F[name.Name()](in)
@@ -48,22 +48,22 @@ func IterativeDataFlow(cfg *ir.ControlFlowGraph, F map[string]func(ir.BitVector)
 
 // IterativeDataflowDragonBook an iterative data-flow algorithm for the reaching definitions problem.
 // as defined at https://en.wikipedia.org/wiki/Reaching_definition
-func IterativeDataflowDragonBook(cfg *ir.ControlFlowGraph, GEN, KILL map[string]ir.BitVector) (map[string]ir.BitVector, map[string]ir.BitVector) {
+func IterativeDataflowDragonBook(cfg *tacil.ControlFlowGraph, GEN, KILL map[string]tacil.BitVector) (map[string]tacil.BitVector, map[string]tacil.BitVector) {
 	rpo := cfg.ReversePostOrder()
 	rpo = rpo[1:]
 
-	workList := adt.NewQueueFrom[*ir.BasicBlock](rpo)
+	workList := adt.NewQueueFrom[*tacil.BasicBlock](rpo)
 
-	IN := map[string]ir.BitVector{}
-	OUT := map[string]ir.BitVector{}
+	IN := map[string]tacil.BitVector{}
+	OUT := map[string]tacil.BitVector{}
 	for _, BB := range cfg.Nodes.Elems() {
-		OUT[BB.Name()] = ir.BitVector(0)
+		OUT[BB.Name()] = tacil.BitVector(0)
 	}
 
 	for !workList.Empty() {
 		B := workList.Dequeue()
 
-		IN[B.Name()] = ir.BitVector(0)
+		IN[B.Name()] = tacil.BitVector(0)
 		for _, name := range cfg.Pred[B.Name()].Elems() {
 			IN[B.Name()] |= OUT[name.Name()]
 		}
@@ -81,11 +81,11 @@ func IterativeDataflowDragonBook(cfg *ir.ControlFlowGraph, GEN, KILL map[string]
 	return IN, OUT
 }
 
-func ReachingDefinition(cfg *ir.ControlFlowGraph, GEN, KILL map[string]adt.Set[uint]) (map[string]adt.Set[uint], map[string]adt.Set[uint]) {
+func ReachingDefinition(cfg *tacil.ControlFlowGraph, GEN, KILL map[string]adt.Set[uint]) (map[string]adt.Set[uint], map[string]adt.Set[uint]) {
 	rpo := cfg.ReversePostOrder()
 	rpo = rpo[1:]
 
-	workList := adt.NewQueueFrom[*ir.BasicBlock](rpo)
+	workList := adt.NewQueueFrom[*tacil.BasicBlock](rpo)
 
 	IN := map[string]adt.Set[uint]{}
 	OUT := map[string]adt.Set[uint]{}
@@ -115,11 +115,11 @@ func ReachingDefinition(cfg *ir.ControlFlowGraph, GEN, KILL map[string]adt.Set[u
 	return IN, OUT
 }
 
-func LiveVariable(cfg *ir.ControlFlowGraph, DEF, USE map[string]adt.Set[uint]) (map[string]adt.Set[uint], map[string]adt.Set[uint]) {
+func LiveVariable(cfg *tacil.ControlFlowGraph, DEF, USE map[string]adt.Set[uint]) (map[string]adt.Set[uint], map[string]adt.Set[uint]) {
 	rpo := cfg.Reverse().ReversePostOrder()
 	rpo = rpo[1:]
 
-	workList := adt.NewQueueFrom[*ir.BasicBlock](rpo)
+	workList := adt.NewQueueFrom[*tacil.BasicBlock](rpo)
 
 	IN := map[string]adt.Set[uint]{}
 	OUT := map[string]adt.Set[uint]{}
@@ -151,11 +151,11 @@ func LiveVariable(cfg *ir.ControlFlowGraph, DEF, USE map[string]adt.Set[uint]) (
 	return IN, OUT
 }
 
-func AvailableExpressions(cfg *ir.ControlFlowGraph, GEN, KILL map[string]adt.Set[uint]) (map[string]adt.Set[uint], map[string]adt.Set[uint]) {
+func AvailableExpressions(cfg *tacil.ControlFlowGraph, GEN, KILL map[string]adt.Set[uint]) (map[string]adt.Set[uint], map[string]adt.Set[uint]) {
 	rpo := cfg.ReversePostOrder()
 	rpo = rpo[1:]
 
-	workList := adt.NewQueueFrom[*ir.BasicBlock](rpo)
+	workList := adt.NewQueueFrom[*tacil.BasicBlock](rpo)
 
 	IN := map[string]adt.Set[uint]{}
 	OUT := map[string]adt.Set[uint]{}
@@ -184,6 +184,6 @@ func AvailableExpressions(cfg *ir.ControlFlowGraph, GEN, KILL map[string]adt.Set
 	return IN, OUT
 }
 
-func AnticipatableExpressions(cfg *ir.ControlFlowGraph) {
+func AnticipatableExpressions(cfg *tacil.ControlFlowGraph) {
 
 }
