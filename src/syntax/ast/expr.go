@@ -78,11 +78,11 @@ type (
 	}
 
 	UnaryExpr struct {
-		OpPos   *token.Position
-		Op      token.Token
-		X       Expression
-		EType   types.Type
-		IRValue tacil.Expr
+		OpPos  *token.Position
+		Op     token.Token
+		X      Expression
+		EType  types.Type
+		IRExpr tacil.Expr
 	}
 
 	Designator struct {

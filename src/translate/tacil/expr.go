@@ -58,11 +58,12 @@ type BinaryOp struct {
 	ty   Type
 }
 
-func NewBinaryOp(op Opcode, x, y Expr) *BinaryOp {
+func NewBinaryOp(ty Type, op Opcode, x, y Expr) *BinaryOp {
 	return &BinaryOp{
 		Op: op,
 		X:  x,
 		Y:  y,
+		ty: ty,
 	}
 }
 

@@ -18,142 +18,138 @@ func (b *Builder) GetInsertBlock() *BasicBlock { return b.BB }
 func (b *Builder) SetInsertPoint(BB *BasicBlock) { b.BB = BB }
 
 func (b *Builder) CreateAdd(lhs, rhs Expr) *BinaryOp {
-	//var (
-	//	ResTy Type
-	//	LHSTy Type = lhs.Type()
-	//	RHSTy Type = rhs.Type()
-	//)
-	//
-	//// lhs != integer-type && lhs != pointer-type && lhs != vector<integer-type>
-	//if !LHSTy.IsIntegerTy() && !LHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
-	//	msg := fmt.Sprintf("[internal] expcted add operand '%s' to be an integer or pointer type. Got '%s'", lhs, LHSTy)
-	//	panic(msg)
-	//}
-	//
-	//// rhs != integer-type && rhs != pointer-type && rhs != vector<integer-type>
-	//if !RHSTy.IsIntegerTy() && !RHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
-	//	msg := fmt.Sprintf("[internal] expected add operand '%s' to be an integer or pointer type. Got '%s'", rhs, RHSTy)
-	//	panic(msg)
-	//}
-	//
-	//if (LHSTy.IsPtrTy() && RHSTy.IsPtrTy()) || (LHSTy.IsIntegerTy() && RHSTy.IsIntegerTy()) {
-	//	if LHSTy.IsIntegerTy() {
-	//		ResTy = LHSTy
-	//	} else {
-	//		ResTy = LHSTy.(*PointerType).elemTy
-	//	}
-	//} else {
-	//	if LHSTy.IsPtrTy() {
-	//		ptr, _ := LHSTy.(*PointerType)
-	//		if ptr.elemTy != RHSTy {
-	//			msg := fmt.Sprintf("[internal] cannot add operands of type '%s' and '%s'", ptr.elemTy, RHSTy)
-	//			panic(msg)
-	//		}
-	//
-	//		ResTy = RHSTy
-	//	}
-	//
-	//	if RHSTy.IsPtrTy() {
-	//		ptr, _ := RHSTy.(*PointerType)
-	//		if ptr.elemTy != LHSTy {
-	//			msg := fmt.Sprintf("[internal] cannot add operands of type '%s' and '%s'", ptr.elemTy, LHSTy)
-	//			panic(msg)
-	//		}
-	//
-	//		ResTy = LHSTy
-	//	}
-	//}
+	var (
+		ResTy Type
+		LHSTy Type = lhs.Type()
+		RHSTy Type = rhs.Type()
+	)
 
-	add := NewBinaryOp(Add, lhs, rhs)
+	// lhs != integer-type && lhs != pointer-type && lhs != vector<integer-type>
+	if !LHSTy.IsIntegerTy() && !LHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
+		msg := fmt.Sprintf("[internal] expcted add operand '%s' to be an integer or pointer type. Got '%s'", lhs, LHSTy)
+		panic(msg)
+	}
+
+	// rhs != integer-type && rhs != pointer-type && rhs != vector<integer-type>
+	if !RHSTy.IsIntegerTy() && !RHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
+		msg := fmt.Sprintf("[internal] expected add operand '%s' to be an integer or pointer type. Got '%s'", rhs, RHSTy)
+		panic(msg)
+	}
+
+	if (LHSTy.IsPtrTy() && RHSTy.IsPtrTy()) || (LHSTy.IsIntegerTy() && RHSTy.IsIntegerTy()) {
+		if LHSTy.IsIntegerTy() {
+			ResTy = LHSTy
+		} else {
+			ResTy = LHSTy.(*PointerType).elemTy
+		}
+	} else {
+		if LHSTy.IsPtrTy() {
+			ptr, _ := LHSTy.(*PointerType)
+			if ptr.elemTy != RHSTy {
+				msg := fmt.Sprintf("[internal] cannot add operands of type '%s' and '%s'", ptr.elemTy, RHSTy)
+				panic(msg)
+			}
+
+			ResTy = RHSTy
+		}
+
+		if RHSTy.IsPtrTy() {
+			ptr, _ := RHSTy.(*PointerType)
+			if ptr.elemTy != LHSTy {
+				msg := fmt.Sprintf("[internal] cannot add operands of type '%s' and '%s'", ptr.elemTy, LHSTy)
+				panic(msg)
+			}
+
+			ResTy = LHSTy
+		}
+	}
+
+	add := NewBinaryOp(ResTy, Add, lhs, rhs)
 	b.BB.instr.PushBack(add)
 
 	return add
 }
 
-//func (b *Builder) CreateSub(lhs, rhs Value, name string) Value {
-//	var (
-//		ResTy Type
-//		LHSTy Type = lhs.Type()
-//		RHSTy Type = rhs.Type()
-//	)
-//
-//	// lhs != integer-type && lhs != pointer-type && lhs != vector<integer-type>
-//	if !LHSTy.IsIntegerTy() && !LHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
-//		msg := fmt.Sprintf("[internal] expected operand '%s' to be an integer or pointer type. Got '%s'", lhs, LHSTy)
-//		panic(msg)
-//	}
-//
-//	// rhs != integer-type && rhs != pointer-type && rhs != vector<integer-type>
-//	if !RHSTy.IsIntegerTy() && !RHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
-//		msg := fmt.Sprintf("[internal] expected operand '%s' to be an integer or pointer type. Got '%s'", rhs, RHSTy)
-//		panic(msg)
-//	}
-//
-//	if (LHSTy.IsPtrTy() && RHSTy.IsPtrTy()) || (LHSTy.IsIntegerTy() && RHSTy.IsIntegerTy()) {
-//		if LHSTy.IsIntegerTy() {
-//			ResTy = LHSTy
-//		} else {
-//			ResTy = LHSTy.(*PointerType).elemTy
-//		}
-//	} else {
-//		if LHSTy.IsPtrTy() {
-//			ptr, _ := LHSTy.(*PointerType)
-//			if ptr.elemTy != RHSTy {
-//				msg := fmt.Sprintf("[internal] cannot subtract operands of type '%s' and '%s'", ptr.elemTy, RHSTy)
-//				panic(msg)
-//			}
-//
-//			ResTy = RHSTy
-//		}
-//
-//		if RHSTy.IsPtrTy() {
-//			ptr, _ := RHSTy.(*PointerType)
-//			if ptr.elemTy != LHSTy {
-//				msg := fmt.Sprintf("[internal] cannot subtract operands of type '%s' and '%s'", ptr.elemTy, LHSTy)
-//				panic(msg)
-//			}
-//
-//			ResTy = LHSTy
-//		}
-//	}
-//
-//	sub := CreateSub(ResTy, lhs, rhs, name)
-//	lhs.AddUse(sub)
-//	rhs.AddUse(sub)
-//	b.BB.instr.PushBack(sub)
-//
-//	return sub
-//}
-//
-//func (b *Builder) CreateXOR(lhs, rhs Value, name string) Value {
-//	var (
-//		ResTy Type
-//		LHSTy Type = lhs.Type()
-//		RHSTy Type = rhs.Type()
-//	)
-//
-//	// lhs != integer-type && lhs != vector<integer-type>
-//	if !LHSTy.IsIntegerTy() /* && !LHS.IsVecTy() */ {
-//		msg := fmt.Sprintf("[internal] expected operand '%s' to be an integer or integer vector type. Got '%s'",
-//			lhs, LHSTy)
-//		panic(msg)
-//	}
-//
-//	// rhs != integer-type && rhs != vector<integer-type>
-//	if !RHSTy.IsIntegerTy() /* && !LHS.IsVecTy() */ {
-//		msg := fmt.Sprintf("[internal] expected operand '%s' to be an integer or pointer type. Got '%s'", rhs, RHSTy)
-//		panic(msg)
-//	}
-//
-//	ResTy = LHSTy
-//
-//	xor := CreateXOR(ResTy, lhs, rhs, name)
-//	lhs.AddUse(xor)
-//	rhs.AddUse(xor)
-//	b.BB.instr.PushBack(xor)
-//
-//	return xor
-//}
+func (b *Builder) CreateSub(lhs, rhs Expr, name string) Expr {
+	var (
+		ResTy Type
+		LHSTy Type = lhs.Type()
+		RHSTy Type = rhs.Type()
+	)
+
+	// lhs != integer-type && lhs != pointer-type && lhs != vector<integer-type>
+	if !LHSTy.IsIntegerTy() && !LHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
+		msg := fmt.Sprintf("[internal] expected operand '%s' to be an integer or pointer type. Got '%s'", lhs, LHSTy)
+		panic(msg)
+	}
+
+	// rhs != integer-type && rhs != pointer-type && rhs != vector<integer-type>
+	if !RHSTy.IsIntegerTy() && !RHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
+		msg := fmt.Sprintf("[internal] expected operand '%s' to be an integer or pointer type. Got '%s'", rhs, RHSTy)
+		panic(msg)
+	}
+
+	if (LHSTy.IsPtrTy() && RHSTy.IsPtrTy()) || (LHSTy.IsIntegerTy() && RHSTy.IsIntegerTy()) {
+		if LHSTy.IsIntegerTy() {
+			ResTy = LHSTy
+		} else {
+			ResTy = LHSTy.(*PointerType).elemTy
+		}
+	} else {
+		if LHSTy.IsPtrTy() {
+			ptr, _ := LHSTy.(*PointerType)
+			if ptr.elemTy != RHSTy {
+				msg := fmt.Sprintf("[internal] cannot subtract operands of type '%s' and '%s'", ptr.elemTy, RHSTy)
+				panic(msg)
+			}
+
+			ResTy = RHSTy
+		}
+
+		if RHSTy.IsPtrTy() {
+			ptr, _ := RHSTy.(*PointerType)
+			if ptr.elemTy != LHSTy {
+				msg := fmt.Sprintf("[internal] cannot subtract operands of type '%s' and '%s'", ptr.elemTy, LHSTy)
+				panic(msg)
+			}
+
+			ResTy = LHSTy
+		}
+	}
+
+	sub := NewBinaryOp(ResTy, Sub, lhs, rhs)
+	b.BB.instr.PushBack(sub)
+
+	return sub
+}
+
+func (b *Builder) CreateXOR(lhs, rhs Expr, name string) Expr {
+	var (
+		ResTy Type
+		LHSTy Type = lhs.Type()
+		RHSTy Type = rhs.Type()
+	)
+
+	// lhs != integer-type && lhs != vector<integer-type>
+	if !LHSTy.IsIntegerTy() /* && !LHS.IsVecTy() */ {
+		msg := fmt.Sprintf("[internal] expected operand '%s' to be an integer or integer vector type. Got '%s'",
+			lhs, LHSTy)
+		panic(msg)
+	}
+
+	// rhs != integer-type && rhs != vector<integer-type>
+	if !RHSTy.IsIntegerTy() /* && !LHS.IsVecTy() */ {
+		msg := fmt.Sprintf("[internal] expected operand '%s' to be an integer or pointer type. Got '%s'", rhs, RHSTy)
+		panic(msg)
+	}
+
+	ResTy = LHSTy
+
+	xor := NewBinaryOp(ResTy, Xor, lhs, rhs)
+	b.BB.instr.PushBack(xor)
+
+	return xor
+}
 
 func (b *Builder) CreateRet(v Expr) *Return {
 	var ret *Return
@@ -285,18 +281,17 @@ func (b *Builder) CreateJmp(dst *BasicBlock) *Jump {
 //
 //	return phi
 //}
-//
-//func (b *Builder) CreateNeg(v Value, name string) Value {
-//	neg := b.CreateSub(GetNullValue(v.Type()), v, name)
-//	b.BB.instr.PushBack(neg)
-//
-//	return neg
-//}
-//
-//func (b *Builder) CreateNot(v Value, name string) Value {
-//	not := b.CreateXOR(v, GetAllOnesValue(v.Type()), name)
-//	v.AddUse(not)
-//	b.BB.instr.PushBack(not)
-//
-//	return not
-//}
+
+func (b *Builder) CreateNeg(v Expr, name string) Expr {
+	neg := b.CreateSub(GetNullValue(v.Type()), v, name)
+	b.BB.instr.PushBack(neg)
+
+	return neg
+}
+
+func (b *Builder) CreateNot(v Expr, name string) Expr {
+	not := b.CreateXOR(v, GetAllOnesValue(v.Type()), name)
+	b.BB.instr.PushBack(not)
+
+	return not
+}
