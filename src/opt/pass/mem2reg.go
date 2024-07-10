@@ -93,7 +93,7 @@ func InsertPhiFunctions(Globals map[string]bool, Blocks map[string]adt.Set[Pair]
 					phi = tacil.CreateEmptyPHINode()
 					phi.AddIncoming(inc.expr, inc.block)
 
-					assign := tacil.CreateAssign(phi, tacil.NewTemp(inc.expr.Name()))
+					assign := tacil.CreateAssign(phi, tacil.NewTemp(inc.expr.Name(), inc.expr.Type()))
 					BB.InsertInstrBegin(assign)
 					BB.Phi[inc.expr.Name()] = assign
 

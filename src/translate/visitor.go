@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/anthonyabeo/obx/src/sema/scope"
+	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/translate/tacil"
@@ -16,11 +17,14 @@ type Visitor struct {
 
 	env    scope.Scope
 	scopes map[string]scope.Scope
+
+	symbols *tacil.SymbolTable
 }
 
 func NewVisitor(scopes map[string]scope.Scope) *Visitor {
 	return &Visitor{
 		scopes:  scopes,
+		symbols: tacil.NewScope(nil, ""),
 		builder: tacil.NewBuilder(),
 	}
 }
@@ -76,16 +80,21 @@ func (v *Visitor) VisitModule(m *ast.Module) {
 		stmt.Accept(v)
 	}
 
-	v.builder.CreateRet(tacil.NewConstantInt(tacil.Int32Type, 0, true, ""))
+	v.builder.CreateRet(tacil.NewConstantInt(tacil.Int32Type, 0, true))
 }
 
-func (v *Visitor) VisitDefinition(definition *ast.Definition) {
+func (v *Visitor) VisitDefinition(def *ast.Definition) {
 	//TODO implement me
 	panic("implement me")
 }
 
 func (v *Visitor) VisitIdentifier(id *ast.Ident) {
-	id.IRExpr = tacil.NewTemp(id.Name)
+	obj := v.symbols.Lookup(id.Name)
+	if obj == nil {
+		panic(fmt.Sprintf("stack allocation for name '%s' not found", id.Name))
+	}
+
+	id.IRExpr = tacil.NewTemp(id.Name, obj.Type())
 }
 
 func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
@@ -96,17 +105,17 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 
 	switch expr.Op {
 	case token.PLUS:
-		instr = v.builder.CreateAdd(expr.Left.Value(), expr.Right.Value(), "")
+		instr = v.builder.CreateAdd(expr.Left.Value(), expr.Right.Value())
 	case token.EQUAL:
-		instr = v.builder.CreateCmp(tacil.Eq, expr.Left.Value(), expr.Right.Value(), "")
+		instr = v.builder.CreateCmp(tacil.Eq, expr.Left.Value(), expr.Right.Value())
 	case token.LESS:
-		instr = v.builder.CreateCmp(tacil.ULe, expr.Left.Value(), expr.Right.Value(), "")
+		instr = v.builder.CreateCmp(tacil.ULe, expr.Left.Value(), expr.Right.Value())
 	case token.GEQ:
-		instr = v.builder.CreateCmp(tacil.UGe, expr.Left.Value(), expr.Right.Value(), "")
+		instr = v.builder.CreateCmp(tacil.UGe, expr.Left.Value(), expr.Right.Value())
 	case token.GREAT:
-		instr = v.builder.CreateCmp(tacil.UGt, expr.Left.Value(), expr.Right.Value(), "")
+		instr = v.builder.CreateCmp(tacil.UGt, expr.Left.Value(), expr.Right.Value())
 	case token.NEQ:
-		instr = v.builder.CreateCmp(tacil.Ne, expr.Left.Value(), expr.Right.Value(), "")
+		instr = v.builder.CreateCmp(tacil.Ne, expr.Left.Value(), expr.Right.Value())
 	}
 
 	expr.IRExpr = instr
@@ -114,7 +123,17 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 
 func (v *Visitor) VisitDesignator(d *ast.Designator) {
 	d.QualifiedIdent.Accept(v)
-	d.IRExpr = d.QualifiedIdent.Value()
+	if d.Selector == nil {
+		d.IRExpr = d.QualifiedIdent.Value()
+		return
+	}
+
+	switch d.Selector.(type) {
+	case *ast.DotOp:
+	case *ast.IndexOp:
+	case *ast.PtrDref:
+	case *ast.TypeGuard:
+	}
 }
 
 func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
@@ -130,7 +149,7 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 		panic(fmt.Sprintf("[internal] undeclared function '%s'", call.Callee.String()))
 	}
 
-	callee := tacil.NewTemp(call.Callee.String())
+	callee := tacil.NewTemp(call.Callee.String(), F.Type())
 	call.IRExpr = v.builder.CreateFuncCall(callee, args)
 }
 
@@ -181,7 +200,7 @@ func (v *Visitor) VisitBasicLit(lit *ast.BasicLit) {
 	if err != nil {
 		panic(fmt.Sprintf("[internal] unable to parse %s", lit.Val))
 	}
-	lit.IRExpr = tacil.NewConstantInt(tacil.GetIntegerType(numBits), val, false, "")
+	lit.IRExpr = tacil.NewConstantInt(tacil.GetIntegerType(numBits), val, false)
 }
 
 func (v *Visitor) VisitExprRange(exprRange *ast.ExprRange) {
@@ -288,6 +307,7 @@ func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 		builder: v.builder,
 		module:  v.module,
 		env:     v.env,
+		symbols: v.symbols,
 	}}
 
 	stmt.LValue.Accept(av)
@@ -313,7 +333,13 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 		arg.Accept(v)
 		args = append(args, arg.Value())
 	}
-	callee := tacil.NewTemp(call.Callee.String())
+
+	Proc := v.module.GetFunction(call.Callee.String())
+	if Proc == nil {
+		panic(fmt.Sprintf("[internal] undeclared procedure '%s'", call.Callee.String()))
+	}
+
+	callee := tacil.NewTemp(call.Callee.String(), Proc.Type())
 	v.builder.CreateProcCall(callee, args)
 }
 
@@ -469,7 +495,11 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 }
 
 func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
-
+	decl.Type.Accept(v)
+	for _, id := range decl.IdentList {
+		obj := tacil.CreateVariableObject(id.Name, decl.Type.IRType(), tacil.Var)
+		v.symbols.Insert(obj)
+	}
 }
 
 func (v *Visitor) VisitConstDecl(decl *ast.ConstDecl) {
@@ -488,25 +518,25 @@ func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
 }
 
 func (v *Visitor) VisitBasicType(t *ast.BasicType) {
-	//var ty tacil.Type
-	//
-	//switch t := t.EType.(type) {
-	//case *types.Basic:
-	//	switch t.Kind() {
-	//	case types.Int8:
-	//		ty = tacil.Int8Type
-	//	case types.Int16:
-	//		ty = tacil.Int1Type
-	//	case types.Int32:
-	//		ty = tacil.Int32Type
-	//	case types.Int64:
-	//		ty = tacil.Int64Type
-	//	}
-	//default:
-	//
-	//}
-	//
-	//t.IRTy = ty
+	var ty tacil.Type
+
+	switch t := t.EType.(type) {
+	case *types.Basic:
+		switch t.Kind() {
+		case types.Int8:
+			ty = tacil.Int8Type
+		case types.Int16:
+			ty = tacil.Int1Type
+		case types.Int32:
+			ty = tacil.Int32Type
+		case types.Int64:
+			ty = tacil.Int64Type
+		}
+	default:
+
+	}
+
+	t.IRTy = ty
 }
 
 func (v *Visitor) VisitArrayType(arrayType *ast.ArrayType) {

@@ -98,7 +98,7 @@ type Expr interface {
 	HasName() bool
 	Operand(int) Expr
 	NumOperands() int
-	//Type() Type
+	Type() Type
 	fmt.Stringer
 }
 

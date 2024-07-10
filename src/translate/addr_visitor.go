@@ -13,12 +13,12 @@ type AddrVisitor struct {
 }
 
 func (l *AddrVisitor) VisitIdentifier(id *ast.Ident) {
-	sym := l.env.Lookup(id.Name)
+	sym := l.symbols.Lookup(id.Name)
 	if sym == nil {
 		panic(fmt.Sprintf("stack allocation for name '%s' not found", id.Name))
 	}
 
-	id.IRExpr = tacil.NewTemp(id.Name)
+	id.IRExpr = tacil.NewTemp(id.Name, sym.Type())
 }
 
 func (l *AddrVisitor) VisitDesignator(d *ast.Designator) {

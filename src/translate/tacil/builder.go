@@ -1,5 +1,7 @@
 package tacil
 
+import "fmt"
+
 type Builder struct {
 	BB  *BasicBlock       // the current BasicBlock where instructions are inserted
 	CFG *ControlFlowGraph // A graph modelling control-flow for the current function
@@ -15,7 +17,7 @@ func (b *Builder) GetInsertBlock() *BasicBlock { return b.BB }
 // SetInsertPoint updates the current BasicBlock to BB
 func (b *Builder) SetInsertPoint(BB *BasicBlock) { b.BB = BB }
 
-func (b *Builder) CreateAdd(lhs, rhs Expr, name string) *BinaryOp {
+func (b *Builder) CreateAdd(lhs, rhs Expr) *BinaryOp {
 	//var (
 	//	ResTy Type
 	//	LHSTy Type = lhs.Type()
@@ -173,61 +175,61 @@ func (b *Builder) CreateRet(v Expr) *Return {
 //	return ret
 //}
 
-func (b *Builder) CreateCmp(pred Opcode, lhs, rhs Expr, name string) Expr {
-	//var (
-	//	//ResTy Type
-	//	LHSTy Type = lhs.Type()
-	//	RHSTy Type = rhs.Type()
-	//)
-	//
-	//// lhs != integer-type && lhs != pointer-type && lhs != vector<integer-type>
-	//if !LHSTy.IsIntegerTy() && !LHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
-	//	msg := fmt.Sprintf("[internal] icmp operand '%s' to be an integer or pointer type. Got '%s'", lhs, LHSTy)
-	//	panic(msg)
-	//}
-	//
-	//// rhs != integer-type && rhs != pointer-type && rhs != vector<integer-type>
-	//if !RHSTy.IsIntegerTy() && !RHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
-	//	msg := fmt.Sprintf("[internal] icmp operand '%s' to be an integer or pointer type. Got '%s'", rhs, RHSTy)
-	//	panic(msg)
-	//}
-	//
-	//if (LHSTy.IsPtrTy() && RHSTy.IsPtrTy()) || (LHSTy.IsIntegerTy() && RHSTy.IsIntegerTy()) {
-	//	ResTy = LHSTy
-	//} else {
-	//	// lhs != rhs (meaning one is an integer and the other is a pointer)
-	//	// if the ptr.elemTy != integer-type, error
-	//	// otherwise, we use an integer-type
-	//	if LHSTy.IsPtrTy() {
-	//		ptr, _ := LHSTy.(*PointerType)
-	//		if ptr.elemTy != RHSTy {
-	//			msg := "[internal] cannot use icmp operation on pointer and integer types"
-	//			panic(msg)
-	//		}
-	//
-	//		ResTy = RHSTy
-	//	}
-	//
-	//	if RHSTy.IsPtrTy() {
-	//		ptr, _ := RHSTy.(*PointerType)
-	//		if ptr.elemTy != LHSTy {
-	//			msg := "[internal] cannot use icmp operation on pointer and integer types"
-	//			panic(msg)
-	//		}
-	//
-	//		ResTy = LHSTy
-	//	}
-	//}
+func (b *Builder) CreateCmp(pred Opcode, lhs, rhs Expr) Expr {
+	var (
+		ResTy Type
+		LHSTy Type = lhs.Type()
+		RHSTy Type = rhs.Type()
+	)
 
-	name = NextTemp()
-	tmp := NewTemp(name)
+	// lhs != integer-type && lhs != pointer-type && lhs != vector<integer-type>
+	if !LHSTy.IsIntegerTy() && !LHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
+		msg := fmt.Sprintf("[internal] icmp operand '%s' to be an integer or pointer type. Got '%s'", lhs, LHSTy)
+		panic(msg)
+	}
+
+	// rhs != integer-type && rhs != pointer-type && rhs != vector<integer-type>
+	if !RHSTy.IsIntegerTy() && !RHSTy.IsPtrTy() /* && !LHS.IsVecTy() */ {
+		msg := fmt.Sprintf("[internal] icmp operand '%s' to be an integer or pointer type. Got '%s'", rhs, RHSTy)
+		panic(msg)
+	}
+
+	if (LHSTy.IsPtrTy() && RHSTy.IsPtrTy()) || (LHSTy.IsIntegerTy() && RHSTy.IsIntegerTy()) {
+		ResTy = LHSTy
+	} else {
+		// lhs != rhs (meaning one is an integer and the other is a pointer)
+		// if the ptr.elemTy != integer-type, error
+		// otherwise, we use an integer-type
+		if LHSTy.IsPtrTy() {
+			ptr, _ := LHSTy.(*PointerType)
+			if ptr.elemTy != RHSTy {
+				msg := "[internal] cannot use icmp operation on pointer and integer types"
+				panic(msg)
+			}
+
+			ResTy = RHSTy
+		}
+
+		if RHSTy.IsPtrTy() {
+			ptr, _ := RHSTy.(*PointerType)
+			if ptr.elemTy != LHSTy {
+				msg := "[internal] cannot use icmp operation on pointer and integer types"
+				panic(msg)
+			}
+
+			ResTy = LHSTy
+		}
+	}
+
+	name := NextTemp()
+	tmp := NewTemp(name, ResTy)
 	icmp := CreateCmp(pred, lhs, rhs)
 	b.CreateAssign(icmp, tmp)
 
 	return tmp
 }
 
-func (b *Builder) CreateFuncCall(callee Expr, args []Expr) *FuncCallInstr {
+func (b *Builder) CreateFuncCall(callee Expr, args []Expr) *FuncCall {
 	call := CreateFuncCall(callee, args)
 	b.BB.instr.PushBack(call)
 
