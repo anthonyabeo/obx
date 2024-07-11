@@ -65,12 +65,11 @@ func (b *Builder) CreateAdd(lhs, rhs Expr) *BinaryOp {
 	}
 
 	add := NewBinaryOp(ResTy, Add, lhs, rhs)
-	b.BB.instr.PushBack(add)
 
 	return add
 }
 
-func (b *Builder) CreateSub(lhs, rhs Expr, name string) Expr {
+func (b *Builder) CreateSub(lhs, rhs Expr) Expr {
 	var (
 		ResTy Type
 		LHSTy Type = lhs.Type()
@@ -118,12 +117,11 @@ func (b *Builder) CreateSub(lhs, rhs Expr, name string) Expr {
 	}
 
 	sub := NewBinaryOp(ResTy, Sub, lhs, rhs)
-	b.BB.instr.PushBack(sub)
 
 	return sub
 }
 
-func (b *Builder) CreateXOR(lhs, rhs Expr, name string) Expr {
+func (b *Builder) CreateXOR(lhs, rhs Expr) Expr {
 	var (
 		ResTy Type
 		LHSTy Type = lhs.Type()
@@ -146,7 +144,6 @@ func (b *Builder) CreateXOR(lhs, rhs Expr, name string) Expr {
 	ResTy = LHSTy
 
 	xor := NewBinaryOp(ResTy, Xor, lhs, rhs)
-	b.BB.instr.PushBack(xor)
 
 	return xor
 }
@@ -282,15 +279,15 @@ func (b *Builder) CreateJmp(dst *BasicBlock) *Jump {
 //	return phi
 //}
 
-func (b *Builder) CreateNeg(v Expr, name string) Expr {
-	neg := b.CreateSub(GetNullValue(v.Type()), v, name)
+func (b *Builder) CreateNeg(v Expr) Expr {
+	neg := b.CreateSub(GetNullValue(v.Type()), v)
 	b.BB.instr.PushBack(neg)
 
 	return neg
 }
 
-func (b *Builder) CreateNot(v Expr, name string) Expr {
-	not := b.CreateXOR(v, GetAllOnesValue(v.Type()), name)
+func (b *Builder) CreateNot(v Expr) Expr {
+	not := b.CreateXOR(v, GetAllOnesValue(v.Type()))
 	b.BB.instr.PushBack(not)
 
 	return not

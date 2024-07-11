@@ -158,9 +158,9 @@ func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
 
 	switch expr.Op {
 	case token.MINUS:
-		expr.IRExpr = v.builder.CreateNeg(expr.X.Value(), "")
+		expr.IRExpr = v.builder.CreateNeg(expr.X.Value())
 	case token.NOT:
-		expr.IRExpr = v.builder.CreateNot(expr.X.Value(), "")
+		expr.IRExpr = v.builder.CreateNot(expr.X.Value())
 	case token.PLUS:
 		expr.IRExpr = expr.X.Value()
 	default:
