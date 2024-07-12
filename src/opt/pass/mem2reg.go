@@ -14,7 +14,7 @@ type Mem2Reg struct {
 
 func (m Mem2Reg) Name() string { return m.Nom }
 
-func (m Mem2Reg) Run(program *tacil.Program) {
+func (m Mem2Reg) Run(program *tacil.Program, symbols *tacil.SymbolTable) {
 	for _, module := range program.Modules {
 		for _, f := range module.GetFunctionList() {
 			cfg := f.CFG()
@@ -22,7 +22,7 @@ func (m Mem2Reg) Run(program *tacil.Program) {
 			DF := analy.DominanceFrontier(cfg)
 
 			Globals, Blocks := ComputeGlobalNames(cfg)
-			InsertPhiFunctions(Globals, Blocks, DF)
+			InsertPhiFunctions(cfg, Globals, Blocks, DF, symbols)
 			Rename(Globals, cfg)
 		}
 	}
@@ -30,9 +30,9 @@ func (m Mem2Reg) Run(program *tacil.Program) {
 
 // ComputeGlobalNames
 // ---------------------------------------------------------------
-func ComputeGlobalNames(cfg *tacil.ControlFlowGraph) (map[string]bool, map[string]adt.Set[Pair]) {
+func ComputeGlobalNames(cfg *tacil.ControlFlowGraph) (map[string]bool, map[string]adt.Set[*tacil.BasicBlock]) {
 	Globals := map[string]bool{}
-	Blocks := map[string]adt.Set[Pair]{}
+	Blocks := map[string]adt.Set[*tacil.BasicBlock]{}
 
 	for _, BB := range cfg.Nodes.Elems() {
 		VarKill := map[string]bool{}
@@ -52,13 +52,10 @@ func ComputeGlobalNames(cfg *tacil.ControlFlowGraph) (map[string]bool, map[strin
 
 				VarKill[assign.Dst.Name()] = true
 				if _, ok := Blocks[assign.Dst.Name()]; !ok {
-					Blocks[assign.Dst.Name()] = adt.NewHashSet[Pair]()
+					Blocks[assign.Dst.Name()] = adt.NewHashSet[*tacil.BasicBlock]()
 				}
 
-				Blocks[assign.Dst.Name()].Add(Pair{
-					expr:  assign.Dst,
-					block: BB,
-				})
+				Blocks[assign.Dst.Name()].Add(BB)
 			}
 		}
 	}
@@ -66,40 +63,40 @@ func ComputeGlobalNames(cfg *tacil.ControlFlowGraph) (map[string]bool, map[strin
 	return Globals, Blocks
 }
 
-// Pair
-// ---------------------------
-type Pair struct {
-	expr  tacil.Expr
-	block *tacil.BasicBlock
-}
-
 // InsertPhiFunctions
 // -----------------------------------------------------------------
-func InsertPhiFunctions(Globals map[string]bool, Blocks map[string]adt.Set[Pair], DF map[string]adt.Set[*tacil.BasicBlock]) {
+func InsertPhiFunctions(
+	cfg *tacil.ControlFlowGraph,
+	Globals map[string]bool,
+	Blocks map[string]adt.Set[*tacil.BasicBlock],
+	DF map[string]adt.Set[*tacil.BasicBlock],
+	symbols *tacil.SymbolTable, ) {
+
 	for name := range Globals {
 		WorkList := Blocks[name]
 
-		workList := adt.NewQueue[*tacil.BasicBlock]()
-		for _, inc := range WorkList.Elems() {
-			workList.Enqueue(inc.block)
-		}
+		for !WorkList.Empty() {
+			block := WorkList.Pop()
+			for _, BB := range DF[block.Name()].Elems() {
 
-		for !workList.Empty() {
-			inc := WorkList.Pop()
-			blk := workList.Dequeue()
-			for _, BB := range DF[blk.Name()].Elems() {
-				var phi *tacil.PHINode
-				if BB.Phi[inc.expr.Name()] == nil {
-					phi = tacil.CreateEmptyPHINode()
-					phi.AddIncoming(inc.expr, inc.block)
+				if BB.Phi[name] == nil {
+					phi := tacil.CreateEmptyPHINode()
 
-					assign := tacil.CreateAssign(phi, tacil.NewTemp(inc.expr.Name(), inc.expr.Type()))
+					obj := symbols.Lookup(name)
+					if obj == nil {
+						panic(fmt.Sprintf("stack allocation for name '%s' not found", name))
+					}
+
+					for _, pred := range cfg.Pred[BB.Name()].Elems() {
+						tmp := tacil.NewTemp(name, obj.Type())
+						phi.AddIncoming(tmp, pred)
+					}
+
+					assign := tacil.CreateAssign(phi, tacil.NewTemp(name, obj.Type()))
 					BB.InsertInstrBegin(assign)
-					BB.Phi[inc.expr.Name()] = assign
+					BB.Phi[name] = assign
 
-					workList.Enqueue(BB)
-				} else {
-					BB.Phi[inc.expr.Name()].Value.(*tacil.PHINode).AddIncoming(inc.expr, inc.block)
+					WorkList.Add(BB)
 				}
 			}
 		}
@@ -155,7 +152,7 @@ func rename(Globals map[string]bool, vst map[string]bool, block *tacil.BasicBloc
 	if cfg.Succ[block.Name()] != nil {
 		for _, s := range cfg.Succ[block.Name()].Elems() {
 			for name, assign := range s.Phi {
-				if phi, ok := assign.Dst.(*tacil.PHINode); ok {
+				if phi, ok := assign.Value.(*tacil.PHINode); ok {
 					for _, inc := range phi.Incoming {
 						if inc.Blk == block {
 							inc.V.SetName(stack[name].Top())
