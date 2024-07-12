@@ -94,6 +94,7 @@ const (
 type Expr interface {
 	expr()
 	Name() string
+	BaseName() string
 	SetName(string)
 	HasName() bool
 	Operand(int) Expr

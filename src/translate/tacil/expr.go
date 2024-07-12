@@ -20,6 +20,7 @@ func NewConstantInt(ty Type, value uint64, signed bool) *ConstantInt {
 
 func (c ConstantInt) expr()              {}
 func (c ConstantInt) Name() string       { return strconv.Itoa(int(c.value)) }
+func (c ConstantInt) BaseName() string   { return strconv.Itoa(int(c.value)) }
 func (c ConstantInt) SetName(string)     {}
 func (c ConstantInt) HasName() bool      { return false }
 func (c ConstantInt) Operand(i int) Expr { panic("constants have no operands") }
@@ -30,19 +31,22 @@ func (c ConstantInt) String() string     { return fmt.Sprintf("%s %d", c.ty, c.v
 // Temp
 // --------------------------------------
 type Temp struct {
-	name string
-	ty   Type
+	name     string
+	baseName string
+	ty       Type
 }
 
 func NewTemp(name string, ty Type) *Temp {
 	return &Temp{
-		name: name,
-		ty:   ty,
+		name:     name,
+		baseName: name,
+		ty:       ty,
 	}
 }
 
 func (t *Temp) expr()            {}
 func (t *Temp) Name() string     { return t.name }
+func (t *Temp) BaseName() string { return t.baseName }
 func (t *Temp) SetName(s string) { t.name = s }
 func (t *Temp) HasName() bool    { return true }
 func (t *Temp) NumOperands() int { return 0 }
@@ -67,10 +71,11 @@ func NewBinaryOp(ty Type, op Opcode, x, y Expr) *BinaryOp {
 	}
 }
 
-func (*BinaryOp) expr()            {}
-func (b *BinaryOp) Name() string   { panic("") }
-func (b *BinaryOp) SetName(string) {}
-func (b *BinaryOp) HasName() bool  { return false }
+func (*BinaryOp) expr()              {}
+func (b *BinaryOp) Name() string     { panic("") }
+func (b *BinaryOp) BaseName() string { panic("") }
+func (b *BinaryOp) SetName(string)   {}
+func (b *BinaryOp) HasName() bool    { return false }
 func (b *BinaryOp) Operand(i int) Expr {
 	switch i {
 	case 1:
@@ -101,10 +106,11 @@ func CreateCmp(pred Opcode, x, y Expr) *Cmp {
 	}
 }
 
-func (*Cmp) expr()            {}
-func (c *Cmp) Name() string   { return "" }
-func (c *Cmp) SetName(string) {}
-func (c *Cmp) HasName() bool  { return false }
+func (*Cmp) expr()              {}
+func (c *Cmp) Name() string     { return "" }
+func (c *Cmp) BaseName() string { return "" }
+func (c *Cmp) SetName(string)   {}
+func (c *Cmp) HasName() bool    { return false }
 func (c *Cmp) Operand(i int) Expr {
 	switch i {
 	case 1:
@@ -141,6 +147,7 @@ func CreatePHINode(numIncomingPaths uint) *PHINode {
 
 func (phi *PHINode) expr()            {}
 func (phi *PHINode) Name() string     { panic("phi nodes have no names") }
+func (phi *PHINode) BaseName() string { panic("phi nodes have no names") }
 func (phi *PHINode) SetName(string)   {}
 func (phi *PHINode) HasName() bool    { return false }
 func (phi *PHINode) Operand(int) Expr { panic("") }
@@ -201,6 +208,7 @@ func (c FuncCall) Operand(idx int) Expr {
 	return c.Args[idx-2]
 }
 func (c FuncCall) Name() string     { return c.Callee.Name() }
+func (c FuncCall) BaseName() string { return c.Callee.Name() }
 func (c FuncCall) SetName(string)   {}
 func (c FuncCall) HasName() bool    { panic("not implemented") }
 func (c FuncCall) NumOperands() int { return 1 + len(c.Args) }
