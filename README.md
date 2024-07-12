@@ -43,16 +43,18 @@ Use "obx [command] --help" for more information about a command.
 The program below is in the `examples/basics/Main.obx` file.
 ```
 module Main
-var a, b, total: integer
+    var a, b, total: integer
 
 begin
+    a := 0
     b := 10
     total := 0
-    
-    for a := 0 to b do
+
+    while a < b do
         total := total + 1
+        a := a + 1
     end
-    
+
     assert(total = 55)
 end Main
 ```
@@ -64,64 +66,69 @@ Output:
 ```
 define i32 @main() {
 %entry:
-    br label %main
+    jmp label %main
 
 %main:
-    %a = alloca i32
-    %b = alloca i32
-    %total = alloca i32
-    store i32 10, ptr %b
-    store i32 0, ptr %total
-    %0 = load i32, ptr %b
-    store i32 0, ptr %a
-    %1 = load i32, ptr %a
-    %2 = icmp slt i32 %1, %0
-    br i1 %2, label %body, label %cont
+    a = i32 0
+    b = i32 10
+    total = i32 0
+    jmp label %loop
 
-%body:
-    %3 = load i32, ptr %total
-    %4 = add i32 %3, 1
-    store i32 %4, ptr %total
-    %5 = load i32, ptr %a
-    %6 = add i32 %5, 1
-    store i32 %6, ptr %a
-    %7 = icmp slt i32 %a, %0
-    br i1 %7, label %body, label %cont
+%loop:
+    t0 = icmp ule a, b
+    br t0, label %if.then, label %if.else
+
+%if.then:
+    total = add total, i32 1
+    a = add a, i32 1
+    jmp label %loop
+
+%if.else:
+    jmp label %cont
 
 %cont:
-    %8 = load i32, ptr %total
-    %9 = icmp eq i32 %8, 55
-    %assert = call void assert(i1 %9)
+    t1 = icmp eq total, i32 55
+    call assert(t1)
     ret i32 0
 }
+
 ```
 
-Run the `mem2reg` pass to remove the unnecessary `load` and `store` operations
+Run the `ssa` pass to convert the program to static single assignment (SSA) form
 
 ```shell
-$ obx build -e Main -p ./examples/basics --emit-ir --opt mem2reg 
+$ obx build -e Main -p ./examples/basics --emit-ir --opt ssa
 ```
 ```
 define i32 @main() {
 %entry:
-    br label %main
+    jmp label %main
 
 %main:
-    %2 = icmp slt i32 0, 10
-    br i1 %2, label %body, label %cont
+    a0 = i32 0
+    b0 = i32 10
+    total0 = i32 0
+    jmp label %loop
 
-%body:
-    %total = phi i32 [ 0, %main ], [ %4, %body ]
-    %a = phi i32 [ 0, %main ], [ %6, %body ]
-    %4 = add i32 %total, 1
-    %6 = add i32 %a, 1
-    %7 = icmp slt i32 %a, 10
-    br i1 %7, label %body, label %cont
+%loop:
+    a1 = phi [ a0, %main ], [ a2, %if.then ]
+    total1 = phi [ total0, %main ], [ total2, %if.then ]
+    t0 = icmp ule a1, b0
+    br t0, label %if.then, label %if.else
+
+%if.then:
+    total2 = add total1, i32 1
+    a2 = add a1, i32 1
+    jmp label %loop
+
+%if.else:
+    jmp label %cont
 
 %cont:
-    %9 = icmp eq i32 %4, 55
-    %assert = call void assert(i1 %9)
+    t1 = icmp eq total2, i32 55
+    call assert(t1)
     ret i32 0
 }
+
 
 ```

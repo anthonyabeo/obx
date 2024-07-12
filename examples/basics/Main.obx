@@ -1,13 +1,15 @@
 module Main
-var a, b, total: integer
+	var a, b, total: integer
 
 begin
+	a := 0
     b := 10
 	total := 0
 
-	for a := 0 to b do
+	while a < b do
 		total := total + 1
+		a := a + 1
 	end
 
-	assert(total = 55)
+    assert(total = 55)
 end Main
