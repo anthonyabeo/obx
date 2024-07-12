@@ -67,7 +67,7 @@ var buildCmd = &cobra.Command{
 		program := ir.Translate(obx, tsOrd)
 
 		// Optimisation
-		pm := opt.NewPassManager()
+		pm := opt.NewPassManager(ir.SymbolTable())
 		pm.AddPasses(opts...)
 		pm.Run(program)
 

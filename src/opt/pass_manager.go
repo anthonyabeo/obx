@@ -7,16 +7,17 @@ import (
 
 type Pass interface {
 	Name() string
-	Run(program *tacil.Program)
+	Run(*tacil.Program, *tacil.SymbolTable)
 }
 
 type PassManager struct {
-	passes []Pass
-	set    map[string]bool
+	passes  []Pass
+	set     map[string]bool
+	symbols *tacil.SymbolTable
 }
 
-func NewPassManager() *PassManager {
-	return &PassManager{set: map[string]bool{}}
+func NewPassManager(table *tacil.SymbolTable) *PassManager {
+	return &PassManager{set: map[string]bool{}, symbols: table}
 }
 
 func (pm *PassManager) AddPass(pass Pass) {
@@ -36,7 +37,7 @@ func (pm *PassManager) dequeue() Pass {
 func (pm *PassManager) Run(program *tacil.Program) {
 	for len(pm.passes) > 0 {
 		p := pm.dequeue()
-		p.Run(program)
+		p.Run(program, pm.symbols)
 	}
 }
 
@@ -56,8 +57,8 @@ var declPasses map[string]Pass
 
 func init() {
 	declPasses = map[string]Pass{
-		"mem2reg": &pass.Mem2Reg{Nom: "mem2reg"},
-		//"dce":        &pass.DeadCodeElimination{Nom: "dce"},
+		"mem2reg":    &pass.Mem2Reg{Nom: "mem2reg"},
+		"dce":        &pass.DeadCodeElimination{Nom: "dce"},
 		"const_prop": &pass.ConstantPropagation{},
 	}
 }

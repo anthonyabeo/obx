@@ -8,7 +8,7 @@ type ConstantPropagation struct {
 
 func (c ConstantPropagation) Name() string { return c.Nom }
 
-func (c ConstantPropagation) Run(program *tacil.Program) {
+func (c ConstantPropagation) Run(program *tacil.Program, symbols *tacil.SymbolTable) {
 	//TODO implement me
 	panic("implement me")
 }

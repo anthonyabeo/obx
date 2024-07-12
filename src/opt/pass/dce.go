@@ -13,7 +13,7 @@ type DeadCodeElimination struct {
 
 func (dce DeadCodeElimination) Name() string { return dce.Nom }
 
-func (dce DeadCodeElimination) Run(program *tacil.Program) {
+func (dce DeadCodeElimination) Run(program *tacil.Program, symbols *tacil.SymbolTable) {
 	for _, mod := range program.Modules {
 		for _, f := range mod.GetFunctionList() {
 			cfg := f.CFG()

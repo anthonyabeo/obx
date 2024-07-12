@@ -33,6 +33,10 @@ func (v *Visitor) Module() *tacil.Module {
 	return v.module
 }
 
+func (v *Visitor) SymbolTable() *tacil.SymbolTable {
+	return v.symbols
+}
+
 func (v *Visitor) VisitOberon(*ast.Oberon) {}
 
 func (v *Visitor) Translate(ob *ast.Oberon, order []string) *tacil.Program {
