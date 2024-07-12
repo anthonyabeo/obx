@@ -125,10 +125,8 @@ define i32 @main() {
     jmp label %cont
 
 %cont:
-    t1 = icmp eq total2, i32 55
+    t1 = icmp eq total1, i32 55
     call assert(t1)
     ret i32 0
 }
-
-
 ```
