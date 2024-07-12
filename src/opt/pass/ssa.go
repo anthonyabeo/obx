@@ -161,9 +161,7 @@ func rename(Globals map[string]bool, vst map[string]bool, block *tacil.BasicBloc
 				}
 			}
 		}
-	}
 
-	if cfg.Succ[block.Name()] != nil {
 		for _, s := range cfg.Succ[block.Name()].Elems() {
 			rename(Globals, vst, s, counter, stack, cfg)
 		}
@@ -172,13 +170,8 @@ func rename(Globals map[string]bool, vst map[string]bool, block *tacil.BasicBloc
 	for i := block.Instr().Front(); i != nil; i = i.Next() {
 		switch instr := i.Value.(type) {
 		case *tacil.Assign:
-			if stack[instr.Dst.Name()] != nil {
-				stack[instr.Dst.Name()].Pop()
-			}
-
-		case *tacil.PHINode:
-			if stack[instr.Name()] != nil {
-				stack[instr.Name()].Pop()
+			if stack[instr.Dst.BaseName()] != nil {
+				stack[instr.Dst.BaseName()].Pop()
 			}
 		default:
 			continue
