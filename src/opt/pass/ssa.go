@@ -8,13 +8,13 @@ import (
 	"github.com/anthonyabeo/obx/src/translate/tacil"
 )
 
-type Mem2Reg struct {
+type SSA struct {
 	Nom string
 }
 
-func (m Mem2Reg) Name() string { return m.Nom }
+func (s SSA) Name() string { return s.Nom }
 
-func (m Mem2Reg) Run(program *tacil.Program, symbols *tacil.SymbolTable) {
+func (s SSA) Run(program *tacil.Program, symbols *tacil.SymbolTable) {
 	for _, module := range program.Modules {
 		for _, f := range module.GetFunctionList() {
 			cfg := f.CFG()
@@ -70,7 +70,7 @@ func InsertPhiFunctions(
 	Globals map[string]bool,
 	Blocks map[string]adt.Set[*tacil.BasicBlock],
 	DF map[string]adt.Set[*tacil.BasicBlock],
-	symbols *tacil.SymbolTable, ) {
+	symbols *tacil.SymbolTable) {
 
 	for name := range Globals {
 		WorkList := Blocks[name]

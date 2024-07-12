@@ -57,7 +57,7 @@ var declPasses map[string]Pass
 
 func init() {
 	declPasses = map[string]Pass{
-		"mem2reg":    &pass.Mem2Reg{Nom: "mem2reg"},
+		"ssa":        &pass.SSA{Nom: "ssa"},
 		"dce":        &pass.DeadCodeElimination{Nom: "dce"},
 		"const_prop": &pass.ConstantPropagation{},
 	}
