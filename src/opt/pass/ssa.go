@@ -41,12 +41,10 @@ func ComputeGlobalNames(cfg *tacil.ControlFlowGraph) (map[string]bool, map[strin
 			if assign, ok := i.Value.(*tacil.Assign); ok {
 				for i := 1; i < assign.Value.NumOperands()+1; i++ {
 					operand := assign.Value.Operand(i)
-					if !operand.HasName() {
-						continue
-					}
-
-					if !VarKill[operand.Name()] {
-						Globals[operand.Name()] = true
+					if tmp, ok := operand.(*tacil.Temp); ok {
+						if !VarKill[tmp.Name()] {
+							Globals[tmp.Name()] = true
+						}
 					}
 				}
 
@@ -70,7 +68,8 @@ func InsertPhiFunctions(
 	Globals map[string]bool,
 	Blocks map[string]adt.Set[*tacil.BasicBlock],
 	DF map[string]adt.Set[*tacil.BasicBlock],
-	symbols *tacil.SymbolTable) {
+	symbols *tacil.SymbolTable,
+) {
 
 	for name := range Globals {
 		WorkList := Blocks[name]
@@ -118,7 +117,15 @@ func Rename(Globals map[string]bool, cfg *tacil.ControlFlowGraph) {
 	rename(Globals, vst, cfg.Entry, counter, stack, cfg)
 }
 
-func rename(Globals map[string]bool, vst map[string]bool, block *tacil.BasicBlock, counter map[string]int, stack map[string]*adt.Stack[string], cfg *tacil.ControlFlowGraph) {
+func rename(
+	Globals map[string]bool,
+	vst map[string]bool,
+	block *tacil.BasicBlock,
+	counter map[string]int,
+	stack map[string]*adt.Stack[string],
+	cfg *tacil.ControlFlowGraph,
+) {
+
 	if vst[block.Name()] {
 		return
 	}
