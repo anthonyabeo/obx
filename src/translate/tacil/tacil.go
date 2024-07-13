@@ -9,34 +9,28 @@ func (op Opcode) String() string {
 }
 
 var opcodes = [...]string{
-	Add: "add",
-	Sub: "sub",
-	Mul: "mul",
+	Add: "+",
+	Sub: "-",
+	Mul: "*",
 	Div: "div",
 
 	Load:  "load",
 	Store: "store",
 
-	Xor:  "xor",
-	Or:   "or",
-	And:  "and",
-	Shl:  "shl",
-	LShr: "lshl",
-	AShr: "ashr",
+	Xor: "xor",
+	Or:  "|",
+	And: "&",
+	Shl: "<<",
 
 	Call: "call",
 	Phi:  "phi",
 
-	Eq:  "eq",
-	Ne:  "ne",
-	UGt: "ugt",
-	UGe: "uge",
-	ULt: "ult",
-	ULe: "ule",
-	SGt: "sgt",
-	SGe: "sge",
-	SLt: "slt",
-	SLe: "sle",
+	Eq: "==",
+	Ne: "!=",
+	Gt: ">",
+	Ge: ">=",
+	Lt: "<",
+	Le: "<=",
 
 	Br:  "br",
 	Ret: "ret",
@@ -73,16 +67,14 @@ const (
 	Phi
 	other_op_end
 
+	cmp_op_begin
 	Eq
 	Ne
-	UGt
-	UGe
-	ULt
-	ULe
-	SGt
-	SGe
-	SLt
-	SLe
+	Gt
+	Ge
+	Lt
+	Le
+	cmp_op_end
 
 	termop_begin
 	Br
