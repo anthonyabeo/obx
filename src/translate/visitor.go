@@ -113,11 +113,11 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 	case token.EQUAL:
 		instr = v.builder.CreateCmp(tacil.Eq, expr.Left.Value(), expr.Right.Value())
 	case token.LESS:
-		instr = v.builder.CreateCmp(tacil.ULe, expr.Left.Value(), expr.Right.Value())
+		instr = v.builder.CreateCmp(tacil.Le, expr.Left.Value(), expr.Right.Value())
 	case token.GEQ:
-		instr = v.builder.CreateCmp(tacil.UGe, expr.Left.Value(), expr.Right.Value())
+		instr = v.builder.CreateCmp(tacil.Ge, expr.Left.Value(), expr.Right.Value())
 	case token.GREAT:
-		instr = v.builder.CreateCmp(tacil.UGt, expr.Left.Value(), expr.Right.Value())
+		instr = v.builder.CreateCmp(tacil.Gt, expr.Left.Value(), expr.Right.Value())
 	case token.NEQ:
 		instr = v.builder.CreateCmp(tacil.Ne, expr.Left.Value(), expr.Right.Value())
 	}
@@ -429,53 +429,51 @@ func (v *Visitor) VisitCaseStmt(stmt *ast.CaseStmt) {
 }
 
 func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
-	//BB := v.builder.GetInsertBlock()
-	//
-	//BodyBB := tacil.CreateBasicBlock("body", BB.Parent())
-	//ContBB := tacil.CreateBasicBlock("cont", BB.Parent())
-	//
-	//IterVar := v.env.Lookup(stmt.CtlVar.Name).Alloca()
-	//if IterVar == nil {
-	//	panic(fmt.Sprintf("stack allocation for name '%s' not found", stmt.CtlVar.Name))
-	//}
-	//
-	//stmt.InitVal.Accept(v)
-	//stmt.FinalVal.Accept(v)
-	//FinalV := stmt.FinalVal.Value()
-	//
-	//v.builder.CreateAssign(stmt.InitVal.Value(), IterVar)
-	//
-	//CtlVar := v.builder.CreateLoad(IterVar.AllocatedTy(), IterVar, "")
-	//CondV := v.builder.CreateCmp(tacil.SLt, CtlVar, FinalV, "")
-	//
-	//v.builder.CreateCondBr(CondV, BodyBB, ContBB)
-	//
-	//// IR-Codegen for loop body
-	//v.builder.SetInsertPoint(BodyBB)
-	//for _, s := range stmt.StmtSeq {
-	//	s.Accept(v)
-	//}
-	//v.builder.SetInsertPoint(BodyBB)
-	//
-	//// update control variable
-	//var inc tacil.Value
-	//if stmt.By != nil {
-	//	stmt.By.Accept(v)
-	//	inc = stmt.By.Value()
-	//} else {
-	//	inc = tacil.NewConstantInt(tacil.Int64Type, 1, true, "")
-	//}
-	//
-	//CtlVar = v.builder.CreateLoad(IterVar.AllocatedTy(), IterVar, "")
-	//Val := v.builder.CreateAdd(CtlVar, inc, "")
-	//v.builder.CreateAssign(Val, IterVar)
-	//
-	//CondV = v.builder.CreateCmp(tacil.SLt, IterVar, FinalV, "")
-	//
-	//v.builder.CreateCondBr(CondV, BodyBB, ContBB)
-	//
-	//// point the builder which block to go to next
-	//v.builder.SetInsertPoint(ContBB)
+	BB := v.builder.GetInsertBlock()
+
+	BodyBB := tacil.CreateBasicBlock("body", BB.Parent())
+	ContBB := tacil.CreateBasicBlock("cont", BB.Parent())
+
+	sym := v.symbols.Lookup(stmt.CtlVar.Name)
+	if sym == nil {
+		panic(fmt.Sprintf("stack allocation for name '%s' not found", stmt.CtlVar.Name))
+	}
+
+	CtlVar := tacil.NewTemp(stmt.CtlVar.Name, sym.Type())
+
+	stmt.InitVal.Accept(v)
+	stmt.FinalVal.Accept(v)
+	FinalV := stmt.FinalVal.Value()
+
+	v.builder.CreateAssign(stmt.InitVal.Value(), CtlVar)
+
+	CondV := v.builder.CreateCmp(tacil.Lt, CtlVar, FinalV)
+	v.builder.CreateCondBr(CondV, BodyBB, ContBB)
+
+	// IR-Codegen for loop body
+	v.builder.SetInsertPoint(BodyBB)
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
+	v.builder.SetInsertPoint(BodyBB)
+
+	// update control variable
+	var inc tacil.Expr
+	if stmt.By != nil {
+		stmt.By.Accept(v)
+		inc = stmt.By.Value()
+	} else {
+		inc = tacil.NewConstantInt(tacil.Int64Type, 1, true)
+	}
+
+	Val := v.builder.CreateAdd(CtlVar, inc)
+	v.builder.CreateAssign(Val, CtlVar)
+
+	CondV = v.builder.CreateCmp(tacil.Lt, CtlVar, FinalV)
+	v.builder.CreateCondBr(CondV, BodyBB, ContBB)
+
+	// point the builder which block to go to next
+	v.builder.SetInsertPoint(ContBB)
 }
 
 func (v *Visitor) VisitExitStmt(stmt *ast.ExitStmt) {
