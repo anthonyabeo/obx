@@ -26,7 +26,7 @@ func (c ConstantInt) HasName() bool      { return false }
 func (c ConstantInt) Operand(i int) Expr { panic("constants have no operands") }
 func (c ConstantInt) NumOperands() int   { return 0 }
 func (c ConstantInt) Type() Type         { return c.ty }
-func (c ConstantInt) String() string     { return fmt.Sprintf("%s %d", c.ty, c.value) }
+func (c ConstantInt) String() string     { return fmt.Sprintf("%d", c.value) }
 
 // Temp
 // --------------------------------------
@@ -88,7 +88,7 @@ func (b *BinaryOp) Operand(i int) Expr {
 }
 func (b *BinaryOp) NumOperands() int { return 2 }
 func (b *BinaryOp) Type() Type       { return b.ty }
-func (b *BinaryOp) String() string   { return fmt.Sprintf("%s %s, %s", b.Op, b.X, b.Y) }
+func (b *BinaryOp) String() string   { return fmt.Sprintf("%s %s %s", b.X, b.Op, b.Y) }
 
 // Cmp
 // -------------------------
@@ -123,7 +123,7 @@ func (c *Cmp) Operand(i int) Expr {
 }
 func (c *Cmp) NumOperands() int { return 2 }
 func (c *Cmp) Type() Type       { return c.ty }
-func (c *Cmp) String() string   { return fmt.Sprintf("icmp %s %s, %s", c.Pred, c.X, c.Y) }
+func (c *Cmp) String() string   { return fmt.Sprintf("(%s %s %s)", c.X, c.Pred, c.Y) }
 
 // PHINode
 // --------------------------

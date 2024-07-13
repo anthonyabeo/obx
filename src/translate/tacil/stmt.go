@@ -20,7 +20,7 @@ func CreateAssign(val, dst Expr) *Assign {
 }
 
 func (Assign) stmt()            {}
-func (a Assign) String() string { return fmt.Sprintf("%s = %s", a.Dst, a.Value) }
+func (a Assign) String() string { return fmt.Sprintf("%s := %s", a.Dst, a.Value) }
 
 // Return
 // -----------------------------
