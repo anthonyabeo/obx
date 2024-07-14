@@ -18,15 +18,15 @@ func NewConstantInt(ty Type, value uint64, signed bool) *ConstantInt {
 	return &ConstantInt{value, signed, ty}
 }
 
-func (c ConstantInt) expr()              {}
-func (c ConstantInt) Name() string       { return strconv.Itoa(int(c.value)) }
-func (c ConstantInt) BaseName() string   { return strconv.Itoa(int(c.value)) }
-func (c ConstantInt) SetName(string)     {}
-func (c ConstantInt) HasName() bool      { return false }
-func (c ConstantInt) Operand(i int) Expr { panic("constants have no operands") }
-func (c ConstantInt) NumOperands() int   { return 0 }
-func (c ConstantInt) Type() Type         { return c.ty }
-func (c ConstantInt) String() string     { return fmt.Sprintf("%d", c.value) }
+func (c ConstantInt) expr()            {}
+func (c ConstantInt) Name() string     { return strconv.Itoa(int(c.value)) }
+func (c ConstantInt) BaseName() string { return strconv.Itoa(int(c.value)) }
+func (c ConstantInt) SetName(string)   {}
+func (c ConstantInt) HasName() bool    { return false }
+func (c ConstantInt) Operand(int) Expr { panic("constants have no operands") }
+func (c ConstantInt) NumOperands() int { return 0 }
+func (c ConstantInt) Type() Type       { return c.ty }
+func (c ConstantInt) String() string   { return fmt.Sprintf("%d", c.value) }
 
 // Temp
 // --------------------------------------
@@ -221,3 +221,27 @@ func (c FuncCall) String() string {
 
 	return fmt.Sprintf("%s = call %s(%s)", c.Name(), c.Callee.Name(), strings.Join(args, ", "))
 }
+
+// Load
+// --------------------------
+type Load struct {
+	Op   Opcode
+	Addr Expr
+}
+
+func (l Load) expr() {}
+
+func (l Load) Name() string     { panic("implement me") }
+func (l Load) BaseName() string { panic("implement me") }
+func (l Load) SetName(string)   { panic("implement me") }
+func (l Load) HasName() bool    { return false }
+func (l Load) Operand(i int) Expr {
+	if i != 1 {
+		panic(fmt.Sprintf("invalid index '%d' for load operand", i))
+	}
+
+	return l.Addr
+}
+func (l Load) NumOperands() int { return 1 }
+func (l Load) Type() Type       { return l.Addr.Type() }
+func (l Load) String() string   { return fmt.Sprintf("%s %s", l.Op, l.Addr) }
