@@ -499,8 +499,11 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 	decl.Type.Accept(v)
 	for _, id := range decl.IdentList {
-		obj := tacil.CreateVariableObject(id.Name, decl.Type.IRType(), tacil.Var)
-		v.symbols.Insert(obj)
+		if sym := v.env.Lookup(id.Name); sym != nil {
+
+			obj := tacil.CreateVariableObject(id.Name, decl.Type.IRType(), sym.Offset(), tacil.Var)
+			v.symbols.Insert(obj)
+		}
 	}
 }
 
