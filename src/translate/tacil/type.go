@@ -9,6 +9,7 @@ type Type interface {
 	IsPtrTy() bool
 	IsFuncTy() bool
 	IsVoidTy() bool
+	IsArrayTy() bool
 }
 
 var (
@@ -65,6 +66,7 @@ func (Int1) IsIntegerTy() bool { return true }
 func (Int1) IsPtrTy() bool     { return false }
 func (Int1) IsFuncTy() bool    { return false }
 func (Int1) IsVoidTy() bool    { return false }
+func (Int1) IsArrayTy() bool   { return false }
 func (Int1) ty()               {}
 func (Int1) String() string    { return "i1" }
 func (i Int1) BitWidth() uint  { return i.numBits }
@@ -79,6 +81,7 @@ func (Int32) IsIntegerTy() bool { return true }
 func (Int32) IsPtrTy() bool     { return false }
 func (Int32) IsFuncTy() bool    { return false }
 func (Int32) IsVoidTy() bool    { return false }
+func (Int32) IsArrayTy() bool   { return false }
 func (Int32) ty()               {}
 func (Int32) String() string    { return "i32" }
 func (i Int32) BitWidth() uint  { return i.numBits }
@@ -93,6 +96,7 @@ func (Int8) IsIntegerTy() bool { return true }
 func (Int8) IsPtrTy() bool     { return false }
 func (Int8) IsFuncTy() bool    { return false }
 func (Int8) IsVoidTy() bool    { return false }
+func (Int8) IsArrayTy() bool   { return false }
 func (Int8) ty()               {}
 func (Int8) String() string    { return "i8" }
 func (i Int8) BitWidth() uint  { return i.numBits }
@@ -107,6 +111,7 @@ func (Int64) IsIntegerTy() bool { return true }
 func (Int64) IsPtrTy() bool     { return false }
 func (Int64) IsFuncTy() bool    { return false }
 func (Int64) IsVoidTy() bool    { return false }
+func (Int64) IsArrayTy() bool   { return false }
 func (Int64) ty()               {}
 func (Int64) String() string    { return "i64" }
 func (i Int64) BitWidth() uint  { return i.numBits }
@@ -121,6 +126,7 @@ func (Int16) IsIntegerTy() bool { return true }
 func (Int16) IsPtrTy() bool     { return false }
 func (Int16) IsFuncTy() bool    { return false }
 func (Int16) IsVoidTy() bool    { return false }
+func (Int16) IsArrayTy() bool   { return false }
 func (Int16) ty()               {}
 func (Int16) String() string    { return "i16" }
 func (i Int16) BitWidth() uint  { return i.numBits }
@@ -135,6 +141,7 @@ func (PointerType) IsIntegerTy() bool { return false }
 func (PointerType) IsPtrTy() bool     { return true }
 func (PointerType) IsFuncTy() bool    { return false }
 func (PointerType) IsVoidTy() bool    { return false }
+func (PointerType) IsArrayTy() bool   { return false }
 func (PointerType) ty()               {}
 func (PointerType) String() string    { return "ptr" }
 func (p PointerType) ElemType() Type  { return p.elemTy }
@@ -148,6 +155,7 @@ func CreatePointerType(ty Type) *PointerType {
 type Void struct{}
 
 func (Void) IsIntegerTy() bool { return false }
+func (Void) IsArrayTy() bool   { return false }
 func (Void) IsPtrTy() bool     { return false }
 func (Void) IsFuncTy() bool    { return false }
 func (Void) IsVoidTy() bool    { return true }
@@ -180,6 +188,7 @@ func (FunctionType) IsIntegerTy() bool     { return false }
 func (FunctionType) IsPtrTy() bool         { return false }
 func (FunctionType) IsFuncTy() bool        { return true }
 func (FunctionType) IsVoidTy() bool        { return false }
+func (FunctionType) IsArrayTy() bool       { return false }
 
 // LabelType ...
 // ---------------------
@@ -188,8 +197,31 @@ type LabelType struct {
 }
 
 func (LabelType) IsIntegerTy() bool { return false }
+func (LabelType) IsArrayTy() bool   { return false }
 func (LabelType) IsPtrTy() bool     { return false }
 func (LabelType) IsFuncTy() bool    { return false }
 func (LabelType) IsVoidTy() bool    { return false }
 func (l LabelType) String() string  { return l.name }
 func (LabelType) ty()               {}
+
+// ArrayType
+// -----------------------------------------
+type ArrayType struct {
+	numElem Expr
+	elemTy  Type
+}
+
+func CreateArrayType(numEl Expr, elTy Type) *ArrayType {
+	return &ArrayType{
+		numElem: numEl,
+		elemTy:  elTy,
+	}
+}
+
+func (a ArrayType) String() string    { return fmt.Sprintf("[%s %s]", a.numElem, a.elemTy) }
+func (a ArrayType) ty()               {}
+func (a ArrayType) IsIntegerTy() bool { return false }
+func (a ArrayType) IsPtrTy() bool     { return false }
+func (a ArrayType) IsFuncTy() bool    { return false }
+func (a ArrayType) IsVoidTy() bool    { return false }
+func (a ArrayType) IsArrayTy() bool   { return true }

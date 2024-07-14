@@ -544,32 +544,43 @@ func (v *Visitor) VisitBasicType(t *ast.BasicType) {
 	t.IRTy = ty
 }
 
-func (v *Visitor) VisitArrayType(arrayType *ast.ArrayType) {
+func (v *Visitor) VisitArrayType(ty *ast.ArrayType) {
+	ty.ElemType.Accept(v)
+	arrType := ty.ElemType.IRType()
+
+	if ty.LenList != nil {
+		for i := len(ty.LenList.List); i >= 0; i-- {
+			size := ty.LenList.List[i]
+			size.Accept(v)
+
+			arrType = tacil.CreateArrayType(size.Value(), arrType)
+		}
+	}
+
+	ty.IRTy = arrType
+}
+
+func (v *Visitor) VisitPointerType(ty *ast.PointerType) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v *Visitor) VisitPointerType(pointerType *ast.PointerType) {
+func (v *Visitor) VisitProcType(ty *ast.ProcType) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v *Visitor) VisitProcType(procType *ast.ProcType) {
+func (v *Visitor) VisitRecordType(ty *ast.RecordType) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v *Visitor) VisitRecordType(recordType *ast.RecordType) {
+func (v *Visitor) VisitEnumType(ty *ast.EnumType) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v *Visitor) VisitEnumType(enumType *ast.EnumType) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (v *Visitor) VisitNamedType(namedType *ast.NamedType) {
+func (v *Visitor) VisitNamedType(ty *ast.NamedType) {
 	//TODO implement me
 	panic("implement me")
 }
