@@ -14,13 +14,15 @@ var opcodes = [...]string{
 	Mul: "*",
 	Div: "div",
 
-	Load:  "load",
-	Store: "store",
+	Ld:  "load",
+	Str: "store",
 
-	Xor: "xor",
-	Or:  "|",
-	And: "&",
-	Shl: "<<",
+	Xor:  "^",
+	Or:   "|",
+	And:  "&",
+	Shl:  "<<",
+	LShr: ">>",
+	AShr: ">>>",
 
 	Call: "call",
 	Phi:  "phi",
@@ -48,9 +50,8 @@ const (
 	binop_end
 
 	memop_begin
-	Alloca
-	Load
-	Store
+	Ld
+	Str
 	memop_end
 
 	bit_binop_begin
