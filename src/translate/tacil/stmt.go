@@ -104,3 +104,14 @@ func (c ProcCallInstr) String() string {
 
 	return fmt.Sprintf("call %s(%s)", c.Callee.Name(), strings.Join(args, ", "))
 }
+
+// Store
+// -----------------------
+type Store struct {
+	Op    Opcode
+	Value Expr
+	Addr  Expr
+}
+
+func (Store) stmt()            {}
+func (s Store) String() string { return fmt.Sprintf("%s %s %s", s.Op, s.Value, s.Addr) }
