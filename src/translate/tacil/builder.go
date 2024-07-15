@@ -161,13 +161,6 @@ func (b *Builder) CreateRet(v Expr) *Return {
 	return ret
 }
 
-//func (b *Builder) CreateRetVoid() *Return {
-//	ret := CreateRetVoid()
-//	b.BB.instr.PushBack(ret)
-//
-//	return ret
-//}
-
 func (b *Builder) CreateCmp(pred Opcode, lhs, rhs Expr) Expr {
 	var (
 		ResTy Type
@@ -243,13 +236,12 @@ func (b *Builder) CreateAssign(Val, Dst Expr) *Assign {
 	return assign
 }
 
-//func (b *Builder) CreateLoad(ty Type, ptr Value, name string) *LoadInst {
-//	load := CreateLoad(ty, ptr, name)
-//	ptr.AddUse(load)
-//	b.BB.instr.PushBack(load)
-//
-//	return load
-//}
+func (b *Builder) CreateLoad(addr Expr) *Load {
+	load := CreateLoad(addr)
+	b.BB.instr.PushBack(load)
+
+	return load
+}
 
 func (b *Builder) CreateCondBr(cond Expr, ifTrue, ifFalse *BasicBlock) *CondBr {
 	br := CreateCondBr(cond, ifTrue, ifFalse)
@@ -271,13 +263,6 @@ func (b *Builder) CreateJmp(dst *BasicBlock) *Jump {
 
 	return jmp
 }
-
-//func (b *Builder) CreatePHI(ty Type, numIncomingValues uint, name string) *PHINode {
-//	phi := CreatePHINode(ty, numIncomingValues, name)
-//	b.BB.instr.PushBack(phi)
-//
-//	return phi
-//}
 
 func (b *Builder) CreateNeg(v Expr) Expr {
 	neg := b.CreateSub(GetNullValue(v.Type()), v)

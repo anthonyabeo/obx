@@ -229,8 +229,14 @@ type Load struct {
 	Addr Expr
 }
 
-func (l Load) expr() {}
+func CreateLoad(addr Expr) *Load {
+	return &Load{
+		Op:   Ld,
+		Addr: addr,
+	}
+}
 
+func (l Load) expr()            {}
 func (l Load) Name() string     { panic("implement me") }
 func (l Load) BaseName() string { panic("implement me") }
 func (l Load) SetName(string)   { panic("implement me") }

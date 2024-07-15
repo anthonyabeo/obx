@@ -113,5 +113,13 @@ type Store struct {
 	Addr  Expr
 }
 
+func CreateStore(addr, value Expr) *Store {
+	return &Store{
+		Op:    Str,
+		Value: value,
+		Addr:  addr,
+	}
+}
+
 func (Store) stmt()            {}
 func (s Store) String() string { return fmt.Sprintf("%s %s %s", s.Op, s.Value, s.Addr) }
