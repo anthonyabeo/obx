@@ -23,8 +23,14 @@ func (c ConstantInt) Name() string     { return strconv.Itoa(int(c.value)) }
 func (c ConstantInt) BaseName() string { return strconv.Itoa(int(c.value)) }
 func (c ConstantInt) SetName(string)   {}
 func (c ConstantInt) HasName() bool    { return false }
-func (c ConstantInt) Operand(int) Expr { panic("constants have no operands") }
-func (c ConstantInt) NumOperands() int { return 0 }
+func (c ConstantInt) Operand(i int) Expr {
+	if i != 1 {
+		panic("operand index of Temp must be 1")
+	}
+
+	return c
+}
+func (c ConstantInt) NumOperands() int { return 1 }
 func (c ConstantInt) Type() Type       { return c.ty }
 func (c ConstantInt) String() string   { return fmt.Sprintf("%d", c.value) }
 
@@ -49,10 +55,16 @@ func (t *Temp) Name() string     { return t.name }
 func (t *Temp) BaseName() string { return t.baseName }
 func (t *Temp) SetName(s string) { t.name = s }
 func (t *Temp) HasName() bool    { return true }
-func (t *Temp) NumOperands() int { return 0 }
-func (t *Temp) Operand(int) Expr { panic("temp has no operands") }
-func (t *Temp) String() string   { return t.name }
-func (t *Temp) Type() Type       { return t.ty }
+func (t *Temp) NumOperands() int { return 1 }
+func (t *Temp) Operand(i int) Expr {
+	if i != 1 {
+		panic("operand index of Temp must be 1")
+	}
+
+	return t
+}
+func (t *Temp) String() string { return t.name }
+func (t *Temp) Type() Type     { return t.ty }
 
 // BinaryOp
 // ----------------------------------------
