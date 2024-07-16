@@ -19,6 +19,8 @@ type Visitor struct {
 	scopes map[string]scope.Scope
 
 	symbols *tacil.SymbolTable
+
+	loopExitTarget *tacil.BasicBlock
 }
 
 func NewVisitor(scopes map[string]scope.Scope) *Visitor {
@@ -113,6 +115,8 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 	case token.EQUAL:
 		instr = v.builder.CreateCmp(tacil.Eq, expr.Left.Value(), expr.Right.Value())
 	case token.LESS:
+		instr = v.builder.CreateCmp(tacil.Lt, expr.Left.Value(), expr.Right.Value())
+	case token.LEQ:
 		instr = v.builder.CreateCmp(tacil.Le, expr.Left.Value(), expr.Right.Value())
 	case token.GEQ:
 		instr = v.builder.CreateCmp(tacil.Ge, expr.Left.Value(), expr.Right.Value())
@@ -223,7 +227,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 	BB := v.builder.GetInsertBlock()
 
 	ThenBB := tacil.CreateBasicBlock("if.then", BB.Parent())
-	ContBB := tacil.CreateBasicBlock("cont", BB.Parent())
+	ContBB := tacil.CreateBasicBlock("if.cont", BB.Parent())
 
 	// if-then only. No else or elsif paths
 	if len(stmt.ElsePath) == 0 && len(stmt.ElseIfBranches) == 0 {
@@ -275,7 +279,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 			for _, s := range elif.ThenPath {
 				s.Accept(v)
 			}
-			ElifThen = v.builder.GetInsertBlock()
+			v.builder.SetInsertPoint(ElifThen)
 			v.builder.CreateJmp(ContBB)
 
 			ElsifBB = ElifElse
@@ -299,7 +303,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 		for _, s := range stmt.ElsePath {
 			s.Accept(v)
 		}
-		ElseBB = v.builder.GetInsertBlock()
+		v.builder.SetInsertPoint(ElseBB)
 		v.builder.CreateJmp(ContBB)
 	}
 
@@ -419,8 +423,21 @@ func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 }
 
 func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
-	//TODO implement me
-	panic("implement me")
+	BB := v.builder.GetInsertBlock()
+
+	Loop := tacil.CreateBasicBlock("loop", BB.Parent())
+	NextBB := tacil.CreateBasicBlock("next", BB.Parent())
+	v.loopExitTarget = NextBB
+
+	v.builder.CreateJmp(Loop)
+
+	v.builder.SetInsertPoint(Loop)
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
+	v.builder.CreateJmp(Loop)
+
+	v.builder.SetInsertPoint(NextBB)
 }
 
 func (v *Visitor) VisitCaseStmt(stmt *ast.CaseStmt) {
@@ -477,8 +494,11 @@ func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
 }
 
 func (v *Visitor) VisitExitStmt(stmt *ast.ExitStmt) {
-	//TODO implement me
-	panic("implement me")
+	if v.loopExitTarget == nil {
+		panic("[internal] some loop statement does not contain an exit statement")
+	}
+
+	v.builder.CreateJmp(v.loopExitTarget)
 }
 
 func (v *Visitor) VisitWithStmt(stmt *ast.WithStmt) {
