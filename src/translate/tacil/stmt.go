@@ -8,8 +8,9 @@ import (
 // Assign
 // --------------------------------
 type Assign struct {
-	Dst   Expr
-	Value Expr
+	Dst    Expr
+	Value  Expr
+	parent *BasicBlock
 }
 
 func CreateAssign(val, dst Expr) *Assign {
@@ -19,14 +20,18 @@ func CreateAssign(val, dst Expr) *Assign {
 	}
 }
 
-func (Assign) stmt()            {}
-func (a Assign) String() string { return fmt.Sprintf("%s := %s", a.Dst, a.Value) }
+func (*Assign) stmt()                          {}
+func (a *Assign) Parent() *BasicBlock          { return a.parent }
+func (a *Assign) SetParent(parent *BasicBlock) { a.parent = parent }
+func (a *Assign) String() string               { return fmt.Sprintf("%s := %s", a.Dst, a.Value) }
 
 // Return
 // -----------------------------
 type Return struct {
 	Op    Opcode
 	Value Expr
+
+	parent *BasicBlock
 }
 
 func CreateRet(v Expr) *Return {
@@ -36,14 +41,18 @@ func CreateRet(v Expr) *Return {
 	}
 }
 
-func (r Return) stmt()          {}
-func (r Return) String() string { return fmt.Sprintf("ret %s", r.Value) }
+func (*Return) stmt()                          {}
+func (r *Return) Parent() *BasicBlock          { return r.parent }
+func (r *Return) SetParent(parent *BasicBlock) { r.parent = parent }
+func (r *Return) String() string               { return fmt.Sprintf("ret %s", r.Value) }
 
 // Jump
 // --------------------------------
 type Jump struct {
 	Op  Opcode
 	Dst *BasicBlock
+
+	parent *BasicBlock
 }
 
 func CreateJmp(dst *BasicBlock) *Jump {
@@ -53,8 +62,10 @@ func CreateJmp(dst *BasicBlock) *Jump {
 	}
 }
 
-func (Jump) stmt()            {}
-func (j Jump) String() string { return fmt.Sprintf("jmp label %%%s", j.Dst.name) }
+func (*Jump) stmt()                          {}
+func (j *Jump) Parent() *BasicBlock          { return j.parent }
+func (j *Jump) SetParent(parent *BasicBlock) { j.parent = parent }
+func (j *Jump) String() string               { return fmt.Sprintf("jmp label %%%s", j.Dst.name) }
 
 // CondBr
 // ----------
@@ -63,6 +74,8 @@ type CondBr struct {
 	Cond    Expr
 	IfTrue  *BasicBlock
 	IfFalse *BasicBlock
+
+	parent *BasicBlock
 }
 
 func CreateCondBr(cond Expr, ifThen, ifElse *BasicBlock) *CondBr {
@@ -74,8 +87,10 @@ func CreateCondBr(cond Expr, ifThen, ifElse *BasicBlock) *CondBr {
 	}
 }
 
-func (CondBr) stmt() {}
-func (c CondBr) String() string {
+func (*CondBr) stmt()                          {}
+func (c *CondBr) Parent() *BasicBlock          { return c.parent }
+func (c *CondBr) SetParent(parent *BasicBlock) { c.parent = parent }
+func (c *CondBr) String() string {
 	return fmt.Sprintf("br %s, label %%%s, label %%%s", c.Cond.Name(), c.IfTrue.name, c.IfFalse.name)
 }
 
@@ -85,6 +100,8 @@ type ProcCallInstr struct {
 	Op     Opcode
 	Callee Expr
 	Args   []Expr
+
+	parent *BasicBlock
 }
 
 func CreateProcCall(callee Expr, args []Expr) *ProcCallInstr {
@@ -95,8 +112,10 @@ func CreateProcCall(callee Expr, args []Expr) *ProcCallInstr {
 	}
 }
 
-func (c ProcCallInstr) stmt() {}
-func (c ProcCallInstr) String() string {
+func (*ProcCallInstr) stmt()                          {}
+func (c *ProcCallInstr) Parent() *BasicBlock          { return c.parent }
+func (c *ProcCallInstr) SetParent(parent *BasicBlock) { c.parent = parent }
+func (c *ProcCallInstr) String() string {
 	var args []string
 	for _, op := range c.Args {
 		args = append(args, op.Name())
@@ -111,6 +130,8 @@ type Store struct {
 	Op    Opcode
 	Value Expr
 	Addr  Expr
+
+	parent *BasicBlock
 }
 
 func CreateStore(addr, value Expr) *Store {
@@ -121,5 +142,7 @@ func CreateStore(addr, value Expr) *Store {
 	}
 }
 
-func (Store) stmt()            {}
-func (s Store) String() string { return fmt.Sprintf("%s %s %s", s.Op, s.Value, s.Addr) }
+func (*Store) stmt()                          {}
+func (s *Store) Parent() *BasicBlock          { return s.parent }
+func (s *Store) SetParent(parent *BasicBlock) { s.parent = parent }
+func (s *Store) String() string               { return fmt.Sprintf("%s %s %s", s.Op, s.Value, s.Addr) }

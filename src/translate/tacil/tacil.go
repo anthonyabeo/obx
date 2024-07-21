@@ -98,6 +98,8 @@ type Expr interface {
 
 type Stmt interface {
 	stmt()
+	Parent() *BasicBlock
+	SetParent(*BasicBlock)
 	fmt.Stringer
 }
 

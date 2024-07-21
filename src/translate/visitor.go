@@ -493,7 +493,7 @@ func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
 	v.builder.SetInsertPoint(ContBB)
 }
 
-func (v *Visitor) VisitExitStmt(stmt *ast.ExitStmt) {
+func (v *Visitor) VisitExitStmt(*ast.ExitStmt) {
 	if v.loopExitTarget == nil {
 		panic("[internal] some loop statement does not contain an exit statement")
 	}
