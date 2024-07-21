@@ -23,7 +23,10 @@ func (s SSA) Run(program *tacil.Program, symbols *tacil.SymbolTable) {
 
 			Globals, Blocks := ComputeGlobalNames(cfg)
 			InsertPhiFunctions(cfg, Globals, Blocks, DF, symbols)
-			Rename(Globals, cfg)
+			defs, uses := Rename(Globals, cfg)
+
+			cfg.Defs = defs
+			cfg.Uses = uses
 		}
 	}
 }
@@ -104,17 +107,21 @@ func InsertPhiFunctions(
 
 // Rename
 // -----------------------------
-func Rename(Globals map[string]bool, cfg *tacil.ControlFlowGraph) {
+func Rename(Globals map[string]bool, cfg *tacil.ControlFlowGraph) (map[string]tacil.Stmt, map[string]adt.Set[tacil.Stmt]) {
 	counter := make(map[string]int)
 	stack := make(map[string]*adt.Stack[string])
 	vst := make(map[string]bool)
+	defs := map[string]tacil.Stmt{}
+	uses := map[string]adt.Set[tacil.Stmt]{}
 
 	for name := range Globals {
 		counter[name] = 0
 		stack[name] = adt.NewStack[string]()
 	}
 
-	rename(Globals, vst, cfg.Entry, counter, stack, cfg)
+	rename(Globals, vst, cfg.Entry, counter, stack, cfg, defs, uses)
+
+	return defs, uses
 }
 
 func rename(
@@ -124,6 +131,8 @@ func rename(
 	counter map[string]int,
 	stack map[string]*adt.Stack[string],
 	cfg *tacil.ControlFlowGraph,
+	defs map[string]tacil.Stmt,
+	uses map[string]adt.Set[tacil.Stmt],
 ) {
 
 	if vst[block.Name()] {
@@ -134,6 +143,8 @@ func rename(
 	for name, phi := range block.Phi {
 		nom := newName(name, counter, stack)
 		phi.Dst.SetName(nom)
+
+		defs[nom] = phi
 	}
 
 	for i := block.Instr().Front(); i != nil; i = i.Next() {
@@ -146,11 +157,18 @@ func rename(
 			operand := assign.Value.Operand(j)
 			if Globals[operand.Name()] {
 				operand.SetName(stack[operand.Name()].Top())
+
+				if uses[stack[operand.BaseName()].Top()] == nil {
+					uses[stack[operand.BaseName()].Top()] = adt.NewHashSet[tacil.Stmt]()
+				}
+				uses[stack[operand.BaseName()].Top()].Add(assign)
 			}
 		}
 
 		if Globals[assign.Dst.Name()] {
-			assign.Dst.SetName(newName(assign.Dst.Name(), counter, stack))
+			nom := newName(assign.Dst.Name(), counter, stack)
+			assign.Dst.SetName(nom)
+			defs[nom] = assign
 		}
 	}
 
@@ -163,6 +181,10 @@ func rename(
 					for _, inc := range phi.Incoming {
 						if inc.Blk == block {
 							inc.V.SetName(stack[name].Top())
+							if uses[stack[name].Top()] == nil {
+								uses[stack[name].Top()] = adt.NewHashSet[tacil.Stmt]()
+							}
+							uses[stack[name].Top()].Add(assign)
 						}
 					}
 				}
@@ -170,7 +192,7 @@ func rename(
 		}
 
 		for _, s := range cfg.Succ[block.Name()].Elems() {
-			rename(Globals, vst, s, counter, stack, cfg)
+			rename(Globals, vst, s, counter, stack, cfg, defs, uses)
 		}
 	}
 
@@ -184,6 +206,8 @@ func rename(
 			continue
 		}
 	}
+
+	return
 }
 
 func newName(name string, counter map[string]int, stack map[string]*adt.Stack[string]) string {
