@@ -158,6 +158,8 @@ func (b *Builder) CreateRet(v Expr) *Return {
 
 	b.BB.instr.PushBack(ret)
 
+	ret.parent = b.BB
+
 	return ret
 }
 
@@ -226,12 +228,16 @@ func (b *Builder) CreateProcCall(callee Expr, args []Expr) *ProcCallInstr {
 	call := CreateProcCall(callee, args)
 	b.BB.instr.PushBack(call)
 
+	call.parent = b.BB
+
 	return call
 }
 
 func (b *Builder) CreateAssign(Val, Dst Expr) *Assign {
 	assign := CreateAssign(Val, Dst)
 	b.BB.instr.PushBack(assign)
+
+	assign.parent = b.BB
 
 	return assign
 }
@@ -251,6 +257,8 @@ func (b *Builder) CreateCondBr(cond Expr, ifTrue, ifFalse *BasicBlock) *CondBr {
 	b.CFG.AddPred(ifTrue.name, b.BB)
 	b.CFG.AddPred(ifFalse.name, b.BB)
 
+	br.parent = b.BB
+
 	return br
 }
 
@@ -260,6 +268,8 @@ func (b *Builder) CreateJmp(dst *BasicBlock) *Jump {
 
 	b.CFG.AddSucc(b.BB.name, dst)
 	b.CFG.AddPred(dst.name, b.BB)
+
+	jmp.parent = b.BB
 
 	return jmp
 }
