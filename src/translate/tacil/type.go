@@ -225,3 +225,17 @@ func (a ArrayType) IsPtrTy() bool     { return false }
 func (a ArrayType) IsFuncTy() bool    { return false }
 func (a ArrayType) IsVoidTy() bool    { return false }
 func (a ArrayType) IsArrayTy() bool   { return true }
+
+// PtrTy
+// -------------------------------------------
+type PtrTy struct {
+	To Type
+}
+
+func (p PtrTy) String() string    { return fmt.Sprintf("%s*", p.To) }
+func (p PtrTy) ty()               {}
+func (p PtrTy) IsIntegerTy() bool { return false }
+func (p PtrTy) IsPtrTy() bool     { return true }
+func (p PtrTy) IsFuncTy() bool    { return false }
+func (p PtrTy) IsVoidTy() bool    { return false }
+func (p PtrTy) IsArrayTy() bool   { return false }
