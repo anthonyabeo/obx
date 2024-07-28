@@ -581,8 +581,8 @@ func (v *Visitor) VisitArrayType(ty *ast.ArrayType) {
 }
 
 func (v *Visitor) VisitPointerType(ty *ast.PointerType) {
-	//TODO implement me
-	panic("implement me")
+	ty.Base.Accept(v)
+	ty.IRTy = &tacil.PtrTy{To: ty.Base.IRType()}
 }
 
 func (v *Visitor) VisitProcType(ty *ast.ProcType) {
