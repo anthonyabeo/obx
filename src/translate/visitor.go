@@ -541,8 +541,25 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 }
 
 func (v *Visitor) VisitConstDecl(decl *ast.ConstDecl) {
-	//TODO implement me
-	panic("implement me")
+	decl.Value.Accept(v)
+	ty := decl.Value.Value().Type()
+
+	if sym := v.env.Lookup(decl.Name.Name); sym != nil {
+		tmp := tacil.NewTemp(tacil.NextTemp(), ty)
+		gp := tacil.NewTemp("$gp", tacil.Int64Type)
+		offset := tacil.NewConstantInt(ty, uint64(sym.Offset()), false)
+
+		v.builder.CreateAssign(
+			tacil.NewBinaryOp(ty, tacil.Add, gp, offset),
+			tmp,
+		)
+
+		v.builder.CreateAssign(
+			tacil.CreateLoad(tmp),
+			tacil.NewTemp(decl.Name.Name, decl.Value.Value().Type()),
+		)
+	}
+
 }
 
 func (v *Visitor) VisitTypeDecl(decl *ast.TypeDecl) {
