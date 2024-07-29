@@ -521,6 +521,19 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 	for _, id := range decl.IdentList {
 		if sym := v.env.Lookup(id.Name); sym != nil {
 
+			tmp := tacil.NewTemp(tacil.NextTemp(), decl.Type.IRType())
+			sp := tacil.NewTemp("$sp", tacil.Int64Type)
+			offset := tacil.NewConstantInt(decl.Type.IRType(), uint64(sym.Offset()), false)
+			v.builder.CreateAssign(
+				tacil.NewBinaryOp(decl.Type.IRType(), tacil.Add, sp, offset),
+				tmp,
+			)
+
+			v.builder.CreateAssign(
+				tacil.CreateLoad(tmp),
+				tacil.NewTemp(id.Name, decl.Type.IRType()),
+			)
+
 			obj := tacil.CreateVariableObject(id.Name, decl.Type.IRType(), sym.Offset(), tacil.Var)
 			v.symbols.Insert(obj)
 		}
