@@ -44,7 +44,7 @@ func ComputeGlobalNames(cfg *tacil.ControlFlowGraph) (map[string]bool, map[strin
 			if assign, ok := i.Value.(*tacil.Assign); ok {
 				for i := 1; i < assign.Value.NumOperands()+1; i++ {
 					operand := assign.Value.Operand(i)
-					if tmp, ok := operand.(*tacil.Temp); ok {
+					if tmp, ok := operand.(*tacil.Temp); ok && !tacil.PredeclaredRegisters[tmp.Name()] {
 						if !VarKill[tmp.Name()] {
 							Globals[tmp.Name()] = true
 						}
