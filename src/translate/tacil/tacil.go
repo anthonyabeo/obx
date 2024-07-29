@@ -111,3 +111,9 @@ func NextTemp() string {
 
 	return t
 }
+
+var PredeclaredRegisters = map[string]bool{
+	"$sp": true,
+	"$gp": true,
+	"$fp": true,
+}
