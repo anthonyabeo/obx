@@ -9,9 +9,9 @@ import (
 // ConstantInt ...
 // --------------------
 type ConstantInt struct {
-	value  uint64
-	signed bool
-	ty     Type
+	Value  uint64
+	Signed bool
+	Ty     Type
 }
 
 func NewConstantInt(ty Type, value uint64, signed bool) *ConstantInt {
@@ -19,8 +19,8 @@ func NewConstantInt(ty Type, value uint64, signed bool) *ConstantInt {
 }
 
 func (c ConstantInt) expr()            {}
-func (c ConstantInt) Name() string     { return strconv.Itoa(int(c.value)) }
-func (c ConstantInt) BaseName() string { return strconv.Itoa(int(c.value)) }
+func (c ConstantInt) Name() string     { return strconv.Itoa(int(c.Value)) }
+func (c ConstantInt) BaseName() string { return strconv.Itoa(int(c.Value)) }
 func (c ConstantInt) SetName(string)   {}
 func (c ConstantInt) HasName() bool    { return false }
 func (c ConstantInt) Operand(i int) Expr {
@@ -31,8 +31,8 @@ func (c ConstantInt) Operand(i int) Expr {
 	return c
 }
 func (c ConstantInt) NumOperands() int { return 1 }
-func (c ConstantInt) Type() Type       { return c.ty }
-func (c ConstantInt) String() string   { return fmt.Sprintf("%d", c.value) }
+func (c ConstantInt) Type() Type       { return c.Ty }
+func (c ConstantInt) String() string   { return fmt.Sprintf("%d", c.Value) }
 
 // Temp
 // --------------------------------------
