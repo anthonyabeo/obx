@@ -67,14 +67,16 @@ func (v *Visitor) VisitModule(m *ast.Module) {
 
 	var (
 		EntryBB = tacil.CreateBasicBlock("entry", Main)
+		ExitBB  = tacil.CreateBasicBlock("exit", Main)
 		MainBB  = tacil.CreateBasicBlock("main", Main)
 	)
 
 	v.builder.CFG = Main.CFG()
+	v.builder.CFG.Entry = EntryBB
+	v.builder.CFG.Exit = ExitBB
 
 	v.builder.SetInsertPoint(EntryBB)
 	v.builder.CreateJmp(MainBB)
-	v.builder.CFG.Entry = EntryBB
 
 	v.builder.SetInsertPoint(MainBB)
 
@@ -87,6 +89,8 @@ func (v *Visitor) VisitModule(m *ast.Module) {
 	}
 
 	v.builder.CreateRet(tacil.NewConstantInt(tacil.Int32Type, 0, true))
+
+	v.builder.CreateJmp(ExitBB)
 }
 
 func (v *Visitor) VisitDefinition(def *ast.Definition) {
