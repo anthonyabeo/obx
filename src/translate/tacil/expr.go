@@ -6,6 +6,58 @@ import (
 	"strings"
 )
 
+// ConstantBool ...
+// --------------------
+type ConstantBool struct {
+	Value int
+	Ty    *Int1
+}
+
+func NewConstBool(value int) *ConstantBool {
+	return &ConstantBool{
+		Value: value,
+		Ty:    Int1Type,
+	}
+}
+func (c ConstantBool) expr() {}
+func (c ConstantBool) Name() string {
+	if c.Value != 1 && c.Value != 0 {
+		panic("value of boolean type must be 0 or 1")
+	}
+
+	if c.Value == 1 {
+		return "true"
+	}
+
+	return "false"
+}
+func (c ConstantBool) BaseName() string {
+	if c.Value != 1 && c.Value != 0 {
+		panic("value of boolean type must be 0 or 1")
+	}
+
+	if c.Value == 1 {
+		return "true"
+	}
+
+	return "false"
+}
+func (c ConstantBool) SetName(string) { panic("implement me") }
+func (c ConstantBool) HasName() bool  { return false }
+func (c ConstantBool) Operand(i int) Expr {
+	if i != 1 {
+		panic("operand index of ConstantBool must be 1")
+	}
+
+	return c
+}
+func (c ConstantBool) NumOperands() int { return 1 }
+func (c ConstantBool) Type() Type       { return c.Ty }
+func (c ConstantBool) String() string {
+	//TODO implement me
+	panic("implement me")
+}
+
 // ConstantInt ...
 // --------------------
 type ConstantInt struct {
