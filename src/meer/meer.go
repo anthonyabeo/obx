@@ -21,12 +21,13 @@ var opcodes = [...]string{
 
 	Call: "call",
 
-	Eq: "==",
-	Ne: "!=",
-	Gt: ">",
-	Ge: ">=",
-	Lt: "<",
-	Le: "<=",
+	Eq:  "==",
+	Ne:  "!=",
+	Gt:  ">",
+	Ge:  ">=",
+	Lt:  "<",
+	Le:  "<=",
+	Not: "~",
 
 	Br:  "br",
 	Ret: "ret",
@@ -51,6 +52,7 @@ const (
 	Ge
 	Lt
 	Le
+	Not
 
 	Br
 	Ret
@@ -60,11 +62,11 @@ const (
 // Program ...
 // ------------------
 type Program struct {
-	Units []*ProgramUnit
+	Units map[string]*ProgramUnit
 }
 
 func NewProgram() *Program {
-	return &Program{}
+	return &Program{Units: map[string]*ProgramUnit{}}
 }
 
 func (p *Program) String() string {

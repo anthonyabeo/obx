@@ -82,10 +82,10 @@ func (b *BinaryOp) String() string   { return fmt.Sprintf("%s %s %s", b.X, b.Op,
 // ----------------------------------------
 type UnaryOp struct {
 	Op Opcode
-	X  Operand
+	X  Expression
 }
 
-func NewUnaryOp(op Opcode, x, y Operand) *UnaryOp {
+func NewUnaryOp(op Opcode, x Expression) *UnaryOp {
 	return &UnaryOp{
 		Op: op,
 		X:  x,
@@ -93,7 +93,7 @@ func NewUnaryOp(op Opcode, x, y Operand) *UnaryOp {
 }
 
 func (*UnaryOp) expr() {}
-func (b *UnaryOp) Operand(i int) Operand {
+func (b *UnaryOp) Operand(i int) Expression {
 	switch i {
 	case 1:
 		return b.X

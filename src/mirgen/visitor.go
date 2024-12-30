@@ -27,7 +27,7 @@ func (v *Visitor) Translate(ob *ast.Oberon, order []string) *meer.Program {
 	for _, name := range order {
 		unit := ob.Units()[name]
 		unit.Accept(v)
-		program.Units = append(program.Units, v.PrgUnit)
+		program.Units[name] = v.PrgUnit
 	}
 
 	return program
@@ -109,8 +109,20 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 }
 
 func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
-	//TODO implement me
-	panic("implement me")
+	expr.X.Accept(v)
+
+	switch expr.Op {
+	case token.MINUS:
+		expr.MirExpr = meer.NewUnaryOp(meer.Sub, expr.X.MirValue())
+
+	case token.NOT:
+		expr.MirExpr = meer.NewUnaryOp(meer.Not, expr.X.MirValue())
+
+	case token.PLUS:
+		expr.MirExpr = expr.X.MirValue()
+	default:
+		panic(fmt.Sprintf("[internal] invalid unary operator '%s'", expr.Op))
+	}
 }
 
 func (v *Visitor) VisitQualifiedIdent(ident *ast.QualifiedIdent) {
@@ -151,8 +163,13 @@ func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
 }
 
 func (v *Visitor) VisitReturnStmt(stmt *ast.ReturnStmt) {
-	//TODO implement me
-	panic("implement me")
+	var value meer.Expression
+	if stmt.Value != nil {
+		stmt.Value.Accept(v)
+		value = stmt.Value.MirValue()
+	}
+
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, meer.CreateRet(value))
 }
 
 func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
@@ -161,8 +178,19 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 }
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
-	//TODO implement me
-	panic("implement me")
+	Body := meer.NewLabel("repeat.body")
+	Cont := meer.NewLabel("cont")
+
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, Body)
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
+
+	stmt.BoolExpr.Accept(v)
+	CondBr := meer.CreateCondBrInst(stmt.BoolExpr.MirValue(), Body, Cont)
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, CondBr)
+
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, Cont)
 }
 
 func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
