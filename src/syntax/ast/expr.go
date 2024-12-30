@@ -3,6 +3,7 @@ package ast
 import (
 	"bytes"
 	"fmt"
+	"github.com/anthonyabeo/obx/src/meer"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/sema/types"
@@ -29,6 +30,7 @@ type (
 		Val      string          // literal string; e.g. 42, 0x7f, 3.14, 1e-9, 2.4i, 'a', '\x7f', "foo" or `\m\n\o`
 		EType    types.Type
 		IRExpr   tacil.Expr
+		MirExpr  meer.Expression
 	}
 
 	BinaryExpr struct {
@@ -37,6 +39,7 @@ type (
 		Op          token.Token // operator
 		EType       types.Type
 		IRExpr      tacil.Expr
+		MirExpr     meer.Expression
 	}
 
 	FuncCall struct {
@@ -51,8 +54,9 @@ type (
 		Name    string
 		IProps  IdentProps
 
-		EType  types.Type
-		IRExpr tacil.Expr
+		EType   types.Type
+		IRExpr  tacil.Expr
+		MirExpr meer.Expression
 	}
 
 	QualifiedIdent struct {
@@ -61,6 +65,7 @@ type (
 
 		EType   types.Type
 		IRValue tacil.Expr
+		MirExpr meer.Expression
 	}
 
 	ExprRange struct {
@@ -91,6 +96,7 @@ type (
 		Selector       Selector
 		EType          types.Type
 		IRExpr         tacil.Expr
+		MirExpr        meer.Expression
 	}
 
 	BadExpr struct {
@@ -99,29 +105,32 @@ type (
 	}
 )
 
-func (e *ExprRange) String() string       { return fmt.Sprintf("%s..%s", e.Beg, e.Ed) }
-func (e *ExprRange) Pos() *token.Position { return e.Beg.Pos() }
-func (e *ExprRange) End() *token.Position { return e.Ed.Pos() }
-func (e *ExprRange) Accept(vst Visitor)   { vst.VisitExprRange(e) }
-func (e *ExprRange) expr()                {}
-func (e *ExprRange) Type() types.Type     { return e.EType }
-func (e *ExprRange) Value() tacil.Expr    { panic("") }
+func (e *ExprRange) String() string            { return fmt.Sprintf("%s..%s", e.Beg, e.Ed) }
+func (e *ExprRange) Pos() *token.Position      { return e.Beg.Pos() }
+func (e *ExprRange) End() *token.Position      { return e.Ed.Pos() }
+func (e *ExprRange) Accept(vst Visitor)        { vst.VisitExprRange(e) }
+func (e *ExprRange) expr()                     {}
+func (e *ExprRange) Type() types.Type          { return e.EType }
+func (e *ExprRange) Value() tacil.Expr         { panic("") }
+func (e *ExprRange) MirValue() meer.Expression { panic("") }
 
-func (b *BasicLit) expr()                {}
-func (b *BasicLit) Pos() *token.Position { return b.ValuePos }
-func (b *BasicLit) End() *token.Position { panic("not implemented") }
-func (b *BasicLit) String() string       { return b.Val }
-func (b *BasicLit) Accept(vst Visitor)   { vst.VisitBasicLit(b) }
-func (b *BasicLit) Type() types.Type     { return b.EType }
-func (b *BasicLit) Value() tacil.Expr    { return b.IRExpr }
+func (b *BasicLit) expr()                     {}
+func (b *BasicLit) Pos() *token.Position      { return b.ValuePos }
+func (b *BasicLit) End() *token.Position      { panic("not implemented") }
+func (b *BasicLit) String() string            { return b.Val }
+func (b *BasicLit) Accept(vst Visitor)        { vst.VisitBasicLit(b) }
+func (b *BasicLit) Type() types.Type          { return b.EType }
+func (b *BasicLit) Value() tacil.Expr         { return b.IRExpr }
+func (b *BasicLit) MirValue() meer.Expression { return b.MirExpr }
 
-func (b *BinaryExpr) expr()                {}
-func (b *BinaryExpr) Pos() *token.Position { return b.OpPos }
-func (b *BinaryExpr) End() *token.Position { return b.Right.End() }
-func (b *BinaryExpr) String() string       { return fmt.Sprintf("%v %v %v", b.Left, b.Op, b.Right) }
-func (b *BinaryExpr) Type() types.Type     { return b.EType }
-func (b *BinaryExpr) Accept(vst Visitor)   { vst.VisitBinaryExpr(b) }
-func (b *BinaryExpr) Value() tacil.Expr    { return b.IRExpr }
+func (b *BinaryExpr) expr()                     {}
+func (b *BinaryExpr) Pos() *token.Position      { return b.OpPos }
+func (b *BinaryExpr) End() *token.Position      { return b.Right.End() }
+func (b *BinaryExpr) String() string            { return fmt.Sprintf("%v %v %v", b.Left, b.Op, b.Right) }
+func (b *BinaryExpr) Type() types.Type          { return b.EType }
+func (b *BinaryExpr) Accept(vst Visitor)        { vst.VisitBinaryExpr(b) }
+func (b *BinaryExpr) Value() tacil.Expr         { return b.IRExpr }
+func (b *BinaryExpr) MirValue() meer.Expression { return b.MirExpr }
 
 func (f *FuncCall) Pos() *token.Position { return f.Callee.Pos() }
 func (f *FuncCall) End() (pos *token.Position) {
@@ -147,7 +156,8 @@ func (f *FuncCall) String() string {
 
 	return fmt.Sprintf("%s(%s)", f.Callee, strings.Join(args, ", "))
 }
-func (f *FuncCall) Value() tacil.Expr { panic("") }
+func (f *FuncCall) Value() tacil.Expr         { panic("") }
+func (f *FuncCall) MirValue() meer.Expression { panic("") }
 
 func (id *Ident) Pos() *token.Position { return id.NamePos }
 func (id *Ident) End() *token.Position {
@@ -171,19 +181,21 @@ func (id *Ident) String() string {
 
 	return buf.String()
 }
-func (id *Ident) expr()              {}
-func (id *Ident) Accept(vst Visitor) { vst.VisitIdentifier(id) }
-func (id *Ident) Props() IdentProps  { return id.IProps }
-func (id *Ident) Type() types.Type   { return id.EType }
-func (id *Ident) Value() tacil.Expr  { return id.IRExpr }
+func (id *Ident) expr()                     {}
+func (id *Ident) Accept(vst Visitor)        { vst.VisitIdentifier(id) }
+func (id *Ident) Props() IdentProps         { return id.IProps }
+func (id *Ident) Type() types.Type          { return id.EType }
+func (id *Ident) Value() tacil.Expr         { return id.IRExpr }
+func (id *Ident) MirValue() meer.Expression { return id.MirExpr }
 
-func (q *QualifiedIdent) Pos() *token.Position { return q.Module.Pos() }
-func (q *QualifiedIdent) End() *token.Position { panic("not implemented") }
-func (q *QualifiedIdent) Type() types.Type     { return q.EType }
-func (q *QualifiedIdent) Accept(vst Visitor)   { vst.VisitQualifiedIdent(q) }
-func (q *QualifiedIdent) expr()                {}
-func (q *QualifiedIdent) String() string       { return fmt.Sprintf("%v::%v", q.Module, q.Sel) }
-func (q *QualifiedIdent) Value() tacil.Expr    { panic("") }
+func (q *QualifiedIdent) Pos() *token.Position      { return q.Module.Pos() }
+func (q *QualifiedIdent) End() *token.Position      { panic("not implemented") }
+func (q *QualifiedIdent) Type() types.Type          { return q.EType }
+func (q *QualifiedIdent) Accept(vst Visitor)        { vst.VisitQualifiedIdent(q) }
+func (q *QualifiedIdent) expr()                     {}
+func (q *QualifiedIdent) String() string            { return fmt.Sprintf("%v::%v", q.Module, q.Sel) }
+func (q *QualifiedIdent) Value() tacil.Expr         { panic("") }
+func (q *QualifiedIdent) MirValue() meer.Expression { return q.MirExpr }
 
 func (s *Set) expr() {}
 func (s *Set) String() string {
@@ -194,19 +206,21 @@ func (s *Set) String() string {
 
 	return fmt.Sprintf("{%s}", strings.Join(elems, ", "))
 }
-func (s *Set) Pos() *token.Position { panic("not implemented") }
-func (s *Set) End() *token.Position { panic("not implemented") }
-func (s *Set) Accept(vst Visitor)   { vst.VisitSet(s) }
-func (s *Set) Type() types.Type     { return s.EType }
-func (s *Set) Value() tacil.Expr    { panic("") }
+func (s *Set) Pos() *token.Position      { panic("not implemented") }
+func (s *Set) End() *token.Position      { panic("not implemented") }
+func (s *Set) Accept(vst Visitor)        { vst.VisitSet(s) }
+func (s *Set) Type() types.Type          { return s.EType }
+func (s *Set) Value() tacil.Expr         { panic("") }
+func (s *Set) MirValue() meer.Expression { panic("") }
 
-func (u *UnaryExpr) Pos() *token.Position { return u.OpPos }
-func (u *UnaryExpr) End() *token.Position { return u.X.End() }
-func (u *UnaryExpr) Type() types.Type     { return u.EType }
-func (u *UnaryExpr) Accept(vst Visitor)   { vst.VisitUnaryExpr(u) }
-func (u *UnaryExpr) expr()                {}
-func (u *UnaryExpr) String() string       { return fmt.Sprintf("%v%v", u.Op, u.X) }
-func (u *UnaryExpr) Value() tacil.Expr    { panic("") }
+func (u *UnaryExpr) Pos() *token.Position      { return u.OpPos }
+func (u *UnaryExpr) End() *token.Position      { return u.X.End() }
+func (u *UnaryExpr) Type() types.Type          { return u.EType }
+func (u *UnaryExpr) Accept(vst Visitor)        { vst.VisitUnaryExpr(u) }
+func (u *UnaryExpr) expr()                     {}
+func (u *UnaryExpr) String() string            { return fmt.Sprintf("%v%v", u.Op, u.X) }
+func (u *UnaryExpr) Value() tacil.Expr         { panic("") }
+func (u *UnaryExpr) MirValue() meer.Expression { panic("") }
 
 func (d *Designator) Pos() *token.Position       { return d.QPos }
 func (d *Designator) End() (pos *token.Position) { panic("not implemented") }
@@ -221,15 +235,17 @@ func (d *Designator) String() string {
 
 	return s
 }
-func (d *Designator) Value() tacil.Expr { return d.IRExpr }
+func (d *Designator) Value() tacil.Expr         { return d.IRExpr }
+func (d *Designator) MirValue() meer.Expression { return d.MirExpr }
 
-func (b *BadExpr) Pos() *token.Position { return b.From }
-func (b *BadExpr) End() *token.Position { return b.To }
-func (b *BadExpr) Accept(Visitor)       { panic("not implemented") }
-func (b *BadExpr) Type() types.Type     { return nil }
-func (b *BadExpr) expr()                {}
-func (b *BadExpr) String() string       { panic("not implemented") }
-func (b *BadExpr) Value() tacil.Expr    { panic("not implemented") }
+func (b *BadExpr) Pos() *token.Position      { return b.From }
+func (b *BadExpr) End() *token.Position      { return b.To }
+func (b *BadExpr) Accept(Visitor)            { panic("not implemented") }
+func (b *BadExpr) Type() types.Type          { return nil }
+func (b *BadExpr) expr()                     {}
+func (b *BadExpr) String() string            { panic("not implemented") }
+func (b *BadExpr) Value() tacil.Expr         { panic("not implemented") }
+func (b *BadExpr) MirValue() meer.Expression { panic("not implemented") }
 
 // Selectors
 // ---------------------

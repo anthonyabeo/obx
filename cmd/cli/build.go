@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/mirgen"
 	"log"
 	"os"
 	"path/filepath"
@@ -10,14 +11,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/anthonyabeo/obx/src/diagnostics"
-	"github.com/anthonyabeo/obx/src/opt"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/lexer"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 	"github.com/anthonyabeo/obx/src/syntax/token"
-	"github.com/anthonyabeo/obx/src/translate"
 )
 
 var buildArgs struct {
@@ -34,8 +33,8 @@ var buildCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		module, err := cmd.Flags().GetString("entry")
 		path, err := cmd.Flags().GetString("path")
-		emitIR, err := cmd.Flags().GetBool("emit-ir")
-		opts, err := cmd.Flags().GetStringArray("opt")
+		//emitIR, err := cmd.Flags().GetBool("emit-ir")
+		//opts, err := cmd.Flags().GetStringArray("opt")
 
 		if len(path) == 0 {
 			path, err = os.Getwd()
@@ -63,19 +62,24 @@ var buildCmd = &cobra.Command{
 		}
 
 		// Translation to IR
-		ir := translate.NewVisitor(scopes)
-		program := ir.Translate(obx, tsOrd)
+		//ir := translate.NewVisitor(scopes)
+		//program := ir.Translate(obx, tsOrd)
+
+		mir := mirgen.NewVisitor(scopes)
+		prg := mir.Translate(obx, tsOrd)
+
+		fmt.Println(prg)
 
 		// Optimisation
-		pm := opt.NewPassManager(ir.SymbolTable())
-		pm.AddPasses(opts...)
-		pm.Run(program)
-
-		if emitIR {
-			for _, f := range ir.Module().GetFunctionList() {
-				fmt.Println(f)
-			}
-		}
+		//pm := opt.NewPassManager(ir.SymbolTable())
+		//pm.AddPasses(opts...)
+		//pm.Run(program)
+		//
+		//if emitIR {
+		//	for _, f := range ir.Module().GetFunctionList() {
+		//		fmt.Println(f)
+		//	}
+		//}
 	},
 }
 

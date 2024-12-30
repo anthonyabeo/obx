@@ -1,0 +1,10 @@
+module Add
+	var a, b, total: integer
+
+begin
+	a := 5
+    b := 10
+	total := a + b
+
+
+end Main

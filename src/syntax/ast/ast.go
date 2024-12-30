@@ -2,6 +2,7 @@ package ast
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/meer"
 
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -25,6 +26,7 @@ type Expression interface {
 	expr()
 	Type() types.Type
 	Value() tacil.Expr
+	MirValue() meer.Expression
 }
 
 type Declaration interface {
