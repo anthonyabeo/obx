@@ -70,7 +70,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 
 	switch expr.Op {
 	case token.PLUS:
-		instr = meer.NewBinaryOp(meer.Add, expr.Left.MirValue(), expr.Right.MirValue())
+		instr = meer.CreateBinaryOp(meer.Add, expr.Left.MirValue(), expr.Right.MirValue())
 	case token.EQUAL:
 		instr = meer.CreateCmpInst(meer.Eq, expr.Left.MirValue(), expr.Right.MirValue())
 	case token.LESS:
@@ -113,11 +113,9 @@ func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
 
 	switch expr.Op {
 	case token.MINUS:
-		expr.MirExpr = meer.NewUnaryOp(meer.Sub, expr.X.MirValue())
-
+		expr.MirExpr = meer.CreateUnaryOp(meer.Sub, expr.X.MirValue())
 	case token.NOT:
-		expr.MirExpr = meer.NewUnaryOp(meer.Not, expr.X.MirValue())
-
+		expr.MirExpr = meer.CreateUnaryOp(meer.Not, expr.X.MirValue())
 	case token.PLUS:
 		expr.MirExpr = expr.X.MirValue()
 	default:
@@ -173,8 +171,18 @@ func (v *Visitor) VisitReturnStmt(stmt *ast.ReturnStmt) {
 }
 
 func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
-	//TODO implement me
-	panic("implement me")
+	var args []meer.Expression
+
+	for _, arg := range call.ActualParams {
+		arg.Accept(v)
+		args = append(args, arg.MirValue())
+	}
+
+	callee := meer.CreateIdent(call.Callee.String())
+	proc := meer.CreateProcCall(callee, args)
+
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, proc)
+
 }
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
