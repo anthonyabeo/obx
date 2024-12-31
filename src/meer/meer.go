@@ -12,7 +12,8 @@ func (op Opcode) String() string {
 }
 
 var opcodes = [...]string{
-	Lbl: "lbl",
+	Lbl:    "lbl",
+	Assign: "=",
 
 	Add: "+",
 	Sub: "-",
@@ -38,6 +39,7 @@ const (
 	Invalid Opcode = iota
 
 	Lbl
+	Assign
 
 	Add
 	Sub

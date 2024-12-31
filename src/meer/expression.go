@@ -33,6 +33,8 @@ type Ident struct {
 	Id string
 }
 
+func CreateIdent(id string) *Ident { return &Ident{Id: id} }
+
 func (id *Ident) expr()            {}
 func (id *Ident) operand()         {}
 func (id *Ident) Name() string     { return id.Id }
@@ -56,7 +58,7 @@ type BinaryOp struct {
 	X, Y Expression
 }
 
-func NewBinaryOp(op Opcode, x, y Expression) *BinaryOp {
+func CreateBinaryOp(op Opcode, x, y Expression) *BinaryOp {
 	return &BinaryOp{
 		Op: op,
 		X:  x,
@@ -85,7 +87,7 @@ type UnaryOp struct {
 	X  Expression
 }
 
-func NewUnaryOp(op Opcode, x Expression) *UnaryOp {
+func CreateUnaryOp(op Opcode, x Expression) *UnaryOp {
 	return &UnaryOp{
 		Op: op,
 		X:  x,

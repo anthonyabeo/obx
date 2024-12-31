@@ -31,12 +31,14 @@ func (l *Label) String() string { return fmt.Sprintf("%s:", l.Name) }
 // AssignInst
 // --------------------------------
 type AssignInst struct {
+	Op    Opcode
 	Dst   Expression
 	Value Expression
 }
 
 func CreateAssign(val, dst Expression) *AssignInst {
 	return &AssignInst{
+		Op:    Assign,
 		Dst:   dst,
 		Value: val,
 	}
