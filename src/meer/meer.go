@@ -96,12 +96,21 @@ func NewProgramUnit(name string) *ProgramUnit {
 
 func (p *ProgramUnit) String() string {
 	buf := new(bytes.Buffer)
+	indent := "\n\t\t"
 
-	buf.WriteString(fmt.Sprintf("module %s\n\t", p.Inst[0].String()))
+	buf.WriteString(fmt.Sprintf("%s\n\t", p.Inst[0].String()))
 	buf.WriteString("begin\n\t\t")
 	for _, inst := range p.Inst[1:] {
-		buf.WriteString(inst.String())
-		buf.WriteString("\n\t\t")
+		if _, ok := inst.(*Label); ok {
+			indent = "\n\t\t"
+			buf.WriteString(indent)
+			buf.WriteString(inst.String())
+			indent = "\n\t\t\t"
+			buf.WriteString(indent)
+		} else {
+			buf.WriteString(inst.String())
+			buf.WriteString(indent)
+		}
 	}
 	buf.WriteString("\n\tend")
 

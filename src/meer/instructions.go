@@ -26,7 +26,7 @@ func NewLabel(name string) *Label {
 }
 
 func (*Label) instr()           {}
-func (l *Label) String() string { return fmt.Sprintf("%s:", l.Name) }
+func (l *Label) String() string { return fmt.Sprintf("%%%s", l.Name) }
 
 // AssignInst
 // --------------------------------
@@ -101,7 +101,7 @@ func CreateCondBrInst(cond Expression, ifThen, ifElse *Label) *CondBrInst {
 
 func (*CondBrInst) instr() {}
 func (c *CondBrInst) String() string {
-	return fmt.Sprintf("br %s, label %%%s, label %%%s", c.Cond, c.IfTrue, c.IfFalse)
+	return fmt.Sprintf("br %s, label %s, label %s", c.Cond, c.IfTrue, c.IfFalse)
 }
 
 // ProcCallInstr ...
