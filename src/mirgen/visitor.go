@@ -202,8 +202,51 @@ func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
 }
 
 func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
-	//TODO implement me
-	panic("implement me")
+	Loop := meer.NewLabel("loop")
+	IfThen := meer.NewLabel("if.then")
+	IfElse := meer.NewLabel("if.else")
+	ContBB := meer.NewLabel("cont")
+
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, Loop)
+
+	stmt.BoolExpr.Accept(v)
+	CondBr := meer.CreateCondBrInst(stmt.BoolExpr.MirValue(), IfThen, IfElse)
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, CondBr)
+
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, IfThen)
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
+	Jmp := meer.CreateJmp(Loop)
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, Jmp)
+
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, IfElse)
+	if len(stmt.ElsIfs) > 0 {
+		for i, elif := range stmt.ElsIfs {
+			ElifThen := meer.NewLabel(fmt.Sprintf("elif.then.%d", i))
+			ElifElse := meer.NewLabel(fmt.Sprintf("elif.else.%d", i))
+
+			elif.BoolExpr.Accept(v)
+			CondBr = meer.CreateCondBrInst(elif.BoolExpr.MirValue(), ElifThen, ElifElse)
+			v.PrgUnit.Inst = append(v.PrgUnit.Inst, CondBr)
+
+			v.PrgUnit.Inst = append(v.PrgUnit.Inst, ElifThen)
+			for _, s := range elif.ThenPath {
+				s.Accept(v)
+			}
+			Jmp = meer.CreateJmp(Loop)
+			v.PrgUnit.Inst = append(v.PrgUnit.Inst, Jmp)
+
+			IfElse = ElifElse
+			v.PrgUnit.Inst = append(v.PrgUnit.Inst, IfElse)
+
+		}
+	}
+
+	Jmp = meer.CreateJmp(ContBB)
+
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, Jmp, ContBB)
+
 }
 
 func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
