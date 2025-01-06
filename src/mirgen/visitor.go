@@ -150,8 +150,98 @@ func (v *Visitor) VisitExprRange(exprRange *ast.ExprRange) {
 }
 
 func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
-	//TODO implement me
-	panic("implement me")
+	var (
+		LblElse  *meer.Label
+		LblElsif *meer.Label
+	)
+
+	stmt.BoolExpr.Accept(v)
+
+	LblThen := meer.NewLabel("if.then")
+	LblCont := meer.NewLabel("if.cont")
+
+	// if-then only. No else or elsif paths
+	if len(stmt.ElsePath) == 0 && len(stmt.ElseIfBranches) == 0 {
+		cond := meer.CreateCondBrInst(stmt.BoolExpr.MirValue(), LblThen, LblCont)
+		v.PrgUnit.Inst = append(v.PrgUnit.Inst, cond)
+	}
+
+	// if-then-elif-else. elif and else paths exist. Create labels for both paths.
+	// Set the false path of conditional branch to the elif label
+	if len(stmt.ElsePath) > 0 && len(stmt.ElseIfBranches) > 0 {
+		LblElse = meer.NewLabel("if.else")
+		LblElsif = meer.NewLabel("elsif")
+
+		cond := meer.CreateCondBrInst(stmt.BoolExpr.MirValue(), LblThen, LblElsif)
+		v.PrgUnit.Inst = append(v.PrgUnit.Inst, cond)
+	}
+
+	// no elsif path. but else path exist
+	if len(stmt.ElsePath) > 0 && len(stmt.ElseIfBranches) == 0 {
+		LblElse = meer.NewLabel("if.else")
+		cond := meer.CreateCondBrInst(stmt.BoolExpr.MirValue(), LblThen, LblElse)
+		v.PrgUnit.Inst = append(v.PrgUnit.Inst, cond)
+
+	}
+
+	// at least one elsif path, but no else path
+	if len(stmt.ElseIfBranches) > 0 && len(stmt.ElsePath) == 0 {
+		LblElsif = meer.NewLabel("elsif")
+		cond := meer.CreateCondBrInst(stmt.BoolExpr.MirValue(), LblThen, LblElsif)
+		v.PrgUnit.Inst = append(v.PrgUnit.Inst, cond)
+	}
+
+	// emit code for the 'True' path
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, LblThen)
+	for _, s := range stmt.ThenPath {
+		s.Accept(v)
+	}
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, meer.CreateJmp(LblCont))
+
+	// emit code for the 'elsif' branches
+	if len(stmt.ElseIfBranches) > 0 {
+		v.PrgUnit.Inst = append(v.PrgUnit.Inst, LblElsif)
+
+		for i, elif := range stmt.ElseIfBranches {
+			LblElifThen := meer.NewLabel(fmt.Sprintf("elif.then.%d", i))
+			LblElifElse := meer.NewLabel(fmt.Sprintf("elif.else.%d", i))
+
+			elif.BoolExpr.Accept(v)
+			cond := meer.CreateCondBrInst(elif.BoolExpr.MirValue(), LblElifThen, LblElifElse)
+			v.PrgUnit.Inst = append(v.PrgUnit.Inst, cond)
+
+			// emit code for the ith, elif branch unconditionally branch to 'cont' BasicBlock
+			v.PrgUnit.Inst = append(v.PrgUnit.Inst, LblElifThen)
+			for _, s := range elif.ThenPath {
+				s.Accept(v)
+			}
+			v.PrgUnit.Inst = append(v.PrgUnit.Inst, meer.CreateJmp(LblCont))
+
+			LblElsif = LblElifElse
+			v.PrgUnit.Inst = append(v.PrgUnit.Inst, LblElsif)
+
+			// we've reached the last elif-branch and there is no else-branch
+			if (i == len(stmt.ElseIfBranches)-1) && len(stmt.ElsePath) == 0 {
+				v.PrgUnit.Inst = append(v.PrgUnit.Inst, meer.CreateJmp(LblCont))
+			}
+
+			// we've reached the last elif-branch and there exists an else-branch
+			if (i == len(stmt.ElseIfBranches)-1) && len(stmt.ElsePath) > 0 {
+				v.PrgUnit.Inst = append(v.PrgUnit.Inst, meer.CreateJmp(LblElse))
+			}
+		}
+	}
+
+	// emit code for the 'False' path if it exists
+	if len(stmt.ElsePath) > 0 {
+		v.PrgUnit.Inst = append(v.PrgUnit.Inst, LblElse)
+		for _, s := range stmt.ElsePath {
+			s.Accept(v)
+		}
+		v.PrgUnit.Inst = append(v.PrgUnit.Inst, meer.CreateJmp(LblCont))
+	}
+
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, LblCont)
 }
 
 func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
@@ -248,7 +338,6 @@ func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 	Jmp = meer.CreateJmp(ContBB)
 
 	v.PrgUnit.Inst = append(v.PrgUnit.Inst, Jmp, ContBB)
-
 }
 
 func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
@@ -257,7 +346,6 @@ func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
 	v.loopExitTarget = Next
 
 	v.PrgUnit.Inst = append(v.PrgUnit.Inst, Loop)
-
 	for _, s := range stmt.StmtSeq {
 		s.Accept(v)
 	}
@@ -272,8 +360,51 @@ func (v *Visitor) VisitCaseStmt(stmt *ast.CaseStmt) {
 }
 
 func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
-	//TODO implement me
-	panic("implement me")
+	LblBody := meer.NewLabel("body")
+	LblCont := meer.NewLabel("cont")
+
+	sym := v.env.Lookup(stmt.CtlVar.Name)
+	if sym == nil {
+		panic(fmt.Sprintf("stack allocation for name '%s' not found", stmt.CtlVar.Name))
+	}
+
+	CtlVar := meer.CreateIdent(stmt.CtlVar.Name)
+
+	stmt.InitVal.Accept(v)
+	stmt.FinalVal.Accept(v)
+	FinalV := stmt.FinalVal.MirValue()
+
+	assign := meer.CreateAssign(stmt.InitVal.MirValue(), CtlVar)
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, assign)
+
+	CondV := meer.CreateCmpInst(meer.Lt, CtlVar, FinalV)
+	cond := meer.CreateCondBrInst(CondV, LblBody, LblCont)
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, cond)
+
+	// IR-Codegen for loop body
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, LblBody)
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
+
+	// update control variable
+	var inc meer.Expression
+	if stmt.By != nil {
+		stmt.By.Accept(v)
+		inc = stmt.By.MirValue()
+	} else {
+		inc = &meer.IntegerConst{Value: 1}
+	}
+
+	Val := meer.CreateBinaryOp(meer.Add, CtlVar, inc)
+	assign = meer.CreateAssign(Val, CtlVar)
+
+	CondV = meer.CreateCmpInst(meer.Lt, CtlVar, FinalV)
+	cond = meer.CreateCondBrInst(CondV, LblBody, LblCont)
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, cond)
+
+	// point the builder which block to go to next
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, LblCont)
 }
 
 func (v *Visitor) VisitExitStmt(stmt *ast.ExitStmt) {
