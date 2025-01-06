@@ -15,6 +15,8 @@ type Visitor struct {
 
 	env    scope.Scope
 	scopes map[string]scope.Scope
+
+	loopExitTarget *meer.Label
 }
 
 func NewVisitor(scopes map[string]scope.Scope) *Visitor {
@@ -250,8 +252,18 @@ func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 }
 
 func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
-	//TODO implement me
-	panic("implement me")
+	Loop := meer.NewLabel("loop")
+	Next := meer.NewLabel("next")
+	v.loopExitTarget = Next
+
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, Loop)
+
+	for _, s := range stmt.StmtSeq {
+		s.Accept(v)
+	}
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, meer.CreateJmp(Loop))
+
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, Next)
 }
 
 func (v *Visitor) VisitCaseStmt(stmt *ast.CaseStmt) {
@@ -265,8 +277,11 @@ func (v *Visitor) VisitForStmt(stmt *ast.ForStmt) {
 }
 
 func (v *Visitor) VisitExitStmt(stmt *ast.ExitStmt) {
-	//TODO implement me
-	panic("implement me")
+	if v.loopExitTarget == nil {
+		panic("[internal] some loop statement does not contain an exit statement")
+	}
+
+	v.PrgUnit.Inst = append(v.PrgUnit.Inst, meer.CreateJmp(v.loopExitTarget))
 }
 
 func (v *Visitor) VisitWithStmt(stmt *ast.WithStmt) {
