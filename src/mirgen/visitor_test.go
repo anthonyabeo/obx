@@ -575,3 +575,110 @@ end Main
 		}
 	}
 }
+
+func TestIRCodegenIfThenElsifElse(t *testing.T) {
+	input := `
+module Main
+	var a, b, max: integer
+
+begin
+	a := 5
+    b := 10
+	
+	if a > b then
+		max := a
+	elsif a = b then
+		max := 15
+	else
+		max := b
+	end
+
+    assert(max = 10)
+end Main
+`
+
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := lexer.NewLexer(file, []byte(input))
+
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
+	unit := p.Parse()
+
+	obx := ast.NewOberon()
+
+	scopes := map[string]scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	s := sema.NewVisitor(scopes, errReporter)
+	unit.Accept(s)
+
+	obx.AddUnit(unit.Name(), unit)
+
+	mir := NewVisitor(scopes)
+	program := mir.Translate(obx, []string{unit.Name()})
+
+	a := meer.CreateIdent("a")
+	b := meer.CreateIdent("b")
+	max := meer.CreateIdent("max")
+
+	Then := meer.NewLabel("if.then")
+	ElseIf := meer.NewLabel("elsif")
+	Else := meer.NewLabel("if.else")
+	ElifThen := meer.NewLabel("elif.then.0")
+	ElifElse := meer.NewLabel("elif.else.0")
+	ifCont := meer.NewLabel("if.cont")
+
+	assert := meer.CreateIdent("assert")
+	args := meer.CreateBinaryOp(meer.Eq, max, &meer.IntegerConst{Value: 10})
+
+	tests := []meer.Instruction{
+		meer.NewLabel("Main"),
+
+		meer.CreateAssign(&meer.IntegerConst{Value: 5}, a),
+		meer.CreateAssign(&meer.IntegerConst{Value: 10}, b),
+		meer.CreateCondBrInst(meer.CreateCmpInst(meer.Gt, a, b), Then, ElseIf),
+
+		Then,
+		meer.CreateAssign(a, max),
+		meer.CreateJmp(ifCont),
+
+		ElseIf,
+		meer.CreateCondBrInst(meer.CreateCmpInst(meer.Eq, a, b), ElifThen, ElifElse),
+
+		ElifThen,
+		meer.CreateAssign(&meer.IntegerConst{Value: 15}, max),
+		meer.CreateJmp(ifCont),
+
+		ElifElse,
+		meer.CreateJmp(Else),
+
+		Else,
+		meer.CreateAssign(b, max),
+		meer.CreateJmp(ifCont),
+
+		ifCont,
+		meer.CreateProcCall(assert, []meer.Expression{args}),
+	}
+
+	Main := program.Units["Main"]
+
+	if len(Main.Inst) != len(tests) {
+		t.Errorf("inaccurate number of instructions. Expected '%d', Got '%d'",
+			len(tests), len(Main.Inst))
+	}
+
+	for idx, i := range Main.Inst {
+		switch inst := i.(type) {
+		case *meer.Label:
+			testLabel(t, inst.Name, tests[idx].(*meer.Label).Name)
+		case *meer.AssignInst:
+			exp := tests[idx].(*meer.AssignInst)
+			testAssign(t, inst, exp.Dst.String(), exp.Value.String())
+		case *meer.CondBrInst:
+			expect := tests[idx].(*meer.CondBrInst)
+			testCondBr(t, inst, expect.Op, expect.IfTrue.String(), expect.IfFalse.String(), expect.Cond.String())
+		}
+	}
+}
