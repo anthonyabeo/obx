@@ -172,47 +172,229 @@ end Main
 	}
 }
 
-func testLabel(t *testing.T, rcv, exp string) {
-	if rcv != exp {
-		t.Errorf("Expected Label with name '%s', got '%s' instead", exp, rcv)
+func TestIRCodegenWhileLoopWithSingleElseIfBranch(t *testing.T) {
+	input := `
+module Main
+	var m, n, gcd: integer
+
+begin
+	m := 24
+    n := 48
+	gcd := 0
+	
+	while m > n do
+		m := m + n
+    elsif n > m do
+		n := n + m
+	end
+
+    assert(gcd = 55)
+end Main
+`
+
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := lexer.NewLexer(file, []byte(input))
+
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
+	unit := p.Parse()
+
+	obx := ast.NewOberon()
+
+	scopes := map[string]scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
+	}
+
+	s := sema.NewVisitor(scopes, errReporter)
+	unit.Accept(s)
+
+	obx.AddUnit(unit.Name(), unit)
+
+	mir := NewVisitor(scopes)
+	program := mir.Translate(obx, []string{unit.Name()})
+
+	m := meer.CreateIdent("m")
+	n := meer.CreateIdent("n")
+	gcd := meer.CreateIdent("gcd")
+
+	loop := meer.NewLabel("loop")
+	ifThen := meer.NewLabel("if.then")
+	ifElse := meer.NewLabel("if.else")
+	ElifThen := meer.NewLabel("elif.then.0")
+	ElifElse := meer.NewLabel("elif.else.0")
+
+	cont := meer.NewLabel("cont")
+
+	cond := meer.CreateCmpInst(meer.Gt, m, n)
+	condBr := meer.CreateCondBrInst(cond, ifThen, ifElse)
+
+	assert := meer.CreateIdent("assert")
+	args := meer.CreateBinaryOp(meer.Eq, gcd, &meer.IntegerConst{Value: 55})
+
+	tests := []meer.Instruction{
+		meer.NewLabel("Main"),
+		meer.CreateAssign(&meer.IntegerConst{Value: 24}, m),
+		meer.CreateAssign(&meer.IntegerConst{Value: 48}, n),
+		meer.CreateAssign(&meer.IntegerConst{Value: 0}, gcd),
+
+		loop,
+		condBr,
+
+		ifThen,
+		meer.CreateAssign(meer.CreateBinaryOp(meer.Add, m, n), m),
+		meer.CreateJmp(loop),
+
+		ifElse,
+		meer.CreateCondBrInst(meer.CreateCmpInst(meer.Gt, n, m), ElifThen, ElifElse),
+
+		ElifThen,
+		meer.CreateAssign(meer.CreateBinaryOp(meer.Add, n, m), n),
+		meer.CreateJmp(loop),
+
+		ElifElse,
+		meer.CreateJmp(cont),
+
+		cont,
+		meer.CreateProcCall(assert, []meer.Expression{args}),
+	}
+
+	Main := program.Units["Main"]
+
+	if len(Main.Inst) != len(tests) {
+		t.Errorf("inaccurate number of instructions. Expected '%d', Got '%d'",
+			len(tests), len(Main.Inst))
+	}
+
+	for idx, i := range Main.Inst {
+		switch inst := i.(type) {
+		case *meer.Label:
+			testLabel(t, inst.Name, tests[idx].(*meer.Label).Name)
+		case *meer.AssignInst:
+			exp := tests[idx].(*meer.AssignInst)
+			testAssign(t, inst, exp.Dst.String(), exp.Value.String())
+		case *meer.CondBrInst:
+			expect := tests[idx].(*meer.CondBrInst)
+			testCondBr(t, inst, expect.Op, expect.IfTrue.String(), expect.IfFalse.String(), expect.Cond.String())
+		}
 	}
 }
 
-func testAssign(t *testing.T, inst *meer.AssignInst, expDst, expValue string) {
-	if inst.Value.String() != expValue {
-		t.Errorf("Expected value in assignment to be '%s', got '%s' instead",
-			expValue, inst.Value.String())
+func TestIRCodegenWhileLoopWithTwoElseIfBranch(t *testing.T) {
+	input := `
+module Main
+	var m, n, gcd: integer
+
+begin
+	m := 24
+    n := 48
+	gcd := 0
+	
+	while m > n do
+		m := m + n
+    elsif n > m do
+		n := n + m
+	elsif m # n do
+		n := n + m
+	end
+
+    assert(gcd = 55)
+end Main
+`
+
+	file := token.NewFile("test.obx", len([]byte(input)))
+	lex := lexer.NewLexer(file, []byte(input))
+
+	errReporter := diagnostics.NewStdErrReporter(10)
+	p := parser.NewParser(lex, errReporter)
+	unit := p.Parse()
+
+	obx := ast.NewOberon()
+
+	scopes := map[string]scope.Scope{}
+	for _, unit := range obx.Units() {
+		scopes[unit.Name()] = nil
 	}
 
-	if inst.Dst.String() != expDst {
-		t.Errorf("Expected destination in assignment to be '%s', got '%s' instead",
-			expDst, inst.Dst.String())
-	}
-}
+	s := sema.NewVisitor(scopes, errReporter)
+	unit.Accept(s)
 
-func testCondBr(t *testing.T, inst *meer.CondBrInst, pred meer.Opcode, expTrueLabel, expFalseLabel, cond string) {
-	if inst.Op != pred {
-		t.Errorf("expected logical operator to be %s, Got %s", pred, inst.Op)
+	obx.AddUnit(unit.Name(), unit)
+
+	mir := NewVisitor(scopes)
+	program := mir.Translate(obx, []string{unit.Name()})
+
+	m := meer.CreateIdent("m")
+	n := meer.CreateIdent("n")
+	gcd := meer.CreateIdent("gcd")
+
+	loop := meer.NewLabel("loop")
+	ifThen := meer.NewLabel("if.then")
+	ifElse := meer.NewLabel("if.else")
+	ElifThen := meer.NewLabel("elif.then.0")
+	ElifElse := meer.NewLabel("elif.else.0")
+	ElifThen1 := meer.NewLabel("elif.then.1")
+	ElifElse1 := meer.NewLabel("elif.else.1")
+	cont := meer.NewLabel("cont")
+
+	assert := meer.CreateIdent("assert")
+	args := meer.CreateBinaryOp(meer.Eq, gcd, &meer.IntegerConst{Value: 55})
+
+	tests := []meer.Instruction{
+		meer.NewLabel("Main"),
+
+		meer.CreateAssign(&meer.IntegerConst{Value: 24}, m),
+		meer.CreateAssign(&meer.IntegerConst{Value: 48}, n),
+		meer.CreateAssign(&meer.IntegerConst{Value: 0}, gcd),
+
+		loop,
+		meer.CreateCondBrInst(meer.CreateCmpInst(meer.Gt, m, n), ifThen, ifElse),
+
+		ifThen,
+		meer.CreateAssign(meer.CreateBinaryOp(meer.Add, m, n), m),
+		meer.CreateJmp(loop),
+
+		ifElse,
+		meer.CreateCondBrInst(meer.CreateCmpInst(meer.Gt, n, m), ElifThen, ElifElse),
+
+		ElifThen,
+		meer.CreateAssign(meer.CreateBinaryOp(meer.Add, n, m), n),
+		meer.CreateJmp(loop),
+
+		ElifElse,
+		meer.CreateCondBrInst(meer.CreateCmpInst(meer.Ne, m, n), ElifThen1, ElifElse1),
+
+		ElifThen1,
+		meer.CreateAssign(meer.CreateBinaryOp(meer.Add, n, m), n),
+		meer.CreateJmp(loop),
+
+		ElifElse1,
+		meer.CreateJmp(cont),
+
+		cont,
+		meer.CreateProcCall(assert, []meer.Expression{args}),
 	}
 
-	if inst.Cond.String() != cond {
-		t.Errorf("expected logical condition to be '%s', Got '%s'", cond, inst.Cond.String())
+	Main := program.Units["Main"]
+
+	if len(Main.Inst) != len(tests) {
+		t.Errorf("inaccurate number of instructions. Expected '%d', Got '%d'",
+			len(tests), len(Main.Inst))
 	}
 
-	testLabel(t, inst.IfTrue.String(), expTrueLabel)
-	testLabel(t, inst.IfFalse.String(), expFalseLabel)
-}
-
-func testBinaryOp(t *testing.T, expr *meer.BinaryOp, left, right string, op meer.Opcode) {
-	if expr.Op != op {
-		t.Errorf("expected operator of binary operation to be '%s', Got '%s'", op, expr.Op)
+	for idx, i := range Main.Inst {
+		switch inst := i.(type) {
+		case *meer.Label:
+			testLabel(t, inst.Name, tests[idx].(*meer.Label).Name)
+		case *meer.AssignInst:
+			exp := tests[idx].(*meer.AssignInst)
+			testAssign(t, inst, exp.Dst.String(), exp.Value.String())
+		case *meer.CondBrInst:
+			expect := tests[idx].(*meer.CondBrInst)
+			testCondBr(t, inst, expect.Op, expect.IfTrue.String(), expect.IfFalse.String(), expect.Cond.String())
+		}
 	}
 
-	if expr.X.String() != left {
-		t.Errorf("expected LHS of binary operation to be '%s', Got '%s'", left, expr.X.String())
-	}
+	//fmt.Println(program)
 
-	if expr.Y.String() != right {
-		t.Errorf("expected RHS of binary operation to be '%s', Got '%s'", right, expr.Y.String())
-	}
 }
