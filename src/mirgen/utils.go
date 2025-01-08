@@ -50,3 +50,12 @@ func testBinaryOp(t *testing.T, expr *meer.BinaryOp, left, right string, op meer
 		t.Errorf("expected RHS of binary operation to be '%s', Got '%s'", right, expr.Y.String())
 	}
 }
+
+func testJmp(t *testing.T, inst meer.Instruction, j *meer.Jump) {
+	jmp, ok := inst.(*meer.Jump)
+	if !ok {
+		t.Errorf("expected a jump instruction, got %s", inst)
+	}
+
+	testLabel(t, jmp.Dst.Name, j.Dst.Name)
+}
