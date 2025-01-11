@@ -39,9 +39,9 @@ func (s *SymbolTable) Lookup(name string) Symbol {
 
 func (s *SymbolTable) Insert(obj Symbol) Symbol {
 	name := obj.Name()
-	if alt := s.Lookup(name); alt != nil {
-		return alt
-	}
+	//if alt := s.Lookup(name); alt != nil {
+	//	return alt
+	//}
 
 	s.insert(name, obj)
 	if obj.Parent() == nil {
