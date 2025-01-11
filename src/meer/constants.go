@@ -6,31 +6,44 @@ import "fmt"
 // -------------
 type BoolConst struct {
 	value bool
+	Ty    Type
 }
 
-func (b *BoolConst) String() string {
-	return fmt.Sprintf("%s", b.value)
-}
+func (b *BoolConst) expr()          {}
+func (b *BoolConst) Type() Type     { return b.Ty }
+func (b *BoolConst) SetType(t Type) { b.Ty = t }
+func (b *BoolConst) String() string { return fmt.Sprintf("%t", b.value) }
 
 // IntegerConst
 // -------------
 type IntegerConst struct {
 	Value  uint64
 	signed bool
+	Ty     Type
 }
 
-func (b *IntegerConst) expr() {}
-func (b *IntegerConst) String() string {
-	return fmt.Sprintf("%d", b.Value)
+func CreateIntegerConst(ty Type, value uint64, signed bool) *IntegerConst {
+	return &IntegerConst{
+		Value:  value,
+		signed: signed,
+		Ty:     ty,
+	}
 }
+
+func (i *IntegerConst) expr()          {}
+func (i *IntegerConst) SetType(t Type) { i.Ty = t }
+func (i *IntegerConst) String() string { return fmt.Sprintf("%d", i.Value) }
+func (i *IntegerConst) Type() Type     { return i.Ty }
 
 // FloatConst
 // -------------
 type FloatConst struct {
 	value  float64
 	signed bool
+	Ty     Type
 }
 
-func (b *FloatConst) String() string {
-	return fmt.Sprintf("%f", b.value)
-}
+func (f *FloatConst) expr()          {}
+func (f *FloatConst) Type() Type     { return f.Ty }
+func (f *FloatConst) SetType(t Type) { f.Ty = t }
+func (f *FloatConst) String() string { return fmt.Sprintf("%f", f.value) }

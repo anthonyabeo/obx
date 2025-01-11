@@ -38,6 +38,7 @@ type Type interface {
 	Node
 	Type() types.Type
 	IRType() tacil.Type
+	MirType() meer.Type
 }
 
 type Unit interface {

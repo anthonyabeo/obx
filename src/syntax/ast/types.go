@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/anthonyabeo/obx/src/meer"
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/translate/tacil"
@@ -16,6 +17,7 @@ type (
 		Name Expression
 
 		EType types.Type
+		MirTy meer.Type
 	}
 
 	BasicType struct {
@@ -24,6 +26,7 @@ type (
 
 		EType types.Type
 		IRTy  tacil.Type
+		MirTy meer.Type
 	}
 
 	ArrayType struct {
@@ -33,6 +36,7 @@ type (
 
 		EType types.Type
 		IRTy  tacil.Type
+		MirTy meer.Type
 	}
 
 	ProcType struct {
@@ -41,6 +45,7 @@ type (
 
 		EType types.Type
 		IRTy  tacil.Type
+		MirTy meer.Type
 	}
 
 	PointerType struct {
@@ -49,6 +54,7 @@ type (
 
 		EType types.Type
 		IRTy  tacil.Type
+		MirTy meer.Type
 	}
 
 	RecordType struct {
@@ -58,6 +64,7 @@ type (
 
 		EType types.Type
 		IRTy  tacil.Type
+		MirTy meer.Type
 	}
 
 	FieldList struct {
@@ -71,6 +78,7 @@ type (
 
 		EType types.Type
 		IRTy  tacil.Type
+		MirTy meer.Type
 	}
 
 	BadType struct {
@@ -89,6 +97,7 @@ func (n *NamedType) End() *token.Position { panic("implement me") }
 func (n *NamedType) Accept(vst Visitor)   { vst.VisitNamedType(n) }
 func (n *NamedType) Type() types.Type     { return n.EType }
 func (n *NamedType) IRType() tacil.Type   { panic("implement me") }
+func (n *NamedType) MirType() meer.Type   { return n.MirTy }
 
 func NewBasicType(pos *token.Position, name string) *BasicType {
 	return &BasicType{name: name, pos: pos}
@@ -101,6 +110,7 @@ func (b *BasicType) Type() types.Type     { return b.EType }
 func (b *BasicType) String() string       { return b.name }
 func (b *BasicType) Accept(vst Visitor)   { vst.VisitBasicType(b) }
 func (b *BasicType) IRType() tacil.Type   { return b.IRTy }
+func (b *BasicType) MirType() meer.Type   { return b.MirTy }
 
 func NewArray(pos *token.Position, lenList *LenList, elem Type) *ArrayType {
 	return &ArrayType{Array: pos, LenList: lenList, ElemType: elem}
@@ -121,6 +131,7 @@ func (a *ArrayType) String() string {
 func (a *ArrayType) Accept(vst Visitor) { vst.VisitArrayType(a) }
 func (a *ArrayType) Type() types.Type   { return a.EType }
 func (a *ArrayType) IRType() tacil.Type { return a.IRTy }
+func (a *ArrayType) MirType() meer.Type { return a.MirTy }
 
 type LenList struct {
 	Modifier token.Token
@@ -133,6 +144,7 @@ func (p *ProcType) String() string       { panic("not implemented") }
 func (p *ProcType) Type() types.Type     { return p.EType }
 func (p *ProcType) Accept(vst Visitor)   { vst.VisitProcType(p) }
 func (p *ProcType) IRType() tacil.Type   { return p.IRTy }
+func (p *ProcType) MirType() meer.Type   { return p.MirTy }
 
 func (p *PointerType) Pos() *token.Position { return p.Ptr }
 func (p *PointerType) End() *token.Position { panic("not implemented") }
@@ -140,6 +152,7 @@ func (p *PointerType) String() string       { return fmt.Sprintf("^%s", p.Base) 
 func (p *PointerType) Type() types.Type     { return p.EType }
 func (p *PointerType) Accept(vst Visitor)   { vst.VisitPointerType(p) }
 func (p *PointerType) IRType() tacil.Type   { return p.IRTy }
+func (p *PointerType) MirType() meer.Type   { return p.MirTy }
 
 func (r *RecordType) Pos() *token.Position { return r.Record }
 func (r *RecordType) End() *token.Position { panic("not implemented") }
@@ -165,6 +178,7 @@ func (r *RecordType) String() string {
 func (r *RecordType) Type() types.Type   { return r.EType }
 func (r *RecordType) Accept(vst Visitor) { vst.VisitRecordType(r) }
 func (r *RecordType) IRType() tacil.Type { return r.IRTy }
+func (r *RecordType) MirType() meer.Type { return r.MirTy }
 
 func (e *EnumType) Pos() *token.Position { return e.Enum }
 func (e *EnumType) End() *token.Position { panic("not implemented") }
@@ -172,6 +186,7 @@ func (e *EnumType) String() string       { panic("not implemented") }
 func (e *EnumType) Type() types.Type     { return e.EType }
 func (e *EnumType) Accept(vst Visitor)   { vst.VisitEnumType(e) }
 func (e *EnumType) IRType() tacil.Type   { return e.IRTy }
+func (e *EnumType) MirType() meer.Type   { return e.MirTy }
 
 func (b *BadType) String() string       { panic("implement me") }
 func (b *BadType) Pos() *token.Position { return b.From }
@@ -180,3 +195,4 @@ func (b *BadType) Accept(vst Visitor)   { panic("implement me") }
 func (b *BadType) expr()                {}
 func (b *BadType) Type() types.Type     { return nil }
 func (b *BadType) IRType() tacil.Type   { panic("implement me") }
+func (b *BadType) MirType() meer.Type   { panic("not implemented") }

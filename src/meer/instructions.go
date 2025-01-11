@@ -64,22 +64,22 @@ func CreateRet(v Expression) *ReturnInst {
 func (*ReturnInst) instr()           {}
 func (r *ReturnInst) String() string { return fmt.Sprintf("ret %s", r.Value) }
 
-// Jump
+// JumpInst
 // --------------------------------
-type Jump struct {
+type JumpInst struct {
 	Op  Opcode
 	Dst *Label
 }
 
-func CreateJmp(dst *Label) *Jump {
-	return &Jump{
+func CreateJmp(dst *Label) *JumpInst {
+	return &JumpInst{
 		Op:  Jmp,
 		Dst: dst,
 	}
 }
 
-func (*Jump) instr()           {}
-func (j *Jump) String() string { return fmt.Sprintf("jmp label %%%s", j.Dst.Name) }
+func (*JumpInst) instr()           {}
+func (j *JumpInst) String() string { return fmt.Sprintf("jmp label %%%s", j.Dst.Name) }
 
 // CondBrInst
 // ----------

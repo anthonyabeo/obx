@@ -30,6 +30,8 @@ var opcodes = [...]string{
 	Le:  "<=",
 	Not: "~",
 
+	Xor: "^",
+
 	Br:  "br",
 	Ret: "ret",
 	Jmp: "jmp",
@@ -55,6 +57,8 @@ const (
 	Lt
 	Le
 	Not
+
+	Xor
 
 	Br
 	Ret
