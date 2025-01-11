@@ -51,8 +51,8 @@ func testBinaryOp(t *testing.T, expr *meer.BinaryOp, left, right string, op meer
 	}
 }
 
-func testJmp(t *testing.T, inst meer.Instruction, j *meer.Jump) {
-	jmp, ok := inst.(*meer.Jump)
+func testJmp(t *testing.T, inst meer.Instruction, j *meer.JumpInst) {
+	jmp, ok := inst.(*meer.JumpInst)
 	if !ok {
 		t.Errorf("expected a jump instruction, got %s", inst)
 	}
