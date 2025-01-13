@@ -47,6 +47,7 @@ type (
 		ActualParams []Expression
 		EType        types.Type
 		IRExpr       tacil.Expr
+		MirExpr      meer.Expression
 	}
 
 	Ident struct {

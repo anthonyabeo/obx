@@ -54,7 +54,7 @@ func (v *Visitor) VisitModule(m *ast.Module) {
 	}
 }
 
-func (v *Visitor) VisitDefinition(definition *ast.Definition) {
+func (v *Visitor) VisitDefinition(def *ast.Definition) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -110,8 +110,16 @@ func (v *Visitor) VisitDesignator(d *ast.Designator) {
 }
 
 func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
-	//TODO implement me
-	panic("implement me")
+	var args []meer.Expression
+
+	for _, arg := range call.ActualParams {
+		arg.Accept(v)
+		args = append(args, arg.MirValue())
+	}
+
+	callee := meer.CreateIdent(call.Callee.String(), nil)
+
+	call.MirExpr = v.builder.CreateFuncCall(callee, args)
 }
 
 func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {

@@ -249,3 +249,9 @@ func (b *Builder) CreateNot(v Expression) Expression {
 
 	return not
 }
+
+func (b *Builder) CreateFuncCall(callee *Ident, args []Expression) *FuncCallInst {
+	call := CreateFuncCall(callee, args)
+
+	return call
+}

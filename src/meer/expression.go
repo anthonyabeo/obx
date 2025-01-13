@@ -156,12 +156,12 @@ func (c *CmpInst) String() string   { return fmt.Sprintf("(%s %s %s)", c.X, c.Pr
 // --------------------
 type FuncCallInst struct {
 	Op     Opcode
-	Callee Operand
-	Args   []Operand
+	Callee *Ident
+	Args   []Expression
 	Ty     Type
 }
 
-func CreateFuncCall(callee Operand, args []Operand) *FuncCallInst {
+func CreateFuncCall(callee *Ident, args []Expression) *FuncCallInst {
 	return &FuncCallInst{
 		Op:     Call,
 		Callee: callee,
@@ -172,7 +172,7 @@ func CreateFuncCall(callee Operand, args []Operand) *FuncCallInst {
 func (c FuncCallInst) expr()          {}
 func (c FuncCallInst) Type() Type     { return c.Ty }
 func (c FuncCallInst) SetType(t Type) { c.Ty = t }
-func (c FuncCallInst) Operand(idx int) Operand {
+func (c FuncCallInst) Operand(idx int) Expression {
 	if idx < 1 || idx > c.NumOperands() {
 		panic(fmt.Sprintf("[internal] invalid index '%d' for instruction '%s'", idx, c))
 	}
