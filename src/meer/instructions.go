@@ -7,14 +7,16 @@ import (
 
 type Instruction interface {
 	instr()
+	OpCode() Opcode
 	fmt.Stringer
 }
 
 // Label ...
 // ------------------
 type Label struct {
-	Op   Opcode
-	Name string
+	Op      Opcode
+	Name    string
+	BlockID uint
 }
 
 func NewLabel(name string) *Label {
@@ -26,6 +28,7 @@ func NewLabel(name string) *Label {
 }
 
 func (*Label) instr()           {}
+func (l *Label) OpCode() Opcode { return l.Op }
 func (l *Label) String() string { return fmt.Sprintf("%%%s", l.Name) }
 
 // AssignInst
@@ -45,6 +48,7 @@ func CreateAssign(val, dst Expression) *AssignInst {
 }
 
 func (*AssignInst) instr()           {}
+func (a *AssignInst) OpCode() Opcode { return a.Op }
 func (a *AssignInst) String() string { return fmt.Sprintf("%s := %s", a.Dst, a.Value) }
 
 // ReturnInst
@@ -62,6 +66,7 @@ func CreateRet(v Expression) *ReturnInst {
 }
 
 func (*ReturnInst) instr()           {}
+func (r *ReturnInst) OpCode() Opcode { return r.Op }
 func (r *ReturnInst) String() string { return fmt.Sprintf("ret %s", r.Value) }
 
 // JumpInst
@@ -79,6 +84,7 @@ func CreateJmp(dst *Label) *JumpInst {
 }
 
 func (*JumpInst) instr()           {}
+func (j *JumpInst) OpCode() Opcode { return j.Op }
 func (j *JumpInst) String() string { return fmt.Sprintf("jmp label %%%s", j.Dst.Name) }
 
 // CondBrInst
@@ -99,7 +105,8 @@ func CreateCondBrInst(cond Expression, ifThen, ifElse *Label) *CondBrInst {
 	}
 }
 
-func (*CondBrInst) instr() {}
+func (*CondBrInst) instr()           {}
+func (c *CondBrInst) OpCode() Opcode { return c.Op }
 func (c *CondBrInst) String() string {
 	return fmt.Sprintf("br %s, label %s, label %s", c.Cond, c.IfTrue, c.IfFalse)
 }
@@ -120,7 +127,8 @@ func CreateProcCall(callee Expression, args []Expression) *ProcCallInstr {
 	}
 }
 
-func (*ProcCallInstr) instr() {}
+func (*ProcCallInstr) instr()           {}
+func (c *ProcCallInstr) OpCode() Opcode { return c.Op }
 func (c *ProcCallInstr) String() string {
 	var args []string
 	for _, op := range c.Args {
