@@ -58,15 +58,28 @@ end Main
 	Main := program.Units["Main"]
 	leaders := findLeaders(Main.Inst)
 
+	// Order of label and block creation is important
+	LblMain := meer.NewLabel("Main")
+	LblLoop := meer.NewLabel("loop")
+	LblIfThen := meer.NewLabel("if.then")
+	LblIfElse := meer.NewLabel("if.else")
+	LblCont := meer.NewLabel("cont")
+
+	BlockMain := NewBasicBlock(LblMain)
+	BlockLoop := NewBasicBlock(LblLoop)
+	BlockIfThen := NewBasicBlock(LblIfThen)
+	BlockIfElse := NewBasicBlock(LblIfElse)
+	BlockCont := NewBasicBlock(LblCont)
+
 	tests := []struct {
 		id       uint
 		numInstr int
 	}{
-		{3, 3},
-		{4, 1},
-		{2, 1},
-		{1, 3},
-		{5, 1},
+		{BlockIfThen.id, 3},
+		{BlockIfElse.id, 1},
+		{BlockLoop.id, 1},
+		{BlockMain.id, 3},
+		{BlockCont.id, 1},
 	}
 
 	for _, tt := range tests {
