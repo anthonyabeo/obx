@@ -63,6 +63,8 @@ const (
 	Br
 	Ret
 	Jmp
+
+	Phi
 )
 
 // Program ...
@@ -89,6 +91,7 @@ func (p *Program) String() string {
 // ------------------
 type ProgramUnit struct {
 	Inst []Instruction
+	CFG  *ControlFlowGraph
 }
 
 func NewProgramUnit(name string) *ProgramUnit {

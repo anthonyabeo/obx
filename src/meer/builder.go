@@ -21,8 +21,8 @@ func (b *Builder) SetInsertPoint(label *Label) { b.instructions = append(b.instr
 func (b *Builder) CreateAdd(lhs, rhs Expression) *BinaryOp {
 	var (
 		ResTy Type
-		LHSTy Type = lhs.Type()
-		RHSTy Type = rhs.Type()
+		LHSTy = lhs.Type()
+		RHSTy = rhs.Type()
 	)
 
 	// lhs != integer-type && lhs != pointer-type && lhs != vector<integer-type>
@@ -73,8 +73,8 @@ func (b *Builder) CreateAdd(lhs, rhs Expression) *BinaryOp {
 func (b *Builder) CreateSub(lhs, rhs Expression) Expression {
 	var (
 		ResTy Type
-		LHSTy Type = lhs.Type()
-		RHSTy Type = rhs.Type()
+		LHSTy = lhs.Type()
+		RHSTy = rhs.Type()
 	)
 
 	// lhs != integer-type && lhs != pointer-type && lhs != vector<integer-type>
@@ -125,8 +125,8 @@ func (b *Builder) CreateSub(lhs, rhs Expression) Expression {
 func (b *Builder) CreateXOR(lhs, rhs Expression) Expression {
 	var (
 		ResTy Type
-		LHSTy Type = lhs.Type()
-		RHSTy Type = rhs.Type()
+		LHSTy = lhs.Type()
+		RHSTy = rhs.Type()
 	)
 	// lhs != integer-type && lhs != vector<integer-type>
 	if !LHSTy.IsIntegerTy() /* && !LHS.IsVecTy() */ {
@@ -164,8 +164,8 @@ func (b *Builder) CreateRet(v Expression) *ReturnInst {
 func (b *Builder) CreateCmp(pred Opcode, lhs, rhs Expression) Expression {
 	var (
 		ResTy Type
-		LHSTy Type = lhs.Type()
-		RHSTy Type = rhs.Type()
+		LHSTy = lhs.Type()
+		RHSTy = rhs.Type()
 	)
 
 	// lhs != integer-type && lhs != pointer-type && lhs != vector<integer-type>
@@ -217,7 +217,7 @@ func (b *Builder) CreateProcCall(callee Expression, args []Expression) *ProcCall
 	return call
 }
 
-func (b *Builder) CreateAssign(Val, Dst Expression) *AssignInst {
+func (b *Builder) CreateAssign(Val Expression, Dst Expression) *AssignInst {
 	assign := CreateAssign(Val, Dst)
 	b.instructions = append(b.instructions, assign)
 

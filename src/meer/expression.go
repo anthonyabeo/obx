@@ -9,6 +9,8 @@ type Expression interface {
 	expr()
 	Type() Type
 	SetType(Type)
+	NumOperands() int
+	Operand(i int) Expression
 	fmt.Stringer
 }
 
@@ -22,6 +24,7 @@ type NamedOperand interface {
 	BaseName() string
 	SetName(string)
 	Operand
+	Expression
 }
 
 type Operand interface {
@@ -45,7 +48,7 @@ func (id *Ident) SetType(t Type)   { id.Ty = t }
 func (id *Ident) Name() string     { return id.Id }
 func (id *Ident) BaseName() string { panic("implement me") }
 func (id *Ident) SetName(s string) { panic("implement me") }
-func (id *Ident) Operand(i int) Operand {
+func (id *Ident) Operand(i int) Expression {
 	switch i {
 	case 1:
 		return id
@@ -192,3 +195,53 @@ func (c FuncCallInst) String() string {
 
 	return fmt.Sprintf("call %s(%s)", c.Callee, strings.Join(args, ", "))
 }
+
+// PHINode
+// --------------------------
+//type PHINode struct {
+//	Op               Opcode
+//	Incoming         []PHINodeIncoming
+//	numIncomingPaths uint
+//	ty               Type
+//}
+//
+//func CreateEmptyPHINode() *PHINode {
+//	return &PHINode{Op: Phi}
+//}
+//
+//func CreatePHINode(numIncomingPaths uint) *PHINode {
+//	return &PHINode{
+//		Op:               Phi,
+//		numIncomingPaths: numIncomingPaths,
+//	}
+//}
+//
+//func (phi *PHINode) expr()                  {}
+//func (phi *PHINode) Operand(int) Expression { panic("") }
+//func (phi *PHINode) NumOperands() int       { return 0 }
+//func (phi *PHINode) String() string {
+//	var incs []string
+//	for _, inc := range phi.Incoming {
+//		incs = append(incs, inc.String())
+//	}
+//
+//	return fmt.Sprintf("phi %s", strings.Join(incs, ", "))
+//}
+//func (phi *PHINode) AddIncoming(v Expression, blk *analy.BasicBlock) {
+//	if phi.ty == nil {
+//		phi.ty = v.Type()
+//	}
+//	phi.Incoming = append(phi.Incoming, PHINodeIncoming{v, blk})
+//	phi.numIncomingPaths++
+//}
+//func (phi *PHINode) Type() Type     { return phi.ty }
+//func (phi *PHINode) SetType(t Type) { phi.ty = t }
+//
+//type PHINodeIncoming struct {
+//	V   Expression
+//	Blk *analy.BasicBlock
+//}
+//
+//func (p PHINodeIncoming) String() string {
+//	return fmt.Sprintf("[ %s, %%%s ]", p.V, p.Blk.Name())
+//}
