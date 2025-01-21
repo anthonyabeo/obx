@@ -1,16 +1,11 @@
 package analy
 
 import (
-	"bytes"
-	"container/list"
-	"fmt"
-	"strings"
-
 	"github.com/anthonyabeo/obx/src/adt"
 	"github.com/anthonyabeo/obx/src/meer"
 )
 
-func ExtendedBasicBlocks(cfg *ControlFlowGraph, src uint) map[uint]*adt.HashSet[uint] {
+func ExtendedBasicBlocks(cfg *meer.ControlFlowGraph, src uint) map[uint]*adt.HashSet[uint] {
 	ebbs := make(map[uint]*adt.HashSet[uint])
 	roots := adt.NewQueue[uint]()
 
@@ -27,7 +22,7 @@ func ExtendedBasicBlocks(cfg *ControlFlowGraph, src uint) map[uint]*adt.HashSet[
 	return ebbs
 }
 
-func extBasicBlocks(cfg *ControlFlowGraph, blkID uint, roots *adt.Queue[uint], s *adt.HashSet[uint]) {
+func extBasicBlocks(cfg *meer.ControlFlowGraph, blkID uint, roots *adt.Queue[uint], s *adt.HashSet[uint]) {
 	s.Add(blkID)
 
 	for _, BlockID := range cfg.Suc[blkID].Elems() {
@@ -39,56 +34,56 @@ func extBasicBlocks(cfg *ControlFlowGraph, blkID uint, roots *adt.Queue[uint], s
 	}
 }
 
-func ImmDominator(cfg *ControlFlowGraph, Dominance map[uint]adt.Set[*BasicBlock]) map[uint]*BasicBlock {
-	IDom := make(map[uint]*BasicBlock)
-	Tmp := make(map[uint]adt.Set[*BasicBlock])
+func ImmDominator(cfg *meer.ControlFlowGraph, Dominance map[uint]adt.Set[*meer.BasicBlock]) map[uint]*meer.BasicBlock {
+	IDom := make(map[uint]*meer.BasicBlock)
+	Tmp := make(map[uint]adt.Set[*meer.BasicBlock])
 
 	for _, BB := range cfg.Nodes.Elems() {
-		Tmp[BB.id] = Dominance[BB.id].Remove(BB)
+		Tmp[BB.ID()] = Dominance[BB.ID()].Remove(BB)
 	}
 
 	for _, BB := range cfg.Nodes.Elems() {
-		if BB.id == cfg.Entry.id {
+		if BB.ID() == cfg.Entry.ID() {
 			continue
 		}
 
-		for _, s := range Tmp[BB.id].Elems() {
-			for _, t := range Tmp[BB.id].Elems() {
+		for _, s := range Tmp[BB.ID()].Elems() {
+			for _, t := range Tmp[BB.ID()].Elems() {
 				if t == s {
 					continue
 				}
 
-				if Tmp[s.id].Contains(t) {
-					Tmp[BB.id].Remove(t)
+				if Tmp[s.ID()].Contains(t) {
+					Tmp[BB.ID()].Remove(t)
 				}
 			}
 		}
 	}
 
 	for _, BB := range cfg.Nodes.Elems() {
-		if BB.id == cfg.Entry.id {
+		if BB.ID() == cfg.Entry.ID() {
 			continue
 		}
 
-		IDom[BB.id] = Tmp[BB.id].Pop()
+		IDom[BB.ID()] = Tmp[BB.ID()].Pop()
 	}
 
 	return IDom
 }
 
-func Dominance(cfg *ControlFlowGraph) map[uint]adt.Set[*BasicBlock] {
-	Dom := make(map[uint]adt.Set[*BasicBlock])
+func Dominance(cfg *meer.ControlFlowGraph) map[uint]adt.Set[*meer.BasicBlock] {
+	Dom := make(map[uint]adt.Set[*meer.BasicBlock])
 
-	entrySet := adt.NewHashSet[*BasicBlock]()
+	entrySet := adt.NewHashSet[*meer.BasicBlock]()
 	entrySet.Add(cfg.Entry)
-	Dom[cfg.Entry.id] = entrySet
+	Dom[cfg.Entry.ID()] = entrySet
 
 	for _, BB := range cfg.Nodes.Elems() {
-		if BB.id == cfg.Entry.id {
+		if BB.ID() == cfg.Entry.ID() {
 			continue
 		}
 
-		Dom[BB.id] = cfg.Nodes.Clone()
+		Dom[BB.ID()] = cfg.Nodes.Clone()
 	}
 
 	changed := true
@@ -115,27 +110,27 @@ func Dominance(cfg *ControlFlowGraph) map[uint]adt.Set[*BasicBlock] {
 	return Dom
 }
 
-func DominanceFrontier(cfg *ControlFlowGraph) map[uint]adt.Set[*BasicBlock] {
-	DF := make(map[uint]adt.Set[*BasicBlock])
+func DominanceFrontier(cfg *meer.ControlFlowGraph) map[uint]adt.Set[*meer.BasicBlock] {
+	DF := make(map[uint]adt.Set[*meer.BasicBlock])
 	for _, BB := range cfg.Nodes.Elems() {
-		DF[BB.id] = adt.NewHashSet[*BasicBlock]()
+		DF[BB.ID()] = adt.NewHashSet[*meer.BasicBlock]()
 	}
 
 	Dom := Dominance(cfg)
 	IDom := ImmDominator(cfg, Dom)
 
 	for _, BB := range cfg.Nodes.Elems() {
-		if !cfg.IsJoinNode(BB.id) {
+		if !cfg.IsJoinNode(BB.ID()) {
 			continue
 		}
 
-		for _, pred := range cfg.Pred[BB.id].Elems() {
+		for _, pred := range cfg.Pred[BB.ID()].Elems() {
 			runner := pred
 
-			for runner != IDom[BB.id].id {
+			for runner != IDom[BB.ID()].ID() {
 				DF[runner].Add(BB)
 				if _, exists := IDom[runner]; exists {
-					runner = IDom[runner].id
+					runner = IDom[runner].ID()
 				}
 			}
 		}
@@ -144,13 +139,13 @@ func DominanceFrontier(cfg *ControlFlowGraph) map[uint]adt.Set[*BasicBlock] {
 	return DF
 }
 
-func NaturalLoop(cfg *ControlFlowGraph, m, n *BasicBlock) adt.Set[uint] {
+func NaturalLoop(cfg *meer.ControlFlowGraph, m, n *meer.BasicBlock) adt.Set[uint] {
 	Stack := adt.NewStack[uint]()
 	Loop := adt.NewHashSet[uint]()
-	Loop.Add(m.id, n.id)
+	Loop.Add(m.ID(), n.ID())
 
 	if m != n {
-		Stack.Push(m.id)
+		Stack.Push(m.ID())
 	}
 
 	for !Stack.Empty() {
@@ -166,11 +161,11 @@ func NaturalLoop(cfg *ControlFlowGraph, m, n *BasicBlock) adt.Set[uint] {
 	return Loop
 }
 
-func BuildCFG(program *meer.Program) *ControlFlowGraph {
+func BuildCFG(program *meer.Program) *meer.ControlFlowGraph {
 	Main := program.Units["Main"]
 
 	blocks := findLeaders(Main.Inst)
-	cfg := NewCFG()
+	cfg := meer.NewCFG()
 
 	for id, block := range blocks {
 		cfg.Nodes.Add(block)
@@ -179,21 +174,23 @@ func BuildCFG(program *meer.Program) *ControlFlowGraph {
 
 		switch last := lastInstr.(type) {
 		case *meer.JumpInst:
-			cfg.AddSuc(block.id, last.Dst.BlockID)
-			cfg.AddPred(last.Dst.BlockID, block.id)
+			cfg.AddSuc(block.ID(), last.Dst.BlockID)
+			cfg.AddPred(last.Dst.BlockID, block.ID())
 		case *meer.CondBrInst:
-			cfg.AddSuc(block.id, last.IfTrue.BlockID, last.IfFalse.BlockID)
+			cfg.AddSuc(block.ID(), last.IfTrue.BlockID, last.IfFalse.BlockID)
 
-			cfg.AddPred(last.IfTrue.BlockID, block.id)
-			cfg.AddPred(last.IfFalse.BlockID, block.id)
+			cfg.AddPred(last.IfTrue.BlockID, block.ID())
+			cfg.AddPred(last.IfFalse.BlockID, block.ID())
 		default:
 			fallthroughBlockID := id + 1
 			if blocks[fallthroughBlockID] != nil {
-				cfg.AddSuc(block.id, fallthroughBlockID)
-				cfg.AddPred(fallthroughBlockID, block.id)
+				cfg.AddSuc(block.ID(), fallthroughBlockID)
+				cfg.AddPred(fallthroughBlockID, block.ID())
 			}
 		}
 	}
+
+	Main.CFG = cfg
 
 	return cfg
 }
@@ -207,12 +204,12 @@ func isTerm(i meer.Instruction) bool {
 	}
 }
 
-func findLeaders(instructions []meer.Instruction) map[uint]*BasicBlock {
-	Blocks := make(map[uint]*BasicBlock)
+func findLeaders(instructions []meer.Instruction) map[uint]*meer.BasicBlock {
+	Blocks := make(map[uint]*meer.BasicBlock)
 
 	first := instructions[0].(*meer.Label)
-	BB := CreateBasicBlock(first)
-	first.BlockID = BB.id
+	BB := meer.CreateBasicBlock(first)
+	first.BlockID = BB.ID()
 
 	for _, inst := range instructions[1:] {
 		i, ok := inst.(*meer.Label)
@@ -222,229 +219,12 @@ func findLeaders(instructions []meer.Instruction) map[uint]*BasicBlock {
 		}
 
 		if ok || isTerm(inst) {
-			Blocks[BB.id] = BB
-			BB = CreateBasicBlock(i)
+			Blocks[BB.ID()] = BB
+			BB = meer.CreateBasicBlock(i)
 		}
 	}
 
-	Blocks[BB.id] = BB
+	Blocks[BB.ID()] = BB
 
 	return Blocks
-}
-
-// BasicBlock ...
-// -------------------------------
-type BasicBlock struct {
-	id    uint
-	name  string
-	instr *list.List
-}
-
-var nb uint = 1
-
-func NewBasicBlock(lbl *meer.Label) *BasicBlock {
-	blk := &BasicBlock{
-		name: lbl.Name,
-		id:   nb,
-	}
-
-	lbl.BlockID = nb
-
-	nb++
-
-	return blk
-}
-
-var nextBlock uint = 1
-
-func CreateBasicBlock(lbl *meer.Label) *BasicBlock {
-	instr := list.New()
-	instr.Init()
-	blk := &BasicBlock{
-		name:  lbl.Name,
-		instr: instr,
-		id:    nextBlock,
-	}
-
-	lbl.BlockID = nextBlock
-
-	nextBlock++
-
-	return blk
-}
-
-func (b *BasicBlock) ID() uint            { return b.id }
-func (b *BasicBlock) Name() string        { return b.name }
-func (b *BasicBlock) SetName(name string) { b.name = name }
-func (b *BasicBlock) HasName() bool       { return b.name != "" }
-func (b *BasicBlock) String() string {
-	s := fmt.Sprintf("%%%s:\n\t", b.name)
-
-	for inst := b.instr.Front(); inst != nil; inst = inst.Next() {
-		i := inst.Value.(meer.Instruction)
-		if inst.Next() != nil {
-			s += fmt.Sprintf("%s\n\t", i)
-		} else {
-			s += fmt.Sprintf("%s\n\n", i)
-		}
-	}
-
-	return s
-}
-func (b *BasicBlock) Instr() *list.List { return b.instr }
-func (b *BasicBlock) InsertInstrBegin(inst meer.Instruction) {
-	b.instr.InsertBefore(inst, b.instr.Front())
-}
-func (b *BasicBlock) RemoveInstr(rem *list.Element) { b.instr.Remove(rem) }
-func (b *BasicBlock) Empty() bool {
-	if b.instr.Len() != 1 {
-		return false
-	}
-
-	_, ok := b.instr.Front().Value.(*meer.JumpInst)
-	return ok
-}
-func (b *BasicBlock) LastInst() meer.Instruction  { return b.instr.Back().Value.(meer.Instruction) }
-func (b *BasicBlock) AddInstr(i meer.Instruction) { b.instr.PushBack(i) }
-func (b *BasicBlock) LastInstIsCondBr() bool {
-	_, ok := b.LastInst().(*meer.CondBrInst)
-	return ok
-}
-
-// ControlFlowGraph
-// ----------------------------------------------------------------
-type ControlFlowGraph struct {
-	Entry, Exit *BasicBlock
-	Blocks      map[uint]*BasicBlock
-	Nodes       adt.Set[*BasicBlock]
-	Suc         map[uint]*adt.HashSet[uint]
-	Pred        map[uint]*adt.HashSet[uint]
-}
-
-func NewCFG() *ControlFlowGraph {
-	return &ControlFlowGraph{
-		Nodes:  adt.NewHashSet[*BasicBlock](),
-		Blocks: make(map[uint]*BasicBlock),
-		Suc:    make(map[uint]*adt.HashSet[uint]),
-		Pred:   make(map[uint]*adt.HashSet[uint]),
-	}
-}
-
-func (cfg *ControlFlowGraph) AddSuc(BlkID uint, Successors ...uint) {
-	if cfg.Suc[BlkID] == nil {
-		cfg.Suc[BlkID] = adt.NewHashSet[uint]()
-	}
-	cfg.Suc[BlkID].Add(Successors...)
-}
-
-func (cfg *ControlFlowGraph) AddPred(BlkID uint, Predecessors ...uint) {
-	if cfg.Pred[BlkID] == nil {
-		cfg.Pred[BlkID] = adt.NewHashSet[uint]()
-	}
-	cfg.Pred[BlkID].Add(Predecessors...)
-}
-
-func (cfg *ControlFlowGraph) IsJoinNode(blk uint) bool {
-	if cfg.Pred[blk] != nil {
-		return cfg.Pred[blk].Size() > 1
-	}
-
-	return false
-}
-
-func (cfg *ControlFlowGraph) IsBrNode(blk uint) bool {
-	return cfg.Suc[blk].Size() > 1
-}
-
-func (cfg *ControlFlowGraph) String() string {
-	var nodes, suc, pred []string
-	for _, blk := range cfg.Nodes.Elems() {
-		nodes = append(nodes, blk.name)
-	}
-
-	for id, bb := range cfg.Suc {
-		var blocks []string
-		for _, blk := range bb.Elems() {
-			blocks = append(blocks, cfg.Blocks[blk].name)
-		}
-
-		suc = append(suc, fmt.Sprintf("\n\t\t\t%s: %s", cfg.Blocks[id], blocks))
-	}
-
-	for id, bb := range cfg.Pred {
-		var blocks []string
-		for _, blk := range bb.Elems() {
-			blocks = append(blocks, cfg.Blocks[blk].name)
-		}
-
-		pred = append(pred, fmt.Sprintf("\n\t\t\t%s: %s", cfg.Blocks[id], blocks))
-	}
-
-	buf := &bytes.Buffer{}
-	buf.WriteString("flow-graph = {\n\t")
-	buf.WriteString(fmt.Sprintf("\tNodes = {%s},\n\t", strings.Join(nodes, ", ")))
-	buf.WriteString(fmt.Sprintf("\tSucc = {%s\n\t\t},\n\t", strings.Join(suc, ", ")))
-	buf.WriteString(fmt.Sprintf("\tPred = {%s\n\t\t},\n\t", strings.Join(pred, ", ")))
-	buf.WriteString("}")
-
-	return buf.String()
-}
-
-func (cfg *ControlFlowGraph) PostOrder() []uint {
-	visited := map[uint]bool{}
-	order := make([]uint, 0)
-
-	cfg.dfs(cfg.Entry.id, visited, &order)
-	return order
-}
-
-func (cfg *ControlFlowGraph) dfs(BlkID uint, visited map[uint]bool, order *[]uint) {
-	visited[BlkID] = true
-	if cfg.Suc[BlkID] != nil {
-		for _, suc := range cfg.Suc[BlkID].Elems() {
-			if _, found := visited[suc]; !found {
-				cfg.dfs(suc, visited, order)
-			}
-		}
-	}
-
-	*order = append(*order, BlkID)
-}
-
-func (cfg *ControlFlowGraph) ReversePostOrder() []uint {
-	pOrder := cfg.PostOrder()
-	var revOrder []uint
-	for i := len(pOrder) - 1; i >= 0; i-- {
-		revOrder = append(revOrder, pOrder[i])
-	}
-
-	return revOrder
-}
-
-func (cfg *ControlFlowGraph) Reverse() *ControlFlowGraph {
-	panic("not implemented")
-}
-
-func (cfg *ControlFlowGraph) DeleteBlocks(blocks ...*BasicBlock) {
-	cfg.Nodes.Remove(blocks...)
-	for _, block := range blocks {
-		delete(cfg.Suc, block.id)
-		delete(cfg.Pred, block.id)
-
-		for _, suc := range cfg.Suc {
-			for _, bb := range suc.Elems() {
-				if bb == block.id {
-					suc.Remove(block.id)
-				}
-			}
-		}
-
-		for _, pred := range cfg.Pred {
-			for _, bb := range pred.Elems() {
-				if bb == block.id {
-					pred.Remove(block.id)
-				}
-			}
-		}
-	}
 }

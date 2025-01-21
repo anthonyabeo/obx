@@ -65,33 +65,33 @@ end Main
 	LblIfElse := meer.NewLabel("if.else")
 	LblCont := meer.NewLabel("cont")
 
-	BlockMain := NewBasicBlock(LblMain)
-	BlockLoop := NewBasicBlock(LblLoop)
-	BlockIfThen := NewBasicBlock(LblIfThen)
-	BlockIfElse := NewBasicBlock(LblIfElse)
-	BlockCont := NewBasicBlock(LblCont)
+	BlockMain := meer.NewBasicBlock(LblMain)
+	BlockLoop := meer.NewBasicBlock(LblLoop)
+	BlockIfThen := meer.NewBasicBlock(LblIfThen)
+	BlockIfElse := meer.NewBasicBlock(LblIfElse)
+	BlockCont := meer.NewBasicBlock(LblCont)
 
 	tests := []struct {
 		id       uint
 		numInstr int
 	}{
-		{BlockIfThen.id, 3},
-		{BlockIfElse.id, 1},
-		{BlockLoop.id, 1},
-		{BlockMain.id, 3},
-		{BlockCont.id, 1},
+		{BlockIfThen.ID(), 3},
+		{BlockIfElse.ID(), 1},
+		{BlockLoop.ID(), 1},
+		{BlockMain.ID(), 3},
+		{BlockCont.ID(), 1},
 	}
 
 	for _, tt := range tests {
 		BB, ok := leaders[tt.id]
 		if !ok {
-			t.Errorf("expected Basic Block leader '%s' not found", leaders[tt.id].name)
+			t.Errorf("expected Basic Block leader '%s' not found", leaders[tt.id].Name())
 			return
 		}
 
-		if tt.numInstr != BB.instr.Len() {
+		if tt.numInstr != BB.Instr().Len() {
 			t.Errorf("expected Basic Block '%s' to have %d instructions, got %d",
-				leaders[tt.id].name, tt.numInstr, BB.instr.Len())
+				leaders[tt.id].Name(), tt.numInstr, BB.Instr().Len())
 			return
 		}
 	}
@@ -147,34 +147,34 @@ end Main
 	LblIfElse := meer.NewLabel("if.else")
 	LblCont := meer.NewLabel("cont")
 
-	BlockMain := NewBasicBlock(LblMain)
-	BlockLoop := NewBasicBlock(LblLoop)
-	BlockIfThen := NewBasicBlock(LblIfThen)
-	BlockIfElse := NewBasicBlock(LblIfElse)
-	BlockCont := NewBasicBlock(LblCont)
+	BlockMain := meer.NewBasicBlock(LblMain)
+	BlockLoop := meer.NewBasicBlock(LblLoop)
+	BlockIfThen := meer.NewBasicBlock(LblIfThen)
+	BlockIfElse := meer.NewBasicBlock(LblIfElse)
+	BlockCont := meer.NewBasicBlock(LblCont)
 
-	Blocks := map[uint]*BasicBlock{
-		BlockMain.id:   BlockMain,
-		BlockLoop.id:   BlockLoop,
-		BlockCont.id:   BlockCont,
-		BlockIfElse.id: BlockIfElse,
-		BlockIfThen.id: BlockIfThen,
+	Blocks := map[uint]*meer.BasicBlock{
+		BlockMain.ID():   BlockMain,
+		BlockLoop.ID():   BlockLoop,
+		BlockCont.ID():   BlockCont,
+		BlockIfElse.ID(): BlockIfElse,
+		BlockIfThen.ID(): BlockIfThen,
 	}
 
 	successors := map[uint][]uint{
-		BlockMain.id:   {BlockLoop.id},
-		BlockLoop.id:   {BlockIfThen.id, BlockIfElse.id},
-		BlockIfThen.id: {BlockLoop.id},
-		BlockIfElse.id: {BlockCont.id},
-		//BlockCont.id:   {},
+		BlockMain.ID():   {BlockLoop.ID()},
+		BlockLoop.ID():   {BlockIfThen.ID(), BlockIfElse.ID()},
+		BlockIfThen.ID(): {BlockLoop.ID()},
+		BlockIfElse.ID(): {BlockCont.ID()},
+		//BlockCont.ID():   {},
 	}
 
 	predecessors := map[uint][]uint{
-		//BlockMain.id:   {},
-		BlockLoop.id:   {BlockMain.id, BlockIfThen.id},
-		BlockIfThen.id: {BlockLoop.id},
-		BlockIfElse.id: {BlockLoop.id},
-		BlockCont.id:   {BlockIfElse.id},
+		//BlockMain.ID():   {},
+		BlockLoop.ID():   {BlockMain.ID(), BlockIfThen.ID()},
+		BlockIfThen.ID(): {BlockLoop.ID()},
+		BlockIfElse.ID(): {BlockLoop.ID()},
+		BlockCont.ID():   {BlockIfElse.ID()},
 	}
 
 	if cfg.Nodes.Size() != len(Blocks) {
@@ -185,14 +185,14 @@ end Main
 	for id, suc := range successors {
 		cfgSuc, ok := cfg.Suc[id]
 		if !ok {
-			t.Errorf("no successors found for block '%s'", Blocks[id].name)
+			t.Errorf("no successors found for block '%s'", Blocks[id].Name())
 			return
 		}
 
 		for _, ttSuc := range suc {
 			if !cfgSuc.Contains(ttSuc) {
 				t.Errorf("expected '%s' to be a successor of '%s'",
-					Blocks[ttSuc].name, Blocks[id].name)
+					Blocks[ttSuc].Name(), Blocks[id].Name())
 			}
 		}
 	}
@@ -201,16 +201,20 @@ end Main
 		cfgPred, ok := cfg.Pred[id]
 		if !ok {
 			t.Errorf("no predecessors found for block '%s'",
-				Blocks[id].name)
+				Blocks[id].Name())
 		}
 
 		for _, ttPred := range pred {
 			if !cfgPred.Contains(ttPred) {
 				t.Errorf("expected '%s' to be a predecessor of '%s'",
-					Blocks[ttPred].name, Blocks[id].name)
+					Blocks[ttPred].Name(), Blocks[id].Name())
 			}
 		}
 	}
+}
+
+func TestBuildCFGForWhileLoopWithSingleElseIfBranch(t *testing.T) {
+
 }
 
 func TestComputingExtendedBasicBlocks(t *testing.T) {
@@ -225,47 +229,47 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 	lbl7 := meer.NewLabel("B7")
 	lblExit := meer.NewLabel("exit")
 
-	entry := NewBasicBlock(lblEntry)
-	b0 := NewBasicBlock(lbl0)
-	b1 := NewBasicBlock(lbl1)
-	b2 := NewBasicBlock(lbl2)
-	b3 := NewBasicBlock(lbl3)
-	b4 := NewBasicBlock(lbl4)
-	b5 := NewBasicBlock(lbl5)
-	b6 := NewBasicBlock(lbl6)
+	entry := meer.NewBasicBlock(lblEntry)
+	b0 := meer.NewBasicBlock(lbl0)
+	b1 := meer.NewBasicBlock(lbl1)
+	b2 := meer.NewBasicBlock(lbl2)
+	b3 := meer.NewBasicBlock(lbl3)
+	b4 := meer.NewBasicBlock(lbl4)
+	b5 := meer.NewBasicBlock(lbl5)
+	b6 := meer.NewBasicBlock(lbl6)
 
-	cfg := NewCFG()
+	cfg := meer.NewCFG()
 	cfg.Entry = entry
 
 	cfg.Nodes.Add(entry, b0, b1, b2, b3, b4, b5, b6)
 
-	cfg.AddSuc(entry.id, b0.id)
-	cfg.AddSuc(b0.id, b1.id, b3.id)
-	cfg.AddSuc(b1.id, b2.id)
-	cfg.AddSuc(b2.id, b0.id)
-	cfg.AddSuc(b3.id, b4.id, b6.id)
-	cfg.AddSuc(b4.id, b5.id)
-	cfg.AddSuc(b5.id, b2.id)
-	cfg.AddSuc(b6.id, b5.id)
+	cfg.AddSuc(entry.ID(), b0.ID())
+	cfg.AddSuc(b0.ID(), b1.ID(), b3.ID())
+	cfg.AddSuc(b1.ID(), b2.ID())
+	cfg.AddSuc(b2.ID(), b0.ID())
+	cfg.AddSuc(b3.ID(), b4.ID(), b6.ID())
+	cfg.AddSuc(b4.ID(), b5.ID())
+	cfg.AddSuc(b5.ID(), b2.ID())
+	cfg.AddSuc(b6.ID(), b5.ID())
 
-	cfg.AddPred(b0.id)
-	cfg.AddPred(b1.id, b0.id)
-	cfg.AddPred(b2.id, b1.id, b5.id)
-	cfg.AddPred(b3.id, b0.id)
-	cfg.AddPred(b4.id, b3.id)
-	cfg.AddPred(b5.id, b6.id, b4.id)
-	cfg.AddPred(b6.id, b3.id)
+	cfg.AddPred(b0.ID())
+	cfg.AddPred(b1.ID(), b0.ID())
+	cfg.AddPred(b2.ID(), b1.ID(), b5.ID())
+	cfg.AddPred(b3.ID(), b0.ID())
+	cfg.AddPred(b4.ID(), b3.ID())
+	cfg.AddPred(b5.ID(), b6.ID(), b4.ID())
+	cfg.AddPred(b6.ID(), b3.ID())
 
 	tests := []struct {
 		root   uint
 		blocks []uint
 	}{
-		{b0.id, []uint{b0.id, b1.id, b3.id, b4.id, b6.id}},
-		{b5.id, []uint{b5.id}},
-		{b2.id, []uint{b2.id}},
+		{b0.ID(), []uint{b0.ID(), b1.ID(), b3.ID(), b4.ID(), b6.ID()}},
+		{b5.ID(), []uint{b5.ID()}},
+		{b2.ID(), []uint{b2.ID()}},
 	}
 
-	extBBs := ExtendedBasicBlocks(cfg, b0.id)
+	extBBs := ExtendedBasicBlocks(cfg, b0.ID())
 	for _, tt := range tests {
 		ebb, found := extBBs[tt.root]
 		if !found {
@@ -285,54 +289,54 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 		}
 	}
 
-	entry = NewBasicBlock(lblEntry)
-	b1 = NewBasicBlock(lbl1)
-	b2 = NewBasicBlock(lbl2)
-	b3 = NewBasicBlock(lbl3)
-	b4 = NewBasicBlock(lbl4)
-	b5 = NewBasicBlock(lbl5)
-	b6 = NewBasicBlock(lbl6)
-	b7 := NewBasicBlock(lbl7)
-	exit := NewBasicBlock(lblExit)
+	entry = meer.NewBasicBlock(lblEntry)
+	b1 = meer.NewBasicBlock(lbl1)
+	b2 = meer.NewBasicBlock(lbl2)
+	b3 = meer.NewBasicBlock(lbl3)
+	b4 = meer.NewBasicBlock(lbl4)
+	b5 = meer.NewBasicBlock(lbl5)
+	b6 = meer.NewBasicBlock(lbl6)
+	b7 := meer.NewBasicBlock(lbl7)
+	exit := meer.NewBasicBlock(lblExit)
 
-	cfg = NewCFG()
+	cfg = meer.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
 	cfg.Nodes.Add(entry, b1, b2, b3, b4, b5, b6, b7, exit)
 
-	cfg.AddSuc(entry.id, b1.id)
-	cfg.AddSuc(b1.id, b2.id, b3.id)
-	cfg.AddSuc(b2.id, b4.id)
-	cfg.AddSuc(b3.id, b4.id)
-	cfg.AddSuc(b4.id, b5.id, b6.id)
-	cfg.AddSuc(b5.id, b7.id)
-	cfg.AddSuc(b6.id, exit.id, b1.id)
-	cfg.AddSuc(b7.id, exit.id, b5.id)
-	cfg.AddSuc(exit.id)
+	cfg.AddSuc(entry.ID(), b1.ID())
+	cfg.AddSuc(b1.ID(), b2.ID(), b3.ID())
+	cfg.AddSuc(b2.ID(), b4.ID())
+	cfg.AddSuc(b3.ID(), b4.ID())
+	cfg.AddSuc(b4.ID(), b5.ID(), b6.ID())
+	cfg.AddSuc(b5.ID(), b7.ID())
+	cfg.AddSuc(b6.ID(), exit.ID(), b1.ID())
+	cfg.AddSuc(b7.ID(), exit.ID(), b5.ID())
+	cfg.AddSuc(exit.ID())
 
-	cfg.AddPred(entry.id)
-	cfg.AddPred(b1.id, b6.id, entry.id)
-	cfg.AddPred(b2.id, b1.id)
-	cfg.AddPred(b3.id, b1.id)
-	cfg.AddPred(b4.id, b2.id, b3.id)
-	cfg.AddPred(b5.id, b7.id, b4.id)
-	cfg.AddPred(b6.id, b4.id)
-	cfg.AddPred(b7.id, b5.id)
-	cfg.AddPred(exit.id, b6.id, b7.id)
+	cfg.AddPred(entry.ID())
+	cfg.AddPred(b1.ID(), b6.ID(), entry.ID())
+	cfg.AddPred(b2.ID(), b1.ID())
+	cfg.AddPred(b3.ID(), b1.ID())
+	cfg.AddPred(b4.ID(), b2.ID(), b3.ID())
+	cfg.AddPred(b5.ID(), b7.ID(), b4.ID())
+	cfg.AddPred(b6.ID(), b4.ID())
+	cfg.AddPred(b7.ID(), b5.ID())
+	cfg.AddPred(exit.ID(), b6.ID(), b7.ID())
 
 	tests = []struct {
 		root   uint
 		blocks []uint
 	}{
-		{entry.id, []uint{entry.id}},
-		{b1.id, []uint{b1.id, b2.id, b3.id}},
-		{b4.id, []uint{b4.id, b6.id}},
-		{b5.id, []uint{b5.id, b7.id}},
-		{exit.id, []uint{exit.id}},
+		{entry.ID(), []uint{entry.ID()}},
+		{b1.ID(), []uint{b1.ID(), b2.ID(), b3.ID()}},
+		{b4.ID(), []uint{b4.ID(), b6.ID()}},
+		{b5.ID(), []uint{b5.ID(), b7.ID()}},
+		{exit.ID(), []uint{exit.ID()}},
 	}
 
-	extBBs = ExtendedBasicBlocks(cfg, entry.id)
+	extBBs = ExtendedBasicBlocks(cfg, entry.ID())
 	for _, tt := range tests {
 		ebb, found := extBBs[tt.root]
 		if !found {
@@ -363,66 +367,66 @@ func TestComputeDominance(t *testing.T) {
 	lbl7 := meer.NewLabel("B7")
 	lblExit := meer.NewLabel("exit")
 
-	entry := NewBasicBlock(lblEntry)
-	b1 := NewBasicBlock(lbl1)
-	b2 := NewBasicBlock(lbl2)
-	b3 := NewBasicBlock(lbl3)
-	b4 := NewBasicBlock(lbl4)
-	b5 := NewBasicBlock(lbl5)
-	b6 := NewBasicBlock(lbl6)
-	b7 := NewBasicBlock(lbl7)
-	exit := NewBasicBlock(lblExit)
+	entry := meer.NewBasicBlock(lblEntry)
+	b1 := meer.NewBasicBlock(lbl1)
+	b2 := meer.NewBasicBlock(lbl2)
+	b3 := meer.NewBasicBlock(lbl3)
+	b4 := meer.NewBasicBlock(lbl4)
+	b5 := meer.NewBasicBlock(lbl5)
+	b6 := meer.NewBasicBlock(lbl6)
+	b7 := meer.NewBasicBlock(lbl7)
+	exit := meer.NewBasicBlock(lblExit)
 
-	cfg := NewCFG()
+	cfg := meer.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
 	cfg.Nodes.Add(entry, b1, b2, b3, b4, b5, b6, b7, exit)
-	cfg.Blocks = map[uint]*BasicBlock{
-		entry.id: entry,
-		b1.id:    b1,
-		b2.id:    b2,
-		b3.id:    b3,
-		b4.id:    b4,
-		b5.id:    b5,
-		b6.id:    b6,
-		b7.id:    b7,
-		exit.id:  exit,
+	cfg.Blocks = map[uint]*meer.BasicBlock{
+		entry.ID(): entry,
+		b1.ID():    b1,
+		b2.ID():    b2,
+		b3.ID():    b3,
+		b4.ID():    b4,
+		b5.ID():    b5,
+		b6.ID():    b6,
+		b7.ID():    b7,
+		exit.ID():  exit,
 	}
 
-	cfg.AddSuc(entry.id, b1.id)
-	cfg.AddSuc(b1.id, b2.id, b3.id)
-	cfg.AddSuc(b2.id, b4.id)
-	cfg.AddSuc(b3.id, b4.id)
-	cfg.AddSuc(b4.id, b5.id, b6.id)
-	cfg.AddSuc(b5.id, b7.id)
-	cfg.AddSuc(b6.id, exit.id, b1.id)
-	cfg.AddSuc(b7.id, exit.id, b5.id)
-	cfg.AddSuc(exit.id)
+	cfg.AddSuc(entry.ID(), b1.ID())
+	cfg.AddSuc(b1.ID(), b2.ID(), b3.ID())
+	cfg.AddSuc(b2.ID(), b4.ID())
+	cfg.AddSuc(b3.ID(), b4.ID())
+	cfg.AddSuc(b4.ID(), b5.ID(), b6.ID())
+	cfg.AddSuc(b5.ID(), b7.ID())
+	cfg.AddSuc(b6.ID(), exit.ID(), b1.ID())
+	cfg.AddSuc(b7.ID(), exit.ID(), b5.ID())
+	cfg.AddSuc(exit.ID())
 
-	cfg.AddPred(entry.id)
-	cfg.AddPred(b1.id, b6.id, entry.id)
-	cfg.AddPred(b2.id, b1.id)
-	cfg.AddPred(b3.id, b1.id)
-	cfg.AddPred(b4.id, b2.id, b3.id)
-	cfg.AddPred(b5.id, b7.id, b4.id)
-	cfg.AddPred(b6.id, b4.id)
-	cfg.AddPred(b7.id, b5.id)
-	cfg.AddPred(exit.id, b6.id, b7.id)
+	cfg.AddPred(entry.ID())
+	cfg.AddPred(b1.ID(), b6.ID(), entry.ID())
+	cfg.AddPred(b2.ID(), b1.ID())
+	cfg.AddPred(b3.ID(), b1.ID())
+	cfg.AddPred(b4.ID(), b2.ID(), b3.ID())
+	cfg.AddPred(b5.ID(), b7.ID(), b4.ID())
+	cfg.AddPred(b6.ID(), b4.ID())
+	cfg.AddPred(b7.ID(), b5.ID())
+	cfg.AddPred(exit.ID(), b6.ID(), b7.ID())
 
 	tests := []struct {
 		id     uint
-		blocks []*BasicBlock
+		blocks []*meer.BasicBlock
 	}{
-		{entry.id, []*BasicBlock{entry}},
-		{b1.id, []*BasicBlock{entry, b1}},
-		{b2.id, []*BasicBlock{entry, b1, b2}},
-		{b3.id, []*BasicBlock{entry, b1, b3}},
-		{b4.id, []*BasicBlock{entry, b1, b4}},
-		{b5.id, []*BasicBlock{entry, b1, b4, b5}},
-		{b6.id, []*BasicBlock{entry, b1, b4, b6}},
-		{b7.id, []*BasicBlock{entry, b1, b4, b5, b7}},
-		{exit.id, []*BasicBlock{entry, b1, b4, exit}},
+		{entry.ID(), []*meer.BasicBlock{entry}},
+		{b1.ID(), []*meer.BasicBlock{entry, b1}},
+		{b2.ID(), []*meer.BasicBlock{entry, b1, b2}},
+		{b3.ID(), []*meer.BasicBlock{entry, b1, b3}},
+		{b4.ID(), []*meer.BasicBlock{entry, b1, b4}},
+		{b5.ID(), []*meer.BasicBlock{entry, b1, b4, b5}},
+		{b6.ID(), []*meer.BasicBlock{entry, b1, b4, b6}},
+		{b7.ID(), []*meer.BasicBlock{entry, b1, b4, b5, b7}},
+		{exit.ID(), []*meer.BasicBlock{entry, b1, b4, exit}},
 	}
 
 	dom := Dominance(cfg)
@@ -449,46 +453,46 @@ func TestComputeDominance2(t *testing.T) {
 	lbl3 := meer.NewLabel("B3")
 	lblExit := meer.NewLabel("exit")
 
-	entry := NewBasicBlock(lblEntry)
-	b1 := NewBasicBlock(lbl1)
-	b2 := NewBasicBlock(lbl2)
-	b3 := NewBasicBlock(lbl3)
-	exit := NewBasicBlock(lblExit)
+	entry := meer.NewBasicBlock(lblEntry)
+	b1 := meer.NewBasicBlock(lbl1)
+	b2 := meer.NewBasicBlock(lbl2)
+	b3 := meer.NewBasicBlock(lbl3)
+	exit := meer.NewBasicBlock(lblExit)
 
-	cfg := NewCFG()
+	cfg := meer.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
 	cfg.Nodes.Add(entry, b1, b2, b3, exit)
-	cfg.Blocks = map[uint]*BasicBlock{
-		entry.id: entry,
-		b1.id:    b1,
-		b2.id:    b2,
-		b3.id:    b3,
-		exit.id:  exit,
+	cfg.Blocks = map[uint]*meer.BasicBlock{
+		entry.ID(): entry,
+		b1.ID():    b1,
+		b2.ID():    b2,
+		b3.ID():    b3,
+		exit.ID():  exit,
 	}
 
-	cfg.AddSuc(entry.id, b1.id, b2.id)
-	cfg.AddSuc(b1.id, b3.id)
-	cfg.AddSuc(b2.id, b3.id)
-	cfg.AddSuc(b3.id, exit.id)
-	cfg.AddSuc(exit.id)
+	cfg.AddSuc(entry.ID(), b1.ID(), b2.ID())
+	cfg.AddSuc(b1.ID(), b3.ID())
+	cfg.AddSuc(b2.ID(), b3.ID())
+	cfg.AddSuc(b3.ID(), exit.ID())
+	cfg.AddSuc(exit.ID())
 
-	cfg.AddPred(entry.id)
-	cfg.AddPred(b1.id, entry.id)
-	cfg.AddPred(b2.id, entry.id)
-	cfg.AddPred(b3.id, b1.id, b2.id)
-	cfg.AddPred(exit.id, b3.id)
+	cfg.AddPred(entry.ID())
+	cfg.AddPred(b1.ID(), entry.ID())
+	cfg.AddPred(b2.ID(), entry.ID())
+	cfg.AddPred(b3.ID(), b1.ID(), b2.ID())
+	cfg.AddPred(exit.ID(), b3.ID())
 
 	tests := []struct {
 		id     uint
-		blocks []*BasicBlock
+		blocks []*meer.BasicBlock
 	}{
-		{entry.id, []*BasicBlock{entry}},
-		{b1.id, []*BasicBlock{entry, b1}},
-		{b2.id, []*BasicBlock{entry, b2}},
-		{b3.id, []*BasicBlock{entry, b3}},
-		{exit.id, []*BasicBlock{entry, b3, exit}},
+		{entry.ID(), []*meer.BasicBlock{entry}},
+		{b1.ID(), []*meer.BasicBlock{entry, b1}},
+		{b2.ID(), []*meer.BasicBlock{entry, b2}},
+		{b3.ID(), []*meer.BasicBlock{entry, b3}},
+		{exit.ID(), []*meer.BasicBlock{entry, b3, exit}},
 	}
 
 	dom := Dominance(cfg)
@@ -520,66 +524,66 @@ func TestComputeDominance3(t *testing.T) {
 	lbl7 := meer.NewLabel("B7")
 	lbl8 := meer.NewLabel("B8")
 
-	b0 := NewBasicBlock(lbl0)
-	b1 := NewBasicBlock(lbl1)
-	b2 := NewBasicBlock(lbl2)
-	b3 := NewBasicBlock(lbl3)
-	b4 := NewBasicBlock(lbl4)
-	b5 := NewBasicBlock(lbl5)
-	b6 := NewBasicBlock(lbl6)
-	b7 := NewBasicBlock(lbl7)
-	b8 := NewBasicBlock(lbl8)
+	b0 := meer.NewBasicBlock(lbl0)
+	b1 := meer.NewBasicBlock(lbl1)
+	b2 := meer.NewBasicBlock(lbl2)
+	b3 := meer.NewBasicBlock(lbl3)
+	b4 := meer.NewBasicBlock(lbl4)
+	b5 := meer.NewBasicBlock(lbl5)
+	b6 := meer.NewBasicBlock(lbl6)
+	b7 := meer.NewBasicBlock(lbl7)
+	b8 := meer.NewBasicBlock(lbl8)
 
-	cfg := NewCFG()
+	cfg := meer.NewCFG()
 	cfg.Entry = b0
 	cfg.Exit = b4
 
 	cfg.Nodes.Add(b0, b1, b2, b3, b4, b5, b6, b7, b8)
-	cfg.Blocks = map[uint]*BasicBlock{
-		b0.id: b0,
-		b1.id: b1,
-		b2.id: b2,
-		b3.id: b3,
-		b4.id: b4,
-		b5.id: b5,
-		b6.id: b6,
-		b7.id: b7,
-		b8.id: b8,
+	cfg.Blocks = map[uint]*meer.BasicBlock{
+		b0.ID(): b0,
+		b1.ID(): b1,
+		b2.ID(): b2,
+		b3.ID(): b3,
+		b4.ID(): b4,
+		b5.ID(): b5,
+		b6.ID(): b6,
+		b7.ID(): b7,
+		b8.ID(): b8,
 	}
 
-	cfg.AddSuc(b0.id, b1.id)
-	cfg.AddSuc(b1.id, b2.id, b5.id)
-	cfg.AddSuc(b2.id, b3.id)
-	cfg.AddSuc(b3.id, b1.id, b4.id)
-	cfg.AddSuc(b4.id)
-	cfg.AddSuc(b5.id, b6.id, b8.id)
-	cfg.AddSuc(b6.id, b7.id)
-	cfg.AddSuc(b7.id, b3.id)
-	cfg.AddSuc(b8.id, b7.id)
+	cfg.AddSuc(b0.ID(), b1.ID())
+	cfg.AddSuc(b1.ID(), b2.ID(), b5.ID())
+	cfg.AddSuc(b2.ID(), b3.ID())
+	cfg.AddSuc(b3.ID(), b1.ID(), b4.ID())
+	cfg.AddSuc(b4.ID())
+	cfg.AddSuc(b5.ID(), b6.ID(), b8.ID())
+	cfg.AddSuc(b6.ID(), b7.ID())
+	cfg.AddSuc(b7.ID(), b3.ID())
+	cfg.AddSuc(b8.ID(), b7.ID())
 
-	cfg.AddPred(b0.id)
-	cfg.AddPred(b1.id, b0.id, b3.id)
-	cfg.AddPred(b2.id, b1.id)
-	cfg.AddPred(b3.id, b2.id, b7.id)
-	cfg.AddPred(b4.id, b3.id)
-	cfg.AddPred(b5.id, b1.id)
-	cfg.AddPred(b6.id, b5.id)
-	cfg.AddPred(b7.id, b6.id, b8.id)
-	cfg.AddPred(b8.id, b5.id)
+	cfg.AddPred(b0.ID())
+	cfg.AddPred(b1.ID(), b0.ID(), b3.ID())
+	cfg.AddPred(b2.ID(), b1.ID())
+	cfg.AddPred(b3.ID(), b2.ID(), b7.ID())
+	cfg.AddPred(b4.ID(), b3.ID())
+	cfg.AddPred(b5.ID(), b1.ID())
+	cfg.AddPred(b6.ID(), b5.ID())
+	cfg.AddPred(b7.ID(), b6.ID(), b8.ID())
+	cfg.AddPred(b8.ID(), b5.ID())
 
 	tests := []struct {
 		id     uint
-		blocks []*BasicBlock
+		blocks []*meer.BasicBlock
 	}{
-		{b0.id, []*BasicBlock{b0}},
-		{b1.id, []*BasicBlock{b0, b1}},
-		{b2.id, []*BasicBlock{b0, b1, b2}},
-		{b3.id, []*BasicBlock{b0, b1, b3}},
-		{b4.id, []*BasicBlock{b0, b1, b3, b4}},
-		{b5.id, []*BasicBlock{b0, b1, b5}},
-		{b6.id, []*BasicBlock{b0, b1, b5, b6}},
-		{b7.id, []*BasicBlock{b0, b1, b5, b7}},
-		{b8.id, []*BasicBlock{b0, b1, b5, b8}},
+		{b0.ID(), []*meer.BasicBlock{b0}},
+		{b1.ID(), []*meer.BasicBlock{b0, b1}},
+		{b2.ID(), []*meer.BasicBlock{b0, b1, b2}},
+		{b3.ID(), []*meer.BasicBlock{b0, b1, b3}},
+		{b4.ID(), []*meer.BasicBlock{b0, b1, b3, b4}},
+		{b5.ID(), []*meer.BasicBlock{b0, b1, b5}},
+		{b6.ID(), []*meer.BasicBlock{b0, b1, b5, b6}},
+		{b7.ID(), []*meer.BasicBlock{b0, b1, b5, b7}},
+		{b8.ID(), []*meer.BasicBlock{b0, b1, b5, b8}},
 	}
 
 	Dom := Dominance(cfg)
@@ -606,36 +610,36 @@ func TestComputeImmediateDominance(t *testing.T) {
 	lbl3 := meer.NewLabel("B3")
 	lblExit := meer.NewLabel("exit")
 
-	entry := NewBasicBlock(lblEntry)
-	b1 := NewBasicBlock(lbl1)
-	b2 := NewBasicBlock(lbl2)
-	b3 := NewBasicBlock(lbl3)
-	exit := NewBasicBlock(lblExit)
+	entry := meer.NewBasicBlock(lblEntry)
+	b1 := meer.NewBasicBlock(lbl1)
+	b2 := meer.NewBasicBlock(lbl2)
+	b3 := meer.NewBasicBlock(lbl3)
+	exit := meer.NewBasicBlock(lblExit)
 
-	cfg := NewCFG()
+	cfg := meer.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
 	cfg.Nodes.Add(entry, b1, b2, b3, exit)
-	cfg.Blocks = map[uint]*BasicBlock{
-		entry.id: entry,
-		b1.id:    b1,
-		b2.id:    b2,
-		b3.id:    b3,
-		exit.id:  exit,
+	cfg.Blocks = map[uint]*meer.BasicBlock{
+		entry.ID(): entry,
+		b1.ID():    b1,
+		b2.ID():    b2,
+		b3.ID():    b3,
+		exit.ID():  exit,
 	}
 
-	cfg.AddSuc(entry.id, b1.id, b2.id)
-	cfg.AddSuc(b1.id, b3.id)
-	cfg.AddSuc(b2.id, b3.id)
-	cfg.AddSuc(b3.id, exit.id)
-	cfg.AddSuc(exit.id)
+	cfg.AddSuc(entry.ID(), b1.ID(), b2.ID())
+	cfg.AddSuc(b1.ID(), b3.ID())
+	cfg.AddSuc(b2.ID(), b3.ID())
+	cfg.AddSuc(b3.ID(), exit.ID())
+	cfg.AddSuc(exit.ID())
 
-	cfg.AddPred(entry.id)
-	cfg.AddPred(b1.id, entry.id)
-	cfg.AddPred(b2.id, entry.id)
-	cfg.AddPred(b3.id, b1.id, b2.id)
-	cfg.AddPred(exit.id, b3.id)
+	cfg.AddPred(entry.ID())
+	cfg.AddPred(b1.ID(), entry.ID())
+	cfg.AddPred(b2.ID(), entry.ID())
+	cfg.AddPred(b3.ID(), b1.ID(), b2.ID())
+	cfg.AddPred(exit.ID(), b3.ID())
 
 	dom := Dominance(cfg)
 	iDom := ImmDominator(cfg, dom)
@@ -644,10 +648,10 @@ func TestComputeImmediateDominance(t *testing.T) {
 		id  uint
 		blk string
 	}{
-		{b1.id, "entry"},
-		{b2.id, "entry"},
-		{b3.id, "entry"},
-		{exit.id, "B3"},
+		{b1.ID(), "entry"},
+		{b2.ID(), "entry"},
+		{b3.ID(), "entry"},
+		{exit.ID(), "B3"},
 	}
 
 	for _, tt := range tests {
@@ -670,42 +674,42 @@ func TestComputeNaturalLoop(t *testing.T) {
 	lbl3 := meer.NewLabel("B3")
 	lblExit := meer.NewLabel("exit")
 
-	entry := NewBasicBlock(lblEntry)
-	b1 := NewBasicBlock(lbl1)
-	b2 := NewBasicBlock(lbl2)
-	b3 := NewBasicBlock(lbl3)
-	exit := NewBasicBlock(lblExit)
+	entry := meer.NewBasicBlock(lblEntry)
+	b1 := meer.NewBasicBlock(lbl1)
+	b2 := meer.NewBasicBlock(lbl2)
+	b3 := meer.NewBasicBlock(lbl3)
+	exit := meer.NewBasicBlock(lblExit)
 
-	cfg := NewCFG()
+	cfg := meer.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
 	cfg.Nodes.Add(entry, b1, b2, b3, exit)
-	cfg.Blocks = map[uint]*BasicBlock{
-		entry.id: entry,
-		b1.id:    b1,
-		b2.id:    b2,
-		b3.id:    b3,
-		exit.id:  exit,
+	cfg.Blocks = map[uint]*meer.BasicBlock{
+		entry.ID(): entry,
+		b1.ID():    b1,
+		b2.ID():    b2,
+		b3.ID():    b3,
+		exit.ID():  exit,
 	}
 
-	cfg.AddSuc(entry.id, b1.id, b2.id)
-	cfg.AddSuc(b1.id, b3.id)
-	cfg.AddSuc(b2.id, b3.id)
-	cfg.AddSuc(b3.id, exit.id)
-	cfg.AddSuc(exit.id)
+	cfg.AddSuc(entry.ID(), b1.ID(), b2.ID())
+	cfg.AddSuc(b1.ID(), b3.ID())
+	cfg.AddSuc(b2.ID(), b3.ID())
+	cfg.AddSuc(b3.ID(), exit.ID())
+	cfg.AddSuc(exit.ID())
 
-	cfg.AddPred(entry.id)
-	cfg.AddPred(b1.id, entry.id)
-	cfg.AddPred(b2.id, entry.id)
-	cfg.AddPred(b3.id, b1.id, b2.id)
-	cfg.AddPred(exit.id, b3.id)
+	cfg.AddPred(entry.ID())
+	cfg.AddPred(b1.ID(), entry.ID())
+	cfg.AddPred(b2.ID(), entry.ID())
+	cfg.AddPred(b3.ID(), b1.ID(), b2.ID())
+	cfg.AddPred(exit.ID(), b3.ID())
 
 	nat := NaturalLoop(cfg, b3, b1)
 
-	tests := []*BasicBlock{b1, b2, b3}
+	tests := []*meer.BasicBlock{b1, b2, b3}
 	for _, tt := range tests {
-		if !nat.Contains(tt.id) {
+		if !nat.Contains(tt.ID()) {
 			t.Errorf("'%s' should not be part of the natural loop of B3->B1", tt)
 		}
 	}
@@ -722,65 +726,65 @@ func TestComputeNaturalLoop2(t *testing.T) {
 	lbl7 := meer.NewLabel("B7")
 	lblExit := meer.NewLabel("exit")
 
-	entry := NewBasicBlock(lblEntry)
-	b1 := NewBasicBlock(lbl1)
-	b2 := NewBasicBlock(lbl2)
-	b3 := NewBasicBlock(lbl3)
-	b4 := NewBasicBlock(lbl4)
-	b5 := NewBasicBlock(lbl5)
-	b6 := NewBasicBlock(lbl6)
-	b7 := NewBasicBlock(lbl7)
-	exit := NewBasicBlock(lblExit)
+	entry := meer.NewBasicBlock(lblEntry)
+	b1 := meer.NewBasicBlock(lbl1)
+	b2 := meer.NewBasicBlock(lbl2)
+	b3 := meer.NewBasicBlock(lbl3)
+	b4 := meer.NewBasicBlock(lbl4)
+	b5 := meer.NewBasicBlock(lbl5)
+	b6 := meer.NewBasicBlock(lbl6)
+	b7 := meer.NewBasicBlock(lbl7)
+	exit := meer.NewBasicBlock(lblExit)
 
-	cfg := NewCFG()
+	cfg := meer.NewCFG()
 	cfg.Entry = entry
 	cfg.Exit = exit
 
 	cfg.Nodes.Add(entry, b1, b2, b3, b4, b5, b6, b7, exit)
-	cfg.Blocks = map[uint]*BasicBlock{
-		entry.id: entry,
-		b1.id:    b1,
-		b2.id:    b2,
-		b3.id:    b3,
-		b4.id:    b4,
-		b5.id:    b5,
-		b6.id:    b6,
-		b7.id:    b7,
-		exit.id:  exit,
+	cfg.Blocks = map[uint]*meer.BasicBlock{
+		entry.ID(): entry,
+		b1.ID():    b1,
+		b2.ID():    b2,
+		b3.ID():    b3,
+		b4.ID():    b4,
+		b5.ID():    b5,
+		b6.ID():    b6,
+		b7.ID():    b7,
+		exit.ID():  exit,
 	}
 
-	cfg.AddSuc(entry.id, b1.id)
-	cfg.AddSuc(b1.id, b2.id, b3.id)
-	cfg.AddSuc(b2.id, b4.id)
-	cfg.AddSuc(b3.id, b4.id)
-	cfg.AddSuc(b4.id, b5.id, b6.id)
-	cfg.AddSuc(b5.id, b7.id)
-	cfg.AddSuc(b6.id, exit.id, b1.id)
-	cfg.AddSuc(b7.id, exit.id, b5.id)
-	cfg.AddSuc(exit.id)
+	cfg.AddSuc(entry.ID(), b1.ID())
+	cfg.AddSuc(b1.ID(), b2.ID(), b3.ID())
+	cfg.AddSuc(b2.ID(), b4.ID())
+	cfg.AddSuc(b3.ID(), b4.ID())
+	cfg.AddSuc(b4.ID(), b5.ID(), b6.ID())
+	cfg.AddSuc(b5.ID(), b7.ID())
+	cfg.AddSuc(b6.ID(), exit.ID(), b1.ID())
+	cfg.AddSuc(b7.ID(), exit.ID(), b5.ID())
+	cfg.AddSuc(exit.ID())
 
-	cfg.AddPred(entry.id)
-	cfg.AddPred(b1.id, b6.id, entry.id)
-	cfg.AddPred(b2.id, b1.id)
-	cfg.AddPred(b3.id, b1.id)
-	cfg.AddPred(b4.id, b2.id, b3.id)
-	cfg.AddPred(b5.id, b7.id, b4.id)
-	cfg.AddPred(b6.id, b4.id)
-	cfg.AddPred(b7.id, b5.id)
-	cfg.AddPred(exit.id, b6.id, b7.id)
+	cfg.AddPred(entry.ID())
+	cfg.AddPred(b1.ID(), b6.ID(), entry.ID())
+	cfg.AddPred(b2.ID(), b1.ID())
+	cfg.AddPred(b3.ID(), b1.ID())
+	cfg.AddPred(b4.ID(), b2.ID(), b3.ID())
+	cfg.AddPred(b5.ID(), b7.ID(), b4.ID())
+	cfg.AddPred(b6.ID(), b4.ID())
+	cfg.AddPred(b7.ID(), b5.ID())
+	cfg.AddPred(exit.ID(), b6.ID(), b7.ID())
 
 	nat := NaturalLoop(cfg, b6, b1)
-	tests := []*BasicBlock{b1, b2, b3, b4, b6}
+	tests := []*meer.BasicBlock{b1, b2, b3, b4, b6}
 	for _, tt := range tests {
-		if !nat.Contains(tt.id) {
+		if !nat.Contains(tt.ID()) {
 			t.Errorf("'%s' should not be part of the natural loop of B3->B1", tt)
 		}
 	}
 
 	natLoop := NaturalLoop(cfg, b7, b5)
-	tests = []*BasicBlock{b7, b5}
+	tests = []*meer.BasicBlock{b7, b5}
 	for _, tt := range tests {
-		if !natLoop.Contains(tt.id) {
+		if !natLoop.Contains(tt.ID()) {
 			t.Errorf("'%s' should not be part of the natural loop of B3->B1", tt)
 		}
 	}
@@ -797,66 +801,66 @@ func TestDominanceFrontier(t *testing.T) {
 	lbl7 := meer.NewLabel("B7")
 	lbl8 := meer.NewLabel("B8")
 
-	b0 := NewBasicBlock(lbl0)
-	b1 := NewBasicBlock(lbl1)
-	b2 := NewBasicBlock(lbl2)
-	b3 := NewBasicBlock(lbl3)
-	b4 := NewBasicBlock(lbl4)
-	b5 := NewBasicBlock(lbl5)
-	b6 := NewBasicBlock(lbl6)
-	b7 := NewBasicBlock(lbl7)
-	b8 := NewBasicBlock(lbl8)
+	b0 := meer.NewBasicBlock(lbl0)
+	b1 := meer.NewBasicBlock(lbl1)
+	b2 := meer.NewBasicBlock(lbl2)
+	b3 := meer.NewBasicBlock(lbl3)
+	b4 := meer.NewBasicBlock(lbl4)
+	b5 := meer.NewBasicBlock(lbl5)
+	b6 := meer.NewBasicBlock(lbl6)
+	b7 := meer.NewBasicBlock(lbl7)
+	b8 := meer.NewBasicBlock(lbl8)
 
-	cfg := NewCFG()
+	cfg := meer.NewCFG()
 	cfg.Entry = b0
 	cfg.Exit = b4
 
 	cfg.Nodes.Add(b0, b1, b2, b3, b4, b5, b6, b7, b8)
-	cfg.Blocks = map[uint]*BasicBlock{
-		b0.id: b0,
-		b1.id: b1,
-		b2.id: b2,
-		b3.id: b3,
-		b4.id: b4,
-		b5.id: b5,
-		b6.id: b6,
-		b7.id: b7,
-		b8.id: b8,
+	cfg.Blocks = map[uint]*meer.BasicBlock{
+		b0.ID(): b0,
+		b1.ID(): b1,
+		b2.ID(): b2,
+		b3.ID(): b3,
+		b4.ID(): b4,
+		b5.ID(): b5,
+		b6.ID(): b6,
+		b7.ID(): b7,
+		b8.ID(): b8,
 	}
 
-	cfg.AddSuc(b0.id, b1.id)
-	cfg.AddSuc(b1.id, b2.id, b5.id)
-	cfg.AddSuc(b2.id, b3.id)
-	cfg.AddSuc(b3.id, b1.id, b4.id)
-	cfg.AddSuc(b4.id)
-	cfg.AddSuc(b5.id, b6.id, b8.id)
-	cfg.AddSuc(b6.id, b7.id)
-	cfg.AddSuc(b7.id, b3.id)
-	cfg.AddSuc(b8.id, b7.id)
+	cfg.AddSuc(b0.ID(), b1.ID())
+	cfg.AddSuc(b1.ID(), b2.ID(), b5.ID())
+	cfg.AddSuc(b2.ID(), b3.ID())
+	cfg.AddSuc(b3.ID(), b1.ID(), b4.ID())
+	cfg.AddSuc(b4.ID())
+	cfg.AddSuc(b5.ID(), b6.ID(), b8.ID())
+	cfg.AddSuc(b6.ID(), b7.ID())
+	cfg.AddSuc(b7.ID(), b3.ID())
+	cfg.AddSuc(b8.ID(), b7.ID())
 
-	cfg.AddPred(b0.id)
-	cfg.AddPred(b1.id, b0.id, b3.id)
-	cfg.AddPred(b2.id, b1.id)
-	cfg.AddPred(b3.id, b2.id, b7.id)
-	cfg.AddPred(b4.id, b3.id)
-	cfg.AddPred(b5.id, b1.id)
-	cfg.AddPred(b6.id, b5.id)
-	cfg.AddPred(b7.id, b6.id, b8.id)
-	cfg.AddPred(b8.id, b5.id)
+	cfg.AddPred(b0.ID())
+	cfg.AddPred(b1.ID(), b0.ID(), b3.ID())
+	cfg.AddPred(b2.ID(), b1.ID())
+	cfg.AddPred(b3.ID(), b2.ID(), b7.ID())
+	cfg.AddPred(b4.ID(), b3.ID())
+	cfg.AddPred(b5.ID(), b1.ID())
+	cfg.AddPred(b6.ID(), b5.ID())
+	cfg.AddPred(b7.ID(), b6.ID(), b8.ID())
+	cfg.AddPred(b8.ID(), b5.ID())
 
 	tests := []struct {
 		id     uint
-		blocks []*BasicBlock
+		blocks []*meer.BasicBlock
 	}{
-		{b0.id, []*BasicBlock{}},
-		{b1.id, []*BasicBlock{b1}},
-		{b2.id, []*BasicBlock{b3}},
-		{b3.id, []*BasicBlock{b1}},
-		{b4.id, []*BasicBlock{}},
-		{b5.id, []*BasicBlock{b3}},
-		{b6.id, []*BasicBlock{b7}},
-		{b7.id, []*BasicBlock{b3}},
-		{b8.id, []*BasicBlock{b7}},
+		{b0.ID(), []*meer.BasicBlock{}},
+		{b1.ID(), []*meer.BasicBlock{b1}},
+		{b2.ID(), []*meer.BasicBlock{b3}},
+		{b3.ID(), []*meer.BasicBlock{b1}},
+		{b4.ID(), []*meer.BasicBlock{}},
+		{b5.ID(), []*meer.BasicBlock{b3}},
+		{b6.ID(), []*meer.BasicBlock{b7}},
+		{b7.ID(), []*meer.BasicBlock{b3}},
+		{b8.ID(), []*meer.BasicBlock{b7}},
 	}
 
 	DF := DominanceFrontier(cfg)
