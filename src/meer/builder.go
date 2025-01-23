@@ -207,7 +207,12 @@ func (b *Builder) CreateCmp(pred Opcode, lhs, rhs Expression) Expression {
 		}
 	}
 
-	return CreateCmpOp(pred, lhs, rhs, ResTy)
+	foo := CreateIdent(NextTemp(), ResTy)
+	cmp := CreateCmpOp(pred, lhs, rhs, ResTy)
+
+	b.CreateAssign(cmp, foo)
+
+	return foo
 }
 
 func (b *Builder) CreateProcCall(callee Expression, args []Expression) *ProcCallInstr {
@@ -218,7 +223,12 @@ func (b *Builder) CreateProcCall(callee Expression, args []Expression) *ProcCall
 }
 
 func (b *Builder) CreateAssign(Val Expression, Dst Expression) *AssignInst {
-	assign := CreateAssign(Val, Dst)
+	dst, ok := Dst.(NamedOperand)
+	if !ok {
+		panic("the destination of the assignInst is not a NamedOperand")
+	}
+
+	assign := CreateAssign(Val, dst)
 	b.instructions = append(b.instructions, assign)
 
 	return assign

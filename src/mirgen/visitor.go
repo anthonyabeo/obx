@@ -65,7 +65,7 @@ func (v *Visitor) VisitIdentifier(id *ast.Ident) {
 		panic(fmt.Sprintf("stack allocation for name '%s' not found", id.Name))
 	}
 
-	id.MirExpr = &meer.Ident{Id: id.Name, Ty: meer.TransType(sym.Type())}
+	id.MirExpr = meer.CreateIdent(id.Name, meer.TransType(sym.Type()))
 }
 
 func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {

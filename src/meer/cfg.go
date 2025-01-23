@@ -15,7 +15,7 @@ type BasicBlock struct {
 	id    uint
 	name  string
 	instr *list.List
-	Phi   map[string]AssignInst
+	Phi   map[string]*AssignInst
 }
 
 var nb uint = 1
@@ -24,6 +24,7 @@ func NewBasicBlock(lbl *Label) *BasicBlock {
 	blk := &BasicBlock{
 		name: lbl.Name,
 		id:   nb,
+		Phi:  map[string]*AssignInst{},
 	}
 
 	lbl.BlockID = nb
@@ -42,6 +43,7 @@ func CreateBasicBlock(lbl *Label) *BasicBlock {
 		name:  lbl.Name,
 		instr: instr,
 		id:    nextBlock,
+		Phi:   map[string]*AssignInst{},
 	}
 
 	lbl.BlockID = nextBlock
@@ -97,6 +99,9 @@ type ControlFlowGraph struct {
 	Nodes       adt.Set[*BasicBlock]
 	Suc         map[uint]*adt.HashSet[uint]
 	Pred        map[uint]*adt.HashSet[uint]
+
+	Defs map[string]Instruction
+	Uses map[string]adt.Set[Instruction]
 }
 
 func NewCFG() *ControlFlowGraph {

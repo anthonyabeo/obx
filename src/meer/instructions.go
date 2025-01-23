@@ -35,11 +35,11 @@ func (l *Label) String() string { return fmt.Sprintf("%%%s", l.Name) }
 // --------------------------------
 type AssignInst struct {
 	Op    Opcode
-	Dst   Expression
+	Dst   NamedOperand
 	Value Expression
 }
 
-func CreateAssign(val, dst Expression) *AssignInst {
+func CreateAssign(val Expression, dst NamedOperand) *AssignInst {
 	return &AssignInst{
 		Op:    Assign,
 		Dst:   dst,

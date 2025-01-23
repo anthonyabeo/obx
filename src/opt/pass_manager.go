@@ -1,13 +1,14 @@
 package opt
 
 import (
+	"github.com/anthonyabeo/obx/src/meer"
 	"github.com/anthonyabeo/obx/src/opt/pass"
 	"github.com/anthonyabeo/obx/src/translate/tacil"
 )
 
 type Pass interface {
 	Name() string
-	Run(*tacil.Program, *tacil.SymbolTable)
+	Run(*meer.Program /*, *tacil.SymbolTable*/)
 }
 
 type PassManager struct {
@@ -16,8 +17,8 @@ type PassManager struct {
 	symbols *tacil.SymbolTable
 }
 
-func NewPassManager(table *tacil.SymbolTable) *PassManager {
-	return &PassManager{set: map[string]bool{}, symbols: table}
+func NewPassManager( /*table *tacil.SymbolTable*/ ) *PassManager {
+	return &PassManager{set: map[string]bool{} /*symbols: table*/}
 }
 
 func (pm *PassManager) AddPass(pass Pass) {
@@ -34,10 +35,10 @@ func (pm *PassManager) dequeue() Pass {
 	return p
 }
 
-func (pm *PassManager) Run(program *tacil.Program) {
+func (pm *PassManager) Run(program *meer.Program) {
 	for len(pm.passes) > 0 {
 		p := pm.dequeue()
-		p.Run(program, pm.symbols)
+		p.Run(program /*, pm.symbols*/)
 	}
 }
 
@@ -57,8 +58,8 @@ var declPasses map[string]Pass
 
 func init() {
 	declPasses = map[string]Pass{
-		"ssa":        &pass.SSA{Nom: "ssa"},
-		"dce":        &pass.DeadCodeElimination{Nom: "dce"},
-		"const_prop": &pass.ConstantPropagation{},
+		"ssa": &pass.SSA{Nom: "ssa"},
+		//"dce":        &pass.DeadCodeElimination{Nom: "dce"},
+		//"const_prop": &pass.ConstantPropagation{},
 	}
 }

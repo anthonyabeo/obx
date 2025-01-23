@@ -67,6 +67,15 @@ const (
 	Phi
 )
 
+var tmp = 0
+
+func NextTemp() string {
+	t := fmt.Sprintf("t%d", tmp)
+	tmp += 1
+
+	return t
+}
+
 // Program ...
 // ------------------
 type Program struct {
@@ -120,6 +129,16 @@ func (p *ProgramUnit) String() string {
 		}
 	}
 	buf.WriteString("\n\tend")
+
+	return buf.String()
+}
+
+func (p *ProgramUnit) Output() string {
+	buf := &bytes.Buffer{}
+
+	for i := 1; i < p.CFG.Nodes.Size()+1; i++ {
+		buf.WriteString(p.CFG.Blocks[uint(i)].String())
+	}
 
 	return buf.String()
 }

@@ -166,9 +166,11 @@ func BuildCFG(program *meer.Program) *meer.ControlFlowGraph {
 
 	blocks := findLeaders(Main.Inst)
 	cfg := meer.NewCFG()
+	cfg.Entry = blocks[1]
 
 	for id, block := range blocks {
 		cfg.Nodes.Add(block)
+		cfg.Blocks[id] = block
 
 		lastInstr := block.LastInst()
 
@@ -209,7 +211,6 @@ func findLeaders(instructions []meer.Instruction) map[uint]*meer.BasicBlock {
 
 	first := instructions[0].(*meer.Label)
 	BB := meer.CreateBasicBlock(first)
-	first.BlockID = BB.ID()
 
 	for _, inst := range instructions[1:] {
 		i, ok := inst.(*meer.Label)

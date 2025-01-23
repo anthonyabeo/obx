@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/mirgen"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,6 +10,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/anthonyabeo/obx/src/diagnostics"
+	"github.com/anthonyabeo/obx/src/mirgen"
+	"github.com/anthonyabeo/obx/src/opt"
+	"github.com/anthonyabeo/obx/src/opt/analy"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/sema/scope"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -33,8 +35,8 @@ var buildCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		module, err := cmd.Flags().GetString("entry")
 		path, err := cmd.Flags().GetString("path")
-		//emitIR, err := cmd.Flags().GetBool("emit-ir")
-		//opts, err := cmd.Flags().GetStringArray("opt")
+		emitIR, err := cmd.Flags().GetBool("emit-ir")
+		opts, err := cmd.Flags().GetStringArray("opt")
 
 		if len(path) == 0 {
 			path, err = os.Getwd()
@@ -62,24 +64,20 @@ var buildCmd = &cobra.Command{
 		}
 
 		// Translation to IR
-		//ir := translate.NewVisitor(scopes)
-		//program := ir.Translate(obx, tsOrd)
-
 		mir := mirgen.NewVisitor(scopes)
-		prg := mir.Translate(obx, tsOrd)
-
-		fmt.Println(prg)
+		program := mir.Translate(obx, tsOrd)
 
 		// Optimisation
-		//pm := opt.NewPassManager(ir.SymbolTable())
-		//pm.AddPasses(opts...)
-		//pm.Run(program)
-		//
-		//if emitIR {
-		//	for _, f := range ir.Module().GetFunctionList() {
-		//		fmt.Println(f)
-		//	}
-		//}
+		analy.BuildCFG(program)
+
+		pm := opt.NewPassManager()
+		pm.AddPasses(opts...)
+		pm.Run(program)
+
+		if emitIR {
+			output := program.Units["Main"].Output()
+			fmt.Println(output)
+		}
 	},
 }
 
