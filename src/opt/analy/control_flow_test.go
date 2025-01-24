@@ -77,9 +77,9 @@ end Main
 	}{
 		{BlockIfThen.ID(), 3},
 		{BlockIfElse.ID(), 1},
-		{BlockLoop.ID(), 1},
+		{BlockLoop.ID(), 2},
 		{BlockMain.ID(), 3},
-		{BlockCont.ID(), 1},
+		{BlockCont.ID(), 2},
 	}
 
 	for _, tt := range tests {
