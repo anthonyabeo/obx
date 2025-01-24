@@ -14,7 +14,7 @@ type SSA struct {
 
 func (s SSA) Name() string { return s.Nom }
 
-func (s SSA) Run(program *meer.Program /*symbols *tacil.SymbolTable*/) {
+func (s SSA) Run(program *meer.Program) {
 	for _, unit := range program.Units {
 		DF := analy.DominanceFrontier(unit.CFG)
 
@@ -29,8 +29,8 @@ func (s SSA) Run(program *meer.Program /*symbols *tacil.SymbolTable*/) {
 
 // ComputeGlobalNames
 // ---------------------------------------------------------------
-func ComputeGlobalNames(cfg *meer.ControlFlowGraph) (map[string]bool, map[string]adt.Set[meer.BasicBlockID]) {
-	Globals := map[string]bool{}
+func ComputeGlobalNames(cfg *meer.ControlFlowGraph) (map[string]meer.Type, map[string]adt.Set[meer.BasicBlockID]) {
+	Globals := map[string]meer.Type{}
 	Blocks := map[string]adt.Set[meer.BasicBlockID]{}
 
 	for _, BB := range cfg.Nodes.Elems() {
@@ -42,7 +42,7 @@ func ComputeGlobalNames(cfg *meer.ControlFlowGraph) (map[string]bool, map[string
 					operand := assign.Value.Operand(i)
 					if tmp, ok := operand.(*meer.Ident); ok {
 						if !VarKill[tmp.Id] {
-							Globals[tmp.Id] = true
+							Globals[tmp.Id] = tmp.Ty
 						}
 					}
 				}
@@ -64,13 +64,12 @@ func ComputeGlobalNames(cfg *meer.ControlFlowGraph) (map[string]bool, map[string
 // -----------------------------------------------------------------
 func InsertPhiFunctions(
 	cfg *meer.ControlFlowGraph,
-	Globals map[string]bool,
+	Globals map[string]meer.Type,
 	Blocks map[string]adt.Set[meer.BasicBlockID],
 	DF map[meer.BasicBlockID]adt.Set[*meer.BasicBlock],
-	/*symbols *tacil.SymbolTable*/
 ) {
 
-	for name := range Globals {
+	for name, ty := range Globals {
 		WorkList := Blocks[name]
 
 		for !WorkList.Empty() {
@@ -80,17 +79,12 @@ func InsertPhiFunctions(
 				if BB.Phi[name] == nil {
 					phi := meer.CreateEmptyPHINode()
 
-					//	obj := symbols.Lookup(name)
-					//	if obj == nil {
-					//		panic(fmt.Sprintf("stack allocation for name '%s' not found", name))
-					//	}
-
 					for _, pred := range cfg.Pred[BB.ID()].Elems() {
-						tmp := meer.CreateIdent(name, nil)
+						tmp := meer.CreateIdent(name, ty)
 						phi.AddIncoming(tmp, cfg.Blocks[pred])
 					}
 
-					assign := meer.CreateAssign(phi, meer.CreateIdent(name, nil))
+					assign := meer.CreateAssign(phi, meer.CreateIdent(name, ty))
 					BB.InsertInstrBegin(assign)
 					BB.Phi[name] = assign
 
@@ -103,7 +97,7 @@ func InsertPhiFunctions(
 
 // Rename
 // -----------------------------
-func Rename(Globals map[string]bool, cfg *meer.ControlFlowGraph) (map[string]meer.Instruction, map[string]adt.Set[meer.Instruction]) {
+func Rename(Globals map[string]meer.Type, cfg *meer.ControlFlowGraph) (map[string]meer.Instruction, map[string]adt.Set[meer.Instruction]) {
 	counter := make(map[string]int)
 	stack := make(map[string]*adt.Stack[string])
 	vst := make(map[meer.BasicBlockID]bool)
@@ -121,7 +115,7 @@ func Rename(Globals map[string]bool, cfg *meer.ControlFlowGraph) (map[string]mee
 }
 
 func rename(
-	Globals map[string]bool,
+	Globals map[string]meer.Type,
 	vst map[meer.BasicBlockID]bool,
 	block meer.BasicBlockID,
 	counter map[string]int,
@@ -152,7 +146,7 @@ func rename(
 		for j := 1; j < assign.Value.NumOperands()+1; j++ {
 			operand := assign.Value.Operand(j)
 			if op, ok := operand.(meer.NamedOperand); ok {
-				if Globals[op.Name()] {
+				if Globals[op.Name()] != nil {
 					op.SetName(stack[op.Name()].Top())
 
 					if uses[stack[op.BaseName()].Top()] == nil {
@@ -163,7 +157,7 @@ func rename(
 			}
 		}
 
-		if Globals[assign.Dst.Name()] {
+		if Globals[assign.Dst.Name()] != nil {
 			nom := newName(assign.Dst.Name(), counter, stack)
 			assign.Dst.SetName(nom)
 			defs[nom] = assign
