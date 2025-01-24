@@ -5,10 +5,12 @@ import "fmt"
 type Builder struct {
 	label        *Label
 	instructions []Instruction
+
+	mgr *TempNameMgr
 }
 
 func NewBuilder() *Builder {
-	return &Builder{}
+	return &Builder{mgr: NewTempNameMgr()}
 }
 
 func (b *Builder) Instr() []Instruction { return b.instructions }
@@ -207,7 +209,7 @@ func (b *Builder) CreateCmp(pred Opcode, lhs, rhs Expression) Expression {
 		}
 	}
 
-	foo := CreateIdent(NextTemp(), ResTy)
+	foo := CreateIdent(b.mgr.NextTemp(), ResTy)
 	cmp := CreateCmpOp(pred, lhs, rhs, ResTy)
 
 	b.CreateAssign(cmp, foo)

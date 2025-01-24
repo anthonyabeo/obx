@@ -154,7 +154,7 @@ func (c *CmpInst) Operand(i int) Expression {
 	}
 }
 func (c *CmpInst) NumOperands() int { return 2 }
-func (c *CmpInst) String() string   { return fmt.Sprintf("(%s %s %s)", c.X, c.Pred, c.Y) }
+func (c *CmpInst) String() string   { return fmt.Sprintf("%s %s %s", c.X, c.Pred, c.Y) }
 
 // FuncCallInst ...
 // --------------------

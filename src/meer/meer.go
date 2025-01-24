@@ -67,11 +67,19 @@ const (
 	Phi
 )
 
-var tmp = 0
+// TempNameMgr ...
+// ------------------
+type TempNameMgr struct {
+	tmp uint
+}
 
-func NextTemp() string {
-	t := fmt.Sprintf("t%d", tmp)
-	tmp += 1
+func NewTempNameMgr() *TempNameMgr {
+	return &TempNameMgr{}
+}
+
+func (mgr *TempNameMgr) NextTemp() string {
+	t := fmt.Sprintf("t%d", mgr.tmp)
+	mgr.tmp += 1
 
 	return t
 }
