@@ -68,6 +68,7 @@ Output:
     a := 0
     b := 10
     total := 0
+    jmp label %loop
 
 %loop:
     t0 := a < b

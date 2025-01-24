@@ -188,6 +188,9 @@ func BuildCFG(program *meer.Program) *meer.ControlFlowGraph {
 			if blocks[fallthroughBlockID] != nil {
 				cfg.AddSuc(block.ID(), fallthroughBlockID)
 				cfg.AddPred(fallthroughBlockID, block.ID())
+
+				jmp := meer.CreateJmp(blocks[fallthroughBlockID].Label())
+				block.AddInstr(jmp)
 			}
 		}
 	}

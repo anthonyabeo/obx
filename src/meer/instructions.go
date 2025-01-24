@@ -29,7 +29,7 @@ func NewLabel(name string) *Label {
 
 func (*Label) instr()           {}
 func (l *Label) OpCode() Opcode { return l.Op }
-func (l *Label) String() string { return fmt.Sprintf("%%%s", l.Name) }
+func (l *Label) String() string { return fmt.Sprintf("%s", l.Name) }
 
 // AssignInst
 // --------------------------------

@@ -15,7 +15,7 @@ type BasicBlockID uint
 // -------------------------------
 type BasicBlock struct {
 	id    BasicBlockID
-	name  string
+	name  *Label
 	instr *list.List
 	Phi   map[string]*AssignInst
 }
@@ -24,7 +24,7 @@ var nb BasicBlockID = 1
 
 func NewBasicBlock(lbl *Label) *BasicBlock {
 	blk := &BasicBlock{
-		name: lbl.Name,
+		name: lbl,
 		id:   nb,
 		Phi:  map[string]*AssignInst{},
 	}
@@ -42,7 +42,7 @@ func CreateBasicBlock(lbl *Label) *BasicBlock {
 	instr := list.New()
 	instr.Init()
 	blk := &BasicBlock{
-		name:  lbl.Name,
+		name:  lbl,
 		instr: instr,
 		id:    nextBlock,
 		Phi:   map[string]*AssignInst{},
@@ -55,10 +55,11 @@ func CreateBasicBlock(lbl *Label) *BasicBlock {
 	return blk
 }
 
+func (b *BasicBlock) Label() *Label       { return b.name }
 func (b *BasicBlock) ID() BasicBlockID    { return b.id }
-func (b *BasicBlock) Name() string        { return b.name }
-func (b *BasicBlock) SetName(name string) { b.name = name }
-func (b *BasicBlock) HasName() bool       { return b.name != "" }
+func (b *BasicBlock) Name() string        { return b.name.Name }
+func (b *BasicBlock) SetName(name string) { b.name.Name = name }
+func (b *BasicBlock) HasName() bool       { return b.name.Name != "" }
 func (b *BasicBlock) String() string {
 	s := fmt.Sprintf("%%%s:\n\t", b.name)
 
@@ -144,13 +145,13 @@ func (cfg *ControlFlowGraph) IsBrNode(blk BasicBlockID) bool {
 func (cfg *ControlFlowGraph) String() string {
 	var nodes, suc, pred []string
 	for _, blk := range cfg.Nodes.Elems() {
-		nodes = append(nodes, blk.name)
+		nodes = append(nodes, blk.name.Name)
 	}
 
 	for id, bb := range cfg.Suc {
 		var blocks []string
 		for _, blk := range bb.Elems() {
-			blocks = append(blocks, cfg.Blocks[blk].name)
+			blocks = append(blocks, cfg.Blocks[blk].name.Name)
 		}
 
 		suc = append(suc, fmt.Sprintf("\n\t\t\t%s: %s", cfg.Blocks[id], blocks))
@@ -159,7 +160,7 @@ func (cfg *ControlFlowGraph) String() string {
 	for id, bb := range cfg.Pred {
 		var blocks []string
 		for _, blk := range bb.Elems() {
-			blocks = append(blocks, cfg.Blocks[blk].name)
+			blocks = append(blocks, cfg.Blocks[blk].name.Name)
 		}
 
 		pred = append(pred, fmt.Sprintf("\n\t\t\t%s: %s", cfg.Blocks[id], blocks))
