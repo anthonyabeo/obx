@@ -64,34 +64,26 @@ $ obx build -e Main -p ./examples/basics --emit-ir
 ```
 Output:
 ```
-define i32 @main() {
-%entry:
-    jmp label %main
-
-%main:
-    a = i32 0
-    b = i32 10
-    total = i32 0
-    jmp label %loop
+%Main:
+    a := 0
+    b := 10
+    total := 0
 
 %loop:
-    t0 = icmp ule a, b
+    t0 := a < b
     br t0, label %if.then, label %if.else
 
 %if.then:
-    total = add total, i32 1
-    a = add a, i32 1
+    total := total + 1
+    a := a + 1
     jmp label %loop
 
 %if.else:
     jmp label %cont
 
 %cont:
-    t1 = icmp eq total, i32 55
+    t1 := total == 55
     call assert(t1)
-    ret i32 0
-}
-
 ```
 
 Run the `ssa` pass to convert the program to static single assignment (SSA) form
@@ -100,33 +92,26 @@ Run the `ssa` pass to convert the program to static single assignment (SSA) form
 $ obx build -e Main -p ./examples/basics --emit-ir --opt ssa
 ```
 ```
-define i32 @main() {
-%entry:
-    jmp label %main
-
-%main:
-    a0 = i32 0
-    b0 = i32 10
-    total0 = i32 0
-    jmp label %loop
+%Main:
+    a0 := 0
+    b0 := 10
+    total0 := 0
 
 %loop:
-    a1 = phi [ a0, %main ], [ a2, %if.then ]
-    total1 = phi [ total0, %main ], [ total2, %if.then ]
-    t0 = icmp ule a1, b0
+    total1 := phi [ total2, %if.then ], [ total0, %Main ]
+    a1 := phi [ a0, %Main ], [ a2, %if.then ]
+    t0 := a1 < b0
     br t0, label %if.then, label %if.else
 
 %if.then:
-    total2 = add total1, i32 1
-    a2 = add a1, i32 1
+    total2 := total1 + 1
+    a2 := a1 + 1
     jmp label %loop
 
 %if.else:
     jmp label %cont
 
 %cont:
-    t1 = icmp eq total1, i32 55
+    t1 := total1 == 55
     call assert(t1)
-    ret i32 0
-}
 ```
