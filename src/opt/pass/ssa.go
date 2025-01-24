@@ -29,9 +29,9 @@ func (s SSA) Run(program *meer.Program /*symbols *tacil.SymbolTable*/) {
 
 // ComputeGlobalNames
 // ---------------------------------------------------------------
-func ComputeGlobalNames(cfg *meer.ControlFlowGraph) (map[string]bool, map[string]adt.Set[uint]) {
+func ComputeGlobalNames(cfg *meer.ControlFlowGraph) (map[string]bool, map[string]adt.Set[meer.BasicBlockID]) {
 	Globals := map[string]bool{}
-	Blocks := map[string]adt.Set[uint]{}
+	Blocks := map[string]adt.Set[meer.BasicBlockID]{}
 
 	for _, BB := range cfg.Nodes.Elems() {
 		VarKill := map[string]bool{}
@@ -49,7 +49,7 @@ func ComputeGlobalNames(cfg *meer.ControlFlowGraph) (map[string]bool, map[string
 
 				VarKill[assign.Dst.Name()] = true
 				if _, ok := Blocks[assign.Dst.Name()]; !ok {
-					Blocks[assign.Dst.Name()] = adt.NewHashSet[uint]()
+					Blocks[assign.Dst.Name()] = adt.NewHashSet[meer.BasicBlockID]()
 				}
 
 				Blocks[assign.Dst.Name()].Add(BB.ID())
@@ -65,8 +65,8 @@ func ComputeGlobalNames(cfg *meer.ControlFlowGraph) (map[string]bool, map[string
 func InsertPhiFunctions(
 	cfg *meer.ControlFlowGraph,
 	Globals map[string]bool,
-	Blocks map[string]adt.Set[uint],
-	DF map[uint]adt.Set[*meer.BasicBlock],
+	Blocks map[string]adt.Set[meer.BasicBlockID],
+	DF map[meer.BasicBlockID]adt.Set[*meer.BasicBlock],
 	/*symbols *tacil.SymbolTable*/
 ) {
 
@@ -106,7 +106,7 @@ func InsertPhiFunctions(
 func Rename(Globals map[string]bool, cfg *meer.ControlFlowGraph) (map[string]meer.Instruction, map[string]adt.Set[meer.Instruction]) {
 	counter := make(map[string]int)
 	stack := make(map[string]*adt.Stack[string])
-	vst := make(map[uint]bool)
+	vst := make(map[meer.BasicBlockID]bool)
 	defs := map[string]meer.Instruction{}
 	uses := map[string]adt.Set[meer.Instruction]{}
 
@@ -122,8 +122,8 @@ func Rename(Globals map[string]bool, cfg *meer.ControlFlowGraph) (map[string]mee
 
 func rename(
 	Globals map[string]bool,
-	vst map[uint]bool,
-	block uint,
+	vst map[meer.BasicBlockID]bool,
+	block meer.BasicBlockID,
 	counter map[string]int,
 	stack map[string]*adt.Stack[string],
 	cfg *meer.ControlFlowGraph,

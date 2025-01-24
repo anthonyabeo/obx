@@ -72,7 +72,7 @@ end Main
 	BlockCont := meer.NewBasicBlock(LblCont)
 
 	tests := []struct {
-		id       uint
+		id       meer.BasicBlockID
 		numInstr int
 	}{
 		{BlockIfThen.ID(), 3},
@@ -153,7 +153,7 @@ end Main
 	BlockIfElse := meer.NewBasicBlock(LblIfElse)
 	BlockCont := meer.NewBasicBlock(LblCont)
 
-	Blocks := map[uint]*meer.BasicBlock{
+	Blocks := map[meer.BasicBlockID]*meer.BasicBlock{
 		BlockMain.ID():   BlockMain,
 		BlockLoop.ID():   BlockLoop,
 		BlockCont.ID():   BlockCont,
@@ -161,7 +161,7 @@ end Main
 		BlockIfThen.ID(): BlockIfThen,
 	}
 
-	successors := map[uint][]uint{
+	successors := map[meer.BasicBlockID][]meer.BasicBlockID{
 		BlockMain.ID():   {BlockLoop.ID()},
 		BlockLoop.ID():   {BlockIfThen.ID(), BlockIfElse.ID()},
 		BlockIfThen.ID(): {BlockLoop.ID()},
@@ -169,7 +169,7 @@ end Main
 		//BlockCont.ID():   {},
 	}
 
-	predecessors := map[uint][]uint{
+	predecessors := map[meer.BasicBlockID][]meer.BasicBlockID{
 		//BlockMain.ID():   {},
 		BlockLoop.ID():   {BlockMain.ID(), BlockIfThen.ID()},
 		BlockIfThen.ID(): {BlockLoop.ID()},
@@ -261,12 +261,12 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 	cfg.AddPred(b6.ID(), b3.ID())
 
 	tests := []struct {
-		root   uint
-		blocks []uint
+		root   meer.BasicBlockID
+		blocks []meer.BasicBlockID
 	}{
-		{b0.ID(), []uint{b0.ID(), b1.ID(), b3.ID(), b4.ID(), b6.ID()}},
-		{b5.ID(), []uint{b5.ID()}},
-		{b2.ID(), []uint{b2.ID()}},
+		{b0.ID(), []meer.BasicBlockID{b0.ID(), b1.ID(), b3.ID(), b4.ID(), b6.ID()}},
+		{b5.ID(), []meer.BasicBlockID{b5.ID()}},
+		{b2.ID(), []meer.BasicBlockID{b2.ID()}},
 	}
 
 	extBBs := ExtendedBasicBlocks(cfg, b0.ID())
@@ -326,14 +326,14 @@ func TestComputingExtendedBasicBlocks(t *testing.T) {
 	cfg.AddPred(exit.ID(), b6.ID(), b7.ID())
 
 	tests = []struct {
-		root   uint
-		blocks []uint
+		root   meer.BasicBlockID
+		blocks []meer.BasicBlockID
 	}{
-		{entry.ID(), []uint{entry.ID()}},
-		{b1.ID(), []uint{b1.ID(), b2.ID(), b3.ID()}},
-		{b4.ID(), []uint{b4.ID(), b6.ID()}},
-		{b5.ID(), []uint{b5.ID(), b7.ID()}},
-		{exit.ID(), []uint{exit.ID()}},
+		{entry.ID(), []meer.BasicBlockID{entry.ID()}},
+		{b1.ID(), []meer.BasicBlockID{b1.ID(), b2.ID(), b3.ID()}},
+		{b4.ID(), []meer.BasicBlockID{b4.ID(), b6.ID()}},
+		{b5.ID(), []meer.BasicBlockID{b5.ID(), b7.ID()}},
+		{exit.ID(), []meer.BasicBlockID{exit.ID()}},
 	}
 
 	extBBs = ExtendedBasicBlocks(cfg, entry.ID())
@@ -382,7 +382,7 @@ func TestComputeDominance(t *testing.T) {
 	cfg.Exit = exit
 
 	cfg.Nodes.Add(entry, b1, b2, b3, b4, b5, b6, b7, exit)
-	cfg.Blocks = map[uint]*meer.BasicBlock{
+	cfg.Blocks = map[meer.BasicBlockID]*meer.BasicBlock{
 		entry.ID(): entry,
 		b1.ID():    b1,
 		b2.ID():    b2,
@@ -415,7 +415,7 @@ func TestComputeDominance(t *testing.T) {
 	cfg.AddPred(exit.ID(), b6.ID(), b7.ID())
 
 	tests := []struct {
-		id     uint
+		id     meer.BasicBlockID
 		blocks []*meer.BasicBlock
 	}{
 		{entry.ID(), []*meer.BasicBlock{entry}},
@@ -464,7 +464,7 @@ func TestComputeDominance2(t *testing.T) {
 	cfg.Exit = exit
 
 	cfg.Nodes.Add(entry, b1, b2, b3, exit)
-	cfg.Blocks = map[uint]*meer.BasicBlock{
+	cfg.Blocks = map[meer.BasicBlockID]*meer.BasicBlock{
 		entry.ID(): entry,
 		b1.ID():    b1,
 		b2.ID():    b2,
@@ -485,7 +485,7 @@ func TestComputeDominance2(t *testing.T) {
 	cfg.AddPred(exit.ID(), b3.ID())
 
 	tests := []struct {
-		id     uint
+		id     meer.BasicBlockID
 		blocks []*meer.BasicBlock
 	}{
 		{entry.ID(), []*meer.BasicBlock{entry}},
@@ -539,7 +539,7 @@ func TestComputeDominance3(t *testing.T) {
 	cfg.Exit = b4
 
 	cfg.Nodes.Add(b0, b1, b2, b3, b4, b5, b6, b7, b8)
-	cfg.Blocks = map[uint]*meer.BasicBlock{
+	cfg.Blocks = map[meer.BasicBlockID]*meer.BasicBlock{
 		b0.ID(): b0,
 		b1.ID(): b1,
 		b2.ID(): b2,
@@ -572,7 +572,7 @@ func TestComputeDominance3(t *testing.T) {
 	cfg.AddPred(b8.ID(), b5.ID())
 
 	tests := []struct {
-		id     uint
+		id     meer.BasicBlockID
 		blocks []*meer.BasicBlock
 	}{
 		{b0.ID(), []*meer.BasicBlock{b0}},
@@ -621,7 +621,7 @@ func TestComputeImmediateDominance(t *testing.T) {
 	cfg.Exit = exit
 
 	cfg.Nodes.Add(entry, b1, b2, b3, exit)
-	cfg.Blocks = map[uint]*meer.BasicBlock{
+	cfg.Blocks = map[meer.BasicBlockID]*meer.BasicBlock{
 		entry.ID(): entry,
 		b1.ID():    b1,
 		b2.ID():    b2,
@@ -645,7 +645,7 @@ func TestComputeImmediateDominance(t *testing.T) {
 	iDom := ImmDominator(cfg, dom)
 
 	tests := []struct {
-		id  uint
+		id  meer.BasicBlockID
 		blk string
 	}{
 		{b1.ID(), "entry"},
@@ -685,7 +685,7 @@ func TestComputeNaturalLoop(t *testing.T) {
 	cfg.Exit = exit
 
 	cfg.Nodes.Add(entry, b1, b2, b3, exit)
-	cfg.Blocks = map[uint]*meer.BasicBlock{
+	cfg.Blocks = map[meer.BasicBlockID]*meer.BasicBlock{
 		entry.ID(): entry,
 		b1.ID():    b1,
 		b2.ID():    b2,
@@ -741,7 +741,7 @@ func TestComputeNaturalLoop2(t *testing.T) {
 	cfg.Exit = exit
 
 	cfg.Nodes.Add(entry, b1, b2, b3, b4, b5, b6, b7, exit)
-	cfg.Blocks = map[uint]*meer.BasicBlock{
+	cfg.Blocks = map[meer.BasicBlockID]*meer.BasicBlock{
 		entry.ID(): entry,
 		b1.ID():    b1,
 		b2.ID():    b2,
@@ -816,7 +816,7 @@ func TestDominanceFrontier(t *testing.T) {
 	cfg.Exit = b4
 
 	cfg.Nodes.Add(b0, b1, b2, b3, b4, b5, b6, b7, b8)
-	cfg.Blocks = map[uint]*meer.BasicBlock{
+	cfg.Blocks = map[meer.BasicBlockID]*meer.BasicBlock{
 		b0.ID(): b0,
 		b1.ID(): b1,
 		b2.ID(): b2,
@@ -849,7 +849,7 @@ func TestDominanceFrontier(t *testing.T) {
 	cfg.AddPred(b8.ID(), b5.ID())
 
 	tests := []struct {
-		id     uint
+		id     meer.BasicBlockID
 		blocks []*meer.BasicBlock
 	}{
 		{b0.ID(), []*meer.BasicBlock{}},

@@ -145,7 +145,7 @@ func (p *ProgramUnit) Output() string {
 	buf := &bytes.Buffer{}
 
 	for i := 1; i < p.CFG.Nodes.Size()+1; i++ {
-		buf.WriteString(p.CFG.Blocks[uint(i)].String())
+		buf.WriteString(p.CFG.Blocks[BasicBlockID(i)].String())
 	}
 
 	return buf.String()

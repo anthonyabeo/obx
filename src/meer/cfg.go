@@ -9,16 +9,18 @@ import (
 	"github.com/anthonyabeo/obx/src/adt"
 )
 
+type BasicBlockID uint
+
 // BasicBlock ...
 // -------------------------------
 type BasicBlock struct {
-	id    uint
+	id    BasicBlockID
 	name  string
 	instr *list.List
 	Phi   map[string]*AssignInst
 }
 
-var nb uint = 1
+var nb BasicBlockID = 1
 
 func NewBasicBlock(lbl *Label) *BasicBlock {
 	blk := &BasicBlock{
@@ -34,7 +36,7 @@ func NewBasicBlock(lbl *Label) *BasicBlock {
 	return blk
 }
 
-var nextBlock uint = 1
+var nextBlock BasicBlockID = 1
 
 func CreateBasicBlock(lbl *Label) *BasicBlock {
 	instr := list.New()
@@ -53,7 +55,7 @@ func CreateBasicBlock(lbl *Label) *BasicBlock {
 	return blk
 }
 
-func (b *BasicBlock) ID() uint            { return b.id }
+func (b *BasicBlock) ID() BasicBlockID    { return b.id }
 func (b *BasicBlock) Name() string        { return b.name }
 func (b *BasicBlock) SetName(name string) { b.name = name }
 func (b *BasicBlock) HasName() bool       { return b.name != "" }
@@ -95,10 +97,10 @@ func (b *BasicBlock) LastInstIsCondBr() bool {
 // ----------------------------------------------------------------
 type ControlFlowGraph struct {
 	Entry, Exit *BasicBlock
-	Blocks      map[uint]*BasicBlock
+	Blocks      map[BasicBlockID]*BasicBlock
 	Nodes       adt.Set[*BasicBlock]
-	Suc         map[uint]*adt.HashSet[uint]
-	Pred        map[uint]*adt.HashSet[uint]
+	Suc         map[BasicBlockID]*adt.HashSet[BasicBlockID]
+	Pred        map[BasicBlockID]*adt.HashSet[BasicBlockID]
 
 	Defs map[string]Instruction
 	Uses map[string]adt.Set[Instruction]
@@ -107,27 +109,27 @@ type ControlFlowGraph struct {
 func NewCFG() *ControlFlowGraph {
 	return &ControlFlowGraph{
 		Nodes:  adt.NewHashSet[*BasicBlock](),
-		Blocks: make(map[uint]*BasicBlock),
-		Suc:    make(map[uint]*adt.HashSet[uint]),
-		Pred:   make(map[uint]*adt.HashSet[uint]),
+		Blocks: make(map[BasicBlockID]*BasicBlock),
+		Suc:    make(map[BasicBlockID]*adt.HashSet[BasicBlockID]),
+		Pred:   make(map[BasicBlockID]*adt.HashSet[BasicBlockID]),
 	}
 }
 
-func (cfg *ControlFlowGraph) AddSuc(BlkID uint, Successors ...uint) {
+func (cfg *ControlFlowGraph) AddSuc(BlkID BasicBlockID, Successors ...BasicBlockID) {
 	if cfg.Suc[BlkID] == nil {
-		cfg.Suc[BlkID] = adt.NewHashSet[uint]()
+		cfg.Suc[BlkID] = adt.NewHashSet[BasicBlockID]()
 	}
 	cfg.Suc[BlkID].Add(Successors...)
 }
 
-func (cfg *ControlFlowGraph) AddPred(BlkID uint, Predecessors ...uint) {
+func (cfg *ControlFlowGraph) AddPred(BlkID BasicBlockID, Predecessors ...BasicBlockID) {
 	if cfg.Pred[BlkID] == nil {
-		cfg.Pred[BlkID] = adt.NewHashSet[uint]()
+		cfg.Pred[BlkID] = adt.NewHashSet[BasicBlockID]()
 	}
 	cfg.Pred[BlkID].Add(Predecessors...)
 }
 
-func (cfg *ControlFlowGraph) IsJoinNode(blk uint) bool {
+func (cfg *ControlFlowGraph) IsJoinNode(blk BasicBlockID) bool {
 	if cfg.Pred[blk] != nil {
 		return cfg.Pred[blk].Size() > 1
 	}
@@ -135,7 +137,7 @@ func (cfg *ControlFlowGraph) IsJoinNode(blk uint) bool {
 	return false
 }
 
-func (cfg *ControlFlowGraph) IsBrNode(blk uint) bool {
+func (cfg *ControlFlowGraph) IsBrNode(blk BasicBlockID) bool {
 	return cfg.Suc[blk].Size() > 1
 }
 
@@ -173,15 +175,15 @@ func (cfg *ControlFlowGraph) String() string {
 	return buf.String()
 }
 
-func (cfg *ControlFlowGraph) PostOrder() []uint {
-	visited := map[uint]bool{}
-	order := make([]uint, 0)
+func (cfg *ControlFlowGraph) PostOrder() []BasicBlockID {
+	visited := map[BasicBlockID]bool{}
+	order := make([]BasicBlockID, 0)
 
 	cfg.dfs(cfg.Entry.id, visited, &order)
 	return order
 }
 
-func (cfg *ControlFlowGraph) dfs(BlkID uint, visited map[uint]bool, order *[]uint) {
+func (cfg *ControlFlowGraph) dfs(BlkID BasicBlockID, visited map[BasicBlockID]bool, order *[]BasicBlockID) {
 	visited[BlkID] = true
 	if cfg.Suc[BlkID] != nil {
 		for _, suc := range cfg.Suc[BlkID].Elems() {
@@ -194,9 +196,9 @@ func (cfg *ControlFlowGraph) dfs(BlkID uint, visited map[uint]bool, order *[]uin
 	*order = append(*order, BlkID)
 }
 
-func (cfg *ControlFlowGraph) ReversePostOrder() []uint {
+func (cfg *ControlFlowGraph) ReversePostOrder() []BasicBlockID {
 	pOrder := cfg.PostOrder()
-	var revOrder []uint
+	var revOrder []BasicBlockID
 	for i := len(pOrder) - 1; i >= 0; i-- {
 		revOrder = append(revOrder, pOrder[i])
 	}

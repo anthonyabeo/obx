@@ -5,15 +5,15 @@ import (
 	"github.com/anthonyabeo/obx/src/meer"
 )
 
-func ExtendedBasicBlocks(cfg *meer.ControlFlowGraph, src uint) map[uint]*adt.HashSet[uint] {
-	ebbs := make(map[uint]*adt.HashSet[uint])
-	roots := adt.NewQueue[uint]()
+func ExtendedBasicBlocks(cfg *meer.ControlFlowGraph, src meer.BasicBlockID) map[meer.BasicBlockID]*adt.HashSet[meer.BasicBlockID] {
+	ebbs := make(map[meer.BasicBlockID]*adt.HashSet[meer.BasicBlockID])
+	roots := adt.NewQueue[meer.BasicBlockID]()
 
 	roots.Enqueue(src)
 	for !roots.Empty() {
 		BB := roots.Dequeue()
 		if _, exists := ebbs[BB]; !exists {
-			s := adt.NewHashSet[uint]()
+			s := adt.NewHashSet[meer.BasicBlockID]()
 			extBasicBlocks(cfg, BB, roots, s)
 			ebbs[BB] = s
 		}
@@ -22,7 +22,7 @@ func ExtendedBasicBlocks(cfg *meer.ControlFlowGraph, src uint) map[uint]*adt.Has
 	return ebbs
 }
 
-func extBasicBlocks(cfg *meer.ControlFlowGraph, blkID uint, roots *adt.Queue[uint], s *adt.HashSet[uint]) {
+func extBasicBlocks(cfg *meer.ControlFlowGraph, blkID meer.BasicBlockID, roots *adt.Queue[meer.BasicBlockID], s *adt.HashSet[meer.BasicBlockID]) {
 	s.Add(blkID)
 
 	for _, BlockID := range cfg.Suc[blkID].Elems() {
@@ -34,9 +34,9 @@ func extBasicBlocks(cfg *meer.ControlFlowGraph, blkID uint, roots *adt.Queue[uin
 	}
 }
 
-func ImmDominator(cfg *meer.ControlFlowGraph, Dominance map[uint]adt.Set[*meer.BasicBlock]) map[uint]*meer.BasicBlock {
-	IDom := make(map[uint]*meer.BasicBlock)
-	Tmp := make(map[uint]adt.Set[*meer.BasicBlock])
+func ImmDominator(cfg *meer.ControlFlowGraph, Dominance map[meer.BasicBlockID]adt.Set[*meer.BasicBlock]) map[meer.BasicBlockID]*meer.BasicBlock {
+	IDom := make(map[meer.BasicBlockID]*meer.BasicBlock)
+	Tmp := make(map[meer.BasicBlockID]adt.Set[*meer.BasicBlock])
 
 	for _, BB := range cfg.Nodes.Elems() {
 		Tmp[BB.ID()] = Dominance[BB.ID()].Remove(BB)
@@ -71,8 +71,8 @@ func ImmDominator(cfg *meer.ControlFlowGraph, Dominance map[uint]adt.Set[*meer.B
 	return IDom
 }
 
-func Dominance(cfg *meer.ControlFlowGraph) map[uint]adt.Set[*meer.BasicBlock] {
-	Dom := make(map[uint]adt.Set[*meer.BasicBlock])
+func Dominance(cfg *meer.ControlFlowGraph) map[meer.BasicBlockID]adt.Set[*meer.BasicBlock] {
+	Dom := make(map[meer.BasicBlockID]adt.Set[*meer.BasicBlock])
 
 	entrySet := adt.NewHashSet[*meer.BasicBlock]()
 	entrySet.Add(cfg.Entry)
@@ -90,7 +90,7 @@ func Dominance(cfg *meer.ControlFlowGraph) map[uint]adt.Set[*meer.BasicBlock] {
 	for changed {
 		changed = false
 
-		workList := adt.NewQueueFrom[uint](cfg.ReversePostOrder()[1:])
+		workList := adt.NewQueueFrom[meer.BasicBlockID](cfg.ReversePostOrder()[1:])
 		for !workList.Empty() {
 			BB := workList.Dequeue()
 
@@ -110,8 +110,8 @@ func Dominance(cfg *meer.ControlFlowGraph) map[uint]adt.Set[*meer.BasicBlock] {
 	return Dom
 }
 
-func DominanceFrontier(cfg *meer.ControlFlowGraph) map[uint]adt.Set[*meer.BasicBlock] {
-	DF := make(map[uint]adt.Set[*meer.BasicBlock])
+func DominanceFrontier(cfg *meer.ControlFlowGraph) map[meer.BasicBlockID]adt.Set[*meer.BasicBlock] {
+	DF := make(map[meer.BasicBlockID]adt.Set[*meer.BasicBlock])
 	for _, BB := range cfg.Nodes.Elems() {
 		DF[BB.ID()] = adt.NewHashSet[*meer.BasicBlock]()
 	}
@@ -139,9 +139,9 @@ func DominanceFrontier(cfg *meer.ControlFlowGraph) map[uint]adt.Set[*meer.BasicB
 	return DF
 }
 
-func NaturalLoop(cfg *meer.ControlFlowGraph, m, n *meer.BasicBlock) adt.Set[uint] {
-	Stack := adt.NewStack[uint]()
-	Loop := adt.NewHashSet[uint]()
+func NaturalLoop(cfg *meer.ControlFlowGraph, m, n *meer.BasicBlock) adt.Set[meer.BasicBlockID] {
+	Stack := adt.NewStack[meer.BasicBlockID]()
+	Loop := adt.NewHashSet[meer.BasicBlockID]()
 	Loop.Add(m.ID(), n.ID())
 
 	if m != n {
@@ -206,8 +206,8 @@ func isTerm(i meer.Instruction) bool {
 	}
 }
 
-func findLeaders(instructions []meer.Instruction) map[uint]*meer.BasicBlock {
-	Blocks := make(map[uint]*meer.BasicBlock)
+func findLeaders(instructions []meer.Instruction) map[meer.BasicBlockID]*meer.BasicBlock {
+	Blocks := make(map[meer.BasicBlockID]*meer.BasicBlock)
 
 	first := instructions[0].(*meer.Label)
 	BB := meer.CreateBasicBlock(first)

@@ -16,7 +16,7 @@ type Instruction interface {
 type Label struct {
 	Op      Opcode
 	Name    string
-	BlockID uint
+	BlockID BasicBlockID
 }
 
 func NewLabel(name string) *Label {
