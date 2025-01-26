@@ -58,8 +58,8 @@ var declPasses map[string]Pass
 
 func init() {
 	declPasses = map[string]Pass{
-		"ssa": &pass.SSA{Nom: "ssa"},
-		//"dce":        &pass.DeadCodeElimination{Nom: "dce"},
-		//"const_prop": &pass.ConstantPropagation{},
+		"ssa":        &pass.SSA{Nom: "ssa"},
+		"dce":        &pass.DeadCodeElimination{Nom: "dce"},
+		"const_prop": &pass.ConstantPropagation{},
 	}
 }

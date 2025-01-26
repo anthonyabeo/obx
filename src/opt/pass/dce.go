@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/anthonyabeo/obx/src/adt"
-	"github.com/anthonyabeo/obx/src/translate/tacil"
+	"github.com/anthonyabeo/obx/src/meer"
 )
 
 type DeadCodeElimination struct {
@@ -13,21 +13,18 @@ type DeadCodeElimination struct {
 
 func (dce DeadCodeElimination) Name() string { return dce.Nom }
 
-func (dce DeadCodeElimination) Run(program *tacil.Program, symbols *tacil.SymbolTable) {
-	for _, mod := range program.Modules {
-		for _, f := range mod.GetFunctionList() {
-			cfg := f.CFG()
-			eliminateUselessControlFlow(cfg)
-			eliminateUselessCode(cfg)
-		}
+func (dce DeadCodeElimination) Run(program *meer.Program) {
+	for _, unit := range program.Units {
+		eliminateUselessControlFlow(unit.CFG)
+		eliminateUselessCode(unit.CFG)
 	}
 }
 
-func eliminateUselessCode(cfg *tacil.ControlFlowGraph) {
+func eliminateUselessCode(cfg *meer.ControlFlowGraph) {
 
 }
 
-func eliminateUselessControlFlow(cfg *tacil.ControlFlowGraph) {
+func eliminateUselessControlFlow(cfg *meer.ControlFlowGraph) {
 	changed := true
 	for changed {
 		changed = false
@@ -37,43 +34,45 @@ func eliminateUselessControlFlow(cfg *tacil.ControlFlowGraph) {
 	}
 }
 
-func makePass(cfg *tacil.ControlFlowGraph, post []*tacil.BasicBlock) bool {
+func makePass(cfg *meer.ControlFlowGraph, post []meer.BasicBlockID) bool {
 	for _, BB := range post {
-		if BB == cfg.Entry {
-			jmp := BB.LastInst().(*tacil.Jump)
+		block := cfg.Blocks[BB]
+		if BB == cfg.Entry.ID() {
+			jmp := cfg.Blocks[BB].LastInst().(*meer.JumpInst)
 			if jmp == nil {
 				panic("last (and only) instruction in 'entry' block should be an unconditional branch")
 			}
 
-			jmp.Dst = cfg.Succ["entry"].Pop()
+			id := cfg.Suc[cfg.Entry.ID()].Pop()
+			jmp.Dst = cfg.Blocks[id].Label()
 			continue
 		}
 
-		lastInst := BB.LastInst()
+		lastInst := block.LastInst()
 
 		//if both targets are identical then replace the branch with a jump
-		condBr, ok := lastInst.(*tacil.CondBr)
+		condBr, ok := lastInst.(*meer.CondBrInst)
 		if ok && (condBr.IfTrue == condBr.IfFalse) {
-			BB.Instr().Remove(BB.Instr().Back())
-			BB.Instr().PushBack(tacil.CreateJmp(condBr.IfTrue))
+			block.Instr().Remove(block.Instr().Back())
+			block.Instr().PushBack(meer.CreateJmp(condBr.IfTrue))
 			return true
 		}
 
-		if jmp, ok := lastInst.(*tacil.Jump); ok {
-			Dst := jmp.Dst
-			if BB.Empty() {
-				removeEmptyBlock(BB, Dst, cfg)
+		if jmp, ok := lastInst.(*meer.JumpInst); ok {
+			Dst := cfg.Blocks[jmp.Dst.BlockID]
+			if block.Empty() {
+				removeEmptyBlock(block, Dst, cfg)
 				return true
 			}
 
-			if cfg.Pred[Dst.Name()].Size() == 1 {
-				mergeBlocks(BB, Dst, cfg)
+			if cfg.Pred[Dst.ID()].Size() == 1 {
+				mergeBlocks(block, Dst, cfg)
 				return true
 			}
 
-			_, isCondBr := Dst.LastInst().(*tacil.CondBr)
+			_, isCondBr := Dst.LastInst().(*meer.CondBrInst)
 			if Dst.Empty() && isCondBr {
-				hoistBranch(BB, Dst, cfg)
+				hoistBranch(block, Dst, cfg)
 				return true
 			}
 		}
@@ -82,11 +81,11 @@ func makePass(cfg *tacil.ControlFlowGraph, post []*tacil.BasicBlock) bool {
 	return false
 }
 
-func mergeBlocks(pred, succ *tacil.BasicBlock, cfg *tacil.ControlFlowGraph) *tacil.BasicBlock {
+func mergeBlocks(pred, succ *meer.BasicBlock, cfg *meer.ControlFlowGraph) *meer.BasicBlock {
 	// create a new block to hold the content of 'pred' and 'succ'
-	mergeBlock := tacil.CreateBasicBlock("merge", pred.Parent())
-	cfg.Succ["merge"] = adt.NewHashSet[*tacil.BasicBlock]()
-	cfg.Pred["merge"] = adt.NewHashSet[*tacil.BasicBlock]()
+	mergeBlock := meer.CreateBasicBlock(meer.NewLabel("merge"))
+	cfg.Suc[mergeBlock.ID()] = adt.NewHashSet[meer.BasicBlockID]()
+	cfg.Pred[mergeBlock.ID()] = adt.NewHashSet[meer.BasicBlockID]()
 
 	// copy the instructions from pred (minus the last branch instruction) and succ
 	// to the new block
@@ -95,27 +94,27 @@ func mergeBlocks(pred, succ *tacil.BasicBlock, cfg *tacil.ControlFlowGraph) *tac
 			continue
 		}
 
-		mergeBlock.AddInstr(i.Value.(tacil.Stmt))
+		mergeBlock.AddInstr(i.Value.(meer.Instruction))
 	}
 
 	for j := succ.Instr().Front(); j != nil; j = j.Next() {
-		mergeBlock.AddInstr(j.Value.(tacil.Stmt))
+		mergeBlock.AddInstr(j.Value.(meer.Instruction))
 	}
 
 	// flow-graph accounting
 	// the predecessors of pred become the predecessors of mergeBlock
-	if cfg.Pred[pred.Name()] != nil {
-		for _, p := range cfg.Pred[pred.Name()].Elems() {
-			cfg.Pred[mergeBlock.Name()].Add(p)
-			cfg.Succ[p.Name()].Add(mergeBlock)
+	if cfg.Pred[pred.ID()] != nil {
+		for _, p := range cfg.Pred[pred.ID()].Elems() {
+			cfg.Pred[mergeBlock.ID()].Add(p)
+			cfg.Suc[p].Add(mergeBlock.ID())
 		}
 	}
 
 	// the successors of succ become the successors of mergeBlock
-	if cfg.Succ[succ.Name()] != nil {
-		for _, s := range cfg.Succ[succ.Name()].Elems() {
-			cfg.Succ[mergeBlock.Name()].Add(s)
-			cfg.Pred[s.Name()].Add(mergeBlock)
+	if cfg.Suc[succ.ID()] != nil {
+		for _, s := range cfg.Suc[succ.ID()].Elems() {
+			cfg.Suc[mergeBlock.ID()].Add(s)
+			cfg.Pred[s].Add(mergeBlock.ID())
 		}
 	}
 
@@ -124,23 +123,23 @@ func mergeBlocks(pred, succ *tacil.BasicBlock, cfg *tacil.ControlFlowGraph) *tac
 	return mergeBlock
 }
 
-func removeEmptyBlock(i, j *tacil.BasicBlock, cfg *tacil.ControlFlowGraph) {
-	if cfg.Pred[i.Name()] != nil {
-		for _, p := range cfg.Pred[i.Name()].Elems() {
-			cfg.Pred[j.Name()].Add(p)
-			cfg.Succ[p.Name()].Add(j)
+func removeEmptyBlock(i, j *meer.BasicBlock, cfg *meer.ControlFlowGraph) {
+	if cfg.Pred[i.ID()] != nil {
+		for _, p := range cfg.Pred[i.ID()].Elems() {
+			cfg.Pred[j.ID()].Add(p)
+			cfg.Suc[p].Add(j.ID())
 
-			switch br := p.LastInst().(type) {
-			case *tacil.CondBr:
-				if i == br.IfTrue {
-					br.IfTrue = j
+			switch br := cfg.Blocks[p].LastInst().(type) {
+			case *meer.CondBrInst:
+				if i.ID() == br.IfTrue.BlockID {
+					br.IfTrue = j.Label()
 				} else {
-					br.IfFalse = j
+					br.IfFalse = j.Label()
 				}
-			case *tacil.Jump:
-				br.Dst = j
+			case *meer.JumpInst:
+				br.Dst = j.Label()
 			default:
-				panic(fmt.Sprintf("last instruction in block %s must be a Jmp or CondBr. Got %s", p.Name(), br))
+				panic(fmt.Sprintf("last instruction in block %s must be a Jmp or CondBr. Got %s", cfg.Blocks[p].Name(), br))
 			}
 		}
 	}
@@ -148,12 +147,12 @@ func removeEmptyBlock(i, j *tacil.BasicBlock, cfg *tacil.ControlFlowGraph) {
 	cfg.DeleteBlocks(i)
 }
 
-func hoistBranch(i, j *tacil.BasicBlock, cfg *tacil.ControlFlowGraph) {
-	for _, s := range cfg.Succ[j.Name()].Elems() {
-		cfg.Succ[i.Name()].Add(s)
-		cfg.Pred[s.Name()].Add(i)
+func hoistBranch(i, j *meer.BasicBlock, cfg *meer.ControlFlowGraph) {
+	for _, s := range cfg.Suc[j.ID()].Elems() {
+		cfg.Suc[i.ID()].Add(s)
+		cfg.Pred[s].Add(i.ID())
 	}
 
-	cfg.Succ[i.Name()].Remove(j)
-	cfg.Pred[j.Name()].Remove(i)
+	cfg.Suc[i.ID()].Remove(j.ID())
+	cfg.Pred[j.ID()].Remove(i.ID())
 }

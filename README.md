@@ -97,6 +97,7 @@ $ obx build -e Main -p ./examples/basics --emit-ir --opt ssa
     a0 := 0
     b0 := 10
     total0 := 0
+    jmp label %loop
 
 %loop:
     total1 := phi [ total2, %if.then ], [ total0, %Main ]
