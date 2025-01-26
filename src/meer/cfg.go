@@ -18,6 +18,10 @@ type BasicBlock struct {
 	name  *Label
 	instr *list.List
 	Phi   map[string]*AssignInst
+
+	//Def
+	//Use
+	//Kill
 }
 
 var nb BasicBlockID = 1
@@ -102,9 +106,6 @@ type ControlFlowGraph struct {
 	Nodes       adt.Set[*BasicBlock]
 	Suc         map[BasicBlockID]*adt.HashSet[BasicBlockID]
 	Pred        map[BasicBlockID]*adt.HashSet[BasicBlockID]
-
-	Defs map[string]Instruction
-	Uses map[string]adt.Set[Instruction]
 }
 
 func NewCFG() *ControlFlowGraph {

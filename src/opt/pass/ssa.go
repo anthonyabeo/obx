@@ -20,10 +20,7 @@ func (s SSA) Run(program *meer.Program) {
 
 		Globals, Blocks := ComputeGlobalNames(unit.CFG)
 		InsertPhiFunctions(unit.CFG, Globals, Blocks, DF)
-		defs, uses := Rename(Globals, unit.CFG)
-
-		unit.CFG.Defs = defs
-		unit.CFG.Uses = uses
+		Rename(Globals, unit.CFG)
 	}
 }
 
@@ -97,21 +94,17 @@ func InsertPhiFunctions(
 
 // Rename
 // -----------------------------
-func Rename(Globals map[string]meer.Type, cfg *meer.ControlFlowGraph) (map[string]meer.Instruction, map[string]adt.Set[meer.Instruction]) {
+func Rename(Globals map[string]meer.Type, cfg *meer.ControlFlowGraph) {
 	counter := make(map[string]int)
 	stack := make(map[string]*adt.Stack[string])
 	vst := make(map[meer.BasicBlockID]bool)
-	defs := map[string]meer.Instruction{}
-	uses := map[string]adt.Set[meer.Instruction]{}
 
 	for name := range Globals {
 		counter[name] = 0
 		stack[name] = adt.NewStack[string]()
 	}
 
-	rename(Globals, vst, cfg.Entry.ID(), counter, stack, cfg, defs, uses)
-
-	return defs, uses
+	rename(Globals, vst, cfg.Entry.ID(), counter, stack, cfg /*defs, uses*/)
 }
 
 func rename(
@@ -121,8 +114,6 @@ func rename(
 	counter map[string]int,
 	stack map[string]*adt.Stack[string],
 	cfg *meer.ControlFlowGraph,
-	defs map[string]meer.Instruction,
-	uses map[string]adt.Set[meer.Instruction],
 ) {
 
 	if vst[block] {
@@ -133,8 +124,6 @@ func rename(
 	for name, phi := range cfg.Blocks[block].Phi {
 		nom := newName(name, counter, stack)
 		phi.Dst.SetName(nom)
-
-		defs[nom] = phi
 	}
 
 	for i := cfg.Blocks[block].Instr().Front(); i != nil; i = i.Next() {
@@ -148,11 +137,6 @@ func rename(
 			if op, ok := operand.(meer.NamedOperand); ok {
 				if Globals[op.Name()] != nil {
 					op.SetName(stack[op.Name()].Top())
-
-					if uses[stack[op.BaseName()].Top()] == nil {
-						uses[stack[op.BaseName()].Top()] = adt.NewHashSet[meer.Instruction]()
-					}
-					uses[stack[op.BaseName()].Top()].Add(assign)
 				}
 			}
 		}
@@ -160,7 +144,6 @@ func rename(
 		if Globals[assign.Dst.Name()] != nil {
 			nom := newName(assign.Dst.Name(), counter, stack)
 			assign.Dst.SetName(nom)
-			defs[nom] = assign
 		}
 	}
 
@@ -173,10 +156,6 @@ func rename(
 					for _, inc := range phi.Incoming {
 						if inc.Blk.ID() == block {
 							inc.V.SetName(stack[name].Top())
-							if uses[stack[name].Top()] == nil {
-								uses[stack[name].Top()] = adt.NewHashSet[meer.Instruction]()
-							}
-							uses[stack[name].Top()].Add(assign)
 						}
 					}
 				}
@@ -184,7 +163,7 @@ func rename(
 		}
 
 		for _, s := range cfg.Suc[block].Elems() {
-			rename(Globals, vst, s, counter, stack, cfg, defs, uses)
+			rename(Globals, vst, s, counter, stack, cfg)
 		}
 	}
 
