@@ -202,7 +202,7 @@ func (c FuncCallInst) String() string {
 type PHINode struct {
 	Op               Opcode
 	Incoming         []PHINodeIncoming
-	numIncomingPaths uint
+	numIncomingPaths int
 	ty               Type
 }
 
@@ -210,16 +210,22 @@ func CreateEmptyPHINode() *PHINode {
 	return &PHINode{Op: Phi}
 }
 
-func CreatePHINode(numIncomingPaths uint) *PHINode {
+func CreatePHINode(numIncomingPaths int) *PHINode {
 	return &PHINode{
 		Op:               Phi,
 		numIncomingPaths: numIncomingPaths,
 	}
 }
 
-func (phi *PHINode) expr()                  {}
-func (phi *PHINode) Operand(int) Expression { panic("") }
-func (phi *PHINode) NumOperands() int       { return 0 }
+func (phi *PHINode) expr() {}
+func (phi *PHINode) Operand(i int) Expression {
+	if i < 0 || i > phi.numIncomingPaths {
+		return nil
+	}
+
+	return phi.Incoming[i-1].V
+}
+func (phi *PHINode) NumOperands() int { return phi.numIncomingPaths }
 func (phi *PHINode) String() string {
 	var incs []string
 	for _, inc := range phi.Incoming {
