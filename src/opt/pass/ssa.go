@@ -2,7 +2,6 @@ package pass
 
 import (
 	"fmt"
-
 	"github.com/anthonyabeo/obx/src/adt"
 	"github.com/anthonyabeo/obx/src/meer"
 	"github.com/anthonyabeo/obx/src/opt/analy"
@@ -21,6 +20,8 @@ func (s SSA) Run(program *meer.Program) {
 		Globals, Blocks := ComputeGlobalNames(unit.CFG)
 		InsertPhiFunctions(unit.CFG, Globals, Blocks, DF)
 		Rename(Globals, unit.CFG)
+
+		unit.CFG.Defs, unit.CFG.Uses = analy.ComputeDefUse(unit.CFG)
 	}
 }
 
@@ -104,7 +105,7 @@ func Rename(Globals map[string]meer.Type, cfg *meer.ControlFlowGraph) {
 		stack[name] = adt.NewStack[string]()
 	}
 
-	rename(Globals, vst, cfg.Entry.ID(), counter, stack, cfg /*defs, uses*/)
+	rename(Globals, vst, cfg.Entry.ID(), counter, stack, cfg)
 }
 
 func rename(

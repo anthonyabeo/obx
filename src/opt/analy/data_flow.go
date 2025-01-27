@@ -2,6 +2,7 @@ package analy
 
 import (
 	"github.com/anthonyabeo/obx/src/adt"
+	"github.com/anthonyabeo/obx/src/meer"
 	"github.com/anthonyabeo/obx/src/translate/tacil"
 )
 
@@ -186,4 +187,54 @@ func AvailableExpressions(cfg *tacil.ControlFlowGraph, GEN, KILL map[string]adt.
 
 func AnticipatableExpressions(cfg *tacil.ControlFlowGraph) {
 
+}
+
+func ComputeDefUse(cfg *meer.ControlFlowGraph) (map[string]meer.Instruction, map[string]adt.Set[meer.Instruction]) {
+	defs := make(map[string]meer.Instruction)
+	uses := make(map[string]adt.Set[meer.Instruction])
+
+	for _, block := range cfg.Blocks {
+		for i := block.Instr().Front(); i != nil; i = i.Next() {
+			switch inst := i.Value.(type) {
+			case *meer.AssignInst:
+				defs[inst.Dst.Name()] = inst
+				for i := 1; i < inst.Value.NumOperands()+1; i++ {
+					op, ok := inst.Value.Operand(i).(meer.NamedOperand)
+					if !ok {
+						continue
+					}
+					if uses[op.Name()] == nil {
+						uses[op.Name()] = adt.NewHashSet[meer.Instruction]()
+					}
+					uses[op.Name()].Add(inst)
+				}
+			case *meer.JumpInst:
+			case *meer.CondBrInst:
+				if foo, ok := inst.Cond.(meer.NamedOperand); ok {
+					if uses[foo.Name()] == nil {
+						uses[foo.Name()] = adt.NewHashSet[meer.Instruction]()
+					}
+					uses[foo.Name()].Add(inst)
+				}
+			case *meer.ProcCallInstr:
+				for _, arg := range inst.Args {
+					if foo, ok := arg.(meer.NamedOperand); ok {
+						if uses[foo.Name()] == nil {
+							uses[foo.Name()] = adt.NewHashSet[meer.Instruction]()
+						}
+						uses[foo.Name()].Add(inst)
+					}
+				}
+			case *meer.ReturnInst:
+				if value, ok := inst.Value.(meer.NamedOperand); ok {
+					if uses[value.Name()] == nil {
+						uses[value.Name()] = adt.NewHashSet[meer.Instruction]()
+					}
+					uses[value.Name()].Add(inst)
+				}
+			}
+		}
+	}
+
+	return defs, uses
 }

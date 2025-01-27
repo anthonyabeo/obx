@@ -106,6 +106,9 @@ type ControlFlowGraph struct {
 	Nodes       adt.Set[*BasicBlock]
 	Suc         map[BasicBlockID]*adt.HashSet[BasicBlockID]
 	Pred        map[BasicBlockID]*adt.HashSet[BasicBlockID]
+
+	Defs map[string]Instruction
+	Uses map[string]adt.Set[Instruction]
 }
 
 func NewCFG() *ControlFlowGraph {
