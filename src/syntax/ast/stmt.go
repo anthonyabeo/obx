@@ -3,22 +3,21 @@ package ast
 import (
 	"fmt"
 	"strings"
-
-	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type (
 	ForStmt struct {
-		For      *token.Position
-		CtlVar   *Ident
+		CtlVar   string
 		InitVal  Expression
 		FinalVal Expression
 		By       Expression
 		StmtSeq  []Statement
+
+		Label string
 	}
 
 	ExitStmt struct {
-		Exit *token.Position
+		Label string
 	}
 
 	Guard struct {
@@ -28,38 +27,38 @@ type (
 	}
 
 	WithStmt struct {
-		With *token.Position
 		Arms []*Guard
 		Else []Statement
 	}
 
-	ProcCall struct {
-		NamePos      *token.Position
+	ProcedureCall struct {
 		Callee       *Designator
 		ActualParams []Expression
 	}
 
 	WhileStmt struct {
-		While    *token.Position
 		BoolExpr Expression
 		StmtSeq  []Statement
 		ElsIfs   []*ElsIfBranch
+
+		Label string
 	}
 
 	ReturnStmt struct {
-		Return *token.Position
-		Value  Expression
+		Value Expression
 	}
 
 	RepeatStmt struct {
-		Repeat   *token.Position
 		StmtSeq  []Statement
 		BoolExpr Expression
+
+		Label string
 	}
 
 	LoopStmt struct {
-		Loop    *token.Position
 		StmtSeq []Statement
+
+		Label string
 	}
 
 	ElsIfBranch struct {
@@ -68,21 +67,18 @@ type (
 	}
 
 	IfStmt struct {
-		If             *token.Position
 		BoolExpr       Expression
 		ThenPath       []Statement
 		ElseIfBranches []*ElsIfBranch
 		ElsePath       []Statement
 	}
 
-	AssignStmt struct {
-		AssignPos *token.Position
-		LValue    Expression
-		RValue    Expression
+	AssignmentStmt struct {
+		LValue Expression
+		RValue Expression
 	}
 
 	CaseStmt struct {
-		Case  *token.Position
 		Expr  Expression
 		Cases []*Case
 		Else  []Statement
@@ -98,35 +94,24 @@ type (
 		End   Expression
 	}
 
-	BadStmt struct {
-		From *token.Position
-		To   *token.Position
-	}
+	BadStmt struct{}
 )
 
-func (stmt *ForStmt) stmt()                {}
-func (stmt *ForStmt) Pos() *token.Position { return stmt.For }
-func (stmt *ForStmt) End() *token.Position { panic("not implemented") }
-func (stmt *ForStmt) String() string       { panic("not implemented") }
-func (stmt *ForStmt) Accept(vst Visitor)   { vst.VisitForStmt(stmt) }
+func (stmt *ForStmt) stmt()              {}
+func (stmt *ForStmt) String() string     { panic("not implemented") }
+func (stmt *ForStmt) Accept(vst Visitor) { vst.VisitForStmt(stmt) }
 
-func (stmt *ExitStmt) stmt()                {}
-func (stmt *ExitStmt) Pos() *token.Position { return stmt.Exit }
-func (stmt *ExitStmt) End() *token.Position { panic("not implemented") }
-func (stmt *ExitStmt) String() string       { panic("not implemented") }
-func (stmt *ExitStmt) Accept(vst Visitor)   { vst.VisitExitStmt(stmt) }
+func (stmt *ExitStmt) stmt()              {}
+func (stmt *ExitStmt) String() string     { panic("not implemented") }
+func (stmt *ExitStmt) Accept(vst Visitor) { vst.VisitExitStmt(stmt) }
 
-func (w *WithStmt) stmt()                {}
-func (w *WithStmt) Pos() *token.Position { return w.With }
-func (w *WithStmt) End() *token.Position { panic("not implemented") }
-func (w *WithStmt) String() string       { panic("not implemented") }
-func (w *WithStmt) Accept(vst Visitor)   { vst.VisitWithStmt(w) }
+func (w *WithStmt) stmt()              {}
+func (w *WithStmt) String() string     { panic("not implemented") }
+func (w *WithStmt) Accept(vst Visitor) { vst.VisitWithStmt(w) }
 
-func (p *ProcCall) Pos() *token.Position { return p.NamePos }
-func (p *ProcCall) End() *token.Position { panic("not implemented") }
-func (p *ProcCall) Accept(vst Visitor)   { vst.VisitProcCall(p) }
-func (p *ProcCall) stmt()                {}
-func (p *ProcCall) String() string {
+func (p *ProcedureCall) stmt()              {}
+func (p *ProcedureCall) Accept(vst Visitor) { vst.VisitProcCall(p) }
+func (p *ProcedureCall) String() string {
 	var args []string
 	for _, arg := range p.ActualParams {
 		args = append(args, arg.String())
@@ -135,59 +120,34 @@ func (p *ProcCall) String() string {
 	return fmt.Sprintf("%s(%s)", p.Callee, strings.Join(args, ", "))
 }
 
-func (w *WhileStmt) Pos() *token.Position { return w.While }
-func (w *WhileStmt) End() *token.Position { panic("not implemented") }
-func (w *WhileStmt) Accept(vst Visitor)   { vst.VisitWhileStmt(w) }
-func (w *WhileStmt) stmt()                {}
-func (w *WhileStmt) String() string       { panic("not implement") }
+func (w *WhileStmt) stmt()              {}
+func (w *WhileStmt) Accept(vst Visitor) { vst.VisitWhileStmt(w) }
+func (w *WhileStmt) String() string     { panic("not implement") }
 
-func (r *ReturnStmt) Pos() *token.Position { return r.Return }
-func (r *ReturnStmt) End() (pos *token.Position) {
-	if r.Value != nil {
-		pos = r.Value.End()
-	} else {
-		pos = r.Pos()
-		pos.Column += len("return")
-	}
-
-	return
-}
-func (r *ReturnStmt) Accept(vst Visitor) { vst.VisitReturnStmt(r) }
 func (r *ReturnStmt) stmt()              {}
+func (r *ReturnStmt) Accept(vst Visitor) { vst.VisitReturnStmt(r) }
 func (r *ReturnStmt) String() string     { return fmt.Sprintf("return %v", r.Value) }
 
-func (r *RepeatStmt) Pos() *token.Position { return r.Repeat }
-func (r *RepeatStmt) End() *token.Position { panic("not implemented") }
-func (r *RepeatStmt) Accept(vst Visitor)   { vst.VisitRepeatStmt(r) }
-func (r *RepeatStmt) stmt()                {}
-func (r *RepeatStmt) String() string       { panic("not implemented") }
+func (r *RepeatStmt) stmt()              {}
+func (r *RepeatStmt) Accept(vst Visitor) { vst.VisitRepeatStmt(r) }
+func (r *RepeatStmt) String() string     { panic("not implemented") }
 
-func (l *LoopStmt) Pos() *token.Position { return l.Loop }
-func (l *LoopStmt) End() *token.Position { panic("not implemented") }
-func (l *LoopStmt) Accept(vst Visitor)   { vst.VisitLoopStmt(l) }
-func (l *LoopStmt) stmt()                {}
-func (l *LoopStmt) String() string       { panic("not implemented") }
+func (l *LoopStmt) stmt()              {}
+func (l *LoopStmt) Accept(vst Visitor) { vst.VisitLoopStmt(l) }
+func (l *LoopStmt) String() string     { panic("not implemented") }
 
-func (stmt *IfStmt) Pos() *token.Position { return stmt.If }
-func (stmt *IfStmt) End() *token.Position { panic("not implemented") }
-func (stmt *IfStmt) Accept(vst Visitor)   { vst.VisitIfStmt(stmt) }
-func (stmt *IfStmt) stmt()                {}
-func (stmt *IfStmt) String() string       { panic("not implemented") }
+func (stmt *IfStmt) stmt()              {}
+func (stmt *IfStmt) Accept(vst Visitor) { vst.VisitIfStmt(stmt) }
+func (stmt *IfStmt) String() string     { panic("not implemented") }
 
-func (a *AssignStmt) Pos() *token.Position { return a.AssignPos }
-func (a *AssignStmt) End() *token.Position { return a.RValue.End() }
-func (a *AssignStmt) Accept(vst Visitor)   { vst.VisitAssignStmt(a) }
-func (a *AssignStmt) stmt()                {}
-func (a *AssignStmt) String() string       { return fmt.Sprintf("%v := %v", a.LValue, a.RValue) }
+func (a *AssignmentStmt) stmt()              {}
+func (a *AssignmentStmt) Accept(vst Visitor) { vst.VisitAssignmentStmt(a) }
+func (a *AssignmentStmt) String() string     { return fmt.Sprintf("%v := %v", a.LValue, a.RValue) }
 
-func (stmt *CaseStmt) Pos() *token.Position { return stmt.Case }
-func (stmt *CaseStmt) End() *token.Position { panic("not implemented") }
-func (stmt *CaseStmt) Accept(vst Visitor)   { vst.VisitCaseStmt(stmt) }
-func (stmt *CaseStmt) stmt()                {}
-func (stmt *CaseStmt) String() string       { panic("not implemented") }
+func (stmt *CaseStmt) stmt()              {}
+func (stmt *CaseStmt) Accept(vst Visitor) { vst.VisitCaseStmt(stmt) }
+func (stmt *CaseStmt) String() string     { panic("not implemented") }
 
-func (b *BadStmt) Pos() *token.Position { return b.From }
-func (b *BadStmt) End() *token.Position { return b.To }
-func (b *BadStmt) Accept(vst Visitor)   { panic("not implemented") }
-func (b *BadStmt) stmt()                {}
-func (b *BadStmt) String() string       { panic("not implemented") }
+func (b *BadStmt) stmt()          {}
+func (b *BadStmt) Accept(Visitor) { panic("you should not be here") }
+func (b *BadStmt) String() string { return "<BadStmt>" }

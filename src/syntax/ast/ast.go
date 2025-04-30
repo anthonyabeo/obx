@@ -1,18 +1,9 @@
 package ast
 
-import (
-	"fmt"
-	"github.com/anthonyabeo/obx/src/meer"
-
-	"github.com/anthonyabeo/obx/src/sema/types"
-	"github.com/anthonyabeo/obx/src/syntax/token"
-	"github.com/anthonyabeo/obx/src/translate/tacil"
-)
+import "fmt"
 
 type Node interface {
 	fmt.Stringer
-	Pos() *token.Position
-	End() *token.Position
 	Accept(Visitor)
 }
 
@@ -24,9 +15,6 @@ type Statement interface {
 type Expression interface {
 	Node
 	expr()
-	Type() types.Type
-	Value() tacil.Expr
-	MirValue() meer.Expression
 }
 
 type Declaration interface {
@@ -36,9 +24,6 @@ type Declaration interface {
 
 type Type interface {
 	Node
-	Type() types.Type
-	IRType() tacil.Type
-	MirType() meer.Type
 }
 
 type Unit interface {

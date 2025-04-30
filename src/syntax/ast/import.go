@@ -4,30 +4,25 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
-
-	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Import struct {
-	NamePos    *token.Position
-	Alias      *Ident
-	Name       *Ident
-	ImportPath []*Ident
+	Alias      string
+	Name       string
+	ImportPath []string
 	Meta       []Expression
 }
 
-func (imp *Import) Pos() *token.Position { return imp.NamePos }
-func (imp *Import) End() *token.Position { panic("not implemented") }
 func (imp *Import) String() string {
 	buf := new(bytes.Buffer)
-	if imp.Alias != nil {
-		buf.WriteString(imp.Alias.Name)
+	if imp.Alias != "" {
+		buf.WriteString(imp.Alias)
 		buf.WriteString(" := ")
 	}
 
 	var path []string
 	for _, id := range imp.ImportPath {
-		path = append(path, id.Name)
+		path = append(path, id)
 	}
 
 	if len(path) > 0 {
@@ -35,7 +30,7 @@ func (imp *Import) String() string {
 		buf.WriteString(".")
 	}
 
-	buf.WriteString(imp.Name.Name)
+	buf.WriteString(imp.Name)
 	if len(imp.Meta) > 0 {
 		var metas []string
 		for _, meta := range imp.Meta {
