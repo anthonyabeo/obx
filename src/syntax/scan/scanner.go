@@ -2,9 +2,11 @@ package scan
 
 import (
 	"fmt"
+	"math"
+	"strconv"
 	"unicode/utf8"
 
-	"github.com/anthonyabeo/gocc/src/syntax/token"
+	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Scanner struct {
@@ -27,7 +29,6 @@ func (s *Scanner) NextItem() token.Token {
 			s.state = s.state(s)
 		}
 	}
-	panic("not reached")
 }
 
 func (s *Scanner) run() {
@@ -55,73 +56,164 @@ func (s *Scanner) next() (r rune) {
 	return r
 }
 
-func (s *Scanner) isLetter(ch rune) bool {
-	return 'a' <= ch && ch <= 'z' ||
-		'A' <= ch && ch <= 'Z'
-}
-
-func (s *Scanner) identifier() string {
-peek:
-	ch := s.peek()
-	if s.isLetter(ch) || s.isDigit(ch) || ch == '_' {
-		s.next()
-		goto peek
+func (s *Scanner) scanIdentifier() string {
+	ch := s.next()
+	for s.isLetter(ch) || s.isDecDigit(ch) || ch == '_' {
+		ch = s.next()
 	}
 
 	return s.input[s.start:s.pos]
 }
 
-func (s *Scanner) number() token.Kind {
-peek:
-	ch := s.peek()
-	if s.isDigit(ch) {
-		s.next()
-		goto peek
-	}
+func (s *Scanner) scanNumber() token.Kind {
+	var kind token.Kind
 
-	// if lex.ch is not a word boundary, return an error
-	if !s.isDelim() && !s.isOperator() && !s.isWhiteSpace() {
-		s.errorf("%c is an invalid number digit", ch)
-	}
-
-	return token.IntLiteral
-}
-
-func (s *Scanner) isDelim() bool {
 	ch := s.peek()
 
-	switch ch {
-	case '(', ')', '[', ']', '{', '}', ',', ';':
-		return true
-	default:
-		return false
+	if s.isDecDigit(ch) {
+		kind = token.INT_LIT
+
+		for s.isDecDigit(ch) {
+			ch = s.next()
+		}
+
+		if ch == '.' {
+			ch = s.next()
+			if !s.isDecDigit(ch) {
+				s.errorf("%c is not a decimal digit. At least one decimal digit expected", ch)
+				return token.ILLEGAL
+			}
+
+			for s.isDecDigit(ch) {
+				ch = s.next()
+			}
+
+			kind = token.REAL_LIT
+
+			if ch == 'E' || ch == 'e' || ch == 'D' || ch == 'd' || ch == 'S' || ch == 's' {
+				exp := ch
+				ch = s.next()
+
+				pos := s.pos - 1
+				if ch == '+' || ch == '-' {
+					ch = s.next()
+				}
+
+				if !s.isDecDigit(ch) {
+					s.errorf("'%c' is not a decimal digit. Decimal number expected for exponent", ch)
+					return token.ILLEGAL
+				}
+
+				for s.isDecDigit(ch) {
+					ch = s.next()
+				}
+
+				switch exp {
+				case 'D', 'd':
+					kind = token.LONGREAL_LIT
+				case 'S', 's':
+					kind = token.REAL_LIT
+				case 'E', 'e':
+					val, err := strconv.ParseInt(s.input[pos:s.pos], 10, 64)
+					if err == nil && (val >= math.MinInt32 && val <= math.MaxInt32) {
+						kind = token.REAL_LIT
+					} else {
+						kind = token.LONGREAL_LIT
+					}
+				}
+			}
+
+			// check for invalid real boundary character
+			if !s.isDelim() && !s.isOperator() && ch != eof {
+				s.errorf("%c is not a valid real boundary character", ch)
+				return token.ILLEGAL
+			}
+
+			return kind
+		}
 	}
+
+	if s.isHexDigit(ch) || ch == 'H' || ch == 'h' || ch == 'X' || ch == 'x' {
+		err := false
+		for s.isHexDigit(ch) {
+			ch = s.next()
+		}
+
+		if ch == 'X' || ch == 'x' {
+			ch = s.next()
+
+			if !s.isDelim() && !s.isOperator() && ch != eof {
+				s.errorf("%c is not a valid integer boundary character", ch)
+				return token.ILLEGAL
+			}
+
+			return token.CHAR_LIT
+		}
+
+		// check for hex marker
+		if ch != 'H' && ch != 'h' {
+			s.errorf("%c is not a hex marker", ch)
+			err = true
+		}
+		ch = s.next()
+
+		if !err {
+			kind = token.INT_LIT
+		} else {
+			return token.ILLEGAL
+		}
+	}
+
+	// check for integer size specifier
+	if ch == 'L' || ch == 'l' {
+		ch = s.next()
+		kind = token.INT64_LIT
+	}
+
+	if ch == 'I' || ch == 'i' {
+		ch = s.next()
+		kind = token.INT32_LIT
+	}
+
+	// check for invalid integer boundary character
+	if !s.isDelim() && !s.isOperator() && ch != eof {
+		s.errorf("%c is not a valid integer boundary character", ch)
+		kind = token.ILLEGAL
+	}
+
+	return kind
 }
 
-func (s *Scanner) isOperator() bool {
-	ch := s.peek()
+func (s *Scanner) scanHexString() token.Kind {
+	delim := s.next()
+	ch := s.next()
 
-	switch ch {
-	case '+', '-', '*', '/', '%', '<', '>', '&', '|', '^', '~', '!':
-		return true
-	default:
-		return false
+	for s.isHexDigit(ch) || s.isWhiteSpace(ch) {
+		ch = s.next()
 	}
+
+	if ch != delim {
+		s.errorf("'%c' is not a valid a hex string character", ch)
+		return token.ILLEGAL
+	}
+
+	return token.HEX_STR_LIT
 }
 
-func (s *Scanner) isWhiteSpace() bool {
-	ch := s.peek()
+func (s *Scanner) scanString() token.Kind {
+	delim := s.next()
+	ch := s.next()
 
-	switch ch {
-	case ' ', '\t', '\n', '\r':
-		return true
-	default:
-		return false
+	for ch != delim {
+		if s.isPrintable(ch) {
+			ch = s.next()
+		} else {
+			s.errorf("'%c' is not a valid string character", ch)
+			return token.ILLEGAL
+		}
 	}
-}
 
-func (s *Scanner) isDigit(ch rune) bool {
-	return '0' <= ch && ch <= '9'
+	return token.STR_LIT
 }
 
 func (s *Scanner) backup() {
@@ -139,7 +231,7 @@ func (s *Scanner) peek() rune {
 }
 
 func (s *Scanner) errorf(format string, args ...interface{}) StateFn {
-	s.items <- token.Token{Kind: token.Illegal, Val: fmt.Sprintf(format, args...)}
+	s.items <- token.Token{Kind: token.ILLEGAL, Val: fmt.Sprintf(format, args...)}
 	return nil
 }
 

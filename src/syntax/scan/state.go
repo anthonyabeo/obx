@@ -1,13 +1,13 @@
 package scan
 
 import (
-	"github.com/anthonyabeo/gocc/src/syntax/token"
+	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type StateFn func(*Scanner) StateFn
 
 func scanIdentifier(sc *Scanner) StateFn {
-	lit := sc.identifier()
+	lit := sc.scanIdentifier()
 	tok := token.Lookup(lit)
 
 	sc.emit(tok)
@@ -15,7 +15,14 @@ func scanIdentifier(sc *Scanner) StateFn {
 }
 
 func scanNumber(sc *Scanner) StateFn {
-	kind := sc.number()
+	kind := sc.scanNumber()
+	sc.emit(kind)
+
+	return scanText
+}
+
+func scanHexString(sc *Scanner) StateFn {
+	kind := sc.scanHexString()
 	sc.emit(kind)
 
 	return scanText
@@ -24,107 +31,104 @@ func scanNumber(sc *Scanner) StateFn {
 func scanText(s *Scanner) StateFn {
 	for ch := s.next(); ch != eof; {
 		switch ch {
-		case '~':
-			s.emit(token.Comp)
+		case '.':
+			c := s.peek()
+			if c == '.' {
+				s.emit(token.RANGE)
+			} else {
+				s.emit(token.PERIOD)
+			}
 		case '-':
-			c := s.peek()
-			if c == '-' {
-				s.next()
-				s.emit(token.Dec)
-			} else {
-				s.emit(token.Sub)
-			}
+			s.emit(token.MINUS)
 		case '+':
-			c := s.peek()
-			if c == '+' {
-				s.next()
-				s.emit(token.Inc)
-			} else {
-				s.emit(token.Add)
-			}
+			s.emit(token.PLUS)
 		case '=':
-			c := s.peek()
-			if c == '=' {
-				s.next()
-				s.emit(token.Eq)
-			} else {
-				s.emit(token.Assign)
-			}
-		case '!':
-			c := s.peek()
-			if c == '=' {
-				s.next()
-				s.emit(token.Neq)
-			} else {
-				s.emit(token.LNot)
-			}
+			s.emit(token.EQUAL)
 		case '<':
 			c := s.peek()
 			if c == '=' {
 				s.next()
-				s.emit(token.Leq)
+				s.emit(token.LEQ)
 			} else {
-				s.emit(token.Lt)
+				s.emit(token.LESS)
 			}
 		case '>':
 			c := s.peek()
 			if c == '=' {
 				s.next()
-				s.emit(token.Geq)
+				s.emit(token.GEQ)
 			} else {
-				s.emit(token.Gt)
+				s.emit(token.GREAT)
 			}
 		case '&':
-			c := s.peek()
-			if c == '&' {
-				s.next()
-				s.emit(token.And)
-			} else {
-				s.emit(token.LAnd)
-			}
+			s.emit(token.AND)
 		case '|':
-			c := s.peek()
-			if c == '|' {
-				s.next()
-				s.emit(token.Or)
-			} else {
-				s.emit(token.LOr)
-			}
+			s.emit(token.BAR)
+		case '#':
+			s.emit(token.NEQ)
 		case '^':
-			s.emit(token.Xor)
-		case '?':
-			s.emit(token.Quest)
+			s.emit(token.CARET)
 		case ':':
-			s.emit(token.Colon)
+			c := s.peek()
+			if c == '=' {
+				s.next()
+				s.emit(token.BECOMES)
+			} else {
+				s.emit(token.COLON)
+			}
 		case '/':
-			s.emit(token.Div)
+			c := s.peek()
+			if c == '/' {
+				s.next()
+				s.emit(token.SL_COMMENT_START)
+			} else {
+				s.emit(token.QUOT)
+			}
 		case '*':
-			s.emit(token.Mul)
-		case '%':
-			s.emit(token.Mod)
+			c := s.peek()
+			if c == ')' {
+				s.next()
+				s.emit(token.ML_COMMENT_END)
+			} else {
+				s.emit(token.STAR)
+			}
 		case '{':
-			s.emit(token.LBrace)
+			s.emit(token.LBRACE)
 		case '}':
-			s.emit(token.RBrace)
+			s.emit(token.RBRACE)
 		case '[':
-			s.emit(token.LBrack)
+			s.emit(token.LBRACK)
 		case ']':
-			s.emit(token.RBrack)
+			s.emit(token.RBRACK)
 		case '(':
-			s.emit(token.LParen)
+			c := s.peek()
+			if c == '*' {
+				s.next()
+				s.emit(token.ML_COMMENT_START)
+			} else {
+				s.emit(token.LPAREN)
+			}
 		case ')':
-			s.emit(token.RParen)
+			s.emit(token.RPAREN)
 		case ',':
-			s.emit(token.Comma)
+			s.emit(token.COMMA)
+		case '~':
+			s.emit(token.NOT)
 		case ';':
-			s.emit(token.SemiColon)
+			s.emit(token.SEMICOLON)
 		case ' ', '\t', '\n':
 			s.ignore()
+		case '$':
+			s.backup()
+			return scanHexString
+		case '\'', '"':
+			s.backup()
+			return scanString
 		default:
-			if s.isLetter(ch) {
+			if s.startsIdent(ch) {
 				s.backup()
 				return scanIdentifier
-			} else if s.isDigit(ch) {
+			} else if s.isDecDigit(ch) {
 				s.backup()
 				return scanNumber
 			} else {
@@ -135,7 +139,14 @@ func scanText(s *Scanner) StateFn {
 		ch = s.next()
 	}
 
-	s.emit(token.Eof)
+	s.emit(token.EOF)
 
 	return nil
+}
+
+func scanString(s *Scanner) StateFn {
+	kind := s.scanString()
+	s.emit(kind)
+
+	return scanText
 }

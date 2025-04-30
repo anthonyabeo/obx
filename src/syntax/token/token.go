@@ -1,15 +1,15 @@
 package token
 
 import (
+	"fmt"
 	"strconv"
-	"strings"
 )
 
-type Token int
+type Kind int
 
-func (tok Token) String() string {
+func (tok Kind) String() string {
 	s := ""
-	if 0 <= tok && tok < Token(len(tokens)) {
+	if 0 <= tok && tok < Kind(len(tokens)) {
 		s = tokens[tok]
 	}
 	if s == "" {
@@ -18,35 +18,33 @@ func (tok Token) String() string {
 	return s
 }
 
-func (tok Token) IsLiteral() bool { return literal_beg < tok && tok < literal_end }
+func (tok Kind) IsLiteral() bool  { return literal_begin < tok && tok < literal_end }
+func (tok Kind) IsOperator() bool { return operator_beg < tok && tok < operator_end }
+func (tok Kind) IsDelim() bool    { return delim_beg < tok && tok < delim_end }
 
 const (
-	ILLEGAL Token = iota
+	ILLEGAL Kind = iota
 	EOF
-	COMMENT
 
-	literal_beg
+	SL_COMMENT_START
+	ML_COMMENT_START
+	ML_COMMENT_END
 
-	IDENT // main
-	INT   // 12345
-	REAL
-	CHAR
-	STRING
-	HEXSTRING
+	IDENTIFIER // main
 
-	BYTE
-	INT8
-	INT16
-	INT32
-	INT64
-	LONGREAL
-
+	literal_begin
+	INT_LIT
+	INT32_LIT
+	INT64_LIT
+	REAL_LIT
+	LONGREAL_LIT
+	CHAR_LIT
+	HEX_STR_LIT
+	STR_LIT
 	NIL
-
 	literal_end
 
 	keyword_beg
-
 	MODULE
 	PROC
 	PROCEDURE
@@ -55,7 +53,7 @@ const (
 	RETURN
 	ELSE
 	IF
-	OR
+
 	VAR
 	THEN
 	DEFINITION
@@ -74,35 +72,46 @@ const (
 	ELSIF
 	CASE
 	DO
-	IN
-	IS
-	DIV
 	UNTIL
 	TRUE
 	FALSE
 	BY
-	MOD
 	OF
 	TO
 
+	INTEGER
+	INT32
+	INT64
 	keyword_end
 
 	operator_beg
-
+	// Arithmetic
 	PLUS
 	MINUS
 	STAR
+	QUOT
+	DIV
+	MOD
+
+	// Logical
+	OR
+	AND
+	NOT
+
+	// Relational
 	EQUAL
 	NEQ
 	LESS
 	LEQ
 	GREAT
 	GEQ
-	AND
-	QUOT
-	NOT
-	RANGE
+	IN
+	IS
 
+	CARET
+	operator_end
+
+	delim_beg
 	LPAREN
 	RPAREN
 	LBRACK
@@ -114,46 +123,33 @@ const (
 	SEMICOLON
 	BECOMES
 	PERIOD
-	CARET
 	BAR
-
-	operator_end
-
-	DCOLON
+	RANGE
+	delim_end
 )
 
 var tokens = [...]string{
-	ILLEGAL: "ILLEGAL",
-	EOF:     "EOF",
-	COMMENT: "COMMENT",
+	ILLEGAL:          "ILLEGAL",
+	EOF:              "EOF",
+	SL_COMMENT_START: "//",
+	ML_COMMENT_START: "(*",
+	ML_COMMENT_END:   "*)",
 
-	IDENT:     "IDENT",
-	INT:       "INT",
-	REAL:      "REAL",
-	CHAR:      "CHAR",
-	STRING:    "STRING",
-	HEXSTRING: "HEXSTRING",
-	BYTE:      "BYTE",
-	INT8:      "INT8",
-	INT16:     "INT16",
-	INT32:     "INT32",
-	INT64:     "INT64",
-	LONGREAL:  "LONGREAL",
+	IDENTIFIER: "IDENTIFIER",
 
-	PLUS:   "+",
-	MINUS:  "-",
-	EQUAL:  "=",
-	NEQ:    "#",
-	STAR:   "*",
-	LESS:   "<",
-	LEQ:    "<=",
-	GREAT:  ">",
-	GEQ:    ">=",
-	AND:    "&",
-	QUOT:   "/",
-	NOT:    "~",
-	RANGE:  "..",
-	DCOLON: "::",
+	PLUS:  "+",
+	MINUS: "-",
+	EQUAL: "=",
+	NEQ:   "#",
+	STAR:  "*",
+	LESS:  "<",
+	LEQ:   "<=",
+	GREAT: ">",
+	GEQ:   ">=",
+	AND:   "&",
+	QUOT:  "/",
+	NOT:   "~",
+	RANGE: "..",
 
 	LPAREN:    "(",
 	RPAREN:    ")",
@@ -209,19 +205,37 @@ var tokens = [...]string{
 	TO:         "to",
 }
 
-var keywords map[string]Token
+var keywords map[string]Kind
 
 func init() {
-	keywords = make(map[string]Token, keyword_end-(keyword_beg+1))
+	keywords = make(map[string]Kind, keyword_end-(keyword_beg+1))
 	for i := keyword_beg + 1; i < keyword_end; i++ {
 		keywords[tokens[i]] = i
 	}
 }
 
-func Lookup(ident string) Token {
-	ident = strings.ToLower(ident)
+func Lookup(ident string) Kind {
 	if tok, isKeyword := keywords[ident]; isKeyword {
 		return tok
 	}
-	return IDENT
+	return IDENTIFIER
+}
+
+type Token struct {
+	Kind Kind
+	Val  string
+}
+
+func (i Token) String() string {
+	switch i.Kind {
+	case EOF:
+		return "EOF"
+	case ILLEGAL:
+		return i.Val
+	default:
+		if len(i.Val) > 10 {
+			return fmt.Sprintf("%.10q...", i.Val)
+		}
+		return fmt.Sprintf("%q", i.Val)
+	}
 }
