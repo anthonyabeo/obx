@@ -1,6 +1,11 @@
 package scan
 
-import "unicode"
+import (
+	"math"
+	"strconv"
+	"strings"
+	"unicode"
+)
 
 func (s *Scanner) isWhiteSpace(ch rune) bool {
 
@@ -31,28 +36,77 @@ func (s *Scanner) startsIdent(ch rune) bool {
 	return s.isLetter(ch) || ch == '_'
 }
 
-func (s *Scanner) isDelim() bool {
-	ch := s.peek()
-
-	switch ch {
-	case '(', ')', '[', ']', '{', '}', ',', ';':
+func (s *Scanner) accept(valid string) bool {
+	r := s.next()
+	if strings.ContainsRune(valid, r) {
 		return true
-	default:
-		return false
 	}
+	s.backup()
+	return false
 }
 
-func (s *Scanner) isOperator() bool {
-	ch := s.peek()
-
-	switch ch {
-	case '+', '-', '*', '/', '%', '<', '>', '&', '|', '^', '~', '!':
-		return true
-	default:
-		return false
+func (s *Scanner) acceptRun(valid string) bool {
+	start := s.pos
+	for strings.ContainsRune(valid, s.next()) {
 	}
+	s.backup()
+	return s.pos > start
 }
 
-func (s *Scanner) isPrintable(ch rune) bool {
-	return unicode.IsPrint(ch)
+func (s *Scanner) acceptDigits(valid string) bool {
+	start := s.pos
+	if !strings.ContainsRune(valid, s.next()) {
+		s.backup()
+		return false
+	}
+	for strings.ContainsRune(valid, s.next()) {
+	}
+	s.backup()
+	return s.pos > start
+}
+
+func canFitInFloat32FromString(fullNum, scaleChar string) bool {
+	// Split on 'e' or 'E' (already validated as present)
+	parts := strings.SplitN(fullNum, scaleChar, 2)
+	if len(parts) != 2 {
+		parts = strings.SplitN(fullNum, "E", 2)
+		if len(parts) != 2 {
+			return false // malformed number
+		}
+	}
+	//_ := parts[0]
+	expStr := parts[1]
+
+	exp, err := strconv.ParseInt(expStr, 10, 64)
+	if err != nil {
+		return false // invalid exponent
+	}
+
+	// Reject out-of-bounds exponents
+	if exp < -45 || exp > 38 {
+		return false // out of float32 range
+	}
+
+	val, err := strconv.ParseFloat(fullNum, 64)
+	if err != nil {
+		return false
+	}
+	abs := math.Abs(val)
+	return abs <= math.MaxFloat32 && (abs == 0 || abs >= math.SmallestNonzeroFloat32)
+}
+
+func isValidHex(s string) bool {
+	for _, r := range s {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", r) {
+			return false
+		}
+	}
+	return true
+}
+
+func isNumberTokenBoundary(r rune) bool {
+	return r == eof ||
+		unicode.IsSpace(r) ||
+		strings.ContainsRune(";,(){}[]", r) || // statement and grouping
+		strings.ContainsRune("+-*/%=!<>", r) // typical operators
 }

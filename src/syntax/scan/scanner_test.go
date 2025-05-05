@@ -184,22 +184,32 @@ func TestScanDelimitersAndOperators(t *testing.T) {
 
 func TestScanHexStrings(t *testing.T) {
 	tests := []struct {
-		input    string
-		expected token.Kind
-		wantErr  bool
+		input         string
+		expected      token.Kind
+		expectedValue string
+		wantErr       bool
 	}{
-		{"$1A2B$", token.HEX_STR_LIT, false},                // valid hex string
-		{"$1234$", token.HEX_STR_LIT, false},                // valid hex string with digits only
-		{"$ABCD$", token.HEX_STR_LIT, false},                // valid hex string with letters only
-		{"$1A2B3C$", token.HEX_STR_LIT, false},              // valid hex string with mixed letters and digits
-		{"$1A 2B 3C$", token.HEX_STR_LIT, false},            // valid hex string with spaces
-		{"$1A5D 2BFF 23CC 3C56$", token.HEX_STR_LIT, false}, // valid hex string with spaces
-		{"$ 1A 2B 3C $", token.HEX_STR_LIT, false},          // valid hex string with leading and trailing spaces
-		{"$1A2B3C", token.ILLEGAL, true},                    // missing closing '$'
-		{"1A2B3C$", token.ILLEGAL, true},                    // missing opening '$'
-		{"$1A2G$", token.ILLEGAL, true},                     // invalid character in hex string
-		{"$1A 2G$", token.ILLEGAL, true},                    // invalid character with spaces in hex string
-		{"$$", token.HEX_STR_LIT, false},                    // empty hex string
+		{"$1A2B$", token.HEX_STR_LIT, "1A2B", false},                            // valid hex string
+		{"$1234$", token.HEX_STR_LIT, "1234", false},                            // valid hex string with digits only
+		{"$ABCD$", token.HEX_STR_LIT, "ABCD", false},                            // valid hex string with letters only
+		{"$1A2B3C$", token.HEX_STR_LIT, "1A2B3C", false},                        // valid hex string with mixed letters and digits
+		{"$1A 2B 3C$", token.HEX_STR_LIT, "1A2B3C", false},                      // valid hex string with spaces
+		{"$1A5D 2BFF 23CC 3C56$", token.HEX_STR_LIT, "1A5D2BFF23CC3C56", false}, // valid hex string with spaces
+		{"$ 1A 2B 3C $", token.HEX_STR_LIT, "1A2B3C", false},                    // valid hex string with leading and trailing spaces
+		{"$1A2B3C", token.ILLEGAL, "", true},                                    // missing closing '$'
+		{"1A2B3C$", token.ILLEGAL, "", true},                                    // missing opening '$'
+		{"$1A2G$", token.ILLEGAL, "", true},                                     // invalid character in hex string
+		{"$1A 2G$", token.ILLEGAL, "", true},                                    // invalid character with spaces in hex string
+		{"$$", token.HEX_STR_LIT, "", false},                                    // empty hex string
+		{"$1A2B3C4D$", token.HEX_STR_LIT, "1A2B3C4D", false},                    // Valid hex string with 4 bytes
+		{"$A1B2C3D4$", token.HEX_STR_LIT, "A1B2C3D4", false},                    // Another valid hex string with 4 bytes
+		{"$a1b2c3d4$", token.HEX_STR_LIT, "a1b2c3d4", false},                    // Lowercase hex string
+		{"$1F3D$", token.HEX_STR_LIT, "1F3D", false},                            // Odd-length hex string (should be an error)
+		{"$123 456$", token.HEX_STR_LIT, "123456", false},                       // Whitespace should be ignored
+		{"$123G$", token.ILLEGAL, "", true},                                     // Invalid character 'G'
+		{"$123$", token.ILLEGAL, "", true},                                      // Odd number of hex digits
+		{"$123", token.ILLEGAL, "", true},                                       // Unterminated hex string
+		{"$A B C$", token.ILLEGAL, "", true},                                    // Valid hex string with space ignored
 	}
 
 	for _, test := range tests {
@@ -218,32 +228,27 @@ func TestScanHexStrings(t *testing.T) {
 
 func TestScanCharacterLiterals(t *testing.T) {
 	tests := []struct {
-		input    string
-		expected token.Kind
-		wantErr  bool
+		input         string
+		expected      token.Kind
+		expectedValue string
+		wantErr       bool
 	}{
-		{"1X", token.CHAR_LIT, false},    // valid character literal with digit and 'X'
-		{"1x", token.CHAR_LIT, false},    // valid character literal with digit and 'x'
-		{"123X", token.CHAR_LIT, false},  // valid character literal with digits and 'X'
-		{"123x", token.CHAR_LIT, false},  // valid character literal with digits and 'x'
-		{"1A2BX", token.CHAR_LIT, false}, // valid character literal with hex digits and 'X'
-		{"1A2Bx", token.CHAR_LIT, false}, // valid character literal with hex digits and 'x'
-		{"1Gx", token.ILLEGAL, true},     // invalid character literal with non-hex digit
-		{"123", token.INT_LIT, false},    // missing 'X' or 'x'
-		{"1A2B", token.ILLEGAL, true},    // missing 'X' or 'x' after hex digits
-		{"", token.EOF, false},           // empty input
-		{"X", token.IDENTIFIER, false},   // single 'X' without preceding digits
-		{"x", token.IDENTIFIER, false},   // single 'x' without preceding digits
-		{"1X2", token.ILLEGAL, true},     // invalid character after 'X'
-		{"1x2", token.ILLEGAL, true},     // invalid character after 'x'
-		{"1Xx", token.ILLEGAL, true},     // mixed 'X' and 'x'
-		{"1xX", token.ILLEGAL, true},     // mixed 'x' and 'X'
-		{"1X ", token.ILLEGAL, true},     // trailing space after 'X'
-		{"1x ", token.ILLEGAL, true},     // trailing space after 'x'
-		{"1 X", token.ILLEGAL, true},     // space between digit and 'X'
-		{"1 x", token.ILLEGAL, true},     // space between digit and 'x'
-		{"1X\n", token.ILLEGAL, true},    // newline after 'X'
-		{"1x\n", token.ILLEGAL, true},    // newline after 'x'    // missing 'X' or 'x' after hex digits
+		// Valid character literals
+		{"1Fx", token.CHAR_LIT, "A", false},    // 8-bit character 'A'
+		{"0041x", token.CHAR_LIT, "A", false},  // 16-bit Unicode 'A'
+		{"03A9x", token.CHAR_LIT, "Ω", false},  // Unicode 'Ω'
+		{"7Fx", token.CHAR_LIT, "", false},    // Extended ASCII ''
+		{"4F60x", token.CHAR_LIT, "你", false}, // Unicode '你' (Chinese character)
+
+		// Invalid character literals
+		{"1x", token.ILLEGAL, "", true},      // Too few hex digits
+		{"G2x", token.IDENTIFIER, "", false}, // Invalid hex digit 'G'
+		{"1F", token.ILLEGAL, "", true},      // Missing 'x'
+		{"12345x", token.ILLEGAL, "", true},  // Too many hex digits
+		{"1Fz", token.ILLEGAL, "", true},     // Invalid suffix 'z'
+		{"x", token.IDENTIFIER, "", false},   // Empty literal
+		{"1234", token.INT_LIT, "", false},   // Missing 'x'
+		{"1F x", token.ILLEGAL, "", true},    // Whitespace between hex and 'x'
 	}
 
 	for _, test := range tests {
@@ -262,34 +267,55 @@ func TestScanCharacterLiterals(t *testing.T) {
 
 func TestScanStringLiterals(t *testing.T) {
 	tests := []struct {
-		input    string
-		expected token.Kind
-		wantErr  bool
+		input       string
+		wantToken   token.Kind
+		wantLiteral string
+		wantError   bool
 	}{
-		{"\"Hello, World!\"", token.STR_LIT, false},   // valid string literal
-		{"'Hello, World!'", token.STR_LIT, false},     // valid single-quoted string
-		{"\"\"", token.STR_LIT, false},                // empty double-quoted string
-		{"''", token.STR_LIT, false},                  // empty single-quoted string
-		{"\"Hello, 'World!'\"", token.STR_LIT, false}, // double-quoted string with single quotes inside
-		{"'Hello, \"World!\"'", token.STR_LIT, false}, // single-quoted string with double quotes inside
-		{"\"Hello\nWorld\"", token.ILLEGAL, true},     // invalid string with newline
-		{"'Hello\nWorld'", token.ILLEGAL, true},       // invalid single-quoted string with newline
-		{"\"Hello, World!", token.ILLEGAL, true},      // missing closing double quote
-		{"'Hello, World!", token.ILLEGAL, true},       // missing closing single quote
-		{"\"Hello\\\"World\"", token.STR_LIT, false},  // escaped double quote inside string
-		{"'Hello\\'World'", token.STR_LIT, false},     // escaped single quote inside string
+		{"\"Hello, World!\"", token.STR_LIT, "Hello, World!", false},       // valid string literal
+		{"'Hello, World!'", token.STR_LIT, "Hello, World!", false},         // valid single-quoted string
+		{"\"\"", token.STR_LIT, "", false},                                 // empty double-quoted string
+		{"''", token.STR_LIT, "", false},                                   // empty single-quoted string
+		{"\"Hello, 'World!'\"", token.STR_LIT, "Hello, 'World!'", false},   // double-quoted string with single quotes inside
+		{"'Hello, \"World!\"'", token.STR_LIT, "Hello, \"World!\"", false}, // single-quoted string with double quotes inside
+		{"\"Hello\nWorld\"", token.ILLEGAL, "", true},                      // invalid string with newline
+		{"'Hello\nWorld'", token.ILLEGAL, "", true},                        // invalid single-quoted string with newline
+		{"\"Hello, World!", token.ILLEGAL, "", true},                       // missing closing double quote
+		{"'Hello, World!", token.ILLEGAL, "", true},                        // missing closing single quote
+		{`\"Hello\\\"World\"`, token.ILLEGAL, "", true},                    // escaped double quote inside string
+		{"'Hello\\'World'", token.ILLEGAL, "", true},                       // escaped single quote inside string
+		{"'hello'", token.STR_LIT, "hello", false},
+		{`"world"`, token.STR_LIT, "world", false},
+		{"''", token.STR_LIT, "", false},
+		{`"123456"`, token.STR_LIT, "123456", false},
+		{`'a!@#$%^&*()_'`, token.STR_LIT, "a!@#$%^&*()_", false},
+		{`'"'`, token.STR_LIT, `"`, false},   // double quote inside single-quoted string
+		{`'hello"`, token.ILLEGAL, "", true}, // mismatched quote
+		{`"hello'`, token.ILLEGAL, "", true}, // mismatched quote
+		{`'hello`, token.ILLEGAL, "", true},  // unterminated
+		{`"hello`, token.ILLEGAL, "", true},
+		{`'line
+next'`, token.ILLEGAL, "", true},        // newline
+		{`"'`, token.ILLEGAL, "", true}, // invalid single char
+		{`'`, token.ILLEGAL, "", true},
 	}
 
-	for _, test := range tests {
-		sc := Scan("", test.input)
-		got := sc.NextItem()
+	for _, tt := range tests {
+		s := Scan("test", tt.input)
+		tok := s.NextItem()
 
-		if test.wantErr {
-			if got.Kind != token.ILLEGAL {
-				t.Errorf("NextItem(%q) = %v; want error", test.input, got.Kind)
+		if tt.wantError {
+			if tok.Kind != token.ILLEGAL {
+				t.Errorf("input %q: expected an error, got %v", tt.input, tok.Kind)
 			}
-		} else if got.Kind != test.expected {
-			t.Errorf("NextItem(%q) = %v; want %v", test.input, got.Kind, test.expected)
+			continue
+		}
+
+		if tok.Kind != tt.wantToken {
+			t.Errorf("input %q: expected token %v, got %v", tt.input, tt.wantToken, tok.Kind)
+		}
+		if tok.Val != tt.wantLiteral {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.wantLiteral, tok.Val)
 		}
 	}
 }

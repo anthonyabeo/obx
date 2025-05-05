@@ -1,31 +1,265 @@
 package scan
 
 import (
+	"strconv"
+	"unicode"
+
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type StateFn func(*Scanner) StateFn
 
 func scanIdentifier(sc *Scanner) StateFn {
-	lit := sc.scanIdentifier()
-	tok := token.Lookup(lit)
+	tok := sc.scanIdentifier()
 
 	sc.emit(tok)
 	return scanText
 }
 
-func scanNumber(sc *Scanner) StateFn {
-	kind := sc.scanNumber()
-	sc.emit(kind)
+func scanNumber(s *Scanner) StateFn {
+	startPos := s.pos
+	isReal := false
+	scaleChar := rune(0) // 'E', 'D', or 'S'
+
+	// Require at least one digit
+	if !s.acceptDigits("0123456789") {
+		return s.errorf("invalid number: expected digit")
+	}
+
+	midPos := s.pos
+	s.acceptRun("0123456789AaBbCcDdEeFf") // possible hex digits
+	if s.accept("Hh") {
+		if s.accept("Ll") {
+			s.emit(token.INT64_LIT)
+			return scanText
+		}
+
+		if s.accept("Ii") {
+			s.emit(token.INT32_LIT)
+			return scanText
+		}
+
+		// Ensure all characters before 'H' were valid hex digits
+		if !isValidHex(s.input[startPos:midPos]) {
+			return s.errorf("invalid hex digits before 'H'")
+		}
+
+		if !isNumberTokenBoundary(s.peek()) {
+			return s.errorf("invalid character '%c' after hex literal", s.peek())
+		}
+
+		s.emit(token.INT_LIT)
+		return scanText
+	}
+
+	if s.accept("Xx") {
+		// extract the character before 'X'
+		hexValue := s.input[startPos : s.pos-1]
+
+		// Ensure all characters before 'X' were valid hex digits
+		if !isValidHex(hexValue) {
+			return s.errorf("invalid hex digits before 'X'")
+		}
+
+		if !isNumberTokenBoundary(s.peek()) {
+			return s.errorf("invalid character '%c' after hex literal", s.peek())
+		}
+
+		var value int
+		if len(hexValue) == 2 {
+			// 8-bit value (ISO/IEC 8859-1 Latin-1)
+			parsed, err := strconv.ParseInt(hexValue, 16, 8)
+			if err != nil {
+				return s.errorf("invalid 8-bit character value: %s", hexValue)
+			}
+			value = int(parsed)
+		} else if len(hexValue) == 4 {
+			// 16-bit value (Unicode BMP)
+			parsed, err := strconv.ParseInt(hexValue, 16, 16)
+			if err != nil {
+				return s.errorf("invalid 16-bit character value: %s", hexValue)
+			}
+			value = int(parsed)
+		} else {
+			return s.errorf("invalid character literal, hex value must be 2 or 4 digits")
+		}
+
+		// Convert the value to a rune
+		character := rune(value)
+
+		// Emit the character token with its Unicode code point
+		s.emitWithValue(token.CHAR_LIT, string(character))
+
+		return scanText
+	}
+	s.pos = midPos // backtrack if not a hex
+
+	// Check for decimal point (required for real)
+	if s.accept(".") {
+		isReal = true
+		if !s.acceptDigits("0123456789") {
+			return s.errorf("invalid real number: no digits after decimal point")
+		}
+	}
+
+	// Check for exponent
+	if s.accept("EeDdSs") {
+		isReal = true
+		scaleChar = rune(s.input[s.pos-1])
+		s.accept("+-")
+		if !s.acceptDigits("0123456789") {
+			return s.errorf("invalid exponent: expected digit after exponent")
+		}
+
+		if !isNumberTokenBoundary(s.peek()) {
+			return s.errorf("invalid character '%c' after hex literal", s.peek())
+		}
+	}
+
+	// Optional suffix for integer
+	if !isReal {
+		if s.accept("Ll") {
+			s.emit(token.INT64_LIT)
+			return scanText
+		}
+
+		if s.accept("Ii") {
+			s.emit(token.INT32_LIT)
+			return scanText
+		}
+
+		if !isNumberTokenBoundary(s.peek()) {
+			return s.errorf("invalid character '%c' after hex literal", s.peek())
+		}
+
+		s.emit(token.INT_LIT)
+		return scanText
+	}
+
+	// Real number type decision
+	switch scaleChar {
+	case 'D', 'd':
+		s.emit(token.LONGREAL_LIT)
+	case 'S', 's':
+		s.emit(token.REAL_LIT)
+	case 'E', 'e':
+		fullNum := s.input[startPos:s.pos]
+		if canFitInFloat32FromString(fullNum, string(scaleChar)) {
+			s.emit(token.REAL_LIT)
+		} else {
+			s.emit(token.LONGREAL_LIT)
+		}
+	default:
+		if !isNumberTokenBoundary(s.peek()) {
+			return s.errorf("invalid character '%c' after hex literal", s.peek())
+		}
+
+		s.emit(token.REAL_LIT)
+	}
 
 	return scanText
 }
 
-func scanHexString(sc *Scanner) StateFn {
-	kind := sc.scanHexString()
-	sc.emit(kind)
+func scanHexString(s *Scanner) StateFn {
+	// First, check for the opening dollar sign
+	if s.next() != '$' {
+		return s.errorf("expected '$' to start hex string")
+	}
 
-	return scanText
+	var hexDigits []rune // to store the hex digits
+
+	// Loop through the characters in the string
+	for {
+		r := s.next()
+
+		// If we reach EOF, the string is unterminated
+		if r == eof {
+			return s.errorf("unterminated hex string")
+		}
+
+		if unicode.IsSpace(r) {
+			// Ignore whitespace characters
+			continue
+		}
+
+		// If we encounter a closing dollar sign, finish the scan
+		if r == '$' {
+			// Check if we have an even number of hex digits
+			if len(hexDigits)%2 != 0 {
+				return s.errorf("hex string must have an even number of hex digits")
+			}
+			// Emit the hex string as a token
+			s.emitWithValue(token.HEX_STR_LIT, string(hexDigits))
+			return scanText
+		}
+
+		// Check if the character is a valid hex digit
+		if !s.isHexDigit(r) {
+			return s.errorf("invalid hex digit: %q", r)
+		}
+
+		// Add the valid hex digit to the hexDigits slice
+		hexDigits = append(hexDigits, r)
+	}
+}
+
+func scanString(s *Scanner) StateFn {
+	quote := s.next() // get the opening quote (either ' or ")
+	if quote != '"' && quote != '\'' {
+		return s.errorf("invalid string start: expected ' or \"")
+	}
+
+	var value []rune // to store the string content
+
+	for {
+		r := s.next()
+		switch r {
+		case eof:
+			return s.errorf("unterminated string")
+		case '\n':
+			return s.errorf("string must not span multiple lines")
+		case '\\': // handle escape sequences
+			// Peek the next character to determine what to escape
+			next := s.peek()
+			switch next {
+			case 'n':
+				value = append(value, '\n')
+				s.next() // consume 'n'
+			case 'r':
+				value = append(value, '\r')
+				s.next() // consume 'r'
+			case 't':
+				value = append(value, '\t')
+				s.next() // consume 't'
+			case '\\':
+				value = append(value, '\\')
+				s.next() // consume '\\'
+			case '\'', '"':
+				// Escaped quote
+				value = append(value, r)
+				if next == quote {
+					return s.errorf("quote cannot be the same as the string delimiter")
+				}
+
+				s.next() // consume '\'
+			//case '"':
+			//	// Escaped quote for double-quoted string
+			//	value = append(value, '"')
+			//	s.next() // consume '\'
+			default:
+				// If it's an unsupported escape, just add the backslash as it is
+				value = append(value, '\\', next)
+				s.next() // consume the character
+			}
+		case quote: // closing quote
+			// Emit the string content (without quotes)
+			s.emitWithValue(token.STR_LIT, string(value))
+			return scanText
+		default:
+			// Just a regular character inside the string
+			value = append(value, r)
+		}
+	}
 }
 
 func scanText(s *Scanner) StateFn {
@@ -142,11 +376,4 @@ func scanText(s *Scanner) StateFn {
 	s.emit(token.EOF)
 
 	return nil
-}
-
-func scanString(s *Scanner) StateFn {
-	kind := s.scanString()
-	s.emit(kind)
-
-	return scanText
 }

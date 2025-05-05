@@ -2,20 +2,20 @@ package parser
 
 import "github.com/anthonyabeo/obx/src/syntax/token"
 
-var stmtStart = map[token.Token]bool{
-	token.EXIT:   true,
-	token.WHILE:  true,
-	token.FOR:    true,
-	token.LOOP:   true,
-	token.IF:     true,
-	token.RETURN: true,
-	token.CASE:   true,
-	token.WITH:   true,
-	token.REPEAT: true,
-	token.IDENT:  true,
+var stmtStart = map[token.Kind]bool{
+	token.EXIT:       true,
+	token.WHILE:      true,
+	token.FOR:        true,
+	token.LOOP:       true,
+	token.IF:         true,
+	token.RETURN:     true,
+	token.CASE:       true,
+	token.WITH:       true,
+	token.REPEAT:     true,
+	token.IDENTIFIER: true,
 }
 
-var declStart = map[token.Token]bool{
+var declStart = map[token.Kind]bool{
 	token.IMPORT:    true,
 	token.CONST:     true,
 	token.TYPE:      true,
@@ -24,7 +24,7 @@ var declStart = map[token.Token]bool{
 	token.PROCEDURE: true,
 }
 
-var exprEnd = map[token.Token]bool{
+var exprEnd = map[token.Kind]bool{
 	token.COMMA:     true,
 	token.COLON:     true,
 	token.SEMICOLON: true,
@@ -33,15 +33,15 @@ var exprEnd = map[token.Token]bool{
 	token.RBRACE:    true,
 }
 
-var typeStart = map[token.Token]bool{
-	token.ARRAY:     true,
-	token.LBRACK:    true,
-	token.PROCEDURE: true,
-	token.LPAREN:    true,
-	token.POINTER:   true,
-	token.CARET:     true,
-	token.RECORD:    true,
-	token.IDENT:     true,
+var typeStart = map[token.Kind]bool{
+	token.ARRAY:      true,
+	token.LBRACK:     true,
+	token.PROCEDURE:  true,
+	token.LPAREN:     true,
+	token.POINTER:    true,
+	token.CARET:      true,
+	token.RECORD:     true,
+	token.IDENTIFIER: true,
 }
 
 func (p *Parser) addOp() bool {
@@ -73,23 +73,20 @@ func (p *Parser) exprStart() bool {
 	return p.tok == token.LPAREN ||
 		p.tok == token.PLUS ||
 		p.tok == token.MINUS ||
-		p.tok == token.IDENT ||
+		p.tok == token.IDENTIFIER ||
 		p.tok == token.TRUE ||
 		p.tok == token.FALSE ||
 		p.tok == token.NIL ||
 		p.tok == token.LBRACE ||
-		p.tok == token.STRING ||
-		p.tok == token.HEXSTRING ||
-		p.tok == token.CHAR ||
-		p.tok == token.INT ||
-		p.tok == token.REAL ||
+		p.tok == token.STR_LIT ||
+		p.tok == token.HEX_STR_LIT ||
+		p.tok == token.CHAR_LIT ||
+		p.tok == token.INT_LIT ||
+		p.tok == token.REAL_LIT ||
 		p.tok == token.NOT ||
-		p.tok == token.BYTE ||
-		p.tok == token.INT8 ||
-		p.tok == token.INT16 ||
-		p.tok == token.INT32 ||
-		p.tok == token.INT64 ||
-		p.tok == token.LONGREAL
+		p.tok == token.INT32_LIT ||
+		p.tok == token.INT64_LIT ||
+		p.tok == token.LONGREAL_LIT
 }
 
 func (p *Parser) stmtStart() bool {
