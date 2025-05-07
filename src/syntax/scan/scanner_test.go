@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -316,6 +317,489 @@ next'`, token.ILLEGAL, "", true},        // newline
 		}
 		if tok.Val != tt.wantLiteral {
 			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.wantLiteral, tok.Val)
+		}
+	}
+}
+
+func TestScanComments(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected token.Kind
+		wantErr  bool
+	}{
+		{"// This is a single-line comment", token.SL_COMMENT_START, false},
+		{"(* This is a multi-line comment *)", token.ML_COMMENT_START, false},
+		{"(* This is a multi-line comment\n spanning multiple lines *)", token.ML_COMMENT_START, false},
+		{"// Another single-line comment", token.SL_COMMENT_START, false},
+		{"(* Another multi-line comment *)", token.ML_COMMENT_START, false},
+	}
+
+	for _, test := range tests {
+		sc := Scan("", test.input)
+		got := sc.NextItem()
+
+		if test.wantErr {
+			if got.Kind != token.ILLEGAL {
+				t.Errorf("NextItem(%q) = %v; want error", test.input, got.Kind)
+			}
+		} else if got.Kind != test.expected {
+			t.Errorf("NextItem(%q) = %v; want %v", test.input, got.Kind, test.expected)
+		}
+	}
+}
+
+func TestLexingOfMinimalObxProgram(t *testing.T) {
+	input := `
+module Main
+	proc fib(n : integer): integer
+		var a, b: integer 
+
+  	begin
+		if (n = 0) or (n = 1) then
+			return n
+		else
+		  a := fib(n - 1)
+		  b := fib(n - 2)
+		  return a + b
+		end
+  	end fib
+
+begin
+	res := fib(21)
+  	assert(res = 10946)
+end Main
+`
+	sc := Scan("", input)
+
+	tests := []struct {
+		tokenKind token.Kind
+		tokenLit  string
+	}{
+		{token.MODULE, "module"},
+		{token.IDENTIFIER, "Main"},
+
+		{token.PROC, "proc"},
+		{token.IDENTIFIER, "fib"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "n"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "integer"},
+		{token.RPAREN, ")"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "integer"},
+
+		{token.VAR, "var"},
+		{token.IDENTIFIER, "a"},
+		{token.COMMA, ","},
+		{token.IDENTIFIER, "b"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "integer"},
+
+		{token.BEGIN, "begin"},
+
+		{token.IF, "if"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "n"},
+		{token.EQUAL, "="},
+		{token.INT_LIT, "0"},
+		{token.RPAREN, ")"},
+		{token.OR, "or"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "n"},
+		{token.EQUAL, "="},
+		{token.INT_LIT, "1"},
+		{token.RPAREN, ")"},
+		{token.THEN, "then"},
+
+		{token.RETURN, "return"},
+		{token.IDENTIFIER, "n"},
+
+		{token.ELSE, "else"},
+
+		{token.IDENTIFIER, "a"},
+		{token.BECOMES, ":="},
+		{token.IDENTIFIER, "fib"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "n"},
+		{token.MINUS, "-"},
+		{token.INT_LIT, "1"},
+		{token.RPAREN, ")"},
+
+		{token.IDENTIFIER, "b"},
+		{token.BECOMES, ":="},
+		{token.IDENTIFIER, "fib"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "n"},
+		{token.MINUS, "-"},
+		{token.INT_LIT, "2"},
+		{token.RPAREN, ")"},
+
+		{token.RETURN, "return"},
+		{token.IDENTIFIER, "a"},
+		{token.PLUS, "+"},
+		{token.IDENTIFIER, "b"},
+
+		{token.END, "end"},
+		{token.END, "end"},
+		{token.IDENTIFIER, "fib"},
+
+		{token.BEGIN, "begin"},
+		{token.IDENTIFIER, "res"},
+		{token.BECOMES, ":="},
+		{token.IDENTIFIER, "fib"},
+		{token.LPAREN, "("},
+		{token.INT_LIT, "21"},
+		{token.RPAREN, ")"},
+
+		{token.IDENTIFIER, "assert"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "res"},
+		{token.EQUAL, "="},
+		{token.INT_LIT, "10946"},
+		{token.RPAREN, ")"},
+
+		{token.END, "end"},
+		{token.IDENTIFIER, "Main"},
+	}
+
+	for _, tt := range tests {
+		got := sc.NextItem()
+		if got.Kind != tt.tokenKind {
+			t.Errorf(fmt.Sprintf("sc.NextItem(). Expected token kind = %v, Got %v", tt.tokenKind, got.Kind))
+		}
+
+		if got.Val != tt.tokenLit {
+			t.Errorf("sc.NextItem(). Expected token literal = %v, Got %v", tt.tokenLit, got.Val)
+		}
+	}
+}
+
+func TestExampleOOPProgram(t *testing.T) {
+	input := `module Drawing
+  import F := Fibonacci
+         C := Collections(Figure)
+
+  type Figure* = pointer to record
+                   position: record
+                     x,y: integer 
+                   end 
+				 end
+  proc (this: Figure) draw*() end
+
+  type
+     Circle* = pointer to record (Figure)
+                  diameter: integer 
+			   end
+     Square* = pointer to record (Figure)
+                          width: integer end
+  proc (this: Circle) draw*() end
+  proc (this: Square) draw*() end
+
+  var figures: C.Deque
+       circle: Circle
+       square: Square
+
+  proc drawAll()
+    type I = record(C.Iterator) count: integer end
+    proc (var this: I) apply( in figure: Figure )
+    begin
+      figure.draw(); inc(this.count)
+    end apply
+    var i: I
+  begin
+    figures.forEach(i)
+    assert(i.count = 2)
+  end drawAll
+begin
+  figures := C.createDeque()
+  new(circle)
+  circle.position.x := F.calc(3)
+  circle.position.y := F.calc(4)
+  circle.diameter := 3
+  figures.append(circle)
+  new(square)
+  square.position.x := F.calc(5)
+  square.position.y := F.calc(6)
+  square.width := 4
+  figures.append(square)
+  drawAll()
+end Drawing
+`
+	sc := Scan("", input)
+
+	tests := []struct {
+		tokenKind token.Kind
+		tokenLit  string
+	}{
+		{token.MODULE, "module"},
+		{token.IDENTIFIER, "Drawing"},
+		{token.IMPORT, "import"},
+		{token.IDENTIFIER, "F"},
+		{token.BECOMES, ":="},
+		{token.IDENTIFIER, "Fibonacci"},
+		{token.IDENTIFIER, "C"},
+		{token.BECOMES, ":="},
+		{token.IDENTIFIER, "Collections"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "Figure"},
+		{token.RPAREN, ")"},
+		{token.TYPE, "type"},
+		{token.IDENTIFIER, "Figure"},
+		{token.STAR, "*"},
+		{token.EQUAL, "="},
+		{token.POINTER, "pointer"},
+		{token.TO, "to"},
+		{token.RECORD, "record"},
+		{token.IDENTIFIER, "position"},
+		{token.COLON, ":"},
+		{token.RECORD, "record"},
+		{token.IDENTIFIER, "x"},
+		{token.COMMA, ","},
+		{token.IDENTIFIER, "y"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "integer"},
+		{token.END, "end"},
+		{token.END, "end"},
+		{token.PROC, "proc"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "this"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "Figure"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "draw"},
+		{token.STAR, "*"},
+		{token.LPAREN, "("},
+		{token.RPAREN, ")"},
+		{token.END, "end"},
+		{token.TYPE, "type"},
+		{token.IDENTIFIER, "Circle"},
+		{token.STAR, "*"},
+		{token.EQUAL, "="},
+		{token.POINTER, "pointer"},
+		{token.TO, "to"},
+		{token.RECORD, "record"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "Figure"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "diameter"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "integer"},
+		{token.END, "end"},
+		{token.IDENTIFIER, "Square"},
+		{token.STAR, "*"},
+		{token.EQUAL, "="},
+		{token.POINTER, "pointer"},
+		{token.TO, "to"},
+		{token.RECORD, "record"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "Figure"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "width"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "integer"},
+		{token.END, "end"},
+		{token.PROC, "proc"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "this"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "Circle"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "draw"},
+		{token.STAR, "*"},
+		{token.LPAREN, "("},
+		{token.RPAREN, ")"},
+		{token.END, "end"},
+		{token.PROC, "proc"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "this"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "Square"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "draw"},
+		{token.STAR, "*"},
+		{token.LPAREN, "("},
+		{token.RPAREN, ")"},
+		{token.END, "end"},
+		{token.VAR, "var"},
+		{token.IDENTIFIER, "figures"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "C"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "Deque"},
+		{token.IDENTIFIER, "circle"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "Circle"},
+		{token.IDENTIFIER, "square"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "Square"},
+		{token.PROC, "proc"},
+		{token.IDENTIFIER, "drawAll"},
+		{token.LPAREN, "("},
+		{token.RPAREN, ")"},
+		{token.TYPE, "type"},
+		{token.IDENTIFIER, "I"},
+		{token.EQUAL, "="},
+		{token.RECORD, "record"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "C"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "Iterator"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "count"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "integer"},
+		{token.END, "end"},
+		{token.PROC, "proc"},
+		{token.LPAREN, "("},
+		{token.VAR, "var"},
+		{token.IDENTIFIER, "this"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "I"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "apply"},
+		{token.LPAREN, "("},
+		{token.IN, "in"},
+		{token.IDENTIFIER, "figure"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "Figure"},
+		{token.RPAREN, ")"},
+		{token.BEGIN, "begin"},
+		{token.IDENTIFIER, "figure"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "draw"},
+		{token.LPAREN, "("},
+		{token.RPAREN, ")"},
+		{token.SEMICOLON, ";"},
+		{token.IDENTIFIER, "inc"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "this"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "count"},
+		{token.RPAREN, ")"},
+		{token.END, "end"},
+		{token.IDENTIFIER, "apply"},
+		{token.VAR, "var"},
+		{token.IDENTIFIER, "i"},
+		{token.COLON, ":"},
+		{token.IDENTIFIER, "I"},
+		{token.BEGIN, "begin"},
+		{token.IDENTIFIER, "figures"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "forEach"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "i"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "assert"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "i"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "count"},
+		{token.EQUAL, "="},
+		{token.INT_LIT, "2"},
+		{token.RPAREN, ")"},
+		{token.END, "end"},
+		{token.IDENTIFIER, "drawAll"},
+		{token.BEGIN, "begin"},
+		{token.IDENTIFIER, "figures"},
+		{token.BECOMES, ":="},
+		{token.IDENTIFIER, "C"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "createDeque"},
+		{token.LPAREN, "("},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "new"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "circle"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "circle"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "position"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "x"},
+		{token.BECOMES, ":="},
+		{token.IDENTIFIER, "F"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "calc"},
+		{token.LPAREN, "("},
+		{token.INT_LIT, "3"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "circle"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "position"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "y"},
+		{token.BECOMES, ":="},
+		{token.IDENTIFIER, "F"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "calc"},
+		{token.LPAREN, "("},
+		{token.INT_LIT, "4"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "circle"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "diameter"},
+		{token.BECOMES, ":="},
+		{token.INT_LIT, "3"},
+		{token.IDENTIFIER, "figures"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "append"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "circle"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "new"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "square"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "square"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "position"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "x"},
+		{token.BECOMES, ":="},
+		{token.IDENTIFIER, "F"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "calc"},
+		{token.LPAREN, "("},
+		{token.INT_LIT, "5"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "square"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "position"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "y"},
+		{token.BECOMES, ":="},
+		{token.IDENTIFIER, "F"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "calc"},
+		{token.LPAREN, "("},
+		{token.INT_LIT, "6"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "square"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "width"},
+		{token.BECOMES, ":="},
+		{token.INT_LIT, "4"},
+		{token.IDENTIFIER, "figures"},
+		{token.PERIOD, "."},
+		{token.IDENTIFIER, "append"},
+		{token.LPAREN, "("},
+		{token.IDENTIFIER, "square"},
+		{token.RPAREN, ")"},
+		{token.IDENTIFIER, "drawAll"},
+		{token.LPAREN, "("},
+		{token.RPAREN, ")"},
+		{token.END, "end"},
+		{token.IDENTIFIER, "Drawing"},
+	}
+
+	for _, tt := range tests {
+		got := sc.NextItem()
+		if got.Kind != tt.tokenKind {
+			t.Errorf(fmt.Sprintf("sc.NextItem(). Expected token kind = %v, Got %v", tt.tokenKind, got.Kind))
+		}
+
+		if got.Val != tt.tokenLit {
+			t.Errorf("sc.NextItem(). Expected token literal = %v, Got %v", tt.tokenLit, got.Val)
 		}
 	}
 }
