@@ -235,10 +235,10 @@ func TestScanCharacterLiterals(t *testing.T) {
 		wantErr       bool
 	}{
 		// Valid character literals
-		{"1Fx", token.CHAR_LIT, "A", false},    // 8-bit character 'A'
-		{"0041x", token.CHAR_LIT, "A", false},  // 16-bit Unicode 'A'
-		{"03A9x", token.CHAR_LIT, "Ω", false},  // Unicode 'Ω'
-		{"7Fx", token.CHAR_LIT, "", false},    // Extended ASCII ''
+		{"1Fx", token.CHAR_LIT, "A", false},   // 8-bit character 'A'
+		{"0041x", token.CHAR_LIT, "A", false}, // 16-bit Unicode 'A'
+		{"03A9x", token.CHAR_LIT, "Ω", false}, // Unicode 'Ω'
+		{"7Fx", token.CHAR_LIT, "", false},   // Extended ASCII ''
 		{"4F60x", token.CHAR_LIT, "你", false}, // Unicode '你' (Chinese character)
 
 		// Invalid character literals
@@ -296,7 +296,7 @@ func TestScanStringLiterals(t *testing.T) {
 		{`'hello`, token.ILLEGAL, "", true},  // unterminated
 		{`"hello`, token.ILLEGAL, "", true},
 		{`'line
-next'`, token.ILLEGAL, "", true},        // newline
+next'`, token.ILLEGAL, "", true}, // newline
 		{`"'`, token.ILLEGAL, "", true}, // invalid single char
 		{`'`, token.ILLEGAL, "", true},
 	}

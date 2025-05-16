@@ -266,10 +266,11 @@ func scanText(s *Scanner) StateFn {
 	for ch := s.next(); ch != eof; {
 		switch ch {
 		case '.':
-			c := s.peek()
+			c := s.next()
 			if c == '.' {
 				s.emit(token.RANGE)
 			} else {
+				s.backup()
 				s.emit(token.PERIOD)
 			}
 		case '-':
@@ -279,11 +280,11 @@ func scanText(s *Scanner) StateFn {
 		case '=':
 			s.emit(token.EQUAL)
 		case '<':
-			c := s.peek()
+			c := s.next()
 			if c == '=' {
-				s.next()
 				s.emit(token.LEQ)
 			} else {
+				s.backup()
 				s.emit(token.LESS)
 			}
 		case '>':
