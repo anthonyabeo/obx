@@ -115,4 +115,6 @@ var basicTypes = map[string]bool{
 	"int32":    true,
 	"int64":    true,
 	"bool":     true,
+	"shortint": true,
+	"longint":  true,
 }

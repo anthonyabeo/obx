@@ -5,8 +5,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/diagnostics"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
-	"github.com/anthonyabeo/obx/src/syntax/lexer"
-	"github.com/anthonyabeo/obx/src/syntax/token"
+	"github.com/anthonyabeo/obx/src/syntax/scan"
 )
 
 func TestParseCaseStatement(t *testing.T) {
@@ -31,10 +30,14 @@ begin
    end
 end Main`
 
-	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := lexer.NewLexer(file, []byte(input))
+	//table := verify.NewSymbolTable(nil, "Main")
+	//table.Insert(verify.NewProcedureSymbol("ReadIdentifier", ast.Unexported))
+	//table.Insert(verify.NewProcedureSymbol("ReadNumber", ast.Unexported))
+	//table.Insert(verify.NewProcedureSymbol("ReadString", ast.Unexported))
+	//table.Insert(verify.NewProcedureSymbol("SpecialCharacter", ast.Unexported))
 
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*table*/)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -45,78 +48,11 @@ end Main`
 	}
 
 	main := unit.(*ast.Module)
-	if main.BName.Name != main.EName.Name {
+	if main.BName != main.EName {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
 			main.BName, main.EName)
 	}
 
-}
-
-func TestParseTypeDeclaration(t *testing.T) {
-	input := `
-module Main
-  type a = array 10, N of integer
-  type b = array of char
-  type c = [N][M] T
-end Main
-`
-
-	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := lexer.NewLexer(file, []byte(input))
-
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
-	unit := p.Parse()
-
-	if p.err.ErrCount() > 0 {
-		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
-	}
-
-	tests := []struct {
-		dim    int
-		elemTy string
-	}{
-		{2, "integer"},
-		{0, "char"},
-		{1, "[M]T"},
-	}
-
-	main := unit.(*ast.Module)
-	if main.BName.Name != main.EName.Name {
-		t.Errorf("start module name, '%s' does not match end module name '%s'",
-			main.BName, main.EName)
-	}
-
-	if len(main.DeclSeq) != len(tests) {
-		t.Errorf("expected 1 declaration in '%v' module, found %d",
-			main.BName, len(main.DeclSeq))
-	}
-
-	for i, tt := range tests {
-		td, ok := main.DeclSeq[i].(*ast.TypeDecl)
-		if !ok {
-			t.Errorf("expected type declaration, got '%s'", main.DeclSeq[i])
-		}
-
-		denoTy, ok := td.DenotedType.(*ast.ArrayType)
-		if !ok {
-			t.Errorf("'%s' is not an array type-expression", td.DenotedType)
-		}
-
-		if denoTy.LenList == nil && (tt.dim != 0) {
-			t.Errorf("expected an array of dimension %d, got %d instead", tt.dim, len(denoTy.LenList.List))
-		}
-
-		if denoTy.LenList != nil && (tt.dim != len(denoTy.LenList.List)) {
-			t.Errorf("expected an array of dimension %d, got %d instead", tt.dim, len(denoTy.LenList.List))
-		}
-
-		if tt.elemTy != denoTy.ElemType.String() {
-			t.Errorf("expected an element type of  '%s', got '%s'", tt.elemTy, denoTy.ElemType.String())
-		}
-	}
 }
 
 func TestParseOberonMinimalProgram(t *testing.T) {
@@ -141,10 +77,11 @@ begin
 end Main
 `
 
-	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := lexer.NewLexer(file, []byte(input))
+	//table := verify.NewSymbolTable(verify.Global, "Main")
+	//table.Insert(verify.NewProcedureSymbol("fib", ast.Unexported))
 
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -155,7 +92,7 @@ end Main
 	}
 
 	main := unit.(*ast.Module)
-	if main.BName.Name != main.EName.Name {
+	if main.BName != main.EName {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
 			main.BName, main.EName)
 	}
@@ -187,11 +124,10 @@ begin
 	end
 end Main
 `
+	//table := verify.NewSymbolTable(verify.Global, "Main")
 
-	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := lexer.NewLexer(file, []byte(input))
-
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -202,7 +138,7 @@ end Main
 	}
 
 	main := unit.(*ast.Module)
-	if main.BName.Name != main.EName.Name {
+	if main.BName != main.EName {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
 			main.BName, main.EName)
 	}
@@ -238,10 +174,10 @@ begin
 	phi := t{CenterTree}
 end Main
 `
-	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := lexer.NewLexer(file, []byte(input))
+	//table := verify.NewSymbolTable(nil, "Main")
 
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -271,7 +207,7 @@ end Main
 	}
 
 	main := unit.(*ast.Module)
-	if main.BName.Name != main.EName.Name {
+	if main.BName != main.EName {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
 			main.BName, main.EName)
 	}
@@ -282,7 +218,7 @@ end Main
 	}
 
 	for i, stmt := range main.StmtSeq {
-		st := stmt.(*ast.AssignStmt)
+		st := stmt.(*ast.AssignmentStmt)
 		if st.RValue.String() != tests[i] {
 			t.Errorf("Expected '%s', got '%s'", tests[i], st.RValue.String())
 		}
@@ -303,10 +239,12 @@ begin
 	t.Insert("John")
 end Main
 `
-	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := lexer.NewLexer(file, []byte(input))
+	//table := verify.NewSymbolTable(verify.Global, "Main")
+	//table.Insert(verify.NewProcedureSymbol("WriteInt", ast.Unexported))
+	//table.Insert(verify.NewProcedureSymbol("t.Insert", ast.Unexported))
 
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -317,7 +255,7 @@ end Main
 	}
 
 	main := unit.(*ast.Module)
-	if main.BName.Name != main.EName.Name {
+	if main.BName != main.EName {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
 			main.BName, main.EName)
 	}
@@ -337,7 +275,7 @@ end Main
 	}
 
 	for idx, stmt := range main.StmtSeq {
-		proc := stmt.(*ast.ProcCall)
+		proc := stmt.(*ast.ProcedureCall)
 		if proc.Callee.String() != tests[idx].procName {
 			t.Errorf("expected procedure name '%s', got '%s'", tests[idx].procName, proc.Callee.String())
 		}
@@ -370,10 +308,11 @@ begin
 	t := c
 end Main
 `
-	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := lexer.NewLexer(file, []byte(input))
+	//table := verify.NewSymbolTable(nil, "Main")
+	//table.Insert(verify.NewProcedureSymbol("log2", ast.Unexported))
 
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -400,7 +339,7 @@ end Main
 	}
 
 	main := unit.(*ast.Module)
-	if main.BName.Name != main.EName.Name {
+	if main.BName != main.EName {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
 			main.BName, main.EName)
 	}
@@ -411,7 +350,7 @@ end Main
 	}
 
 	for i, stmt := range main.StmtSeq {
-		st := stmt.(*ast.AssignStmt)
+		st := stmt.(*ast.AssignmentStmt)
 
 		if st.LValue.String() != tests[i].lvalue {
 			t.Errorf("Expected LValue '%s', got '%s'", tests[i].lvalue, st.LValue.String())
@@ -436,10 +375,10 @@ func TestParseImportDecl(t *testing.T) {
 		Out
 end Drawing
 `
-	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := lexer.NewLexer(file, []byte(input))
+	//table := verify.NewSymbolTable(nil, "Main")
 
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -462,7 +401,7 @@ end Drawing
 	}
 
 	main := unit.(*ast.Module)
-	if main.BName.Name != main.EName.Name {
+	if main.BName != main.EName {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
 			main.BName, main.EName)
 	}
@@ -499,12 +438,12 @@ func TestParseOOPExample(t *testing.T) {
  proc (this: Circle) draw*() end
  proc (this: Square) draw*() end
 
- var figures: C::Deque
+ var figures: C.Deque
       circle: Circle
       square: Square
 
  proc drawAll()
-   type I = record(C::Iterator) count: integer end
+   type I = record(C.Iterator) count: integer end
    proc (var this: I) apply( in figure: Figure )
    begin
      figure.draw(); inc(this.count)
@@ -515,24 +454,24 @@ func TestParseOOPExample(t *testing.T) {
    assert(i.count = 2)
  end drawAll
 begin
- figures := C::createDeque()
+ figures := C.createDeque()
  new(circle)
- circle.position.x := F::calc(3)
- circle.position.y := F::calc(4)
+ circle.position.x := F.calc(3)
+ circle.position.y := F.calc(4)
  circle.diameter := 3
  figures.append(circle)
  new(square)
- square.position.x := F::calc(5)
- square.position.y := F::calc(6)
+ square.position.x := F.calc(5)
+ square.position.y := F.calc(6)
  square.width := 4
  figures.append(square)
  drawAll()
 end Drawing
 `
-	file := token.NewFile("test.obx", len([]byte(input)))
-	lex := lexer.NewLexer(file, []byte(input))
+	//table := verify.NewSymbolTable(nil, "Main")
 
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10))
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -543,21 +482,21 @@ end Drawing
 	}
 
 	main := unit.(*ast.Module)
-	if main.BName.Name != main.EName.Name {
+	if main.BName != main.EName {
 		t.Errorf("start module name, '%s' does not match end module name '%s'",
 			main.BName, main.EName)
 	}
 
 	stmtTests := []string{
-		"figures := C::createDeque()",
+		"figures := C.createDeque()",
 		"new(circle)",
-		"circle.position.x := F::calc(3)",
-		"circle.position.y := F::calc(4)",
+		"circle.position.x := F.calc(3)",
+		"circle.position.y := F.calc(4)",
 		"circle.diameter := 3",
 		"figures.append(circle)",
 		"new(square)",
-		"square.position.x := F::calc(5)",
-		"square.position.y := F::calc(6)",
+		"square.position.x := F.calc(5)",
+		"square.position.y := F.calc(6)",
 		"square.width := 4",
 		"figures.append(square)",
 		"drawAll()",
@@ -581,7 +520,7 @@ end Drawing
 		"Square* = ^record(Figure){integer}",
 		"(this: Circle) draw*()",
 		"(this: Square) draw*()",
-		"figures: C::Deque",
+		"figures: C.Deque",
 		"circle: Circle",
 		"square: Square",
 		"drawAll()",
@@ -589,7 +528,7 @@ end Drawing
 
 	for i, decl := range main.DeclSeq {
 		switch d := decl.(type) {
-		case *ast.VarDecl:
+		case *ast.VariableDecl:
 			if Decls[i] != d.String() {
 				t.Errorf("expected variable declaration '%s', got '%s'", Decls[i], d.String())
 			}
@@ -597,10 +536,306 @@ end Drawing
 			if Decls[i] != d.String() {
 				t.Errorf("expected type declaration '%s', got '%s'", Decls[i], d.String())
 			}
-		case *ast.ProcDecl:
+		case *ast.ProcedureDecl:
 			if Decls[i] != d.Head.String() {
 				t.Errorf("expected procedure declaration '%s', got '%s'", Decls[i], d.Head.String())
 			}
+		}
+	}
+}
+
+func TestParseModuleWithVariableDecl(t *testing.T) {
+	input := `
+module Main
+	var i, j, k: integer
+		x, y: real
+		p, q: bool
+		s: set
+		F: Function
+		a: array 100 of real
+		w: array 16 of record
+			 name: array 32 of char
+			 count: integer
+		   end
+		t, c: Tree
+end Main
+`
+	//table := verify.NewSymbolTable(nil, "Main")
+
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	unit := p.Parse()
+	if p.err.ErrCount() > 0 {
+		t.Error("found parse errors")
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
+		}
+	}
+
+	main := unit.(*ast.Module)
+	if main.BName != main.EName {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			main.BName, main.EName)
+	}
+
+	if len(main.DeclSeq) != 8 {
+		t.Errorf("expected 8 declarations in '%v' module, found %d",
+			main.BName, len(main.DeclSeq))
+	}
+
+	var tests = []struct {
+		declIndex  int
+		identCount int
+		declType   string
+		identNames []string
+	}{
+		{0, 3, "integer", []string{"i", "j", "k"}},
+		{1, 2, "real", []string{"x", "y"}},
+		{2, 2, "bool", []string{"p", "q"}},
+		{3, 1, "set", []string{"s"}},
+		{4, 1, "Function", []string{"F"}},
+		{5, 1, "[100]real", []string{"a"}},
+		{6, 1, "[16]record{[32]char; integer}", []string{"w"}},
+		{7, 2, "Tree", []string{"t", "c"}},
+	}
+
+	for _, tt := range tests {
+		decl, ok := main.DeclSeq[tt.declIndex].(*ast.VariableDecl)
+		if !ok {
+			t.Errorf("expected variable declaration, got '%s'", main.DeclSeq[tt.declIndex])
+		}
+
+		if len(decl.IdentList) != tt.identCount {
+			t.Errorf("expected %d identifiers in variable declaration, got %d", tt.identCount, len(decl.IdentList))
+		}
+
+		for i, ident := range decl.IdentList {
+			if ident.Name != tt.identNames[i] {
+				t.Errorf("expected identifier '%s', got '%s'", tt.identNames[i], ident.Name)
+			}
+		}
+
+		if decl.Type.String() != tt.declType {
+			t.Errorf("expected type '%s', got '%s'", tt.declType, decl.Type.String())
+		}
+	}
+
+}
+
+func TestParseTypeDeclaration(t *testing.T) {
+	input := `
+module Main
+type a = array 10, N of integer
+	 b = array of char
+     c = [N][M] T
+	 Table = array N of real
+	 Tree = pointer to Node
+	 Node = record
+	   key: integer
+	   left, right: Tree
+	 end
+	 CenterTree = pointer to CenterNode
+	 CenterNode = record (Node)
+		width: integer
+	  	subnode: Tree
+		end
+	Function = procedure(x: integer): integer
+end Main
+`
+	//table := verify.NewSymbolTable(nil, "Main")
+
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	unit := p.Parse()
+	if p.err.ErrCount() > 0 {
+		t.Error("found parse errors")
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
+		}
+	}
+
+	main := unit.(*ast.Module)
+	if main.BName != main.EName {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			main.BName, main.EName)
+	}
+
+	if len(main.DeclSeq) != 9 {
+		t.Errorf("expected 9 type declarations in '%v' module, found %d",
+			main.BName, len(main.DeclSeq))
+	}
+
+	tests := []struct {
+		declIndex int
+		declType  string
+		declName  string
+	}{
+		{0, "[10, N]integer", "a"},
+		{1, "[]char", "b"},
+		{2, "[N][M]T", "c"},
+		{3, "[N]real", "Table"},
+		{4, "^Node", "Tree"},
+		{5, "record{integer; Tree; Tree}", "Node"},
+		{6, "^CenterNode", "CenterTree"},
+		{7, "record(Node){integer; Tree}", "CenterNode"},
+		{8, "procedure(x: integer): integer", "Function"},
+	}
+
+	for _, tt := range tests {
+		decl, ok := main.DeclSeq[tt.declIndex].(*ast.TypeDecl)
+		if !ok {
+			t.Errorf("expected type declaration, got '%s'", main.DeclSeq[tt.declIndex])
+		}
+
+		if decl.DenotedType.String() != tt.declType {
+			t.Errorf("expected type '%s', got '%s'", tt.declType, decl.DenotedType.String())
+		}
+
+		if decl.Name.Name != tt.declName {
+			t.Errorf("expected type name '%s', got '%s'", tt.declName, decl.Name.Name)
+		}
+	}
+}
+
+func TestParseConstantDeclaration(t *testing.T) {
+	input := `
+module Main
+const
+	pi = 3.14159
+	e = 2.718281828459
+	phi = 1.6180339887
+	zero = 0
+	one = 1
+	ten = 10
+	oneHundred = 100
+	oneThousand = 1000
+	oneMillion = 1000000
+end Main
+`
+	//table := verify.NewSymbolTable(nil, "Main")
+
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	unit := p.Parse()
+	if p.err.ErrCount() > 0 {
+		t.Error("found parse errors")
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
+		}
+	}
+
+	main := unit.(*ast.Module)
+	if main.BName != main.EName {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			main.BName, main.EName)
+	}
+
+	if len(main.DeclSeq) != 9 {
+		t.Errorf("expected 8 constant declarations in '%v' module, found %d",
+			main.BName, len(main.DeclSeq))
+	}
+
+	tests := []struct {
+		declIndex int
+		declName  string
+		declValue string
+	}{
+		{0, "pi", "3.14159"},
+		{1, "e", "2.718281828459"},
+		{2, "phi", "1.6180339887"},
+		{3, "zero", "0"},
+		{4, "one", "1"},
+		{5, "ten", "10"},
+		{6, "oneHundred", "100"},
+		{7, "oneThousand", "1000"},
+		{8, "oneMillion", "1000000"},
+	}
+
+	for _, tt := range tests {
+		decl, ok := main.DeclSeq[tt.declIndex].(*ast.ConstantDecl)
+		if !ok {
+			t.Errorf("expected constant declaration, got '%s'", main.DeclSeq[tt.declIndex])
+		}
+
+		if decl.Name.Name != tt.declName {
+			t.Errorf("expected constant name '%s', got '%s'", tt.declName, decl.Name.Name)
+		}
+
+		if decl.Value.String() != tt.declValue {
+			t.Errorf("expected constant value '%s', got '%s'", tt.declValue, decl.Value.String())
+		}
+	}
+}
+
+func TestParseExpression(t *testing.T) {
+	input := `module Main
+begin
+	i := 1991
+	i := i div 3
+	i := ~p or q
+	i := (i + j) * (i - j)
+	i := s - {8, 9, 13}
+	i := i + x
+	i := a[i + j] * a[i - j]
+	i := (0 <= i) & (i < 100)
+	i := t.key = 0
+	i := k in {i..j - 1}
+	i := w[i].name <= John
+	i := t is CenterTree
+	i := a[i]
+	i := w[3].name[i]
+	i := t.left.right
+	i := t{CenterTree}.subnode
+	t{CenterTree}.subnode := t{CenterTree}.subnode
+end Main
+`
+	//table := verify.NewSymbolTable(nil, "Main")
+
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	unit := p.Parse()
+	if p.err.ErrCount() > 0 {
+		t.Error("found parse errors")
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
+		}
+	}
+
+	tests := []string{
+		"1991",
+		"i div 3",
+		"~p or q",
+		"i + j * i - j",
+		"s - {8, 9, 13}",
+		"i + x",
+		"a[i + j] * a[i - j]",
+		"0 <= i & i < 100",
+		"t.key = 0",
+		"k in {i..j - 1}",
+		"w[i].name <= John",
+		"t is CenterTree",
+		"a[i]",
+		"w[3].name[i]",
+		"t.left.right",
+		"t{CenterTree}.subnode",
+		"t{CenterTree}.subnode",
+	}
+
+	main := unit.(*ast.Module)
+	if main.BName != main.EName {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			main.BName, main.EName)
+	}
+
+	if len(main.StmtSeq) != len(tests) {
+		t.Errorf("expected %d statements in '%s' module, found %d",
+			len(tests), main.BName, len(main.StmtSeq))
+	}
+
+	for i, stmt := range main.StmtSeq {
+		st := stmt.(*ast.AssignmentStmt)
+		if st.RValue.String() != tests[i] {
+			t.Errorf("Expected '%s', got '%s'", tests[i], st.RValue.String())
 		}
 	}
 }

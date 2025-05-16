@@ -1,66 +1,65 @@
 package parser
 
 import (
+	"strings"
+
 	"github.com/anthonyabeo/obx/src/diagnostics"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
-	"github.com/anthonyabeo/obx/src/syntax/lexer"
+	"github.com/anthonyabeo/obx/src/syntax/scan"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Parser struct {
-	err diagnostics.ErrReporter
-	lex *lexer.Lexer
+	err     diagnostics.ErrReporter
+	scanner *scan.Scanner
 
 	// Next token
-	tok token.Token
+	tok token.Kind
 	lit string
-	pos *token.Position
-
-	syncPos *token.Position // last synchronization position
-	syncCnt int             // number of parser.advance calls without progress
 }
 
-func NewParser(lex *lexer.Lexer, rpt diagnostics.ErrReporter) *Parser {
-	p := &Parser{lex: lex, err: rpt}
+func NewParser(lex *scan.Scanner, rpt diagnostics.ErrReporter) *Parser {
+	p := &Parser{scanner: lex, err: rpt}
 	p.next()
 
 	return p
 }
 
-func (p *Parser) errorExpected(pos *token.Position, msg string) {
+func (p *Parser) errorExpected(msg string) {
 	msg = "expected " + msg
-	if pos == p.pos {
-		switch {
-		case p.tok.IsLiteral():
-			msg += ", found " + p.lit
-		default:
-			msg += ", found '" + p.tok.String() + "'"
-		}
+
+	switch {
+	case p.tok.IsLiteral():
+		msg += ", found " + p.lit
+	default:
+		msg += ", found '" + p.tok.String() + "'"
 	}
 
-	p.err.AddError(pos, msg)
+	p.err.AddError(msg)
 }
 
-func (p *Parser) match(tok token.Token) {
+func (p *Parser) match(tok token.Kind) {
 	if p.tok != tok {
-		p.errorExpected(p.pos, "'"+tok.String()+"'")
+		p.errorExpected("'" + tok.String() + "'")
 	}
 
 	p.next()
 }
 
 func (p *Parser) next() {
-	p.tok, p.lit, p.pos = p.lex.Lex()
+	tok := p.scanner.NextItem()
+	p.tok = tok.Kind
+	p.lit = tok.Val
 }
 
-func (p *Parser) Parse() (unit ast.Unit) {
+func (p *Parser) Parse() (unit ast.CompilationUnit) {
 	switch p.tok {
 	case token.MODULE:
 		unit = p.parseModule()
 	case token.DEFINITION:
 		unit = p.parseDefinition()
 	default:
-		p.errorExpected(p.pos, "MODULE or DEFINITION")
+		p.errorExpected("MODULE or DEFINITION")
 	}
 
 	return
@@ -93,7 +92,7 @@ func (p *Parser) parseMetaSection() *ast.MetaSection {
 	}
 
 	ms.Ids = append(ms.Ids, p.parseIdent())
-	for p.tok == token.COMMA || p.tok == token.IDENT {
+	for p.tok == token.COMMA || p.tok == token.IDENTIFIER {
 		if p.tok == token.COMMA {
 			p.next()
 		}
@@ -110,7 +109,7 @@ func (p *Parser) parseMetaSection() *ast.MetaSection {
 }
 
 func (p *Parser) parseModule() *ast.Module {
-	mod := ast.NewModule(p.pos)
+	mod := ast.NewModule()
 
 	p.match(token.MODULE)
 	mod.BName = p.parseIdent()
@@ -130,10 +129,9 @@ func (p *Parser) parseModule() *ast.Module {
 		case token.VAR, token.TYPE, token.CONST, token.PROC, token.PROCEDURE:
 			mod.DeclSeq = p.parseDeclarationSeq()
 		default:
-			pos := p.pos
-			p.errorExpected(p.pos, "import or declaration")
+			p.errorExpected("import or declaration")
 			p.advance(declStart)
-			mod.DeclSeq = append(mod.DeclSeq, &ast.BadDecl{From: pos, To: p.pos})
+			mod.DeclSeq = append(mod.DeclSeq, &ast.BadDecl{})
 		}
 	}
 
@@ -153,7 +151,7 @@ func (p *Parser) parseModule() *ast.Module {
 
 // definition   = DEFINITION ident [';']  [ ImportList ] DeclarationSequence2 END ident ['.']
 func (p *Parser) parseDefinition() *ast.Definition {
-	def := ast.NewDefinition(p.pos)
+	def := ast.NewDefinition()
 
 	p.match(token.DEFINITION)
 	def.BName = p.parseIdent()
@@ -185,7 +183,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 
 	p.match(token.IMPORT)
 	list = append(list, p.parseImport())
-	for p.tok == token.COMMA || p.tok == token.IDENT {
+	for p.tok == token.COMMA || p.tok == token.IDENTIFIER {
 		if p.tok == token.COMMA {
 			p.next()
 		}
@@ -203,7 +201,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 // import = [ ident ':=' ] ImportPath ident [ MetaActuals ]
 // ImportPath = { ident '.' }
 func (p *Parser) parseImport() *ast.Import {
-	imp := &ast.Import{NamePos: p.pos}
+	imp := &ast.Import{}
 	var avail bool
 
 	id := p.parseIdent()
@@ -227,7 +225,8 @@ ImportPath:
 		goto ImportPath
 	}
 
-	imp.Name = id
+	imp.ImportPath = append(imp.ImportPath, id)
+	imp.Name = strings.Join(imp.ImportPath, ".")
 
 	if p.tok == token.LPAREN {
 		p.next()
@@ -258,15 +257,15 @@ func (p *Parser) parseDeclarationSeq2() (seq []ast.Declaration) {
 		switch p.tok {
 		case token.VAR:
 			p.match(token.VAR)
-			for p.tok == token.IDENT {
-				seq = append(seq, p.parseVarDecl())
+			for p.tok == token.IDENTIFIER {
+				seq = append(seq, p.parseVariableDecl())
 				if p.tok == token.SEMICOLON {
 					p.next()
 				}
 			}
 		case token.TYPE:
 			p.match(token.TYPE)
-			for p.tok == token.IDENT {
+			for p.tok == token.IDENTIFIER {
 				seq = append(seq, p.parseTypeDecl())
 				if p.tok == token.SEMICOLON {
 					p.next()
@@ -274,8 +273,8 @@ func (p *Parser) parseDeclarationSeq2() (seq []ast.Declaration) {
 			}
 		case token.CONST:
 			p.match(token.CONST)
-			for p.tok == token.IDENT {
-				seq = append(seq, p.parseConstDecl())
+			for p.tok == token.IDENTIFIER {
+				seq = append(seq, p.parseConstantDecl())
 				if p.tok == token.SEMICOLON {
 					p.next()
 				}
@@ -286,10 +285,9 @@ func (p *Parser) parseDeclarationSeq2() (seq []ast.Declaration) {
 				p.next()
 			}
 		default:
-			pos := p.pos
-			p.errorExpected(pos, "declaration")
+			p.errorExpected("declaration")
 			p.advance(declStart)
-			seq = append(seq, &ast.BadDecl{From: pos, To: p.pos})
+			seq = append(seq, &ast.BadDecl{})
 		}
 	}
 
@@ -307,15 +305,15 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 		switch p.tok {
 		case token.VAR:
 			p.match(token.VAR)
-			for p.tok == token.IDENT {
-				seq = append(seq, p.parseVarDecl())
+			for p.tok == token.IDENTIFIER {
+				seq = append(seq, p.parseVariableDecl())
 				if p.tok == token.SEMICOLON {
 					p.next()
 				}
 			}
 		case token.TYPE:
 			p.match(token.TYPE)
-			for p.tok == token.IDENT {
+			for p.tok == token.IDENTIFIER {
 				seq = append(seq, p.parseTypeDecl())
 				if p.tok == token.SEMICOLON {
 					p.next()
@@ -323,22 +321,21 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 			}
 		case token.CONST:
 			p.match(token.CONST)
-			for p.tok == token.IDENT {
-				seq = append(seq, p.parseConstDecl())
+			for p.tok == token.IDENTIFIER {
+				seq = append(seq, p.parseConstantDecl())
 				if p.tok == token.SEMICOLON {
 					p.next()
 				}
 			}
 		case token.PROC, token.PROCEDURE:
-			seq = append(seq, p.parseProcDecl())
+			seq = append(seq, p.parseProcedureDecl())
 			if p.tok == token.SEMICOLON {
 				p.next()
 			}
 		default:
-			pos := p.pos
-			p.errorExpected(pos, "declaration")
+			p.errorExpected("declaration")
 			p.advance(declStart)
-			seq = append(seq, &ast.BadDecl{From: pos, To: p.pos})
+			seq = append(seq, &ast.BadDecl{})
 		}
 	}
 
@@ -347,67 +344,66 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 
 // TypeDeclaration = identdef '=' type
 func (p *Parser) parseTypeDecl() *ast.TypeDecl {
-	t := &ast.TypeDecl{Type: p.pos}
-
-	t.Name = p.parseIdentDef()
-	p.match(token.EQUAL)
-	t.DenotedType = p.parseType()
-
-	return t
+	return &ast.TypeDecl{
+		Name: p.parseIdentifierDef(),
+		DenotedType: func() ast.Type {
+			p.match(token.EQUAL)
+			return p.parseType()
+		}(),
+	}
 }
 
 // ConstDeclaration = identdef '=' ConstExpression
-func (p *Parser) parseConstDecl() *ast.ConstDecl {
-	c := &ast.ConstDecl{Const: p.pos}
-
-	c.Name = p.parseIdentDef()
-	p.match(token.EQUAL)
-	c.Value = p.parseExpression()
-
-	return c
+func (p *Parser) parseConstantDecl() *ast.ConstantDecl {
+	return &ast.ConstantDecl{
+		Name: p.parseIdentifierDef(),
+		Value: func() ast.Expression {
+			p.match(token.EQUAL)
+			return p.parseExpression()
+		}(),
+	}
 }
 
 // VariableDeclaration = IdentList ':' type
-func (p *Parser) parseVarDecl() (v *ast.VarDecl) {
-	v = &ast.VarDecl{Var: p.pos}
-
-	v.IdentList = p.parseIdentList()
-	p.match(token.COLON)
-	v.Type = p.parseType()
-
-	return
+func (p *Parser) parseVariableDecl() (v *ast.VariableDecl) {
+	return &ast.VariableDecl{
+		IdentList: p.parseIdentList(),
+		Type: func() ast.Type {
+			p.match(token.COLON)
+			return p.parseType()
+		}(),
+	}
 }
 
 func (p *Parser) parseType() (ty ast.Type) {
 	switch p.tok {
-	case token.IDENT:
+	case token.IDENTIFIER:
 		ty = p.parseNamedType()
 	case token.ARRAY, token.LBRACK:
 		ty = p.parseArrayType()
 	case token.RECORD:
 		ty = p.parseRecordType()
 	case token.PROCEDURE, token.PROC:
-		ty = p.parseProcType()
+		ty = p.parseProcedureType()
 	case token.POINTER, token.CARET:
 		ty = p.parsePtrType()
 	case token.LPAREN:
 		ty = p.parseEnumType()
 	default:
-		pos := p.pos
-		p.errorExpected(pos, "type")
+		p.errorExpected("type")
 		p.advance(typeStart)
-		return &ast.BadType{From: pos, To: p.pos}
+		return &ast.BadType{}
 	}
 
 	return
 }
 
 func (p *Parser) parseEnumType() *ast.EnumType {
-	enum := &ast.EnumType{Enum: p.pos}
+	enum := &ast.EnumType{}
 	p.next()
 
 	enum.Variants = append(enum.Variants, p.parseIdent())
-	for p.tok == token.COMMA || p.tok == token.IDENT {
+	for p.tok == token.COMMA || p.tok == token.IDENTIFIER {
 		if p.tok == token.COMMA {
 			p.next()
 		}
@@ -420,7 +416,7 @@ func (p *Parser) parseEnumType() *ast.EnumType {
 }
 
 func (p *Parser) parsePtrType() *ast.PointerType {
-	ptr := &ast.PointerType{Ptr: p.pos}
+	ptr := &ast.PointerType{}
 	tok := p.tok
 
 	p.next()
@@ -433,18 +429,9 @@ func (p *Parser) parsePtrType() *ast.PointerType {
 	return ptr
 }
 
-func (p *Parser) parseProcType() *ast.ProcType {
-	proc := &ast.ProcType{Proc: p.pos}
-	p.next()
-
-	if p.tok == token.LPAREN {
-		p.next()
-		if p.tok == token.POINTER || p.tok == token.CARET {
-			p.next()
-		}
-
-		p.match(token.RPAREN)
-	}
+func (p *Parser) parseProcedureType() *ast.ProcedureType {
+	proc := &ast.ProcedureType{}
+	p.match(token.PROCEDURE)
 
 	if p.tok == token.LPAREN {
 		proc.FP = p.parseFormalParameters()
@@ -454,7 +441,6 @@ func (p *Parser) parseProcType() *ast.ProcType {
 }
 
 func (p *Parser) parseArrayType() *ast.ArrayType {
-	pos := p.pos
 	p.next()
 
 	var ll *ast.LenList
@@ -472,28 +458,28 @@ func (p *Parser) parseArrayType() *ast.ArrayType {
 		p.next()
 		typ := p.parseType()
 
-		return ast.NewArray(pos, ll, typ)
+		return ast.NewArray(ll, typ)
 	}
 
 	p.match(token.OF)
 
-	return ast.NewArray(pos, ll, p.parseType())
+	return ast.NewArray(ll, p.parseType())
 }
 
 func (p *Parser) parseRecordType() *ast.RecordType {
-	rec := &ast.RecordType{Record: p.pos}
+	rec := &ast.RecordType{}
 
 	p.match(token.RECORD)
 
 	if p.tok == token.LPAREN {
 		p.next()
-		rec.BaseType = p.parseNamedType()
+		rec.Base = p.parseNamedType()
 		p.match(token.RPAREN)
 	}
 
-	if p.tok == token.IDENT {
+	if p.tok == token.IDENTIFIER {
 		rec.Fields = append(rec.Fields, p.fieldList())
-		for p.tok == token.SEMICOLON || p.tok == token.IDENT {
+		for p.tok == token.SEMICOLON || p.tok == token.IDENTIFIER {
 			if p.tok == token.SEMICOLON {
 				p.next()
 			}
@@ -507,9 +493,8 @@ func (p *Parser) parseRecordType() *ast.RecordType {
 }
 
 func (p *Parser) fieldList() *ast.FieldList {
-	fl := &ast.FieldList{}
+	fl := &ast.FieldList{List: p.parseIdentList()}
 
-	fl.IdList = p.parseIdentList()
 	p.match(token.COLON)
 	fl.Type = p.parseType()
 
@@ -518,19 +503,10 @@ func (p *Parser) fieldList() *ast.FieldList {
 
 // advance consumes tokens until the current token p.tok
 // is in the 'to' set, or token.EOF. For diagnostics recovery.
-func (p *Parser) advance(to map[token.Token]bool) {
+func (p *Parser) advance(to map[token.Kind]bool) {
 	for ; p.tok != token.EOF; p.next() {
 		if to[p.tok] {
-			if p.pos.Cmp(p.syncPos) == 0 && p.syncCnt < 10 {
-				p.syncCnt++
-				return
-			}
-
-			if p.pos.Cmp(p.syncPos) == 1 {
-				p.syncPos = p.pos
-				p.syncCnt = 0
-				return
-			}
+			return
 		}
 	}
 }
@@ -540,7 +516,7 @@ func (p *Parser) parseExpression() (expr ast.Expression) {
 	expr = p.parseSimpleExpression()
 
 	if p.relation() {
-		relExpr := &ast.BinaryExpr{OpPos: p.pos, Left: expr, Op: p.tok}
+		relExpr := &ast.BinaryExpr{Left: expr, Op: p.tok}
 		p.next()
 
 		relExpr.Right = p.parseSimpleExpression()
@@ -552,28 +528,24 @@ func (p *Parser) parseExpression() (expr ast.Expression) {
 
 // SimpleExpression = ['+' | '-'] term { AddOperator term }
 func (p *Parser) parseSimpleExpression() (expr ast.Expression) {
-	var (
-		sign = token.ILLEGAL
-		pos  = &token.Position{}
-	)
+	var sign = token.ILLEGAL
 
 	if p.tok == token.MINUS || p.tok == token.PLUS {
 		sign = p.tok
-		pos = p.pos
 		p.next()
 	}
 
 	expr = p.parseTerm()
 	if sign != token.ILLEGAL {
-		expr = &ast.UnaryExpr{OpPos: pos, Op: sign, X: expr}
+		expr = &ast.UnaryExpr{Op: sign, Operand: expr}
 	}
 
 	for p.addOp() {
-		binExpr := &ast.BinaryExpr{OpPos: p.pos, Left: expr, Op: p.tok}
+		bin := &ast.BinaryExpr{Left: expr, Op: p.tok}
 		p.next()
 
-		binExpr.Right = p.parseTerm()
-		expr = binExpr
+		bin.Right = p.parseTerm()
+		expr = bin
 	}
 
 	return
@@ -584,11 +556,11 @@ func (p *Parser) parseTerm() (expr ast.Expression) {
 	expr = p.parseFactor()
 
 	for p.mulOp() {
-		binExpr := &ast.BinaryExpr{OpPos: p.pos, Left: expr, Op: p.tok}
+		bin := &ast.BinaryExpr{Left: expr, Op: p.tok}
 		p.next()
 
-		binExpr.Right = p.parseFactor()
-		expr = binExpr
+		bin.Right = p.parseFactor()
+		expr = bin
 	}
 
 	return
@@ -598,28 +570,25 @@ func (p *Parser) parseTerm() (expr ast.Expression) {
 func (p *Parser) parseFactor() (expr ast.Expression) {
 	switch p.tok {
 	case token.NOT:
-		pos := p.pos
 		p.next()
-		expr = &ast.UnaryExpr{OpPos: pos, Op: token.NOT, X: p.parseFactor()}
+		expr = &ast.UnaryExpr{Op: token.NOT, Operand: p.parseFactor()}
 	case token.LPAREN:
 		p.match(token.LPAREN)
 		expr = p.parseExpression()
 		p.match(token.RPAREN)
-	case token.IDENT:
+	case token.IDENTIFIER:
 		expr = p.parseDesignator()
 		if p.tok == token.LPAREN {
-			expr = &ast.FuncCall{Callee: expr, ActualParams: p.parseActualParameters()}
+			expr = &ast.FunctionCall{Callee: expr, ActualParams: p.parseActualParameters()}
 		}
-	case token.INT, token.BYTE, token.INT8, token.INT16, token.INT32, token.INT64,
-		token.REAL, token.LONGREAL, token.STRING, token.HEXSTRING, token.CHAR,
-		token.NIL, token.TRUE, token.FALSE, token.LBRACE:
+	case token.INT_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
+		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.NIL, token.TRUE, token.FALSE, token.LBRACE:
 
 		expr = p.parseLiteral()
 	default:
-		pos := p.pos
-		p.errorExpected(pos, "literal, parenthesized expression, operator or name")
+		p.errorExpected("literal, parenthesized expression, operator or name")
 		p.advance(exprEnd)
-		expr = &ast.BadExpr{From: pos, To: p.pos}
+		expr = &ast.BadExpr{}
 	}
 
 	return
@@ -652,28 +621,29 @@ func (p *Parser) parseExprList() (list []ast.Expression) {
 // designator = qualident {selector}
 // selector = '.' ident | '[' ExpList ']' | '^' | '{' qualident '}'
 func (p *Parser) parseDesignator() (dsg *ast.Designator) {
-	dsg = &ast.Designator{QPos: p.pos, QualifiedIdent: p.parseQualifiedIdent()}
+	dsg = &ast.Designator{QualifiedIdent: p.parseQualifiedIdent()}
 
 	expr := dsg.QualifiedIdent
 
 	for p.tok == token.PERIOD || p.tok == token.LBRACK || p.tok == token.CARET || p.tok == token.LBRACE {
-		dsg = &ast.Designator{QPos: p.pos, QualifiedIdent: expr}
+		dsg = &ast.Designator{QualifiedIdent: expr}
 
 		switch p.tok {
 		case token.PERIOD:
 			p.next()
-			dsg.Selector = &ast.DotOp{Field: p.parseIdent()}
+			dsg.Select = &ast.DotOp{Field: p.parseIdent()}
 		case token.LBRACK:
 			p.next()
 			List := p.parseExprList()
-			p.next()
-			dsg.Selector = &ast.IndexOp{List: List}
+			p.match(token.RBRACK)
+			dsg.Select = &ast.IndexOp{List: List}
 		case token.CARET:
-			dsg.Selector = &ast.PtrDref{}
+			dsg.Select = &ast.PtrDeref{}
 		case token.LBRACE:
 			p.match(token.LBRACE)
-			dsg.Selector = &ast.TypeGuard{Ty: p.parseQualifiedIdent()}
+			dsg.Select = &ast.TypeGuard{Ty: p.parseQualifiedIdent()}
 			p.match(token.RBRACE)
+		default:
 		}
 
 		expr = dsg
@@ -685,13 +655,11 @@ func (p *Parser) parseDesignator() (dsg *ast.Designator) {
 // literal = number | string | hexstring | hexchar | NIL | TRUE | FALSE | set
 func (p *Parser) parseLiteral() (lit ast.Expression) {
 	switch p.tok {
-	case token.INT, token.BYTE, token.INT8, token.INT16, token.INT32,
-		token.INT64, token.REAL, token.LONGREAL, token.STRING, token.HEXSTRING,
-		token.CHAR, token.TRUE, token.FALSE:
+	case token.INT_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
+		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.TRUE, token.FALSE, token.NIL:
 
-		lit = &ast.BasicLit{ValuePos: p.pos, Kind: p.tok, Val: p.lit}
+		lit = &ast.BasicLit{Kind: p.tok, Val: p.lit}
 		p.next()
-	case token.NIL:
 	case token.LBRACE:
 		p.next()
 		set := &ast.Set{}
@@ -707,6 +675,10 @@ func (p *Parser) parseLiteral() (lit ast.Expression) {
 		p.match(token.RBRACE)
 
 		lit = set
+	default:
+		p.errorExpected("literal or set")
+		p.advance(exprEnd)
+		lit = &ast.BadExpr{}
 	}
 
 	return
@@ -718,7 +690,7 @@ func (p *Parser) parseSetElem() ast.Expression {
 	expr := p.parseExpression()
 	if p.tok == token.RANGE {
 		p.next()
-		return &ast.ExprRange{Beg: expr, Ed: p.parseExpression()}
+		return &ast.ExprRange{Beg: expr, End: p.parseExpression()}
 	}
 
 	return expr
@@ -727,22 +699,26 @@ func (p *Parser) parseSetElem() ast.Expression {
 func (p *Parser) parseNamedType() ast.Type {
 	typ := p.parseQualifiedIdent()
 	if basicTypes[typ.String()] {
-		return ast.NewBasicType(typ.Pos(), typ.String())
+		return ast.NewBasicType(typ.String())
 	}
 
-	return ast.NewNamedType(typ.Pos(), typ)
+	return ast.NewNamedType(typ)
 
 }
 
 // qualident = [ ident '.' ] ident
-func (p *Parser) parseQualifiedIdent() ast.Expression {
-	id := p.parseIdent()
+func (p *Parser) parseQualifiedIdent() *ast.QualifiedIdent {
+	id := &ast.QualifiedIdent{}
 
-	if p.tok == token.DCOLON {
+	// Parse the first identifier
+	id.Prefix = p.parseIdent()
+
+	if p.tok == token.PERIOD {
 		p.next()
-		sel := p.parseIdent()
-
-		return &ast.QualifiedIdent{Module: id, Sel: sel}
+		id.Name = p.parseIdent()
+	} else {
+		id.Name = id.Prefix
+		id.Prefix = ""
 	}
 
 	return id
@@ -750,20 +726,40 @@ func (p *Parser) parseQualifiedIdent() ast.Expression {
 
 // IdentList = identdef { [','] identdef}
 // identdef  = ident ['*' | '-']
-func (p *Parser) parseIdentList() (list []*ast.Ident) {
-	list = append(list, p.parseIdentDef())
+func (p *Parser) parseIdentList() (list []*ast.IdentifierDef) {
+	list = append(list, p.parseIdentifierDef())
 
 	for p.tok == token.COMMA {
 		p.next()
-		list = append(list, p.parseIdentDef())
+		list = append(list, p.parseIdentifierDef())
 	}
 
 	return
 }
 
+// IdentDef = ident ['*' | '-']
+func (p *Parser) parseIdentifierDef() *ast.IdentifierDef {
+	id := &ast.IdentifierDef{Name: p.parseIdent()}
+
+	switch p.tok {
+	case token.STAR:
+		id.Props = ast.Exported
+	case token.MINUS:
+		id.Props = ast.ExportedReadOnly
+	default:
+		id.Props = ast.Unexported
+	}
+
+	if p.tok == token.STAR || p.tok == token.MINUS {
+		p.next()
+	}
+
+	return id
+}
+
 // ProcedureDeclaration = ProcedureHeading [ ';' ] ProcedureBody END [ ident ]
-func (p *Parser) parseProcDecl() (proc *ast.ProcDecl) {
-	proc = &ast.ProcDecl{Proc: p.pos}
+func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
+	proc = &ast.ProcedureDecl{}
 
 	proc.Head = p.parseProcHeading()
 	if p.tok == token.SEMICOLON {
@@ -773,7 +769,7 @@ func (p *Parser) parseProcDecl() (proc *ast.ProcDecl) {
 	proc.Body = p.parseProcBody()
 
 	p.match(token.END)
-	if p.tok == token.IDENT {
+	if p.tok == token.IDENTIFIER {
 		proc.EndName = p.parseIdent()
 	}
 
@@ -782,11 +778,11 @@ func (p *Parser) parseProcDecl() (proc *ast.ProcDecl) {
 
 // ProcedureHeading = ( PROCEDURE | PROC ) [Receiver] identdef [ FormalParameters ]
 // Receiver = '(' [VAR|IN] ident ':' ident ')'
-func (p *Parser) parseProcHeading() (head *ast.ProcHead) {
-	head = &ast.ProcHead{}
+func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
+	head = &ast.ProcedureHeading{}
 
 	if p.tok != token.PROC && p.tok != token.PROCEDURE {
-		p.errorExpected(p.pos, "proc or procedure")
+		p.errorExpected("proc or procedure")
 		p.advance(declStart)
 		return nil
 	} else {
@@ -795,7 +791,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcHead) {
 			head.Rcv = p.parseReceiver()
 		}
 
-		head.Name = p.parseIdentDef()
+		head.Name = p.parseIdentifierDef()
 		if p.tok == token.LPAREN {
 			head.FP = p.parseFormalParameters()
 		}
@@ -804,27 +800,13 @@ func (p *Parser) parseProcHeading() (head *ast.ProcHead) {
 	return
 }
 
-func (p *Parser) parseIdentDef() *ast.Ident {
-	id := p.parseIdent()
-	if p.tok == token.STAR || p.tok == token.MINUS {
-		id.IProps |= ast.Exported
-		if p.tok == token.MINUS {
-			id.IProps |= ast.ReadOnly
-		}
-
-		p.next()
-	}
-
-	return id
-}
-
 // FormalParameters = '(' [ FPSection { [';'] FPSection } ] ')' [ ':' ReturnType ]
 func (p *Parser) parseFormalParameters() (fp *ast.FormalParams) {
 	fp = &ast.FormalParams{}
 
 	p.match(token.LPAREN)
 
-	if p.tok == token.VAR || p.tok == token.IN || p.tok == token.IDENT {
+	if p.tok == token.VAR || p.tok == token.IN || p.tok == token.IDENTIFIER {
 		fp.Params = append(fp.Params, p.parseFPSection())
 		for p.tok == token.SEMICOLON {
 			p.next()
@@ -876,7 +858,7 @@ func (p *Parser) parseReceiver() (rcv *ast.Receiver) {
 
 	rcv.Var = p.parseIdent()
 	p.match(token.COLON)
-	rcv.Type = p.parseIdent()
+	rcv.Type = p.parseNamedType()
 
 	p.match(token.RPAREN)
 
@@ -884,8 +866,8 @@ func (p *Parser) parseReceiver() (rcv *ast.Receiver) {
 }
 
 // ProcedureBody = DeclarationSequence [ BEGIN StatementSequence | ReturnStatement [ ';' ] ]
-func (p *Parser) parseProcBody() (body *ast.ProcBody) {
-	body = &ast.ProcBody{}
+func (p *Parser) parseProcBody() (body *ast.ProcedureBody) {
+	body = &ast.ProcedureBody{}
 
 	body.DeclSeq = p.parseDeclarationSeq()
 
@@ -916,18 +898,16 @@ func (p *Parser) parseStatementSeq() (seq []ast.Statement) {
 	return
 }
 
-func (p *Parser) parseIdent() *ast.Ident {
-	pos := p.pos
+func (p *Parser) parseIdent() string {
 	name := "_"
-	if p.tok == token.IDENT {
+	if p.tok == token.IDENTIFIER {
 		name = p.lit
-
 		p.next()
 	} else {
-		p.match(token.IDENT)
+		p.match(token.IDENTIFIER)
 	}
 
-	return &ast.Ident{NamePos: pos, Name: name}
+	return name
 }
 
 func (p *Parser) parseStatement() (stmt ast.Statement) {
@@ -950,28 +930,31 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 		stmt = p.parseWhileStmt()
 	case token.REPEAT:
 		stmt = p.parseRepeatStmt()
-	case token.IDENT:
+	case token.IDENTIFIER:
 		dsg := p.parseDesignator()
 		switch p.tok {
 		case token.BECOMES:
-			pos := p.pos
 			p.next()
-			stmt = &ast.AssignStmt{AssignPos: pos, LValue: dsg, RValue: p.parseExpression()}
-		case token.LPAREN:
-			stmt = &ast.ProcCall{NamePos: dsg.QPos, Callee: dsg, ActualParams: p.parseActualParameters()}
+			stmt = &ast.AssignmentStmt{LValue: dsg, RValue: p.parseExpression()}
+		default:
+			var list []ast.Expression
+
+			if p.tok == token.LPAREN {
+				list = p.parseActualParameters()
+			}
+			stmt = &ast.ProcedureCall{Callee: dsg, ActualParams: list}
 		}
 	default:
-		pos := p.pos
-		p.errorExpected(pos, "statement")
+		p.errorExpected("statement")
 		p.advance(stmtStart)
-		stmt = &ast.BadStmt{From: pos, To: p.pos}
+		stmt = &ast.BadStmt{}
 	}
 
 	return
 }
 
 func (p *Parser) parseLoopStmt() (stmt *ast.LoopStmt) {
-	stmt = &ast.LoopStmt{Loop: p.pos}
+	stmt = &ast.LoopStmt{}
 
 	p.match(token.LOOP)
 	stmt.StmtSeq = p.parseStatementSeq()
@@ -981,7 +964,7 @@ func (p *Parser) parseLoopStmt() (stmt *ast.LoopStmt) {
 }
 
 func (p *Parser) parseRepeatStmt() (stmt *ast.RepeatStmt) {
-	stmt = &ast.RepeatStmt{Repeat: p.pos}
+	stmt = &ast.RepeatStmt{}
 
 	p.match(token.REPEAT)
 	stmt.StmtSeq = p.parseStatementSeq()
@@ -992,7 +975,7 @@ func (p *Parser) parseRepeatStmt() (stmt *ast.RepeatStmt) {
 }
 
 func (p *Parser) parseWhileStmt() (stmt *ast.WhileStmt) {
-	stmt = &ast.WhileStmt{While: p.pos}
+	stmt = &ast.WhileStmt{}
 
 	p.match(token.WHILE)
 	stmt.BoolExpr = p.parseExpression()
@@ -1015,7 +998,7 @@ func (p *Parser) parseWhileStmt() (stmt *ast.WhileStmt) {
 }
 
 func (p *Parser) parseReturnStmt() (stmt *ast.ReturnStmt) {
-	stmt = &ast.ReturnStmt{Return: p.pos}
+	stmt = &ast.ReturnStmt{}
 
 	p.match(token.RETURN)
 	if p.exprStart() {
@@ -1027,7 +1010,7 @@ func (p *Parser) parseReturnStmt() (stmt *ast.ReturnStmt) {
 
 // IfStatement = IF expression THEN StatementSequence {ElsifStatement} [ElseStatement] END
 func (p *Parser) parseIfStmt() (stmt *ast.IfStmt) {
-	stmt = &ast.IfStmt{If: p.pos}
+	stmt = &ast.IfStmt{}
 
 	p.match(token.IF)
 	stmt.BoolExpr = p.parseExpression()
@@ -1056,7 +1039,7 @@ func (p *Parser) parseIfStmt() (stmt *ast.IfStmt) {
 
 // CaseStatement = CASE expression OF ['|'] Case { '|' Case } [ ELSE StatementSequence ] END
 func (p *Parser) parseCaseStmt() (stmt *ast.CaseStmt) {
-	stmt = &ast.CaseStmt{Case: p.pos}
+	stmt = &ast.CaseStmt{}
 
 	p.match(token.CASE)
 
@@ -1111,7 +1094,7 @@ func (p *Parser) parseLabelRange() *ast.LabelRange {
 
 // ForStatement = FOR ident ':=' expression TO expression [BY ConstExpression] DO StatementSequence END
 func (p *Parser) parseForStmt() (stmt *ast.ForStmt) {
-	stmt = &ast.ForStmt{For: p.pos}
+	stmt = &ast.ForStmt{}
 
 	p.match(token.FOR)
 	stmt.CtlVar = p.parseIdent()
@@ -1135,16 +1118,15 @@ func (p *Parser) parseForStmt() (stmt *ast.ForStmt) {
 
 // ExitStatement = EXIT
 func (p *Parser) parseExitStmt() *ast.ExitStmt {
-	stmt := &ast.ExitStmt{Exit: p.pos}
 	p.match(token.EXIT)
 
-	return stmt
+	return &ast.ExitStmt{}
 }
 
 // WithStatement = WITH ['|'] Guard DO StatementSequence { '|' Guard DO StatementSequence} [ ELSE StatementSequence ] END
 // Guard         = qualident ':' qualident
 func (p *Parser) parseWithStmt() *ast.WithStmt {
-	stmt := &ast.WithStmt{With: p.pos}
+	stmt := &ast.WithStmt{}
 
 	p.match(token.WITH)
 
