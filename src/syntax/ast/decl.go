@@ -59,7 +59,7 @@ type (
 	Receiver struct {
 		Mod  token.Kind
 		Var  string
-		Type string
+		Type Type
 	}
 
 	BadDecl struct{}
@@ -74,11 +74,11 @@ func (v *VariableDecl) String() string {
 
 	return fmt.Sprintf("%s: %s", strings.Join(list, ", "), v.Type)
 }
-func (v *VariableDecl) Accept(vst Visitor) { vst.VisitVarDecl(v) }
+func (v *VariableDecl) Accept(vst Visitor) { vst.VisitVariableDecl(v) }
 
 func (c *ConstantDecl) decl()              {}
 func (c *ConstantDecl) String() string     { return fmt.Sprintf("%v = %v", c.Name, c.Value) }
-func (c *ConstantDecl) Accept(vst Visitor) { vst.VisitConstDecl(c) }
+func (c *ConstantDecl) Accept(vst Visitor) { vst.VisitConstantDecl(c) }
 
 func (t *TypeDecl) decl()              {}
 func (t *TypeDecl) String() string     { return fmt.Sprintf("%s = %s", t.Name, t.DenotedType) }
@@ -94,7 +94,7 @@ func (p *ProcedureDecl) String() string {
 
 	return buf.String()
 }
-func (p *ProcedureDecl) Accept(vst Visitor) { vst.VisitProcDecl(p) }
+func (p *ProcedureDecl) Accept(vst Visitor) { vst.VisitProcedureDecl(p) }
 
 func (p *ProcedureHeading) String() string {
 	buf := new(bytes.Buffer)
@@ -105,7 +105,7 @@ func (p *ProcedureHeading) String() string {
 
 	return buf.String()
 }
-func (p *ProcedureHeading) Accept(vst Visitor) { vst.VisitProcHead(p) }
+func (p *ProcedureHeading) Accept(vst Visitor) { vst.VisitProcedureHeading(p) }
 func (p *ProcedureHeading) decl()              {}
 
 func (p *ProcedureBody) String() string { panic("not implemented") }
@@ -154,6 +154,6 @@ func (r *Receiver) String() string {
 	return buf.String()
 }
 
-func (b *BadDecl) Accept(Visitor) { panic("unimplemented") }
+func (b *BadDecl) Accept(Visitor) {}
 func (b *BadDecl) decl()          {}
-func (b *BadDecl) String() string { panic("unimplemented") }
+func (b *BadDecl) String() string { return "<BadDecl>" }

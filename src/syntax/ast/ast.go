@@ -24,12 +24,14 @@ type Declaration interface {
 
 type Type interface {
 	Node
+	typ()
+	Width() int
 }
 
-type Unit interface {
+type CompilationUnit interface {
 	Node
 	Name() string
 	ListImport() []*Import
-	Edges() map[string]Unit
-	addEdge(string, Unit)
+	Edges() map[string]CompilationUnit
+	addEdge(string, CompilationUnit)
 }

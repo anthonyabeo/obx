@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	scope2 "github.com/anthonyabeo/obx/src/scope"
 	"strconv"
 
 	"github.com/anthonyabeo/obx/src/diagnostics"
@@ -16,11 +17,11 @@ type Visitor struct {
 	err    diagnostics.ErrReporter
 
 	ast    *ast.Oberon
-	env    scope.Scope
-	scopes map[string]scope.Scope
+	env    scope2.Scope
+	scopes map[string]scope2.Scope
 }
 
-func NewVisitor(scopes map[string]scope.Scope, report diagnostics.ErrReporter) *Visitor {
+func NewVisitor(scopes map[string]scope2.Scope, report diagnostics.ErrReporter) *Visitor {
 	return &Visitor{scopes: scopes, err: report}
 }
 
@@ -37,7 +38,7 @@ func (v *Visitor) VisitModule(m *ast.Module) {
 		v.err.AddError(m.Pos(), msg)
 	}
 
-	scp := scope.NewScope(scope.Global, m.BName.Name)
+	scp := scope2.NewScope(scope2.Global, m.BName.Name)
 	v.scopes[m.BName.Name] = scp
 	v.env = scp
 
@@ -56,7 +57,7 @@ func (v *Visitor) VisitModule(m *ast.Module) {
 				}
 
 				genTy := types.NewGenericType(ty.Name, tyConst)
-				v.env.Insert(scope.NewTypeName(ty.NamePos, ty.Name, genTy, ty.IProps, -1))
+				v.env.Insert(scope2.NewTypeName(ty.NamePos, ty.Name, genTy, ty.IProps, -1))
 			}
 		}
 	}
@@ -101,27 +102,27 @@ func (v *Visitor) VisitIdentifier(id *ast.Ident) {
 func (v *Visitor) VisitBasicLit(b *ast.BasicLit) {
 	switch b.Kind {
 	case token.INT:
-		b.EType = scope.Typ[types.Int]
+		b.EType = scope2.Typ[types.Int]
 	case token.BYTE:
-		b.EType = scope.Typ[types.Byte]
+		b.EType = scope2.Typ[types.Byte]
 	case token.INT8:
-		b.EType = scope.Typ[types.Int8]
+		b.EType = scope2.Typ[types.Int8]
 	case token.INT16:
-		b.EType = scope.Typ[types.Int16]
+		b.EType = scope2.Typ[types.Int16]
 	case token.INT32:
-		b.EType = scope.Typ[types.Int32]
+		b.EType = scope2.Typ[types.Int32]
 	case token.INT64:
-		b.EType = scope.Typ[types.Int64]
+		b.EType = scope2.Typ[types.Int64]
 	case token.REAL:
-		b.EType = scope.Typ[types.Real]
+		b.EType = scope2.Typ[types.Real]
 	case token.LONGREAL:
-		b.EType = scope.Typ[types.LReal]
+		b.EType = scope2.Typ[types.LReal]
 	case token.TRUE, token.FALSE:
-		b.EType = scope.Typ[types.Bool]
+		b.EType = scope2.Typ[types.Bool]
 	case token.STRING:
-		b.EType = scope.Typ[types.String]
+		b.EType = scope2.Typ[types.String]
 	case token.NIL:
-		b.EType = scope.Typ[types.Nil]
+		b.EType = scope2.Typ[types.Nil]
 	}
 }
 
@@ -137,7 +138,7 @@ func (v *Visitor) VisitSet(s *ast.Set) {
 		}
 	}
 
-	s.EType = scope.Typ[types.Set]
+	s.EType = scope2.Typ[types.Set]
 }
 
 func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
@@ -169,12 +170,12 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 		}
 
 		if left.Info() == types.IsSet && right.Info() == types.IsSet {
-			expr.EType = scope.Typ[types.Set]
+			expr.EType = scope2.Typ[types.Set]
 			return
 		}
 
 		if expr.Op == token.QUOT {
-			expr.EType = scope.Typ[types.LReal]
+			expr.EType = scope2.Typ[types.LReal]
 			return
 		}
 
@@ -222,7 +223,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 				v.err.AddError(expr.Right.Pos(), msg)
 			}
 
-			expr.EType = scope.Typ[types.Bool]
+			expr.EType = scope2.Typ[types.Bool]
 			return
 		}
 
@@ -234,7 +235,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 				v.err.AddError(expr.Pos(), msg)
 			}
 
-			expr.EType = scope.Typ[types.Bool]
+			expr.EType = scope2.Typ[types.Bool]
 			return
 		}
 
@@ -246,7 +247,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 				v.err.AddError(expr.Pos(), msg)
 			}
 
-			expr.EType = scope.Typ[types.Bool]
+			expr.EType = scope2.Typ[types.Bool]
 			return
 		}
 
@@ -259,7 +260,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 				v.err.AddError(expr.Pos(), msg)
 			}
 
-			expr.EType = scope.Typ[types.Bool]
+			expr.EType = scope2.Typ[types.Bool]
 			return
 		}
 
@@ -280,7 +281,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 				v.err.AddError(expr.Right.Pos(), msg)
 			}
 
-			expr.EType = scope.Typ[types.Bool]
+			expr.EType = scope2.Typ[types.Bool]
 			return
 		}
 
@@ -292,13 +293,13 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 				v.err.AddError(expr.Pos(), msg)
 			}
 
-			expr.EType = scope.Typ[types.Bool]
+			expr.EType = scope2.Typ[types.Bool]
 			return
 		}
 
 		// TODO check for CHAR and WCHAR arrays
 
-		expr.EType = scope.Typ[types.Bool]
+		expr.EType = scope2.Typ[types.Bool]
 	case token.OR, token.AND:
 		left, leftOk := LTy.(*types.Basic)
 		right, rightOk := RTy.(*types.Basic)
@@ -314,7 +315,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			v.err.AddError(expr.OpPos, msg)
 		}
 
-		expr.EType = scope.Typ[types.Bool]
+		expr.EType = scope2.Typ[types.Bool]
 	case token.IN:
 		left, leftOk := LTy.(*types.Basic)
 		right, rightOk := RTy.(*types.Basic)
@@ -335,7 +336,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			v.err.AddError(expr.Right.Pos(), msg)
 		}
 
-		expr.EType = scope.Typ[types.Bool]
+		expr.EType = scope2.Typ[types.Bool]
 	case token.IS:
 		var a types.Type
 
@@ -358,7 +359,7 @@ func (v *Visitor) VisitBinaryExpr(expr *ast.BinaryExpr) {
 			v.err.AddError(expr.Pos(), msg)
 		}
 
-		expr.EType = scope.Typ[types.Bool]
+		expr.EType = scope2.Typ[types.Bool]
 	}
 }
 
@@ -386,7 +387,7 @@ func (v *Visitor) VisitDesignator(des *ast.Designator) {
 				v.err.AddError(des.QualifiedIdent.Pos(), msg)
 			}
 
-			var sym scope.Symbol
+			var sym scope2.Symbol
 			sym = record.fields.Lookup(sel.Field.Name)
 			if sym != nil {
 				des.EType = sym.Type()
@@ -458,7 +459,7 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 		param.Accept(v)
 	}
 
-	if call.Callee.Type() == scope.Typ[types.Invalid] {
+	if call.Callee.Type() == scope2.Typ[types.Invalid] {
 		obj := v.env.Lookup(call.Callee.String())
 		if obj == nil {
 			v.err.AddError(call.Pos(), fmt.Sprintf("unknown procedure '%v'", call.Callee.String()))
@@ -470,7 +471,7 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 		return
 	}
 
-	sig, ok := call.Callee.Type().(*ast.Signature)
+	sig, ok := call.Callee.Type().(*types.Signature)
 	if !ok {
 		v.err.AddError(call.Pos(), fmt.Sprintf("cannot call a non-procedure %v", call.Callee.String()))
 	}
@@ -494,39 +495,39 @@ func (v *Visitor) VisitFuncCall(call *ast.FuncCall) {
 }
 
 func (v *Visitor) VisitUnaryExpr(expr *ast.UnaryExpr) {
-	expr.X.Accept(v)
+	expr.Operand.Accept(v)
 
-	X, _ := expr.X.Type().(*types.Basic)
+	X, _ := expr.Operand.Type().(*types.Basic)
 
 	switch expr.Op {
 	case token.PLUS, token.MINUS:
 		if X.Info()|types.IsNumeric != types.IsNumeric {
-			msg := fmt.Sprintf("'%v' must be numeric type", expr.X)
-			v.err.AddError(expr.X.Pos(), msg)
+			msg := fmt.Sprintf("'%v' must be numeric type", expr.Operand)
+			v.err.AddError(expr.Operand.Pos(), msg)
 		}
 
 		expr.EType = X
 	case token.NOT:
 		if X.Info() != types.IsBoolean {
-			msg := fmt.Sprintf("'%v' does not evaluate to Boolean type", expr.X)
-			v.err.AddError(expr.X.Pos(), msg)
+			msg := fmt.Sprintf("'%v' does not evaluate to Boolean type", expr.Operand)
+			v.err.AddError(expr.Operand.Pos(), msg)
 		}
 
-		expr.EType = scope.Typ[types.Bool]
+		expr.EType = scope2.Typ[types.Bool]
 	}
 }
 
 func (v *Visitor) VisitQualifiedIdent(id *ast.QualifiedIdent) {
-	sym := v.env.Lookup(id.Module.String())
-	if sym == nil || sym.Kind() != scope.MOD {
-		msg := fmt.Sprintf("'%s' is not recognised as a module", id.Module.String())
-		v.err.AddError(id.Module.Pos(), msg)
+	sym := v.env.Lookup(id.Prefix.String())
+	if sym == nil || sym.Kind() != scope2.MOD {
+		msg := fmt.Sprintf("'%s' is not recognised as a module", id.Prefix.String())
+		v.err.AddError(id.Prefix.Pos(), msg)
 	}
 
-	mod := sym.(*scope.Module)
+	mod := sym.(*scope2.Module)
 	decl := mod.Scope.Lookup(id.Sel.Name)
-	if decl == nil || decl.Props()&ast.ExRdOnly != ast.Exported {
-		msg := fmt.Sprintf("'%s' is not declared/exported in module '%s'", id.Sel.Name, id.Module.String())
+	if decl == nil || decl.Props()&ast.ExportedReadOnly != ast.Exported {
+		msg := fmt.Sprintf("'%s' is not declared/exported in module '%s'", id.Sel.Name, id.Prefix.String())
 		v.err.AddError(id.Sel.Pos(), msg)
 	}
 
@@ -535,7 +536,7 @@ func (v *Visitor) VisitQualifiedIdent(id *ast.QualifiedIdent) {
 
 func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 	stmt.BoolExpr.Accept(v)
-	if stmt.BoolExpr.Type() != scope.Typ[types.Bool] {
+	if stmt.BoolExpr.Type() != scope2.Typ[types.Bool] {
 		msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", stmt.BoolExpr)
 		v.err.AddError(stmt.BoolExpr.Pos(), msg)
 	}
@@ -546,7 +547,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 
 	for _, elsif := range stmt.ElseIfBranches {
 		elsif.BoolExpr.Accept(v)
-		if elsif.BoolExpr.Type() != scope.Typ[types.Bool] {
+		if elsif.BoolExpr.Type() != scope2.Typ[types.Bool] {
 			msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", elsif.BoolExpr)
 			v.err.AddError(elsif.BoolExpr.Pos(), msg)
 		}
@@ -561,7 +562,7 @@ func (v *Visitor) VisitIfStmt(stmt *ast.IfStmt) {
 	}
 }
 
-func (v *Visitor) VisitAssignStmt(stmt *ast.AssignStmt) {
+func (v *Visitor) VisitAssignStmt(stmt *ast.AssignmentStmt) {
 	stmt.LValue.Accept(v)
 	stmt.RValue.Accept(v)
 
@@ -578,7 +579,7 @@ func (v *Visitor) VisitLoopStmt(stmt *ast.LoopStmt) {
 
 func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
 	stmt.BoolExpr.Accept(v)
-	if stmt.BoolExpr.Type() != scope.Typ[types.Bool] {
+	if stmt.BoolExpr.Type() != scope2.Typ[types.Bool] {
 		msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", stmt.BoolExpr)
 		v.err.AddError(stmt.BoolExpr.Pos(), msg)
 	}
@@ -590,7 +591,7 @@ func (v *Visitor) VisitRepeatStmt(stmt *ast.RepeatStmt) {
 
 func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 	stmt.BoolExpr.Accept(v)
-	if stmt.BoolExpr.Type() != scope.Typ[types.Bool] {
+	if stmt.BoolExpr.Type() != scope2.Typ[types.Bool] {
 		msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", stmt.BoolExpr)
 		v.err.AddError(stmt.BoolExpr.Pos(), msg)
 	}
@@ -601,7 +602,7 @@ func (v *Visitor) VisitWhileStmt(stmt *ast.WhileStmt) {
 
 	for _, elsif := range stmt.ElsIfs {
 		elsif.BoolExpr.Accept(v)
-		if elsif.BoolExpr.Type() != scope.Typ[types.Bool] {
+		if elsif.BoolExpr.Type() != scope2.Typ[types.Bool] {
 			msg := fmt.Sprintf("expression '%v' does not evaluate to a boolean", elsif.BoolExpr)
 			v.err.AddError(elsif.BoolExpr.Pos(), msg)
 		}
@@ -672,14 +673,14 @@ func (v *Visitor) VisitWithStmt(stmt *ast.WithStmt) {
 	panic("not implemented")
 }
 
-func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
+func (v *Visitor) VisitProcCall(call *ast.ProcedureCall) {
 	call.Callee.Accept(v)
 	for _, param := range call.ActualParams {
 		param.Accept(v)
 	}
 
-	if call.Callee.Type() != scope.Typ[types.Invalid] {
-		sig, ok := call.Callee.Type().(*ast.Signature)
+	if call.Callee.Type() != scope2.Typ[types.Invalid] {
+		sig, ok := call.Callee.Type().(*types.Signature)
 		if !ok {
 			v.err.AddError(call.Pos(), fmt.Sprintf("cannot call a non-procedure %v", call.Callee.String()))
 		}
@@ -708,10 +709,10 @@ func (v *Visitor) VisitProcCall(call *ast.ProcCall) {
 	}
 }
 
-func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
+func (v *Visitor) VisitProcDecl(decl *ast.ProcedureDecl) {
 	if decl.Head.Rcv == nil {
-		sig := ast.NewSignature(decl.Head.Rcv, decl.Head.FP)
-		obj := v.env.Insert(scope.NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props(), v.offset))
+		sig := types.NewSignature(decl.Head.Rcv, decl.Head.FP)
+		obj := v.env.Insert(scope2.NewProcedure(decl.Pos(), decl.Head.Name.Name, sig, decl.Head.Name.Props(), v.offset))
 		if obj != nil {
 			v.err.AddError(decl.Pos(), fmt.Sprintf("name %s already declared at %v", obj.String(), obj.Pos()))
 		} else {
@@ -727,7 +728,7 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 	// create a new scope to accommodate the symbols in the procedure. Make this new scope
 	// the current scope (v.env) so that subsequent insertions of symbols will go into this
 	// scope while we are processing the procedure.
-	v.env = scope.NewScope(v.env, decl.Head.Name.Name)
+	v.env = scope2.NewScope(v.env, decl.Head.Name.Name)
 
 	decl.Head.Accept(v)
 
@@ -746,11 +747,11 @@ func (v *Visitor) VisitProcDecl(decl *ast.ProcDecl) {
 	v.offset = off
 }
 
-func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
+func (v *Visitor) VisitVarDecl(decl *ast.VariableDecl) {
 	decl.Type.Accept(v)
 
 	for _, ident := range decl.IdentList {
-		obj := v.env.Insert(scope.NewVar(ident.Pos(), ident.Name, decl.Type.Type(), ident.Props(), v.offset))
+		obj := v.env.Insert(scope2.NewVar(ident.Pos(), ident.Name, decl.Type.Type(), ident.Props(), v.offset))
 		if obj != nil {
 			v.err.AddError(decl.Pos(), fmt.Sprintf("variable name '%s' already declared at '%v'", obj.String(), obj.Pos()))
 		} else {
@@ -759,10 +760,10 @@ func (v *Visitor) VisitVarDecl(decl *ast.VarDecl) {
 	}
 }
 
-func (v *Visitor) VisitConstDecl(decl *ast.ConstDecl) {
+func (v *Visitor) VisitConstDecl(decl *ast.ConstantDecl) {
 	decl.Value.Accept(v)
 
-	obj := v.env.Insert(scope.NewConst(decl.Name.NamePos, decl.Name.Name, decl.Value.Type(), decl.Name.Props(), decl.Value, v.offset))
+	obj := v.env.Insert(scope2.NewConst(decl.Name.NamePos, decl.Name.Name, decl.Value.Type(), decl.Name.Props(), decl.Value, v.offset))
 	if obj != nil {
 		msg := fmt.Sprintf("name '%s' already declared at '%v'", obj.String(), obj.Pos())
 		v.err.AddError(decl.Pos(), msg)
@@ -774,7 +775,7 @@ func (v *Visitor) VisitConstDecl(decl *ast.ConstDecl) {
 func (v *Visitor) VisitTypeDecl(decl *ast.TypeDecl) {
 	decl.DenotedType.Accept(v)
 
-	obj := v.env.Insert(scope.NewTypeName(decl.Type, decl.Name.Name, decl.DenotedType.Type(), decl.Name.Props(), v.offset))
+	obj := v.env.Insert(scope2.NewTypeName(decl.Type, decl.Name.Name, decl.DenotedType.Type(), decl.Name.Props(), v.offset))
 	if obj != nil {
 		msg := fmt.Sprintf("name '%s' already declared at '%v'", obj.String(), obj.Pos())
 		v.err.AddError(decl.Pos(), msg)
@@ -826,7 +827,7 @@ func (v *Visitor) VisitArrayType(a *ast.ArrayType) {
 	a.EType = NewArray(a.ElemType.Type(), a.LenList)
 }
 
-func (v *Visitor) VisitProcType(p *ast.ProcType) {
+func (v *Visitor) VisitProcType(p *ast.ProcedureType) {
 	for _, sec := range p.FP.Params {
 		sec.Type.Accept(v)
 
@@ -838,9 +839,9 @@ func (v *Visitor) VisitProcType(p *ast.ProcType) {
 			}
 
 			if sec.Mod == token.IN {
-				v.env.Insert(scope.NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
+				v.env.Insert(scope2.NewConst(name.NamePos, name.Name, sec.Type.Type(), name.Props(), nil, v.offset))
 			} else {
-				v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
+				v.env.Insert(scope2.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
 			}
 
 			v.offset += sec.Type.Type().Width()
@@ -869,7 +870,7 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 	var (
 		base     *Record
 		baseOk   bool
-		baseFlds *scope.RecordSymTable
+		baseFlds *scope2.RecordSymTable
 	)
 
 	// entering a new scope. store the current offset and reset v.offset to be used in the new scope
@@ -896,7 +897,7 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 		baseFlds = base.fields
 	}
 
-	ty := NewRecordType(scope.NewRecordScope(baseFlds, v.env), base)
+	ty := NewRecordType(scope2.NewRecordScope(baseFlds, v.env), base)
 
 	for _, field := range r.Fields {
 		field.Type.Accept(v)
@@ -906,7 +907,7 @@ func (v *Visitor) VisitRecordType(r *ast.RecordType) {
 		}
 
 		for _, id := range field.IdList {
-			obj := ty.fields.Insert(scope.NewVar(id.NamePos, id.Name, field.Type.Type(), id.IProps, v.offset))
+			obj := ty.fields.Insert(scope2.NewVar(id.NamePos, id.Name, field.Type.Type(), id.IProps, v.offset))
 			if obj != nil {
 				msg := fmt.Sprintf("field name '%s' already declared at '%v'", id.Name, obj.Pos())
 				v.err.AddError(id.NamePos, msg)
@@ -934,7 +935,7 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 			EType: types.NewBasicType(types.Int, types.IsInteger, "integer"),
 		}
 
-		obj := v.env.Insert(scope.NewConst(c.NamePos, c.Name, ty, c.Props(), value, v.offset))
+		obj := v.env.Insert(scope2.NewConst(c.NamePos, c.Name, ty, c.Props(), value, v.offset))
 		if obj != nil {
 			msg := fmt.Sprintf("name '%s' already declared at '%v'", c.Name, obj.Pos())
 			v.err.AddError(c.NamePos, msg)
@@ -946,14 +947,14 @@ func (v *Visitor) VisitEnumType(e *ast.EnumType) {
 	e.EType = ty
 }
 
-func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
+func (v *Visitor) VisitProcHead(head *ast.ProcedureHeading) {
 	if head.Rcv != nil {
 		head.Rcv.Type.Accept(v)
 
 		switch ty := head.Rcv.Type.Type().(type) {
 		case *Record:
-			sig := ast.NewSignature(head.Rcv, head.FP)
-			ty.fields.Insert(scope.NewProcedure(head.Name.NamePos, head.Name.Name, sig, head.Name.IProps, v.offset))
+			sig := types.NewSignature(head.Rcv, head.FP)
+			ty.fields.Insert(scope2.NewProcedure(head.Name.NamePos, head.Name.Name, sig, head.Name.IProps, v.offset))
 		case *types.PtrType:
 			rec, recOk := ty.UTy.(*Record)
 			if !recOk {
@@ -961,18 +962,18 @@ func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
 				v.err.AddError(head.Rcv.Type.Pos(), msg)
 			}
 
-			sig := ast.NewSignature(head.Rcv, head.FP)
-			rec.fields.Insert(scope.NewProcedure(head.Name.NamePos, head.Name.Name, sig, head.Name.IProps, v.offset))
+			sig := types.NewSignature(head.Rcv, head.FP)
+			rec.fields.Insert(scope2.NewProcedure(head.Name.NamePos, head.Name.Name, sig, head.Name.IProps, v.offset))
 		default:
 			msg := fmt.Sprintf("receiver must be a (pointer to) record type, got '%s'", ty)
 			v.err.AddError(head.Rcv.Type.Pos(), msg)
 		}
 
-		var sym scope.Symbol
+		var sym scope2.Symbol
 		if head.Rcv.Mod == token.IN {
-			sym = scope.NewVar(head.Rcv.Var.NamePos, head.Rcv.Var.Name, head.Rcv.Type.Type(), ast.ReadOnly, v.offset)
+			sym = scope2.NewVar(head.Rcv.Var.NamePos, head.Rcv.Var.Name, head.Rcv.Type.Type(), ast.ReadOnly, v.offset)
 		} else {
-			sym = scope.NewVar(head.Rcv.Var.NamePos, head.Rcv.Var.Name, head.Rcv.Type.Type(), head.Rcv.Var.IProps, v.offset)
+			sym = scope2.NewVar(head.Rcv.Var.NamePos, head.Rcv.Var.Name, head.Rcv.Type.Type(), head.Rcv.Var.IProps, v.offset)
 		}
 
 		v.offset += head.Rcv.Type.Type().Width()
@@ -992,9 +993,9 @@ func (v *Visitor) VisitProcHead(head *ast.ProcHead) {
 			}
 
 			if sec.Mod == token.IN {
-				v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), ast.ReadOnly, v.offset))
+				v.env.Insert(scope2.NewVar(name.Pos(), name.Name, sec.Type.Type(), ast.ReadOnly, v.offset))
 			} else {
-				v.env.Insert(scope.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
+				v.env.Insert(scope2.NewVar(name.Pos(), name.Name, sec.Type.Type(), name.Props(), v.offset))
 			}
 
 			v.offset += sec.Type.Type().Width()
@@ -1012,8 +1013,8 @@ func (v *Visitor) VisitImport(imp *ast.Import) {
 	}
 
 	scp := v.scopes[imp.Name.Name]
-	v.env.Insert(scope.NewModule(nil, imp.Alias.Name, scp))
-	v.env.Insert(scope.NewModule(nil, imp.Name.Name, scp))
+	v.env.Insert(scope2.NewModule(nil, imp.Alias.Name, scp))
+	v.env.Insert(scope2.NewModule(nil, imp.Name.Name, scp))
 }
 
 func (v *Visitor) VisitExprRange(rng *ast.ExprRange) {

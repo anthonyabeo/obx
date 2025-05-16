@@ -15,8 +15,9 @@ const (
 	Exported IdentProps = 1 << iota
 	ReadOnly
 	Predeclared
+	Unexported
 
-	ExRdOnly = Exported | ReadOnly
+	ExportedReadOnly = Exported | ReadOnly
 )
 
 type (
@@ -26,13 +27,13 @@ type (
 	}
 
 	BasicLit struct {
-		Kind token.Token // token.INT, token.REAL, token.HEXCHAR, or token.STRING
-		Val  string      // literal string; e.g. 42, 0x7f, 3.14, 1e-9, 2.4i, 'a', '\x7f', "foo" or `\m\n\o`
+		Kind token.Kind // token.INT, token.REAL, token.HEXCHAR, or token.STRING
+		Val  string     // literal string; e.g. 42, 0x7f, 3.14, 1e-9, 2.4i, 'a', '\x7f', "foo" or `\m\n\o`
 	}
 
 	BinaryExpr struct {
-		Left, Right Expression  // operands
-		Op          token.Token // operator
+		Left, Right Expression // operands
+		Op          token.Kind // operator
 	}
 
 	FunctionCall struct {
@@ -55,7 +56,7 @@ type (
 	}
 
 	UnaryExpr struct {
-		Op      token.Token
+		Op      token.Kind
 		Operand Expression
 	}
 
@@ -66,6 +67,21 @@ type (
 
 	BadExpr struct{}
 )
+
+// func (id *IdentifierDef) expr()              {}
+// func (id *IdentifierDef) Accept(vst Visitor) { vst.VisitIdentifierDef(id) }
+func (id *IdentifierDef) String() string {
+	name := id.Name
+	switch id.Props {
+	case ExportedReadOnly:
+		name += "-"
+	case Exported:
+		name += "*"
+	default:
+	}
+
+	return name
+}
 
 func (e *ExprRange) String() string     { return fmt.Sprintf("%s..%s", e.Beg, e.End) }
 func (e *ExprRange) Accept(vst Visitor) { vst.VisitExprRange(e) }
@@ -92,7 +108,12 @@ func (f *FunctionCall) String() string {
 
 func (q *QualifiedIdent) Accept(vst Visitor) { vst.VisitQualifiedIdent(q) }
 func (q *QualifiedIdent) expr()              {}
-func (q *QualifiedIdent) String() string     { return fmt.Sprintf("%v::%v", q.Prefix, q.Name) }
+func (q *QualifiedIdent) String() string {
+	if q.Prefix == "" {
+		return q.Name
+	}
+	return fmt.Sprintf("%v.%v", q.Prefix, q.Name)
+}
 
 func (s *Set) expr() {}
 func (s *Set) String() string {

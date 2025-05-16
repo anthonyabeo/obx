@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+	scope2 "github.com/anthonyabeo/obx/src/scope"
 	"strconv"
 
 	"github.com/anthonyabeo/obx/src/sema/scope"
@@ -26,8 +27,8 @@ func (v *Visitor) sameType(Ta, Tb types.Type) bool {
 	}
 
 	sym := v.env.Lookup(Ta.String())
-	if sym != nil && sym.Kind() == scope.TYPE {
-		ty := sym.(*scope.TypeName)
+	if sym != nil && sym.Kind() == scope2.TYPE {
+		ty := sym.(*scope2.TypeName)
 		if ty.Type().String() == Tb.String() {
 			return true
 		}
@@ -182,7 +183,7 @@ func (v *Visitor) directExt(baseTy, extTy types.Type) bool {
 	}
 
 	sym := v.env.Lookup(extTy.String())
-	if sym == nil || sym.Kind() != scope.TYPE {
+	if sym == nil || sym.Kind() != scope2.TYPE {
 		return false
 	}
 
@@ -275,27 +276,27 @@ func (v *Visitor) resultTypeMatch(a, b types.Type) bool {
 }
 
 func (v *Visitor) checkFuncBuiltin(b *scope.Builtin, call *ast.FuncCall) {
-	proc := scope.PredeclaredProcedures[b.Id]
+	proc := scope2.PredeclaredProcedures[b.Id]
 
 	switch b.Id {
-	case scope.Abs_:
-	case scope.Cap_:
-	case scope.BitAnd_:
-	case scope.BitAsr_:
-	case scope.BitNot_:
-	case scope.BitOr_:
-	case scope.Bits_:
-	case scope.BitShl_:
-	case scope.BitShr_:
-	case scope.BitXor_:
-	case scope.Cast_:
-	case scope.Chr_:
-	case scope.Default_:
-	case scope.Floor_:
-	case scope.Flt_:
-	case scope.LdCmd_:
-	case scope.LdMod_:
-	case scope.Len_:
+	case scope2.Abs_:
+	case scope2.Cap_:
+	case scope2.BitAnd_:
+	case scope2.BitAsr_:
+	case scope2.BitNot_:
+	case scope2.BitOr_:
+	case scope2.Bits_:
+	case scope2.BitShl_:
+	case scope2.BitShr_:
+	case scope2.BitXor_:
+	case scope2.Cast_:
+	case scope2.Chr_:
+	case scope2.Default_:
+	case scope2.Floor_:
+	case scope2.Flt_:
+	case scope2.LdCmd_:
+	case scope2.LdMod_:
+	case scope2.Len_:
 		if len(call.ActualParams) != 1 && len(call.ActualParams) != 2 {
 			v.err.AddError(call.Pos(), fmt.Sprintf("invalid number of arguments to procedure call '%v'", proc.Name))
 		}
@@ -334,20 +335,20 @@ func (v *Visitor) checkFuncBuiltin(b *scope.Builtin, call *ast.FuncCall) {
 			}
 		}
 
-		call.EType = scope.Typ[types.Int32]
-	case scope.Long_:
-	case scope.Max_:
-	case scope.Min_:
-	case scope.Odd_:
-	case scope.Ord_:
+		call.EType = scope2.Typ[types.Int32]
+	case scope2.Long_:
+	case scope2.Max_:
+	case scope2.Min_:
+	case scope2.Odd_:
+	case scope2.Ord_:
 		obj := v.env.Lookup(call.ActualParams[0].String())
-		if obj == nil || obj.Kind() != scope.CONST {
+		if obj == nil || obj.Kind() != scope2.CONST {
 			msg := fmt.Sprintf("'%s' is not recognised as an enumeration variant", call.ActualParams[0].String())
 			v.err.AddError(call.ActualParams[0].Pos(), msg)
 			v.err.AddError(call.ActualParams[0].Pos(), msg)
 		}
 
-		bl, ok := obj.(*scope.Const).Value().(*ast.BasicLit)
+		bl, ok := obj.(*scope2.Const).Value().(*ast.BasicLit)
 		if !ok {
 			msg := fmt.Sprintf("ordinal value of enum variant '%s' is not an integer", call.ActualParams[0].String())
 			v.err.AddError(call.ActualParams[0].Pos(), msg)
@@ -360,31 +361,31 @@ func (v *Visitor) checkFuncBuiltin(b *scope.Builtin, call *ast.FuncCall) {
 			v.err.AddError(call.ActualParams[0].Pos(), msg)
 		}
 
-		call.EType = scope.Typ[types.Int]
-	case scope.Short_:
-	case scope.Size_:
-	case scope.StrLen_:
-	case scope.WChr_:
-	case scope.ASh_:
-	case scope.ASr_:
-	case scope.Entier_:
-	case scope.Lsl_:
-	case scope.Ror_:
+		call.EType = scope2.Typ[types.Int]
+	case scope2.Short_:
+	case scope2.Size_:
+	case scope2.StrLen_:
+	case scope2.WChr_:
+	case scope2.ASh_:
+	case scope2.ASr_:
+	case scope2.Entier_:
+	case scope2.Lsl_:
+	case scope2.Ror_:
 	}
 }
 
-func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcCall) {
-	proc := scope.PredeclaredProcedures[b.Id]
+func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcedureCall) {
+	proc := scope2.PredeclaredProcedures[b.Id]
 
 	switch b.Id {
-	case scope.Assert_:
+	case scope2.Assert_:
 		if len(call.ActualParams) != 1 && len(call.ActualParams) != 2 {
 			v.err.AddError(call.Pos(), fmt.Sprintf("invalid number of arguments to procedure call '%v'", proc.Name))
 		}
 
-		if !v.assignCompat(scope.Typ[types.Bool], call.ActualParams[0].Type()) {
+		if !v.assignCompat(scope2.Typ[types.Bool], call.ActualParams[0].Type()) {
 			msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
-				call.ActualParams[0], scope.Typ[types.Bool])
+				call.ActualParams[0], scope2.Typ[types.Bool])
 			v.err.AddError(call.ActualParams[0].Pos(), msg)
 		}
 
@@ -403,11 +404,11 @@ func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcCall) {
 				v.err.AddError(call.ActualParams[0].Pos(), msg)
 			}
 		}
-	case scope.Bytes_:
-	case scope.Dec_:
-	case scope.Excl_:
-	case scope.Halt_:
-	case scope.Inc_:
+	case scope2.Bytes_:
+	case scope2.Dec_:
+	case scope2.Excl_:
+	case scope2.Halt_:
+	case scope2.Inc_:
 		if len(call.ActualParams) != 1 && len(call.ActualParams) != 2 {
 			v.err.AddError(call.Pos(), fmt.Sprintf("invalid number of arguments to procedure call '%v'", proc.Name))
 		}
@@ -429,8 +430,8 @@ func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcCall) {
 				v.err.AddError(call.ActualParams[1].Pos(), msg)
 			}
 		}
-	case scope.Incl_:
-	case scope.New_:
+	case scope2.Incl_:
+	case scope2.New_:
 		if len(call.ActualParams) == 1 {
 			switch ty := call.ActualParams[0].Type().(type) {
 			case *types.PtrType:
@@ -475,11 +476,11 @@ func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcCall) {
 				}
 			}
 		}
-	case scope.Number_:
-	case scope.PCall_:
-	case scope.Raise_:
-	case scope.Copy_:
-	case scope.Pack_:
-	case scope.UnPk_:
+	case scope2.Number_:
+	case scope2.PCall_:
+	case scope2.Raise_:
+	case scope2.Copy_:
+	case scope2.Pack_:
+	case scope2.UnPk_:
 	}
 }

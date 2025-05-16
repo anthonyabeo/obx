@@ -3,6 +3,7 @@ package scope
 import (
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	//"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
 var offset = 0
@@ -34,19 +35,19 @@ var AliasTypes = []*types.Basic{
 
 func defPredeclaredTypes() {
 	for _, t := range Typ {
-		Global.Insert(NewTypeName(nil, t.Name(), t, ast.Predeclared, offset))
+		Global.Insert(NewTypeName(t.Name(), t, ast.Predeclared, offset))
 	}
 
 	for _, t := range AliasTypes {
-		Global.Insert(NewTypeName(nil, t.Name(), t, ast.Predeclared, offset))
+		Global.Insert(NewTypeName(t.Name(), t, ast.Predeclared, offset))
 	}
 }
 
-// A BuiltinId is the id of a builtin function.
-type BuiltinId int
+// A PreDeclFuncProc is the id of a predeclared function or procedure.
+type PreDeclFuncProc int
 
 const (
-	Assert_ BuiltinId = iota
+	Assert_ PreDeclFuncProc = iota
 	Bytes_
 	Dec_
 	Excl_
@@ -157,9 +158,9 @@ var PredeclaredProcedures = [...]struct {
 
 func defPredeclaredProcedures() {
 	for i := range PredeclaredProcedures {
-		id := BuiltinId(i)
+		id := PreDeclFuncProc(i)
 
-		Global.Insert(NewBuiltin(id))
+		Global.Insert(NewPreDeclFuncProc(id))
 	}
 }
 

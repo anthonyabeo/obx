@@ -10,7 +10,7 @@ import (
 
 type (
 	NamedType struct {
-		Name Expression
+		Name *QualifiedIdent
 	}
 
 	BasicType struct {
@@ -22,7 +22,7 @@ type (
 		ElemType Type
 	}
 
-	ProcType struct {
+	ProcedureType struct {
 		FP *FormalParams
 	}
 
@@ -47,12 +47,14 @@ type (
 	BadType struct{}
 )
 
-func NewNamedType(name Expression) *NamedType {
+func NewNamedType(name *QualifiedIdent) *NamedType {
 	return &NamedType{Name: name}
 }
 
+func (n *NamedType) Width() int         { panic("implement me") }
 func (n *NamedType) String() string     { return n.Name.String() }
 func (n *NamedType) Accept(vst Visitor) { vst.VisitNamedType(n) }
+func (n *NamedType) typ()               {}
 
 func NewBasicType(name string) *BasicType {
 	return &BasicType{name: name}
@@ -61,6 +63,21 @@ func NewBasicType(name string) *BasicType {
 func (b *BasicType) Name() string       { return b.name }
 func (b *BasicType) String() string     { return b.name }
 func (b *BasicType) Accept(vst Visitor) { vst.VisitBasicType(b) }
+func (b *BasicType) typ()               {}
+func (b *BasicType) Width() int {
+	switch b.name {
+	case "byte", "int8", "bool", "char":
+		return 1
+	case "int16", "wchar":
+		return 2
+	case "int", "real", "set":
+		return 4
+	case "int64", "lreal":
+		return 8
+	default:
+		panic(fmt.Sprintf("'%s' is not a basic type", b.name))
+	}
+}
 
 func NewArray(lenList *LenList, elem Type) *ArrayType {
 	return &ArrayType{LenList: lenList, ElemType: elem}
@@ -77,17 +94,28 @@ func (a *ArrayType) String() string {
 	return fmt.Sprintf("[%s]%s", strings.Join(ll, ", "), a.ElemType)
 }
 func (a *ArrayType) Accept(vst Visitor) { vst.VisitArrayType(a) }
+func (a *ArrayType) typ()               {}
+func (a *ArrayType) Width() int         { panic("implement me") }
 
 type LenList struct {
-	Modifier token.Token
+	Modifier token.Kind
 	List     []Expression
 }
 
-func (p *ProcType) String() string     { panic("not implemented") }
-func (p *ProcType) Accept(vst Visitor) { vst.VisitProcType(p) }
+func (p *ProcedureType) String() string {
+	if p.FP == nil {
+		return "procedure"
+	}
+	return fmt.Sprintf("procedure%s", p.FP.String())
+}
+func (p *ProcedureType) Accept(vst Visitor) { vst.VisitProcType(p) }
+func (p *ProcedureType) typ()               {}
+func (p *ProcedureType) Width() int         { panic("implement me") }
 
 func (p *PointerType) String() string     { return fmt.Sprintf("^%s", p.Base) }
 func (p *PointerType) Accept(vst Visitor) { vst.VisitPointerType(p) }
+func (p *PointerType) typ()               {}
+func (p *PointerType) Width() int         { panic("implement me") }
 
 func (r *RecordType) String() string {
 	buf := new(bytes.Buffer)
@@ -109,9 +137,15 @@ func (r *RecordType) String() string {
 	return buf.String()
 }
 func (r *RecordType) Accept(vst Visitor) { vst.VisitRecordType(r) }
+func (r *RecordType) typ()               {}
+func (r *RecordType) Width() int         { panic("implement me") }
 
-func (e *EnumType) String() string     { panic("not implemented") }
+func (e *EnumType) String() string     { return fmt.Sprintf("enum(%s)", strings.Join(e.Variants, ", ")) }
 func (e *EnumType) Accept(vst Visitor) { vst.VisitEnumType(e) }
+func (e *EnumType) typ()               {}
+func (e *EnumType) Width() int         { panic("implement me") }
 
-func (b *BadType) String() string { panic("implement me") }
-func (b *BadType) Accept(Visitor) { panic("implement me") }
+func (b *BadType) String() string { return "<BadType>" }
+func (b *BadType) Accept(Visitor) {}
+func (b *BadType) typ()           {}
+func (b *BadType) Width() int     { panic("implement me") }

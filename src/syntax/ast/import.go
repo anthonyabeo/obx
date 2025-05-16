@@ -20,16 +20,6 @@ func (imp *Import) String() string {
 		buf.WriteString(" := ")
 	}
 
-	var path []string
-	for _, id := range imp.ImportPath {
-		path = append(path, id)
-	}
-
-	if len(path) > 0 {
-		buf.WriteString(strings.Join(path, "."))
-		buf.WriteString(".")
-	}
-
 	buf.WriteString(imp.Name)
 	if len(imp.Meta) > 0 {
 		var metas []string

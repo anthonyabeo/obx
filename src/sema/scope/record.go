@@ -1,11 +1,9 @@
-package sema
+package types
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/anthonyabeo/obx/src/sema/scope"
-	"github.com/anthonyabeo/obx/src/sema/types"
+	"strings"
 )
 
 type Record struct {
@@ -26,7 +24,7 @@ func (r Record) String() string {
 	return fmt.Sprintf("{%s}", strings.Join(fields, "; "))
 }
 
-func (r Record) Underlying() types.Type {
+func (r Record) Underlying() Type {
 	return r
 }
 
