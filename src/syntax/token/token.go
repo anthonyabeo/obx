@@ -53,7 +53,6 @@ const (
 	RETURN
 	ELSE
 	IF
-
 	VAR
 	THEN
 	DEFINITION
@@ -79,6 +78,11 @@ const (
 	OF
 	TO
 
+	OR
+	IN
+	DIV
+	IS
+
 	INTEGER
 	INT32
 	INT64
@@ -90,11 +94,9 @@ const (
 	MINUS
 	STAR
 	QUOT
-	DIV
 	MOD
 
 	// Logical
-	OR
 	AND
 	NOT
 
@@ -105,8 +107,6 @@ const (
 	LEQ
 	GREAT
 	GEQ
-	IN
-	IS
 
 	CARET
 	operator_end
