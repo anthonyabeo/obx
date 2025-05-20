@@ -98,7 +98,7 @@ func (s *Scanner) peek() rune {
 
 func (s *Scanner) errorf(format string, args ...interface{}) StateFn {
 	s.items <- token.Token{Kind: token.ILLEGAL, Val: fmt.Sprintf(format, args...)}
-	return nil
+	return scanText
 }
 
 func Scan(name, input string) *Scanner {
