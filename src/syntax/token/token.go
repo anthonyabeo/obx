@@ -41,7 +41,6 @@ const (
 	CHAR_LIT
 	HEX_STR_LIT
 	STR_LIT
-	NIL
 	literal_end
 
 	keyword_beg
@@ -77,11 +76,13 @@ const (
 	BY
 	OF
 	TO
+	NIL
 
 	OR
 	IN
 	DIV
 	IS
+	MOD
 
 	INTEGER
 	INT32
@@ -94,13 +95,10 @@ const (
 	MINUS
 	STAR
 	QUOT
-	MOD
 
-	// Logical
 	AND
 	NOT
 
-	// Relational
 	EQUAL
 	NEQ
 	LESS
