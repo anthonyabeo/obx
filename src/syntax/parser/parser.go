@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/diagnostics"
@@ -11,15 +12,19 @@ import (
 
 type Parser struct {
 	err     diagnostics.ErrReporter
+	envs    map[string]*ast.Environment
+	env     *ast.Environment
 	scanner *scan.Scanner
 
 	// Next token
 	tok token.Kind
 	lit string
+
+	list []ast.Expression
 }
 
-func NewParser(lex *scan.Scanner, rpt diagnostics.ErrReporter) *Parser {
-	p := &Parser{scanner: lex, err: rpt}
+func NewParser(scanner *scan.Scanner, rpt diagnostics.ErrReporter, env *ast.Environment, envs map[string]*ast.Environment) *Parser {
+	p := &Parser{scanner: scanner, err: rpt, env: env, envs: envs}
 	p.next()
 
 	return p
@@ -195,6 +200,17 @@ func (p *Parser) parseImportList() []*ast.Import {
 		p.next()
 	}
 
+	// add module imports to the environment
+	for _, imp := range list {
+		if sym := p.env.Insert(ast.NewModuleSymbol(imp.Name)); sym != nil {
+			p.errorExpected("duplicate module import")
+		}
+
+		if sym := p.env.Insert(ast.NewModuleSymbol(imp.Alias)); sym != nil {
+			p.errorExpected("duplicate module import")
+		}
+	}
+
 	return list
 }
 
@@ -344,35 +360,45 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 
 // TypeDeclaration = identdef '=' type
 func (p *Parser) parseTypeDecl() *ast.TypeDecl {
-	return &ast.TypeDecl{
-		Name: p.parseIdentifierDef(),
-		DenotedType: func() ast.Type {
-			p.match(token.EQUAL)
-			return p.parseType()
-		}(),
+	name := p.parseIdentifierDef()
+	p.match(token.EQUAL)
+	Typ := p.parseType()
+
+	if sym := p.env.Insert(ast.NewTypeSymbol(name.Name, name.Props, Typ)); sym != nil {
+		p.errorExpected("duplicate type declaration " + name.Name)
 	}
+
+	return &ast.TypeDecl{Name: name, DenotedType: Typ}
 }
 
 // ConstDeclaration = identdef '=' ConstExpression
 func (p *Parser) parseConstantDecl() *ast.ConstantDecl {
-	return &ast.ConstantDecl{
-		Name: p.parseIdentifierDef(),
-		Value: func() ast.Expression {
-			p.match(token.EQUAL)
-			return p.parseExpression()
-		}(),
+	name := p.parseIdentifierDef()
+	p.match(token.EQUAL)
+	value := p.parseExpression()
+
+	if sym := p.env.Insert(ast.NewConstantSymbol(name.Name, name.Props, value)); sym != nil {
+		p.errorExpected("duplicate constant declaration " + name.Name)
 	}
+
+	return &ast.ConstantDecl{Name: name, Value: value}
 }
 
 // VariableDeclaration = IdentList ':' type
-func (p *Parser) parseVariableDecl() (v *ast.VariableDecl) {
-	return &ast.VariableDecl{
-		IdentList: p.parseIdentList(),
-		Type: func() ast.Type {
-			p.match(token.COLON)
-			return p.parseType()
-		}(),
+func (p *Parser) parseVariableDecl() *ast.VariableDecl {
+	decl := &ast.VariableDecl{IdentList: p.parseIdentList()}
+	p.match(token.COLON)
+	decl.Type = p.parseType()
+
+	// add the variables to the environment
+	for _, id := range decl.IdentList {
+		sym := p.env.Insert(ast.NewVariableSymbol(id.Name, id.Props, decl.Type))
+		if sym != nil {
+			p.errorExpected("duplicate variable declaration " + id.Name)
+		}
 	}
+
+	return decl
 }
 
 func (p *Parser) parseType() (ty ast.Type) {
@@ -468,28 +494,107 @@ func (p *Parser) parseArrayType() *ast.ArrayType {
 
 func (p *Parser) parseRecordType() *ast.RecordType {
 	rec := &ast.RecordType{}
-
 	p.match(token.RECORD)
 
-	if p.tok == token.LPAREN {
-		p.next()
-		rec.Base = p.parseNamedType()
-		p.match(token.RPAREN)
-	}
+	baseEnv := p.parseRecordBase(rec)
+	rec.Env = ast.NewRecordEnv(baseEnv, p.env)
 
 	if p.tok == token.IDENTIFIER {
-		rec.Fields = append(rec.Fields, p.fieldList())
-		for p.tok == token.SEMICOLON || p.tok == token.IDENTIFIER {
-			if p.tok == token.SEMICOLON {
-				p.next()
-			}
-			rec.Fields = append(rec.Fields, p.fieldList())
-		}
+		rec.Fields = p.parseRecordFields()
 	}
 
 	p.match(token.END)
+	p.addFieldsToEnv(rec)
 
 	return rec
+}
+
+func (p *Parser) parseRecordBase(rec *ast.RecordType) *ast.RecordEnv {
+	if p.tok != token.LPAREN {
+		return nil
+	}
+
+	p.next()
+	rec.Base = p.parseNamedType()
+	p.match(token.RPAREN)
+
+	baseType, ok := rec.Base.(*ast.NamedType)
+	if !ok {
+		p.errorExpected("named type")
+		return nil
+	}
+
+	base := p.lookupBaseType(baseType)
+	if base == nil {
+		return nil
+	}
+
+	recordType := p.getRecordType(base)
+	if recordType == nil {
+		return nil
+	}
+
+	return recordType.Env
+}
+
+func (p *Parser) lookupBaseType(baseType *ast.NamedType) ast.Symbol {
+	if env, ok := p.envs[baseType.Name.Prefix]; ok {
+		base := env.Lookup(baseType.Name.Name)
+		if base == nil || base.Props() != ast.Exported {
+			p.errorExpected(fmt.Sprintf("object %s is not exported", baseType.Name))
+			p.advance(declStart)
+			return nil
+		}
+		return base
+	}
+
+	return p.env.Lookup(baseType.Name.Name)
+}
+
+func (p *Parser) getRecordType(base ast.Symbol) *ast.RecordType {
+	typeSymbol, ok := base.(*ast.TypeSymbol)
+	if !ok || typeSymbol == nil {
+		p.errorExpected("record type")
+		p.advance(declStart)
+		return nil
+	}
+
+	switch ty := typeSymbol.Type().(type) {
+	case *ast.RecordType:
+		return ty
+	case *ast.PointerType:
+		if recordType, ok := ty.Base.(*ast.RecordType); ok {
+			return recordType
+		}
+	}
+
+	p.errorExpected("record type")
+	p.advance(declStart)
+	return nil
+}
+
+func (p *Parser) parseRecordFields() []*ast.FieldList {
+	var fields []*ast.FieldList
+	fields = append(fields, p.fieldList())
+
+	for p.tok == token.SEMICOLON || p.tok == token.IDENTIFIER {
+		if p.tok == token.SEMICOLON {
+			p.next()
+		}
+		fields = append(fields, p.fieldList())
+	}
+	return fields
+}
+
+func (p *Parser) addFieldsToEnv(rec *ast.RecordType) {
+	for _, field := range rec.Fields {
+		for _, id := range field.List {
+			sym := rec.Env.Insert(ast.NewFieldSymbol(id.Name, id.Props, field.Type))
+			if sym != nil {
+				p.errorExpected("duplicate field declaration")
+			}
+		}
+	}
 }
 
 func (p *Parser) fieldList() *ast.FieldList {
@@ -567,31 +672,44 @@ func (p *Parser) parseTerm() (expr ast.Expression) {
 }
 
 // factor = literal | designator [ActualParameters] | '(' expression ')' | '~' factor
-func (p *Parser) parseFactor() (expr ast.Expression) {
+func (p *Parser) parseFactor() ast.Expression {
 	switch p.tok {
 	case token.NOT:
 		p.next()
-		expr = &ast.UnaryExpr{Op: token.NOT, Operand: p.parseFactor()}
+		return &ast.UnaryExpr{Op: token.NOT, Operand: p.parseFactor()}
+
 	case token.LPAREN:
 		p.match(token.LPAREN)
-		expr = p.parseExpression()
+		expr := p.parseExpression()
 		p.match(token.RPAREN)
+		return expr
+
 	case token.IDENTIFIER:
-		expr = p.parseDesignator()
-		if p.tok == token.LPAREN {
-			expr = &ast.FunctionCall{Callee: expr, ActualParams: p.parseActualParameters()}
+		dsg := p.parseDesignator()
+		env := p.env
+		if dsg.QIdent.Prefix != "" {
+			env = p.envs[dsg.QIdent.Prefix]
 		}
+
+		if sym := env.Lookup(dsg.QIdent.Name); sym != nil &&
+			sym.Kind() == ast.ProcedureSymbolKind &&
+			p.tok == token.RPAREN {
+			call := &ast.FunctionCall{Callee: dsg, ActualParams: p.list}
+			p.list = nil
+			p.next()
+			return call
+		}
+		return dsg
+
 	case token.INT_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
 		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.NIL, token.TRUE, token.FALSE, token.LBRACE:
+		return p.parseLiteral()
 
-		expr = p.parseLiteral()
 	default:
-		p.errorExpected("literal, parenthesized expression, operator or name")
+		p.errorExpected(p.lit)
 		p.advance(exprEnd)
-		expr = &ast.BadExpr{}
+		return &ast.BadExpr{}
 	}
-
-	return
 }
 
 // ActualParameters = '(' [ExpList] ')'
@@ -619,44 +737,82 @@ func (p *Parser) parseExprList() (list []ast.Expression) {
 }
 
 // designator = qualident {selector}
-// selector = '.' ident | '[' ExpList ']' | '^' | '{' qualident '}'
-func (p *Parser) parseDesignator() (dsg *ast.Designator) {
-	dsg = &ast.Designator{QualifiedIdent: p.parseQualifiedIdent()}
+// selector = '.' ident | '[' ExpList ']' | '^' | '(' qualident ')'
+func (p *Parser) parseDesignator() *ast.Designator {
+	dsg := &ast.Designator{QIdent: p.parseQualifiedIdent()}
 
-	expr := dsg.QualifiedIdent
-
-	for p.tok == token.PERIOD || p.tok == token.LBRACK || p.tok == token.CARET || p.tok == token.LBRACE {
-		dsg = &ast.Designator{QualifiedIdent: expr}
-
+	for p.tok == token.PERIOD || p.tok == token.LBRACK || p.tok == token.CARET || p.tok == token.LPAREN {
 		switch p.tok {
 		case token.PERIOD:
 			p.next()
-			dsg.Select = &ast.DotOp{Field: p.parseIdent()}
+			dsg.Select = append(dsg.Select, &ast.DotOp{Field: p.parseIdent()})
+
 		case token.LBRACK:
 			p.next()
-			List := p.parseExprList()
+			list := p.parseExprList()
 			p.match(token.RBRACK)
-			dsg.Select = &ast.IndexOp{List: List}
-		case token.CARET:
-			dsg.Select = &ast.PtrDeref{}
-		case token.LBRACE:
-			p.match(token.LBRACE)
-			dsg.Select = &ast.TypeGuard{Ty: p.parseQualifiedIdent()}
-			p.match(token.RBRACE)
-		default:
-		}
+			dsg.Select = append(dsg.Select, &ast.IndexOp{List: list})
 
-		expr = dsg
+		case token.CARET:
+			p.next()
+			dsg.Select = append(dsg.Select, &ast.PtrDeref{})
+
+		case token.LPAREN:
+			p.next()
+			if !p.parseTypeGuard(dsg) {
+				return dsg
+			}
+		}
 	}
 
-	return
+	return dsg
+}
+
+func (p *Parser) parseTypeGuard(dsg *ast.Designator) bool {
+	if !p.exprStart() {
+		return false
+	}
+
+	p.list = p.parseExprList()
+	if len(p.list) == 0 {
+		return false
+	}
+
+	d, ok := p.list[0].(*ast.Designator)
+	if !ok {
+		return false
+	}
+
+	env := p.env
+	if d.QIdent.Prefix != "" {
+		env = p.envs[d.QIdent.Prefix]
+	}
+
+	sym := env.Lookup(d.QIdent.Name)
+	if sym == nil || sym.Kind() != ast.TypeSymbolKind {
+		return false
+	}
+
+	switch t := sym.Type().(type) {
+	case *ast.RecordType:
+	case *ast.PointerType:
+		if _, ok := t.Base.(*ast.RecordType); !ok {
+			return false
+		}
+	default:
+		return false
+	}
+
+	dsg.Select = append(dsg.Select, &ast.TypeGuard{Ty: d.QIdent})
+	p.match(token.LPAREN)
+	return true
 }
 
 // literal = number | string | hexstring | hexchar | NIL | TRUE | FALSE | set
 func (p *Parser) parseLiteral() (lit ast.Expression) {
 	switch p.tok {
 	case token.INT_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
-		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.TRUE, token.FALSE, token.NIL:
+		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.TRUE, token.FALSE:
 
 		lit = &ast.BasicLit{Kind: p.tok, Val: p.lit}
 		p.next()
@@ -675,9 +831,12 @@ func (p *Parser) parseLiteral() (lit ast.Expression) {
 		p.match(token.RBRACE)
 
 		lit = set
+	case token.NIL:
+		p.next()
+		lit = &ast.Nil{}
 	default:
 		p.errorExpected("literal or set")
-		p.advance(exprEnd)
+		p.advance(exprStart)
 		lit = &ast.BadExpr{}
 	}
 
@@ -713,7 +872,8 @@ func (p *Parser) parseQualifiedIdent() *ast.QualifiedIdent {
 	// Parse the first identifier
 	id.Prefix = p.parseIdent()
 
-	if p.tok == token.PERIOD {
+	sym := p.env.Lookup(id.Prefix)
+	if sym != nil && sym.Kind() == ast.ModuleSymbolKind && p.tok == token.PERIOD {
 		p.next()
 		id.Name = p.parseIdent()
 	} else {
@@ -761,6 +921,13 @@ func (p *Parser) parseIdentifierDef() *ast.IdentifierDef {
 func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 	proc = &ast.ProcedureDecl{}
 
+	parent := p.env
+	p.env = ast.NewEnvironment(parent, "")
+	proc.Env = p.env
+	defer func() {
+		p.env = parent
+	}()
+
 	proc.Head = p.parseProcHeading()
 	if p.tok == token.SEMICOLON {
 		p.next()
@@ -785,19 +952,81 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 		p.errorExpected("proc or procedure")
 		p.advance(declStart)
 		return nil
-	} else {
-		p.next()
-		if p.tok == token.LPAREN {
-			head.Rcv = p.parseReceiver()
+	}
+
+	p.next()
+
+	if p.tok == token.LPAREN {
+		head.Rcv = p.parseReceiver()
+	}
+
+	head.Name = p.parseIdentifierDef()
+	if p.tok == token.LPAREN {
+		head.FP = p.parseFormalParameters()
+	}
+
+	// check that head.Rcv.Type has been declared as a record type and retrieve its env
+	// insert the receiver into the procedure's environment and the rest of the procedure's
+	// parameters into the receiver's environment
+	if head.Rcv != nil {
+		sym := p.env.Lookup(head.Rcv.Type.String())
+		if sym == nil {
+			p.errorExpected("record type")
+			p.advance(declStart)
+			return head
 		}
 
-		head.Name = p.parseIdentifierDef()
-		if p.tok == token.LPAREN {
-			head.FP = p.parseFormalParameters()
+		typeSymbol, ok := sym.(*ast.TypeSymbol)
+		if !ok || typeSymbol == nil {
+			p.errorExpected("record type")
+			p.advance(declStart)
+			return head
+		}
+
+		var recordType *ast.RecordType
+		switch t := typeSymbol.Type().(type) {
+		case *ast.RecordType:
+			recordType = t
+		case *ast.PointerType:
+			if t.Base == nil {
+				p.errorExpected("record type")
+				p.advance(declStart)
+				return head
+			}
+
+			recordType, ok = t.Base.(*ast.RecordType)
+			if !ok {
+				p.errorExpected("record type")
+				p.advance(declStart)
+				return head
+			}
+		default:
+			p.errorExpected("record type")
+			p.advance(declStart)
+			return head
+		}
+
+		// add the receiver to the procedure's parent environment
+		if sym := p.env.Insert(ast.NewParamSymbol(head.Rcv.Var, head.Rcv.Mod, head.Rcv.Type)); sym != nil {
+			p.errorExpected("duplicate parameter declaration")
+		}
+
+		// add the procedure to the receiver's environment
+		if sym := recordType.Env.Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props)); sym != nil {
+			p.errorExpected("duplicate procedure declaration")
 		}
 	}
 
-	return
+	// add the formal parameters into the receiver's environment
+	for _, param := range head.FP.Params {
+		for _, id := range param.Names {
+			if sym := p.env.Insert(ast.NewParamSymbol(id, param.Mod, param.Type)); sym != nil {
+				p.errorExpected("duplicate field declaration")
+			}
+		}
+	}
+
+	return head
 }
 
 // FormalParameters = '(' [ FPSection { [';'] FPSection } ] ')' [ ':' ReturnType ]
@@ -936,13 +1165,14 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 		case token.BECOMES:
 			p.next()
 			stmt = &ast.AssignmentStmt{LValue: dsg, RValue: p.parseExpression()}
+		case token.RPAREN:
+			stmt = &ast.ProcedureCall{Callee: dsg, ActualParams: p.list}
+			p.list = make([]ast.Expression, 0)
+			p.next()
 		default:
-			var list []ast.Expression
-
-			if p.tok == token.LPAREN {
-				list = p.parseActualParameters()
-			}
-			stmt = &ast.ProcedureCall{Callee: dsg, ActualParams: list}
+			stmt = &ast.BadStmt{}
+			p.errorExpected("assignment or procedure call")
+			p.advance(stmtStart)
 		}
 	default:
 		p.errorExpected("statement")

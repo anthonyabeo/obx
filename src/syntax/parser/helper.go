@@ -24,6 +24,26 @@ var declStart = map[token.Kind]bool{
 	token.PROCEDURE: true,
 }
 
+var exprStart = map[token.Kind]bool{
+	token.LPAREN:       true,
+	token.PLUS:         true,
+	token.MINUS:        true,
+	token.IDENTIFIER:   true,
+	token.TRUE:         true,
+	token.FALSE:        true,
+	token.NIL:          true,
+	token.LBRACE:       true,
+	token.STR_LIT:      true,
+	token.HEX_STR_LIT:  true,
+	token.CHAR_LIT:     true,
+	token.INT_LIT:      true,
+	token.REAL_LIT:     true,
+	token.NOT:          true,
+	token.INT32_LIT:    true,
+	token.INT64_LIT:    true,
+	token.LONGREAL_LIT: true,
+}
+
 var exprEnd = map[token.Kind]bool{
 	token.COMMA:     true,
 	token.COLON:     true,

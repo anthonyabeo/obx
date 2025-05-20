@@ -30,14 +30,14 @@ begin
    end
 end Main`
 
-	//table := verify.NewSymbolTable(nil, "Main")
-	//table.Insert(verify.NewProcedureSymbol("ReadIdentifier", ast.Unexported))
-	//table.Insert(verify.NewProcedureSymbol("ReadNumber", ast.Unexported))
-	//table.Insert(verify.NewProcedureSymbol("ReadString", ast.Unexported))
-	//table.Insert(verify.NewProcedureSymbol("SpecialCharacter", ast.Unexported))
+	table := ast.NewEnvironment(nil, "Main")
+	table.Insert(ast.NewProcedureSymbol("ReadIdentifier", ast.Unexported))
+	table.Insert(ast.NewProcedureSymbol("ReadNumber", ast.Unexported))
+	table.Insert(ast.NewProcedureSymbol("ReadString", ast.Unexported))
+	table.Insert(ast.NewProcedureSymbol("SpecialCharacter", ast.Unexported))
 
 	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*table*/)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -77,11 +77,11 @@ begin
 end Main
 `
 
-	//table := verify.NewSymbolTable(verify.Global, "Main")
-	//table.Insert(verify.NewProcedureSymbol("fib", ast.Unexported))
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+	table.Insert(ast.NewProcedureSymbol("fib", ast.Unexported))
 
 	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -124,10 +124,10 @@ begin
 	end
 end Main
 `
-	//table := verify.NewSymbolTable(verify.Global, "Main")
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
 	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -167,17 +167,20 @@ begin
 	phi := t.key = 0              
 	phi := k in {i..j-1}          
 	phi := w[i].name <= "John"   
-	phi := t is CenterTree      
-	phi := t{CenterTree}.subnode
+	phi := t is CenterTree   
+	phi := a[i]
+	phi := t(CenterTree).subnode
 	phi := t.left.right 
 	phi := w[3].name[i]
-	phi := t{CenterTree}
+	phi := t(CenterTree)
+	t(CenterTree).subnode := t(CenterTree).subnode
 end Main
 `
-	//table := verify.NewSymbolTable(nil, "Main")
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+	table.Insert(ast.NewTypeSymbol("CenterTree", ast.Unexported, &ast.RecordType{}))
 
 	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -200,10 +203,12 @@ end Main
 		"k in {i..j - 1}",
 		"w[i].name <= John",
 		"t is CenterTree",
-		"t{CenterTree}.subnode",
+		"a[i]",
+		"t(CenterTree).subnode",
 		"t.left.right",
 		"w[3].name[i]",
-		"t{CenterTree}",
+		"t(CenterTree)",
+		"t(CenterTree).subnode",
 	}
 
 	main := unit.(*ast.Module)
@@ -228,6 +233,10 @@ end Main
 func TestParseProcedureCall(t *testing.T) {
 	input := `
 module Main
+	type CenterTree = record
+		x,y: integer 
+	end
+
 	proc WriteInt(i: integer)
 	end WriteInt
 
@@ -239,12 +248,12 @@ begin
 	t.Insert("John")
 end Main
 `
-	//table := verify.NewSymbolTable(verify.Global, "Main")
-	//table.Insert(verify.NewProcedureSymbol("WriteInt", ast.Unexported))
-	//table.Insert(verify.NewProcedureSymbol("t.Insert", ast.Unexported))
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+	table.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
+	table.Insert(ast.NewProcedureSymbol("t.Insert", ast.Unexported))
 
 	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -308,11 +317,11 @@ begin
 	t := c
 end Main
 `
-	//table := verify.NewSymbolTable(nil, "Main")
-	//table.Insert(verify.NewProcedureSymbol("log2", ast.Unexported))
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+	table.Insert(ast.NewProcedureSymbol("log2", ast.Unexported))
 
 	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -375,10 +384,10 @@ func TestParseImportDecl(t *testing.T) {
 		Out
 end Drawing
 `
-	//table := verify.NewSymbolTable(nil, "Main")
+	table := ast.NewEnvironment(nil, "Main")
 
 	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -468,10 +477,27 @@ begin
  drawAll()
 end Drawing
 `
-	//table := verify.NewSymbolTable(nil, "Main")
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+	figures := ast.NewEnvironment(ast.GlobalEnviron, "Figure")
+	figures.Insert(ast.NewProcedureSymbol("calc", ast.Exported))
 
+	collections := ast.NewEnvironment(ast.GlobalEnviron, "Collections")
+	collections.Insert(ast.NewTypeSymbol("Iterator", ast.Exported, &ast.RecordType{}))
+	collections.Insert(ast.NewProcedureSymbol("createDeque", ast.Exported))
+
+	env := ast.NewRecordEnv(nil, collections)
+	env.Insert(ast.NewProcedureSymbol("forEach", ast.Exported))
+	env.Insert(ast.NewProcedureSymbol("append", ast.Exported))
+	collections.Insert(ast.NewTypeSymbol("Deque", ast.Exported, &ast.RecordType{Env: env}))
+
+	envs := map[string]*ast.Environment{
+		"Fibonacci":   figures,
+		"F":           figures,
+		"Collections": collections,
+		"C":           collections,
+	}
 	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, envs)
 	unit := p.Parse()
 
 	if p.err.ErrCount() > 0 {
@@ -560,10 +586,10 @@ module Main
 		t, c: Tree
 end Main
 `
-	//table := verify.NewSymbolTable(nil, "Main")
+	table := ast.NewEnvironment(nil, "Main")
 
 	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
 	unit := p.Parse()
 	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
@@ -642,10 +668,10 @@ type a = array 10, N of integer
 	Function = procedure(x: integer): integer
 end Main
 `
-	//table := verify.NewSymbolTable(nil, "Main")
+	table := ast.NewEnvironment(nil, "Main")
 
 	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
 	unit := p.Parse()
 	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
@@ -712,10 +738,10 @@ const
 	oneMillion = 1000000
 end Main
 `
-	//table := verify.NewSymbolTable(nil, "Main")
+	table := ast.NewEnvironment(nil, "Main")
 
 	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
 	unit := p.Parse()
 	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
@@ -767,32 +793,57 @@ end Main
 	}
 }
 
-func TestParseExpression(t *testing.T) {
-	input := `module Main
-begin
-	i := 1991
-	i := i div 3
-	i := ~p or q
-	i := (i + j) * (i - j)
-	i := s - {8, 9, 13}
-	i := i + x
-	i := a[i + j] * a[i - j]
-	i := (0 <= i) & (i < 100)
-	i := t.key = 0
-	i := k in {i..j - 1}
-	i := w[i].name <= John
-	i := t is CenterTree
-	i := a[i]
-	i := w[3].name[i]
-	i := t.left.right
-	i := t{CenterTree}.subnode
-	t{CenterTree}.subnode := t{CenterTree}.subnode
+func TestParseProcedureWithRecord(t *testing.T) {
+	input := `
+module Main
+	proc WriteInt()
+	end WriteInt
+
+	type Tree = pointer to record
+		key: integer
+		left, right: Tree
+	end
+	type CenterTree = pointer to record (Tree)
+		width: integer
+		subnode: Tree
+	end
+	proc (t: Tree) Insert(node: Tree)
+		var p, father: Tree
+	begin
+		p := t
+		repeat 
+			father := p
+			if node.key = p.key then return end
+			if node.key < p.key then
+				p := p.left
+			else
+				p := p.right
+			end
+		until p = nil
+		if node.key < father.key then
+			father.left := node
+		else
+			father.right := node
+		end
+		node.left := nil
+		node.right := nil
+	end Insert
+	proc (t: CenterTree) Insert(node: Tree)
+	begin
+		WriteInt(node(CenterTree).width)
+		t.Insert^(node)
+	end Insert
+
 end Main
 `
-	//table := verify.NewSymbolTable(nil, "Main")
+	table := ast.NewEnvironment(nil, "Main")
+	table.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
+
+	InsertScope := ast.NewEnvironment(table, "Insert")
+	InsertScope.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
 
 	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10) /*, table*/)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
 	unit := p.Parse()
 	if p.err.ErrCount() > 0 {
 		t.Error("found parse errors")
@@ -801,24 +852,16 @@ end Main
 		}
 	}
 
-	tests := []string{
-		"1991",
-		"i div 3",
-		"~p or q",
-		"i + j * i - j",
-		"s - {8, 9, 13}",
-		"i + x",
-		"a[i + j] * a[i - j]",
-		"0 <= i & i < 100",
-		"t.key = 0",
-		"k in {i..j - 1}",
-		"w[i].name <= John",
-		"t is CenterTree",
-		"a[i]",
-		"w[3].name[i]",
-		"t.left.right",
-		"t{CenterTree}.subnode",
-		"t{CenterTree}.subnode",
+	tests := []struct {
+		declIndex int
+		declType  string
+		declName  string
+	}{
+		{0, "WriteInt()", "WriteInt"},
+		{1, "^record{integer; Tree; Tree}", "Tree"},
+		{2, "^record(Tree){integer; Tree}", "CenterTree"},
+		{3, "(t: Tree) Insert(node: Tree)", "Insert"},
+		{4, "(t: CenterTree) Insert(node: Tree)", "Insert"},
 	}
 
 	main := unit.(*ast.Module)
@@ -827,15 +870,133 @@ end Main
 			main.BName, main.EName)
 	}
 
-	if len(main.StmtSeq) != len(tests) {
-		t.Errorf("expected %d statements in '%s' module, found %d",
-			len(tests), main.BName, len(main.StmtSeq))
+	if len(main.DeclSeq) != len(tests) {
+		t.Errorf("expected %d declarations in '%v' module, found %d",
+			len(tests), main.BName, len(main.DeclSeq))
 	}
 
-	for i, stmt := range main.StmtSeq {
-		st := stmt.(*ast.AssignmentStmt)
-		if st.RValue.String() != tests[i] {
-			t.Errorf("Expected '%s', got '%s'", tests[i], st.RValue.String())
+	for _, tt := range tests {
+		switch decl := main.DeclSeq[tt.declIndex].(type) {
+		case *ast.ProcedureDecl:
+			if decl.Head.String() != tt.declType {
+				t.Errorf("expected type '%s', got '%s'", tt.declType, decl.Head.String())
+			}
+
+			if decl.Head.Name.Name != tt.declName {
+				t.Errorf("expected type name '%s', got '%s'", tt.declName, decl.Head.Name.Name)
+			}
+		case *ast.TypeDecl:
+			if decl.DenotedType.String() != tt.declType {
+				t.Errorf("expected type '%s', got '%s'", tt.declType, decl.DenotedType.String())
+			}
+
+			if decl.Name.Name != tt.declName {
+				t.Errorf("expected type name '%s', got '%s'", tt.declName, decl.Name.Name)
+			}
+
+		default:
+			t.Errorf("expected type or procedure declaration, got '%s'", main.DeclSeq[tt.declIndex])
+		}
+	}
+}
+
+func TestParseProcedure(t *testing.T) {
+	input := `
+module Main
+ 	proc Read(var ch: char)
+	end Read
+
+	proc Write(ch: char)
+	end Write
+
+	proc ReadInt(var x: integer)
+		var i: integer; ch: char
+	begin i := 0; Read(ch)
+		while ("0" <= ch) & (ch <= "9") do
+			i := 10*i + (ord(ch)-ord("0")); Read(ch)
+		end
+		x := i
+	end ReadInt
+	proc WriteInt(x: integer) 
+		var i: integer; buf: [5]integer
+	begin i := 0
+		repeat buf[i] := x mod 10; x := x div 10; inc(i) 
+		until x = 0
+		repeat dec(i); Write(chr(buf[i] + ord("0"))) 
+		until i = 0
+	end WriteInt
+	proc WriteString(s: []char)
+		var i: integer
+	begin i := 0
+		while (i < len(s)) & (s[i] # 0x) do Write(s[i]); inc(i) end
+	end WriteString
+	proc log2(x: integer): integer
+		var y: integer 
+	begin
+		y := 0; 
+		while x > 1 do 
+			x := x div 2; 
+			inc(y) 
+		end
+		return y
+	end log2
+
+end Main
+`
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+	table.Insert(ast.NewProcedureSymbol("Read", ast.Unexported))
+	table.Insert(ast.NewProcedureSymbol("Write", ast.Unexported))
+	table.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
+	table.Insert(ast.NewProcedureSymbol("WriteString", ast.Unexported))
+	table.Insert(ast.NewProcedureSymbol("log2", ast.Unexported))
+	table.Insert(ast.NewProcedureSymbol("ReadInt", ast.Unexported))
+
+	lex := scan.Scan("test.obx", input)
+	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	unit := p.Parse()
+	if p.err.ErrCount() > 0 {
+		t.Error("found parse errors")
+		for _, err := range p.err.Errors() {
+			t.Log(err.Error())
+		}
+	}
+
+	tests := []struct {
+		declIndex int
+		declType  string
+		declName  string
+	}{
+		{0, "Read(var ch: char)", "Read"},
+		{1, "Write(ch: char)", "Write"},
+		{2, "ReadInt(var x: integer)", "ReadInt"},
+		{3, "WriteInt(x: integer)", "WriteInt"},
+		{4, "WriteString(s: []char)", "WriteString"},
+		{5, "log2(x: integer): integer", "log2"},
+	}
+
+	main := unit.(*ast.Module)
+	if main.BName != main.EName {
+		t.Errorf("start module name, '%s' does not match end module name '%s'",
+			main.BName, main.EName)
+	}
+
+	if len(main.DeclSeq) != len(tests) {
+		t.Errorf("expected %d declarations in '%v' module, found %d",
+			len(tests), main.BName, len(main.DeclSeq))
+	}
+
+	for _, tt := range tests {
+		decl, ok := main.DeclSeq[tt.declIndex].(*ast.ProcedureDecl)
+		if !ok {
+			t.Errorf("expected procedure declaration, got '%s'", main.DeclSeq[tt.declIndex])
+		}
+
+		if decl.Head.String() != tt.declType {
+			t.Errorf("expected type '%s', got '%s'", tt.declType, decl.Head.String())
+		}
+
+		if decl.Head.Name.Name != tt.declName {
+			t.Errorf("expected type name '%s', got '%s'", tt.declName, decl.Head.Name.Name)
 		}
 	}
 }
