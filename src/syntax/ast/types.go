@@ -33,6 +33,7 @@ type (
 	RecordType struct {
 		Base   Type
 		Fields []*FieldList
+		Env    *RecordEnv
 	}
 
 	FieldList struct {
@@ -117,6 +118,9 @@ func (p *PointerType) Accept(vst Visitor) { vst.VisitPointerType(p) }
 func (p *PointerType) typ()               {}
 func (p *PointerType) Width() int         { panic("implement me") }
 
+func NewRecordType(base Type, fields []*FieldList, env *RecordEnv) *RecordType {
+	return &RecordType{Base: base, Fields: fields, Env: env}
+}
 func (r *RecordType) String() string {
 	buf := new(bytes.Buffer)
 	buf.WriteString("record")

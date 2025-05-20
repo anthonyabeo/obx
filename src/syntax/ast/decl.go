@@ -30,6 +30,7 @@ type (
 		Head    *ProcedureHeading
 		Body    *ProcedureBody
 		EndName string
+		Env     *Environment
 	}
 
 	ProcedureHeading struct {
@@ -113,7 +114,7 @@ func (p *ProcedureBody) String() string { panic("not implemented") }
 func (sec *FPSection) String() string {
 	buf := new(bytes.Buffer)
 	if sec.Mod != token.ILLEGAL {
-		buf.WriteString(sec.Mod.String())
+		buf.WriteString(sec.Mod.String() + " ")
 	}
 
 	var names []string

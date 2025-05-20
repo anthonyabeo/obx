@@ -13,6 +13,7 @@ type Module struct {
 	DeclSeq    []Declaration
 	StmtSeq    []Statement
 
+	Env   *Environment
 	edges map[string]CompilationUnit
 }
 

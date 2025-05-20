@@ -13,9 +13,9 @@ type IdentProps int
 // Properties of an identifier
 const (
 	Exported IdentProps = 1 << iota
+	Unexported
 	ReadOnly
 	Predeclared
-	Unexported
 
 	ExportedReadOnly = Exported | ReadOnly
 )
@@ -37,7 +37,7 @@ type (
 	}
 
 	FunctionCall struct {
-		Callee       Expression
+		Callee       *Designator
 		ActualParams []Expression
 	}
 
@@ -61,15 +61,20 @@ type (
 	}
 
 	Designator struct {
-		QualifiedIdent Expression
-		Select         Selector
+		QIdent *QualifiedIdent
+		Select []Selector
+	}
+
+	Nil struct {
 	}
 
 	BadExpr struct{}
 )
 
-// func (id *IdentifierDef) expr()              {}
-// func (id *IdentifierDef) Accept(vst Visitor) { vst.VisitIdentifierDef(id) }
+func (*Nil) String() string       { return "nil" }
+func (n *Nil) Accept(vst Visitor) { vst.VisitNil(n) }
+func (*Nil) expr()                {}
+
 func (id *IdentifierDef) String() string {
 	name := id.Name
 	switch id.Props {
@@ -133,9 +138,20 @@ func (u *UnaryExpr) String() string     { return fmt.Sprintf("%v%v", u.Op, u.Ope
 func (d *Designator) Accept(vst Visitor) { vst.VisitDesignator(d) }
 func (d *Designator) expr()              {}
 func (d *Designator) String() string {
-	s := d.QualifiedIdent.String()
-	if d.Select != nil {
-		s += d.Select.String()
+	s := d.QIdent.String()
+	for _, sel := range d.Select {
+		switch sel := sel.(type) {
+		case *DotOp:
+			s += sel.String()
+		case *IndexOp:
+			s += sel.String()
+		case *TypeGuard:
+			s += sel.String()
+		case *PtrDeref:
+			s += sel.String()
+		default:
+			panic(fmt.Sprintf("unknown selector type: %T", sel))
+		}
 	}
 
 	return s
@@ -184,7 +200,7 @@ type TypeGuard struct {
 	Ty Expression
 }
 
-func (t *TypeGuard) String() string { return fmt.Sprintf("{%s}", t.Ty) }
+func (t *TypeGuard) String() string { return fmt.Sprintf("(%s)", t.Ty) }
 func (t *TypeGuard) sel()           {}
 
 // PtrDeref

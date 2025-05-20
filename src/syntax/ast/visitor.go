@@ -13,6 +13,7 @@ type Visitor interface {
 	VisitSet(*Set)
 	VisitBasicLit(*BasicLit)
 	VisitExprRange(*ExprRange)
+	VisitNil(*Nil)
 
 	VisitIfStmt(*IfStmt)
 	VisitAssignmentStmt(*AssignmentStmt)
