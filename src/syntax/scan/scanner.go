@@ -41,11 +41,11 @@ func (s *Scanner) run() {
 	close(s.items)
 }
 
-func (s *Scanner) emit(kind token.Kind, rng report.Range) {
+func (s *Scanner) emit(kind token.Kind, rng *report.Range) {
 	s.emitWithValue(kind, string(s.src.Content[s.start:s.pos]), rng)
 }
 
-func (s *Scanner) emitWithValue(t token.Kind, value string, rng report.Range) {
+func (s *Scanner) emitWithValue(t token.Kind, value string, rng *report.Range) {
 	s.items <- token.Token{Kind: t, Lexeme: value, Range: rng}
 	s.start = s.pos
 }
@@ -83,8 +83,8 @@ func (s *Scanner) peek() rune {
 	return r
 }
 
-func (s *Scanner) errorf(format string, args ...interface{}) StateFn {
-	s.items <- token.Token{Kind: token.ILLEGAL, Lexeme: fmt.Sprintf(format, args...)}
+func (s *Scanner) errorf(format string, rng *report.Range, args ...interface{}) StateFn {
+	s.items <- token.Token{Kind: token.ILLEGAL, Lexeme: fmt.Sprintf(format, args...), Range: rng}
 	return scanText
 }
 

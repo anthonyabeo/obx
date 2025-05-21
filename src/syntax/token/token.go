@@ -86,9 +86,20 @@ const (
 	IS
 	MOD
 
-	INTEGER
+	BOOLEAN
+	BYTE
+	CHAR
+	INT8
+	INT16
 	INT32
 	INT64
+	REAL
+	LONGREAL
+	SET
+	WCHAR
+	INTEGER
+	SHORTINT
+	LONGINT
 	keyword_end
 
 	operator_beg
@@ -136,9 +147,21 @@ var tokens = [...]string{
 	ML_COMMENT_END:   "*)",
 
 	IDENTIFIER: "IDENTIFIER",
-	INTEGER:    "integer",
-	INT32:      "int32",
-	INT64:      "int64",
+
+	BOOLEAN:  "boolean",
+	BYTE:     "byte",
+	CHAR:     "char",
+	INT8:     "int8",
+	INT16:    "int16",
+	INT32:    "int32",
+	INT64:    "int64",
+	REAL:     "real",
+	LONGREAL: "longreal",
+	SET:      "set",
+	WCHAR:    "wchar",
+	INTEGER:  "integer",
+	SHORTINT: "shortint",
+	LONGINT:  "longint",
 
 	PLUS:  "+",
 	MINUS: "-",
@@ -227,7 +250,7 @@ func Lookup(ident string) Kind {
 type Token struct {
 	Kind   Kind
 	Lexeme string
-	Range  report.Range
+	Range  *report.Range
 }
 
 func (i Token) String() string {

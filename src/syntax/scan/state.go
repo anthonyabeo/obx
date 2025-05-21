@@ -15,8 +15,11 @@ func scanIdentifier(s *Scanner) StateFn {
 	// The first character must be a letter or '_'
 	r := s.peek()
 	if !s.isLetter(r) && !s.isDecDigit(r) && r != '_' {
-		return s.errorf("invalid identifier: must start with letter or '_'")
-		//return token.ILLEGAL
+		rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+		if err != nil {
+			panic(err.Error())
+		}
+		return s.errorf("invalid identifier: must start with letter or '_'", rng)
 	}
 
 	// Consume the rest: letters, digits, or underscores
@@ -34,7 +37,6 @@ func scanIdentifier(s *Scanner) StateFn {
 
 	rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 	if err != nil {
-		s.errorf(err.Error())
 		panic(err.Error())
 	}
 
@@ -47,9 +49,14 @@ func scanNumber(s *Scanner) StateFn {
 	isReal := false
 	scaleChar := rune(0) // 'E', 'D', or 'S'
 
+	rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	// Require at least one digit
 	if !s.acceptDigits("0123456789") {
-		return s.errorf("invalid number: expected digit")
+		return s.errorf("invalid number: expected digit", rng)
 	}
 
 	midPos := s.pos
@@ -58,7 +65,6 @@ func scanNumber(s *Scanner) StateFn {
 		if s.accept("Ll") {
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 
@@ -69,7 +75,6 @@ func scanNumber(s *Scanner) StateFn {
 		if s.accept("Ii") {
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 
@@ -77,19 +82,17 @@ func scanNumber(s *Scanner) StateFn {
 			return scanText
 		}
 
+		rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+		if err != nil {
+			panic(err.Error())
+		}
 		// Ensure all characters before 'H' were valid hex digits
 		if !isValidHex(string(s.src.Content[s.start:midPos])) {
-			return s.errorf("invalid hex digits before 'H'")
+			return s.errorf("invalid hex digits before 'H'", rng)
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("invalid character '%c' after hex literal", s.peek())
-		}
-
-		rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
-		if err != nil {
-			s.errorf(err.Error())
-			panic(err.Error())
+			return s.errorf("invalid character '%c' after hex literal", rng, s.peek())
 		}
 
 		s.emit(token.INT_LIT, rng)
@@ -97,16 +100,21 @@ func scanNumber(s *Scanner) StateFn {
 	}
 
 	if s.accept("Xx") {
+		rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+		if err != nil {
+			panic(err.Error())
+		}
+
 		// extract the character before 'X'
 		hexValue := string(s.src.Content[s.start : s.pos-1])
 
 		// Ensure all characters before 'X' were valid hex digits
 		if !isValidHex(hexValue) {
-			return s.errorf("invalid hex digits before 'X'")
+			return s.errorf("invalid hex digits before 'X'", rng)
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("invalid character '%c' after hex literal", s.peek())
+			return s.errorf("invalid character '%c' after hex literal", rng, s.peek())
 		}
 
 		var value int
@@ -114,30 +122,24 @@ func scanNumber(s *Scanner) StateFn {
 			// 8-bit value (ISO/IEC 8859-1 Latin-1)
 			parsed, err := strconv.ParseInt(hexValue, 16, 8)
 			if err != nil {
-				return s.errorf("invalid 8-bit character value: %s", hexValue)
+				return s.errorf("invalid 8-bit character value: %s", rng, hexValue)
 			}
 			value = int(parsed)
 		} else if len(hexValue) == 4 {
 			// 16-bit value (Unicode BMP)
 			parsed, err := strconv.ParseInt(hexValue, 16, 16)
 			if err != nil {
-				return s.errorf("invalid 16-bit character value: %s", hexValue)
+				return s.errorf("invalid 16-bit character value: %s", rng, hexValue)
 			}
 			value = int(parsed)
 		} else {
-			return s.errorf("invalid character literal, hex value must be 2 or 4 digits")
+			return s.errorf("invalid character literal, hex value must be 2 or 4 digits", rng)
 		}
 
 		// Convert the value to a rune
 		character := rune(value)
 
 		// Emit the character token with its Unicode code point
-		rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
-		if err != nil {
-			s.errorf(err.Error())
-			panic(err.Error())
-		}
-
 		s.emitWithValue(token.CHAR_LIT, string(character), rng)
 
 		return scanText
@@ -146,23 +148,33 @@ func scanNumber(s *Scanner) StateFn {
 
 	// Check for decimal point (required for real)
 	if s.accept(".") {
+		rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+		if err != nil {
+			panic(err.Error())
+		}
+
 		isReal = true
 		if !s.acceptDigits("0123456789") {
-			return s.errorf("invalid real number: no digits after decimal point")
+			return s.errorf("invalid real number: no digits after decimal point", rng)
 		}
 	}
 
 	// Check for exponent
 	if s.accept("EeDdSs") {
+		rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+		if err != nil {
+			panic(err.Error())
+		}
+
 		isReal = true
 		scaleChar = rune(s.src.Content[s.pos-1])
 		s.accept("+-")
 		if !s.acceptDigits("0123456789") {
-			return s.errorf("invalid exponent: expected digit after exponent")
+			return s.errorf("invalid exponent: expected digit after exponent", rng)
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("invalid character '%c' after hex literal", s.peek())
+			return s.errorf("invalid character '%c' after hex literal", rng, s.peek())
 		}
 	}
 
@@ -171,7 +183,6 @@ func scanNumber(s *Scanner) StateFn {
 		if s.accept("Ll") {
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 
@@ -182,7 +193,6 @@ func scanNumber(s *Scanner) StateFn {
 		if s.accept("Ii") {
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 
@@ -190,23 +200,20 @@ func scanNumber(s *Scanner) StateFn {
 			return scanText
 		}
 
-		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("invalid character '%c' after hex literal", s.peek())
-		}
-
 		rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 		if err != nil {
-			s.errorf(err.Error())
 			panic(err.Error())
+		}
+		if !isNumberTokenBoundary(s.peek()) {
+			return s.errorf("invalid character '%c' after hex literal", rng, s.peek())
 		}
 
 		s.emit(token.INT_LIT, rng)
 		return scanText
 	}
 
-	rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+	rng, err = s.mgr.Range(s.src.Name, s.start, s.pos)
 	if err != nil {
-		s.errorf(err.Error())
 		panic(err.Error())
 	}
 	// Real number type decision
@@ -224,7 +231,7 @@ func scanNumber(s *Scanner) StateFn {
 		}
 	default:
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("invalid character '%c' after hex literal", s.peek())
+			return s.errorf("invalid character '%c' after hex literal", rng, s.peek())
 		}
 
 		s.emit(token.REAL_LIT, rng)
@@ -234,9 +241,14 @@ func scanNumber(s *Scanner) StateFn {
 }
 
 func scanHexString(s *Scanner) StateFn {
+	rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	// First, check for the opening dollar sign
 	if s.next() != '$' {
-		return s.errorf("expected '$' to start hex string")
+		return s.errorf("expected '$' to start hex string", rng)
 	}
 
 	var hexDigits []rune // to store the hex digits
@@ -245,9 +257,13 @@ func scanHexString(s *Scanner) StateFn {
 	for {
 		r := s.next()
 
+		rng, err = s.mgr.Range(s.src.Name, s.start, s.pos)
+		if err != nil {
+			panic(err.Error())
+		}
 		// If we reach EOF, the string is unterminated
 		if r == eof {
-			return s.errorf("unterminated hex string")
+			return s.errorf("unterminated hex string", rng)
 		}
 
 		if unicode.IsSpace(r) {
@@ -259,23 +275,17 @@ func scanHexString(s *Scanner) StateFn {
 		if r == '$' {
 			// Check if we have an even number of hex digits
 			if len(hexDigits)%2 != 0 {
-				return s.errorf("hex string must have an even number of hex digits")
+				return s.errorf("hex string must have an even number of hex digits", rng)
 			}
 
 			// Emit the hex string as a token
-			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
-			if err != nil {
-				s.errorf(err.Error())
-				panic(err.Error())
-			}
-
 			s.emitWithValue(token.HEX_STR_LIT, string(hexDigits), rng)
 			return scanText
 		}
 
 		// Check if the character is a valid hex digit
 		if !s.isHexDigit(r) {
-			return s.errorf("invalid hex digit: %q", r)
+			return s.errorf("invalid hex digit: %q", rng, r)
 		}
 
 		// Add the valid hex digit to the hexDigits slice
@@ -284,20 +294,31 @@ func scanHexString(s *Scanner) StateFn {
 }
 
 func scanString(s *Scanner) StateFn {
+	rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	quote := s.next() // get the opening quote (either ' or ")
 	if quote != '"' && quote != '\'' {
-		return s.errorf("invalid string start: expected ' or \"")
+		return s.errorf("invalid string start: expected ' or \"", rng)
 	}
 
 	var value []rune // to store the string content
 
 	for {
 		r := s.next()
+
+		rng, err = s.mgr.Range(s.src.Name, s.start, s.pos)
+		if err != nil {
+			panic(err.Error())
+		}
+
 		switch r {
 		case eof:
-			return s.errorf("unterminated string")
+			return s.errorf("unterminated string", rng)
 		case '\n':
-			return s.errorf("string must not span multiple lines")
+			return s.errorf("string must not span multiple lines", rng)
 		case '\\': // handle escape sequences
 			// Peek the next character to determine what to escape
 			next := s.peek()
@@ -318,7 +339,7 @@ func scanString(s *Scanner) StateFn {
 				// Escaped quote
 				value = append(value, r)
 				if next == quote {
-					return s.errorf("quote cannot be the same as the string delimiter")
+					return s.errorf("quote cannot be the same as the string delimiter", rng)
 				}
 
 				s.next() // consume '\'
@@ -336,7 +357,6 @@ func scanString(s *Scanner) StateFn {
 			// Emit the string content (without quotes)
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 
@@ -350,7 +370,6 @@ func scanString(s *Scanner) StateFn {
 }
 
 func scanText(s *Scanner) StateFn {
-	//start := s.pos
 	for ch := s.next(); ch != eof; {
 		switch ch {
 		case '.':
@@ -359,14 +378,12 @@ func scanText(s *Scanner) StateFn {
 				s.next()
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 				s.emit(token.RANGE, rng)
 			} else {
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 				s.emit(token.PERIOD, rng)
@@ -374,14 +391,12 @@ func scanText(s *Scanner) StateFn {
 		case '-':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 			s.emit(token.MINUS, rng)
 		case '+':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 
@@ -389,7 +404,6 @@ func scanText(s *Scanner) StateFn {
 		case '=':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 
@@ -401,7 +415,6 @@ func scanText(s *Scanner) StateFn {
 
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 
@@ -409,7 +422,6 @@ func scanText(s *Scanner) StateFn {
 			} else {
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 				s.emit(token.LESS, rng)
@@ -420,14 +432,12 @@ func scanText(s *Scanner) StateFn {
 				s.next()
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 				s.emit(token.GEQ, rng)
 			} else {
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 				s.emit(token.GREAT, rng)
@@ -435,14 +445,12 @@ func scanText(s *Scanner) StateFn {
 		case '&':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 			s.emit(token.AND, rng)
 		case '|':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 
@@ -450,14 +458,12 @@ func scanText(s *Scanner) StateFn {
 		case '#':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 			s.emit(token.NEQ, rng)
 		case '^':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 
@@ -468,7 +474,6 @@ func scanText(s *Scanner) StateFn {
 				s.next()
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 
@@ -476,7 +481,6 @@ func scanText(s *Scanner) StateFn {
 			} else {
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 				s.emit(token.COLON, rng)
@@ -487,14 +491,12 @@ func scanText(s *Scanner) StateFn {
 				s.next()
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 				s.emit(token.SL_COMMENT_START, rng)
 			} else {
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 				s.emit(token.QUOT, rng)
@@ -505,14 +507,12 @@ func scanText(s *Scanner) StateFn {
 				s.next()
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 				s.emit(token.ML_COMMENT_END, rng)
 			} else {
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 				s.emit(token.STAR, rng)
@@ -520,28 +520,24 @@ func scanText(s *Scanner) StateFn {
 		case '{':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 			s.emit(token.LBRACE, rng)
 		case '}':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 			s.emit(token.RBRACE, rng)
 		case '[':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 			s.emit(token.LBRACK, rng)
 		case ']':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 			s.emit(token.RBRACK, rng)
@@ -551,14 +547,12 @@ func scanText(s *Scanner) StateFn {
 				s.next()
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 				s.emit(token.ML_COMMENT_START, rng)
 			} else {
 				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 				if err != nil {
-					s.errorf(err.Error())
 					panic(err.Error())
 				}
 				s.emit(token.LPAREN, rng)
@@ -566,28 +560,24 @@ func scanText(s *Scanner) StateFn {
 		case ')':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 			s.emit(token.RPAREN, rng)
 		case ',':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 			s.emit(token.COMMA, rng)
 		case '~':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 			s.emit(token.NOT, rng)
 		case ';':
 			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
 			if err != nil {
-				s.errorf(err.Error())
 				panic(err.Error())
 			}
 			s.emit(token.SEMICOLON, rng)
@@ -607,14 +597,18 @@ func scanText(s *Scanner) StateFn {
 				s.backup()
 				return scanNumber
 			} else {
-				s.errorf("invalid character %c", ch)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					panic(err.Error())
+				}
+				s.errorf("invalid character %c", rng, ch)
 			}
 		}
 
 		ch = s.next()
 	}
 
-	s.emit(token.EOF, report.Range{})
+	s.emit(token.EOF, &report.Range{})
 
 	return nil
 }
