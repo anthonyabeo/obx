@@ -110,14 +110,14 @@ func (sm *SourceManager) Pos(file string, offset int) (Position, error) {
 	return Position{File: file, Offset: offset, Line: line, Column: col}, nil
 }
 
-func (sm *SourceManager) Range(file string, start, end int) (Range, error) {
+func (sm *SourceManager) Range(file string, start, end int) (*Range, error) {
 	p1, err := sm.Pos(file, start)
 	if err != nil {
-		return Range{}, err
+		return &Range{}, err
 	}
 	p2, err := sm.Pos(file, end)
 	if err != nil {
-		return Range{}, err
+		return &Range{}, err
 	}
-	return Range{Start: p1, End: p2}, nil
+	return &Range{Start: p1, End: p2}, nil
 }

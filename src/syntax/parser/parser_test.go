@@ -1,15 +1,16 @@
 package parser
 
 import (
+	"os"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/diagnostics"
+	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/scan"
 )
 
 func TestParseCaseStatement(t *testing.T) {
-	input := `module Main
+	input := []byte(`module Main
 proc ReadIdentifier()
 end ReadIdentifier
 
@@ -28,7 +29,7 @@ begin
    | "'", '"': ReadString()
    else SpecialCharacter()
    end
-end Main`
+end Main`)
 
 	table := ast.NewEnvironment(nil, "Main")
 	table.Insert(ast.NewProcedureSymbol("ReadIdentifier", ast.Unexported))
@@ -36,15 +37,21 @@ end Main`
 	table.Insert(ast.NewProcedureSymbol("ReadString", ast.Unexported))
 	table.Insert(ast.NewProcedureSymbol("SpecialCharacter", ast.Unexported))
 
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -56,7 +63,7 @@ end Main`
 }
 
 func TestParseOberonMinimalProgram(t *testing.T) {
-	input := `
+	input := []byte(`
 module Main
 	proc fib(n : integer): integer
 		var a, b: integer 
@@ -75,20 +82,26 @@ begin
 	res := fib(21)
   	assert(res = 10946)
 end Main
-`
+`)
 
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 	table.Insert(ast.NewProcedureSymbol("fib", ast.Unexported))
 
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -109,7 +122,7 @@ end Main
 }
 
 func TestParseWhileStatement(t *testing.T) {
-	input := `
+	input := []byte(`
 module Main
 begin
 	while i > 0 do 
@@ -123,18 +136,24 @@ begin
 		n := n - m
 	end
 end Main
-`
+`)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -150,7 +169,7 @@ end Main
 }
 
 func TestParseExpressions(t *testing.T) {
-	input := `
+	input := []byte(`
 module Main
 	type CenterTree = record
 		x,y: integer 
@@ -175,19 +194,25 @@ begin
 	phi := t(CenterTree)
 	t(CenterTree).subnode := t(CenterTree).subnode
 end Main
-`
+`)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-	table.Insert(ast.NewTypeSymbol("CenterTree", ast.Unexported, &ast.RecordType{}))
+	//table.Insert(ast.NewTypeSymbol("CenterTree", ast.Unexported, &ast.RecordType{}))
 
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	tests := []string{
@@ -231,7 +256,7 @@ end Main
 }
 
 func TestParseProcedureCall(t *testing.T) {
-	input := `
+	input := []byte(`
 module Main
 	type CenterTree = record
 		x,y: integer 
@@ -247,20 +272,26 @@ begin
 	inc(w[k].count)
 	t.Insert("John")
 end Main
-`
+`)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 	table.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
 	table.Insert(ast.NewProcedureSymbol("t.Insert", ast.Unexported))
 
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -299,7 +330,7 @@ end Main
 }
 
 func TestParseAssignStmt(t *testing.T) {
-	input := `
+	input := []byte(`
 module Main
 proc log2(x: real)
 end log2
@@ -316,19 +347,25 @@ begin
 	w[i+1].name := "John"
 	t := c
 end Main
-`
+`)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 	table.Insert(ast.NewProcedureSymbol("log2", ast.Unexported))
 
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	tests := []struct {
@@ -372,29 +409,35 @@ end Main
 }
 
 func TestParseImportDecl(t *testing.T) {
-	input := `module Drawing
+	input := []byte(`module Drawing
  import F := Fibonacci
         C := Collections(Figure)
 		Foobar
 		a.b.c.d
 		D := a.b.c
 		E := a.b.c.d(Bar)
-		F := a.b.c.d(Bar, Baz)
+		H := a.b.c.d(Bar, Baz)
 		G := a.b.c.d(Foo Bar Baz)
 		Out
 end Drawing
-`
+`)
 	table := ast.NewEnvironment(nil, "Main")
 
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	tests := []string{
@@ -404,7 +447,7 @@ end Drawing
 		"a.b.c.d",
 		"D := a.b.c",
 		"E := a.b.c.d(Bar)",
-		"F := a.b.c.d(Bar, Baz)",
+		"H := a.b.c.d(Bar, Baz)",
 		"G := a.b.c.d(Foo, Bar, Baz)",
 		"Out",
 	}
@@ -427,7 +470,7 @@ end Drawing
 }
 
 func TestParseOOPExample(t *testing.T) {
-	input := `module Drawing
+	input := []byte(`module Drawing
  import F := Fibonacci
         C := Collections(Figure)
 
@@ -476,7 +519,7 @@ begin
  figures.append(square)
  drawAll()
 end Drawing
-`
+`)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 	figures := ast.NewEnvironment(ast.GlobalEnviron, "Figure")
 	figures.Insert(ast.NewProcedureSymbol("calc", ast.Exported))
@@ -496,15 +539,22 @@ end Drawing
 		"Collections": collections,
 		"C":           collections,
 	}
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, envs)
+
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, envs)
 	unit := p.Parse()
 
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -571,7 +621,7 @@ end Drawing
 }
 
 func TestParseModuleWithVariableDecl(t *testing.T) {
-	input := `
+	input := []byte(`
 module Main
 	var i, j, k: integer
 		x, y: real
@@ -585,17 +635,23 @@ module Main
 		   end
 		t, c: Tree
 end Main
-`
+`)
 	table := ast.NewEnvironment(nil, "Main")
 
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
 	unit := p.Parse()
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -649,7 +705,7 @@ end Main
 }
 
 func TestParseTypeDeclaration(t *testing.T) {
-	input := `
+	input := []byte(`
 module Main
 type a = array 10, N of integer
 	 b = array of char
@@ -667,17 +723,23 @@ type a = array 10, N of integer
 		end
 	Function = procedure(x: integer): integer
 end Main
-`
+`)
 	table := ast.NewEnvironment(nil, "Main")
 
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
 	unit := p.Parse()
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -724,7 +786,7 @@ end Main
 }
 
 func TestParseConstantDeclaration(t *testing.T) {
-	input := `
+	input := []byte(`
 module Main
 const
 	pi = 3.14159
@@ -737,17 +799,23 @@ const
 	oneThousand = 1000
 	oneMillion = 1000000
 end Main
-`
+`)
 	table := ast.NewEnvironment(nil, "Main")
 
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
 	unit := p.Parse()
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -794,7 +862,7 @@ end Main
 }
 
 func TestParseProcedureWithRecord(t *testing.T) {
-	input := `
+	input := []byte(`
 module Main
 	proc WriteInt()
 	end WriteInt
@@ -835,21 +903,27 @@ module Main
 	end Insert
 
 end Main
-`
+`)
 	table := ast.NewEnvironment(nil, "Main")
 	table.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
 
 	InsertScope := ast.NewEnvironment(table, "Insert")
 	InsertScope.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
 
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
 	unit := p.Parse()
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	tests := []struct {
@@ -901,7 +975,7 @@ end Main
 }
 
 func TestParseProcedure(t *testing.T) {
-	input := `
+	input := []byte(`
 module Main
  	proc Read(var ch: char)
 	end Read
@@ -942,7 +1016,7 @@ module Main
 	end log2
 
 end Main
-`
+`)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 	table.Insert(ast.NewProcedureSymbol("Read", ast.Unexported))
 	table.Insert(ast.NewProcedureSymbol("Write", ast.Unexported))
@@ -951,14 +1025,20 @@ end Main
 	table.Insert(ast.NewProcedureSymbol("log2", ast.Unexported))
 	table.Insert(ast.NewProcedureSymbol("ReadInt", ast.Unexported))
 
-	lex := scan.Scan("test.obx", input)
-	p := NewParser(lex, diagnostics.NewStdErrReporter(10), table, nil)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, input)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
 	unit := p.Parse()
-	if p.err.ErrCount() > 0 {
+	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		for _, err := range p.err.Errors() {
-			t.Log(err.Error())
-		}
+		p.err.Flush()
 	}
 
 	tests := []struct {

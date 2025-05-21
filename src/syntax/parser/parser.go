@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/diagnostics"
+	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/scan"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Parser struct {
-	err     diagnostics.ErrReporter
+	err     report.Reporter
 	envs    map[string]*ast.Environment
 	env     *ast.Environment
 	scanner *scan.Scanner
@@ -19,11 +19,12 @@ type Parser struct {
 	// Next token
 	tok token.Kind
 	lit string
+	rng *report.Range
 
 	list []ast.Expression
 }
 
-func NewParser(scanner *scan.Scanner, rpt diagnostics.ErrReporter, env *ast.Environment, envs map[string]*ast.Environment) *Parser {
+func NewParser(scanner *scan.Scanner, rpt report.Reporter, env *ast.Environment, envs map[string]*ast.Environment) *Parser {
 	p := &Parser{scanner: scanner, err: rpt, env: env, envs: envs}
 	p.next()
 
@@ -40,7 +41,12 @@ func (p *Parser) errorExpected(msg string) {
 		msg += ", found '" + p.tok.String() + "'"
 	}
 
-	p.err.AddError(msg)
+	p.err.Report(report.Diagnostic{
+		Severity: report.Error,
+		Message:  msg,
+		Pos:      p.rng.Start,
+		Range:    p.rng,
+	})
 }
 
 func (p *Parser) match(tok token.Kind) {
@@ -52,9 +58,10 @@ func (p *Parser) match(tok token.Kind) {
 }
 
 func (p *Parser) next() {
-	tok := p.scanner.NextItem()
+	tok := p.scanner.NextToken()
 	p.tok = tok.Kind
-	p.lit = tok.Val
+	p.lit = tok.Lexeme
+	p.rng = tok.Range
 }
 
 func (p *Parser) Parse() (unit ast.CompilationUnit) {
@@ -107,7 +114,7 @@ func (p *Parser) parseMetaSection() *ast.MetaSection {
 
 	if p.tok == token.COLON {
 		p.next()
-		ms.TyConst = p.parseNamedType()
+		ms.TyConst = ast.NewNamedType(p.parseQualifiedIdent())
 	}
 
 	return ms
@@ -202,12 +209,24 @@ func (p *Parser) parseImportList() []*ast.Import {
 
 	// add module imports to the environment
 	for _, imp := range list {
-		if sym := p.env.Insert(ast.NewModuleSymbol(imp.Name)); sym != nil {
-			p.errorExpected("duplicate module import")
-		}
-
-		if sym := p.env.Insert(ast.NewModuleSymbol(imp.Alias)); sym != nil {
-			p.errorExpected("duplicate module import")
+		if imp.Alias != "" {
+			if sym := p.env.Insert(ast.NewModuleSymbol(imp.Alias)); sym != nil {
+				p.err.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  "duplicate module import",
+					Pos:      p.rng.Start,
+					Range:    p.rng,
+				})
+			}
+		} else {
+			if sym := p.env.Insert(ast.NewModuleSymbol(imp.Name)); sym != nil {
+				p.err.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  "duplicate module import",
+					Pos:      p.rng.Start,
+					Range:    p.rng,
+				})
+			}
 		}
 	}
 
@@ -365,7 +384,12 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 	Typ := p.parseType()
 
 	if sym := p.env.Insert(ast.NewTypeSymbol(name.Name, name.Props, Typ)); sym != nil {
-		p.errorExpected("duplicate type declaration " + name.Name)
+		p.err.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  "duplicate type declaration " + name.Name,
+			Pos:      p.rng.Start,
+			Range:    p.rng,
+		})
 	}
 
 	return &ast.TypeDecl{Name: name, DenotedType: Typ}
@@ -378,7 +402,12 @@ func (p *Parser) parseConstantDecl() *ast.ConstantDecl {
 	value := p.parseExpression()
 
 	if sym := p.env.Insert(ast.NewConstantSymbol(name.Name, name.Props, value)); sym != nil {
-		p.errorExpected("duplicate constant declaration " + name.Name)
+		p.err.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  "duplicate constant declaration " + name.Name,
+			Pos:      p.rng.Start,
+			Range:    p.rng,
+		})
 	}
 
 	return &ast.ConstantDecl{Name: name, Value: value}
@@ -394,7 +423,12 @@ func (p *Parser) parseVariableDecl() *ast.VariableDecl {
 	for _, id := range decl.IdentList {
 		sym := p.env.Insert(ast.NewVariableSymbol(id.Name, id.Props, decl.Type))
 		if sym != nil {
-			p.errorExpected("duplicate variable declaration " + id.Name)
+			p.err.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  "duplicate variable declaration " + id.Name,
+				Pos:      p.rng.Start,
+				Range:    p.rng,
+			})
 		}
 	}
 
@@ -403,8 +437,12 @@ func (p *Parser) parseVariableDecl() *ast.VariableDecl {
 
 func (p *Parser) parseType() (ty ast.Type) {
 	switch p.tok {
+	case token.INTEGER, token.BOOLEAN, token.CHAR, token.REAL, token.LONGREAL, token.INT8,
+		token.INT16, token.INT32, token.INT64, token.WCHAR, token.BYTE, token.SHORTINT, token.LONGINT, token.SET:
+		ty = ast.NewBasicType(p.lit)
+		p.next()
 	case token.IDENTIFIER:
-		ty = p.parseNamedType()
+		ty = ast.NewNamedType(p.parseQualifiedIdent())
 	case token.ARRAY, token.LBRACK:
 		ty = p.parseArrayType()
 	case token.RECORD:
@@ -515,7 +553,7 @@ func (p *Parser) parseRecordBase(rec *ast.RecordType) *ast.RecordEnv {
 	}
 
 	p.next()
-	rec.Base = p.parseNamedType()
+	rec.Base = ast.NewNamedType(p.parseQualifiedIdent())
 	p.match(token.RPAREN)
 
 	baseType, ok := rec.Base.(*ast.NamedType)
@@ -541,7 +579,12 @@ func (p *Parser) lookupBaseType(baseType *ast.NamedType) ast.Symbol {
 	if env, ok := p.envs[baseType.Name.Prefix]; ok {
 		base := env.Lookup(baseType.Name.Name)
 		if base == nil || base.Props() != ast.Exported {
-			p.errorExpected(fmt.Sprintf("object %s is not exported", baseType.Name))
+			p.err.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("object %s is not exported", baseType.Name),
+				Pos:      p.rng.Start,
+				Range:    p.rng,
+			})
 			p.advance(declStart)
 			return nil
 		}
@@ -591,7 +634,12 @@ func (p *Parser) addFieldsToEnv(rec *ast.RecordType) {
 		for _, id := range field.List {
 			sym := rec.Env.Insert(ast.NewFieldSymbol(id.Name, id.Props, field.Type))
 			if sym != nil {
-				p.errorExpected("duplicate field declaration")
+				p.err.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  "duplicate field declaration " + id.Name,
+					Pos:      p.rng.Start,
+					Range:    p.rng,
+				})
 			}
 		}
 	}
@@ -706,7 +754,7 @@ func (p *Parser) parseFactor() ast.Expression {
 		return p.parseLiteral()
 
 	default:
-		p.errorExpected(p.lit)
+		p.errorExpected("factor expression")
 		p.advance(exprEnd)
 		return &ast.BadExpr{}
 	}
@@ -804,7 +852,7 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator) bool {
 	}
 
 	dsg.Select = append(dsg.Select, &ast.TypeGuard{Ty: d.QIdent})
-	p.match(token.LPAREN)
+	p.match(token.RPAREN)
 	return true
 }
 
@@ -855,15 +903,10 @@ func (p *Parser) parseSetElem() ast.Expression {
 	return expr
 }
 
-func (p *Parser) parseNamedType() ast.Type {
-	typ := p.parseQualifiedIdent()
-	if basicTypes[typ.String()] {
-		return ast.NewBasicType(typ.String())
-	}
-
-	return ast.NewNamedType(typ)
-
-}
+//func (p *Parser) parseNamedType() ast.Type {
+//	return ast.NewNamedType(p.parseQualifiedIdent())
+//
+//}
 
 // qualident = [ ident '.' ] ident
 func (p *Parser) parseQualifiedIdent() *ast.QualifiedIdent {
@@ -1008,12 +1051,22 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 
 		// add the receiver to the procedure's parent environment
 		if sym := p.env.Insert(ast.NewParamSymbol(head.Rcv.Var, head.Rcv.Mod, head.Rcv.Type)); sym != nil {
-			p.errorExpected("duplicate parameter declaration")
+			p.err.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  "duplicate parameter declaration",
+				Pos:      p.rng.Start,
+				Range:    p.rng,
+			})
 		}
 
 		// add the procedure to the receiver's environment
 		if sym := recordType.Env.Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props)); sym != nil {
-			p.errorExpected("duplicate procedure declaration")
+			p.err.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  "duplicate procedure declaration",
+				Pos:      p.rng.Start,
+				Range:    p.rng,
+			})
 		}
 	}
 
@@ -1021,7 +1074,12 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 	for _, param := range head.FP.Params {
 		for _, id := range param.Names {
 			if sym := p.env.Insert(ast.NewParamSymbol(id, param.Mod, param.Type)); sym != nil {
-				p.errorExpected("duplicate field declaration")
+				p.err.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  "duplicate field declaration",
+					Pos:      p.rng.Start,
+					Range:    p.rng,
+				})
 			}
 		}
 	}
@@ -1087,7 +1145,7 @@ func (p *Parser) parseReceiver() (rcv *ast.Receiver) {
 
 	rcv.Var = p.parseIdent()
 	p.match(token.COLON)
-	rcv.Type = p.parseNamedType()
+	rcv.Type = ast.NewNamedType(p.parseQualifiedIdent())
 
 	p.match(token.RPAREN)
 
