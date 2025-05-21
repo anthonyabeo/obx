@@ -4,21 +4,25 @@ import (
 	"fmt"
 	"unicode/utf8"
 
+	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Scanner struct {
-	name  string
-	input string // the string being tokenized
-	start int    // start position of this item
-	pos   int    // current position of the input
-	width int    // width of the last rune read
+	src *report.SourceFile
+	mgr *report.SourceManager
+
+	start  int // start position of this item
+	pos    int // current position of the input
+	width  int // width of the last rune read
+	line   int // current line number
+	column int // current column number
 
 	state StateFn
 	items chan token.Token // channel of scanned items
 }
 
-func (s *Scanner) NextItem() token.Token {
+func (s *Scanner) NextToken() token.Token {
 	for {
 		select {
 		case item := <-s.items:
@@ -37,49 +41,32 @@ func (s *Scanner) run() {
 	close(s.items)
 }
 
-func (s *Scanner) emit(kind token.Kind) {
-	s.items <- token.Token{Kind: kind, Val: s.input[s.start:s.pos]}
-	s.start = s.pos
+func (s *Scanner) emit(kind token.Kind, rng report.Range) {
+	s.emitWithValue(kind, string(s.src.Content[s.start:s.pos]), rng)
 }
 
-func (s *Scanner) emitWithValue(t token.Kind, value string) {
-	s.items <- token.Token{Kind: t, Val: value /*, add Position if needed */}
+func (s *Scanner) emitWithValue(t token.Kind, value string, rng report.Range) {
+	s.items <- token.Token{Kind: t, Lexeme: value, Range: rng}
 	s.start = s.pos
 }
 
 func (s *Scanner) next() (r rune) {
-	if s.pos >= len(s.input) {
+	if s.pos >= len(s.src.Content) {
 		s.width = 0
 		return eof
 	}
 
-	r, s.width = utf8.DecodeRuneInString(s.input[s.pos:])
+	r, s.width = utf8.DecodeRune(s.src.Content[s.pos:])
 	s.pos += s.width
 
+	if r == '\n' {
+		s.line++
+		s.column = 1
+	} else {
+		s.column++
+	}
+
 	return r
-}
-
-func (s *Scanner) scanIdentifier() token.Kind {
-	start := s.pos
-
-	// The first character must be a letter or '_'
-	r := s.peek()
-	if !s.isLetter(r) && !s.isDecDigit(r) && r != '_' {
-		s.errorf("invalid identifier: must start with letter or '_'")
-		return token.ILLEGAL
-	}
-
-	// Consume the rest: letters, digits, or underscores
-	for {
-		r = s.peek()
-		if s.isLetter(r) || s.isDecDigit(r) || r == '_' {
-			s.next()
-		} else {
-			break
-		}
-	}
-
-	return token.Lookup(s.input[start:s.pos])
 }
 
 func (s *Scanner) backup() {
@@ -97,16 +84,18 @@ func (s *Scanner) peek() rune {
 }
 
 func (s *Scanner) errorf(format string, args ...interface{}) StateFn {
-	s.items <- token.Token{Kind: token.ILLEGAL, Val: fmt.Sprintf(format, args...)}
+	s.items <- token.Token{Kind: token.ILLEGAL, Lexeme: fmt.Sprintf(format, args...)}
 	return scanText
 }
 
-func Scan(name, input string) *Scanner {
+func Scan(src *report.SourceFile, mgr *report.SourceManager) *Scanner {
 	scan := &Scanner{
-		name:  name,
-		input: input,
-		state: scanText,
-		items: make(chan token.Token, 512),
+		src:    src,
+		mgr:    mgr,
+		state:  scanText,
+		items:  make(chan token.Token, 512),
+		line:   1,
+		column: 1,
 	}
 
 	return scan

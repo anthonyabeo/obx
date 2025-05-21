@@ -136,6 +136,9 @@ var tokens = [...]string{
 	ML_COMMENT_END:   "*)",
 
 	IDENTIFIER: "IDENTIFIER",
+	INTEGER:    "integer",
+	INT32:      "int32",
+	INT64:      "int64",
 
 	PLUS:  "+",
 	MINUS: "-",
@@ -222,9 +225,9 @@ func Lookup(ident string) Kind {
 }
 
 type Token struct {
-	Kind  Kind
-	Val   string
-	Range report.Range
+	Kind   Kind
+	Lexeme string
+	Range  report.Range
 }
 
 func (i Token) String() string {
@@ -232,11 +235,11 @@ func (i Token) String() string {
 	case EOF:
 		return "EOF"
 	case ILLEGAL:
-		return i.Val
+		return i.Lexeme
 	default:
-		if len(i.Val) > 10 {
-			return fmt.Sprintf("%.10q...", i.Val)
+		if len(i.Lexeme) > 10 {
+			return fmt.Sprintf("%.10q...", i.Lexeme)
 		}
-		return fmt.Sprintf("%q", i.Val)
+		return fmt.Sprintf("%q", i.Lexeme)
 	}
 }

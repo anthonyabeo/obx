@@ -2,22 +2,48 @@ package scan
 
 import (
 	"strconv"
+	"strings"
 	"unicode"
 
+	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type StateFn func(*Scanner) StateFn
 
-func scanIdentifier(sc *Scanner) StateFn {
-	tok := sc.scanIdentifier()
+func scanIdentifier(s *Scanner) StateFn {
+	// The first character must be a letter or '_'
+	r := s.peek()
+	if !s.isLetter(r) && !s.isDecDigit(r) && r != '_' {
+		return s.errorf("invalid identifier: must start with letter or '_'")
+		//return token.ILLEGAL
+	}
 
-	sc.emit(tok)
+	// Consume the rest: letters, digits, or underscores
+	for {
+		r = s.peek()
+		if s.isLetter(r) || s.isDecDigit(r) || r == '_' {
+			s.next()
+		} else {
+			break
+		}
+	}
+
+	lexeme := strings.ToLower(string(s.src.Content[s.start:s.pos]))
+	kind := token.Lookup(lexeme)
+
+	rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+	if err != nil {
+		s.errorf(err.Error())
+		panic(err.Error())
+	}
+
+	s.emit(kind, rng)
+
 	return scanText
 }
 
 func scanNumber(s *Scanner) StateFn {
-	startPos := s.pos
 	isReal := false
 	scaleChar := rune(0) // 'E', 'D', or 'S'
 
@@ -30,17 +56,29 @@ func scanNumber(s *Scanner) StateFn {
 	s.acceptRun("0123456789AaBbCcDdEeFf") // possible hex digits
 	if s.accept("Hh") {
 		if s.accept("Ll") {
-			s.emit(token.INT64_LIT)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+
+			s.emit(token.INT64_LIT, rng)
 			return scanText
 		}
 
 		if s.accept("Ii") {
-			s.emit(token.INT32_LIT)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+
+			s.emit(token.INT32_LIT, rng)
 			return scanText
 		}
 
 		// Ensure all characters before 'H' were valid hex digits
-		if !isValidHex(s.input[startPos:midPos]) {
+		if !isValidHex(string(s.src.Content[s.start:midPos])) {
 			return s.errorf("invalid hex digits before 'H'")
 		}
 
@@ -48,13 +86,19 @@ func scanNumber(s *Scanner) StateFn {
 			return s.errorf("invalid character '%c' after hex literal", s.peek())
 		}
 
-		s.emit(token.INT_LIT)
+		rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+		if err != nil {
+			s.errorf(err.Error())
+			panic(err.Error())
+		}
+
+		s.emit(token.INT_LIT, rng)
 		return scanText
 	}
 
 	if s.accept("Xx") {
 		// extract the character before 'X'
-		hexValue := s.input[startPos : s.pos-1]
+		hexValue := string(s.src.Content[s.start : s.pos-1])
 
 		// Ensure all characters before 'X' were valid hex digits
 		if !isValidHex(hexValue) {
@@ -88,7 +132,13 @@ func scanNumber(s *Scanner) StateFn {
 		character := rune(value)
 
 		// Emit the character token with its Unicode code point
-		s.emitWithValue(token.CHAR_LIT, string(character))
+		rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+		if err != nil {
+			s.errorf(err.Error())
+			panic(err.Error())
+		}
+
+		s.emitWithValue(token.CHAR_LIT, string(character), rng)
 
 		return scanText
 	}
@@ -105,7 +155,7 @@ func scanNumber(s *Scanner) StateFn {
 	// Check for exponent
 	if s.accept("EeDdSs") {
 		isReal = true
-		scaleChar = rune(s.input[s.pos-1])
+		scaleChar = rune(s.src.Content[s.pos-1])
 		s.accept("+-")
 		if !s.acceptDigits("0123456789") {
 			return s.errorf("invalid exponent: expected digit after exponent")
@@ -119,12 +169,24 @@ func scanNumber(s *Scanner) StateFn {
 	// Optional suffix for integer
 	if !isReal {
 		if s.accept("Ll") {
-			s.emit(token.INT64_LIT)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+
+			s.emit(token.INT64_LIT, rng)
 			return scanText
 		}
 
 		if s.accept("Ii") {
-			s.emit(token.INT32_LIT)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+
+			s.emit(token.INT32_LIT, rng)
 			return scanText
 		}
 
@@ -132,29 +194,40 @@ func scanNumber(s *Scanner) StateFn {
 			return s.errorf("invalid character '%c' after hex literal", s.peek())
 		}
 
-		s.emit(token.INT_LIT)
+		rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+		if err != nil {
+			s.errorf(err.Error())
+			panic(err.Error())
+		}
+
+		s.emit(token.INT_LIT, rng)
 		return scanText
 	}
 
+	rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+	if err != nil {
+		s.errorf(err.Error())
+		panic(err.Error())
+	}
 	// Real number type decision
 	switch scaleChar {
 	case 'D', 'd':
-		s.emit(token.LONGREAL_LIT)
+		s.emit(token.LONGREAL_LIT, rng)
 	case 'S', 's':
-		s.emit(token.REAL_LIT)
+		s.emit(token.REAL_LIT, rng)
 	case 'E', 'e':
-		fullNum := s.input[startPos:s.pos]
+		fullNum := string(s.src.Content[s.start:s.pos])
 		if canFitInFloat32FromString(fullNum, string(scaleChar)) {
-			s.emit(token.REAL_LIT)
+			s.emit(token.REAL_LIT, rng)
 		} else {
-			s.emit(token.LONGREAL_LIT)
+			s.emit(token.LONGREAL_LIT, rng)
 		}
 	default:
 		if !isNumberTokenBoundary(s.peek()) {
 			return s.errorf("invalid character '%c' after hex literal", s.peek())
 		}
 
-		s.emit(token.REAL_LIT)
+		s.emit(token.REAL_LIT, rng)
 	}
 
 	return scanText
@@ -188,8 +261,15 @@ func scanHexString(s *Scanner) StateFn {
 			if len(hexDigits)%2 != 0 {
 				return s.errorf("hex string must have an even number of hex digits")
 			}
+
 			// Emit the hex string as a token
-			s.emitWithValue(token.HEX_STR_LIT, string(hexDigits))
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+
+			s.emitWithValue(token.HEX_STR_LIT, string(hexDigits), rng)
 			return scanText
 		}
 
@@ -252,8 +332,15 @@ func scanString(s *Scanner) StateFn {
 				s.next() // consume the character
 			}
 		case quote: // closing quote
+
 			// Emit the string content (without quotes)
-			s.emitWithValue(token.STR_LIT, string(value))
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+
+			s.emitWithValue(token.STR_LIT, string(value), rng)
 			return scanText
 		default:
 			// Just a regular character inside the string
@@ -263,94 +350,247 @@ func scanString(s *Scanner) StateFn {
 }
 
 func scanText(s *Scanner) StateFn {
+	//start := s.pos
 	for ch := s.next(); ch != eof; {
 		switch ch {
 		case '.':
-			c := s.next()
+			c := s.peek()
 			if c == '.' {
-				s.emit(token.RANGE)
+				s.next()
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+				s.emit(token.RANGE, rng)
 			} else {
-				s.backup()
-				s.emit(token.PERIOD)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+				s.emit(token.PERIOD, rng)
 			}
 		case '-':
-			s.emit(token.MINUS)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+			s.emit(token.MINUS, rng)
 		case '+':
-			s.emit(token.PLUS)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+
+			s.emit(token.PLUS, rng)
 		case '=':
-			s.emit(token.EQUAL)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+
+			s.emit(token.EQUAL, rng)
 		case '<':
-			c := s.next()
+			c := s.peek()
 			if c == '=' {
-				s.emit(token.LEQ)
+				s.next()
+
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+
+				s.emit(token.LEQ, rng)
 			} else {
-				s.backup()
-				s.emit(token.LESS)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+				s.emit(token.LESS, rng)
 			}
 		case '>':
 			c := s.peek()
 			if c == '=' {
 				s.next()
-				s.emit(token.GEQ)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+				s.emit(token.GEQ, rng)
 			} else {
-				s.emit(token.GREAT)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+				s.emit(token.GREAT, rng)
 			}
 		case '&':
-			s.emit(token.AND)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+			s.emit(token.AND, rng)
 		case '|':
-			s.emit(token.BAR)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+
+			s.emit(token.BAR, rng)
 		case '#':
-			s.emit(token.NEQ)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+			s.emit(token.NEQ, rng)
 		case '^':
-			s.emit(token.CARET)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+
+			s.emit(token.CARET, rng)
 		case ':':
 			c := s.peek()
 			if c == '=' {
 				s.next()
-				s.emit(token.BECOMES)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+
+				s.emit(token.BECOMES, rng)
 			} else {
-				s.emit(token.COLON)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+				s.emit(token.COLON, rng)
 			}
 		case '/':
 			c := s.peek()
 			if c == '/' {
 				s.next()
-				s.emit(token.SL_COMMENT_START)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+				s.emit(token.SL_COMMENT_START, rng)
 			} else {
-				s.emit(token.QUOT)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+				s.emit(token.QUOT, rng)
 			}
 		case '*':
 			c := s.peek()
 			if c == ')' {
 				s.next()
-				s.emit(token.ML_COMMENT_END)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+				s.emit(token.ML_COMMENT_END, rng)
 			} else {
-				s.emit(token.STAR)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+				s.emit(token.STAR, rng)
 			}
 		case '{':
-			s.emit(token.LBRACE)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+			s.emit(token.LBRACE, rng)
 		case '}':
-			s.emit(token.RBRACE)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+			s.emit(token.RBRACE, rng)
 		case '[':
-			s.emit(token.LBRACK)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+			s.emit(token.LBRACK, rng)
 		case ']':
-			s.emit(token.RBRACK)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+			s.emit(token.RBRACK, rng)
 		case '(':
 			c := s.peek()
 			if c == '*' {
 				s.next()
-				s.emit(token.ML_COMMENT_START)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+				s.emit(token.ML_COMMENT_START, rng)
 			} else {
-				s.emit(token.LPAREN)
+				rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+				if err != nil {
+					s.errorf(err.Error())
+					panic(err.Error())
+				}
+				s.emit(token.LPAREN, rng)
 			}
 		case ')':
-			s.emit(token.RPAREN)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+			s.emit(token.RPAREN, rng)
 		case ',':
-			s.emit(token.COMMA)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+			s.emit(token.COMMA, rng)
 		case '~':
-			s.emit(token.NOT)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+			s.emit(token.NOT, rng)
 		case ';':
-			s.emit(token.SEMICOLON)
+			rng, err := s.mgr.Range(s.src.Name, s.start, s.pos)
+			if err != nil {
+				s.errorf(err.Error())
+				panic(err.Error())
+			}
+			s.emit(token.SEMICOLON, rng)
 		case ' ', '\t', '\n':
 			s.ignore()
 		case '$':
@@ -374,7 +614,7 @@ func scanText(s *Scanner) StateFn {
 		ch = s.next()
 	}
 
-	s.emit(token.EOF)
+	s.emit(token.EOF, report.Range{})
 
 	return nil
 }

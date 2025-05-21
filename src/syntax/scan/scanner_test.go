@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -84,16 +85,21 @@ func TestScanNumber(t *testing.T) {
 		{"0H.", token.ILLEGAL, true},         // invalid character after hex marker
 	}
 
+	file := "test.ob"
+	sm := report.NewSourceManager()
+
 	for _, test := range tests {
-		sc := Scan("", test.input)
-		got := sc.NextItem()
+		sm.Load(file, []byte(test.input))
+		sc := Scan(sm.GetSourceFile(file), sm)
+
+		got := sc.NextToken()
 
 		if test.wantErr {
 			if got.Kind != token.ILLEGAL {
-				t.Errorf("NextItem(%q) = %v; want error", test.input, got.Kind)
+				t.Errorf("NextToken(%q) = %v; want error", test.input, got.Kind)
 			}
 		} else if got.Kind != test.expected {
-			t.Errorf("NextItem(%q) = %v; want %v", test.input, got.Kind, test.expected)
+			t.Errorf("NextToken(%q) = %v; want %v", test.input, got.Kind, test.expected)
 		}
 	}
 }
@@ -122,16 +128,20 @@ func TestScanIdentifiers(t *testing.T) {
 		{"_123", token.IDENTIFIER, false},                           // underscore followed by digits
 	}
 
-	for _, test := range tests {
-		sc := Scan("", test.input)
-		got := sc.NextItem()
+	file := "test.ob"
+	sm := report.NewSourceManager()
 
+	for _, test := range tests {
+		sm.Load(file, []byte(test.input))
+		sc := Scan(sm.GetSourceFile(file), sm)
+
+		got := sc.NextToken()
 		if test.wantErr {
 			if got.Kind != token.ILLEGAL {
-				t.Errorf("NextItem(%q) = %v; want error", test.input, got.Kind)
+				t.Errorf("NextToken(%q) = %v; want error", test.input, got.Kind)
 			}
 		} else if got.Kind != test.expected {
-			t.Errorf("NextItem(%q) = %v; want %v", test.input, got.Kind, test.expected)
+			t.Errorf("NextToken(%q) = %v; want %v", test.input, got.Kind, test.expected)
 		}
 	}
 }
@@ -169,16 +179,20 @@ func TestScanDelimitersAndOperators(t *testing.T) {
 		{"*)", token.ML_COMMENT_END, false},
 	}
 
-	for _, test := range tests {
-		sc := Scan("", test.input)
-		got := sc.NextItem()
+	file := "test.ob"
+	sm := report.NewSourceManager()
 
+	for _, test := range tests {
+		sm.Load(file, []byte(test.input))
+		sc := Scan(sm.GetSourceFile(file), sm)
+
+		got := sc.NextToken()
 		if test.wantErr {
 			if got.Kind != token.ILLEGAL {
-				t.Errorf("NextItem(%q) = %v; want error", test.input, got.Kind)
+				t.Errorf("NextToken(%q) = %v; want error", test.input, got.Kind)
 			}
 		} else if got.Kind != test.expected {
-			t.Errorf("NextItem(%q) = %v; want %v", test.input, got.Kind, test.expected)
+			t.Errorf("NextToken(%q) = %v; want %v", test.input, got.Kind, test.expected)
 		}
 	}
 }
@@ -213,16 +227,21 @@ func TestScanHexStrings(t *testing.T) {
 		{"$A B C$", token.ILLEGAL, "", true},                                    // Valid hex string with space ignored
 	}
 
+	file := "test.ob"
+	sm := report.NewSourceManager()
+
 	for _, test := range tests {
-		sc := Scan("", test.input)
-		got := sc.NextItem()
+		sm.Load(file, []byte(test.input))
+		sc := Scan(sm.GetSourceFile(file), sm)
+
+		got := sc.NextToken()
 
 		if test.wantErr {
 			if got.Kind != token.ILLEGAL {
-				t.Errorf("NextItem(%q) = %v; want error", test.input, got.Kind)
+				t.Errorf("NextToken(%q) = %v; want error", test.input, got.Kind)
 			}
 		} else if got.Kind != test.expected {
-			t.Errorf("NextItem(%q) = %v; want %v", test.input, got.Kind, test.expected)
+			t.Errorf("NextToken(%q) = %v; want %v", test.input, got.Kind, test.expected)
 		}
 	}
 }
@@ -252,16 +271,20 @@ func TestScanCharacterLiterals(t *testing.T) {
 		{"1F x", token.ILLEGAL, "", true},    // Whitespace between hex and 'x'
 	}
 
-	for _, test := range tests {
-		sc := Scan("", test.input)
-		got := sc.NextItem()
+	file := "test.ob"
+	sm := report.NewSourceManager()
 
+	for _, test := range tests {
+		sm.Load(file, []byte(test.input))
+		sc := Scan(sm.GetSourceFile(file), sm)
+
+		got := sc.NextToken()
 		if test.wantErr {
 			if got.Kind != token.ILLEGAL {
-				t.Errorf("NextItem(%q) = %v; want error", test.input, got.Kind)
+				t.Errorf("NextToken(%q) = %v; want error", test.input, got.Kind)
 			}
 		} else if got.Kind != test.expected {
-			t.Errorf("NextItem(%q) = %v; want %v", test.input, got.Kind, test.expected)
+			t.Errorf("NextToken(%q) = %v; want %v", test.input, got.Kind, test.expected)
 		}
 	}
 }
@@ -301,9 +324,14 @@ next'`, token.ILLEGAL, "", true}, // newline
 		{`'`, token.ILLEGAL, "", true},
 	}
 
+	file := "test.ob"
+	sm := report.NewSourceManager()
+
 	for _, tt := range tests {
-		s := Scan("test", tt.input)
-		tok := s.NextItem()
+		sm.Load(file, []byte(tt.input))
+		sc := Scan(sm.GetSourceFile(file), sm)
+
+		tok := sc.NextToken()
 
 		if tt.wantError {
 			if tok.Kind != token.ILLEGAL {
@@ -315,8 +343,8 @@ next'`, token.ILLEGAL, "", true}, // newline
 		if tok.Kind != tt.wantToken {
 			t.Errorf("input %q: expected token %v, got %v", tt.input, tt.wantToken, tok.Kind)
 		}
-		if tok.Val != tt.wantLiteral {
-			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.wantLiteral, tok.Val)
+		if tok.Lexeme != tt.wantLiteral {
+			t.Errorf("input %q: expected literal %q, got %q", tt.input, tt.wantLiteral, tok.Lexeme)
 		}
 	}
 }
@@ -334,16 +362,21 @@ func TestScanComments(t *testing.T) {
 		{"(* Another multi-line comment *)", token.ML_COMMENT_START, false},
 	}
 
+	file := "test.ob"
+	sm := report.NewSourceManager()
+
 	for _, test := range tests {
-		sc := Scan("", test.input)
-		got := sc.NextItem()
+		sm.Load(file, []byte(test.input))
+		sc := Scan(sm.GetSourceFile(file), sm)
+
+		got := sc.NextToken()
 
 		if test.wantErr {
 			if got.Kind != token.ILLEGAL {
-				t.Errorf("NextItem(%q) = %v; want error", test.input, got.Kind)
+				t.Errorf("NextToken(%q) = %v; want error", test.input, got.Kind)
 			}
 		} else if got.Kind != test.expected {
-			t.Errorf("NextItem(%q) = %v; want %v", test.input, got.Kind, test.expected)
+			t.Errorf("NextToken(%q) = %v; want %v", test.input, got.Kind, test.expected)
 		}
 	}
 }
@@ -369,7 +402,10 @@ begin
   	assert(res = 10946)
 end Main
 `
-	sc := Scan("", input)
+	file := "test.ob"
+	sm := report.NewSourceManager()
+	sm.Load(file, []byte(input))
+	sc := Scan(sm.GetSourceFile(file), sm)
 
 	tests := []struct {
 		tokenKind token.Kind
@@ -463,13 +499,13 @@ end Main
 	}
 
 	for _, tt := range tests {
-		got := sc.NextItem()
+		got := sc.NextToken()
 		if got.Kind != tt.tokenKind {
-			t.Errorf(fmt.Sprintf("sc.NextItem(). Expected token kind = %v, Got %v", tt.tokenKind, got.Kind))
+			t.Errorf(fmt.Sprintf("sc.NextToken(). Expected token kind = %v, Got %v", tt.tokenKind, got.Kind))
 		}
 
-		if got.Val != tt.tokenLit {
-			t.Errorf("sc.NextItem(). Expected token literal = %v, Got %v", tt.tokenLit, got.Val)
+		if got.Lexeme != tt.tokenLit {
+			t.Errorf("sc.NextToken(). Expected token literal = %v, Got %v", tt.tokenLit, got.Lexeme)
 		}
 	}
 }
@@ -525,7 +561,10 @@ begin
   drawAll()
 end Drawing
 `
-	sc := Scan("", input)
+	file := "test.ob"
+	sm := report.NewSourceManager()
+	sm.Load(file, []byte(input))
+	sc := Scan(sm.GetSourceFile(file), sm)
 
 	tests := []struct {
 		tokenKind token.Kind
@@ -793,13 +832,13 @@ end Drawing
 	}
 
 	for _, tt := range tests {
-		got := sc.NextItem()
+		got := sc.NextToken()
 		if got.Kind != tt.tokenKind {
-			t.Errorf(fmt.Sprintf("sc.NextItem(). Expected token kind = %v, Got %v", tt.tokenKind, got.Kind))
+			t.Errorf(fmt.Sprintf("sc.NextToken(). Expected token kind = %v, Got %v", tt.tokenKind, got.Kind))
 		}
 
-		if got.Val != tt.tokenLit {
-			t.Errorf("sc.NextItem(). Expected token literal = %v, Got %v", tt.tokenLit, got.Val)
+		if got.Lexeme != tt.tokenLit {
+			t.Errorf("sc.NextToken(). Expected token literal = %v, Got %v", tt.tokenLit, got.Lexeme)
 		}
 	}
 }
