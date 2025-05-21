@@ -3,6 +3,8 @@ package token
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/anthonyabeo/obx/src/report"
 )
 
 type Kind int
@@ -220,8 +222,9 @@ func Lookup(ident string) Kind {
 }
 
 type Token struct {
-	Kind Kind
-	Val  string
+	Kind  Kind
+	Val   string
+	Range report.Range
 }
 
 func (i Token) String() string {

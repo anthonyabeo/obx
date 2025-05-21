@@ -1,12 +1,10 @@
-package sema
+package analysis
 
 import (
 	"fmt"
-	scope2 "github.com/anthonyabeo/obx/src/scope"
 	"strconv"
 
 	"github.com/anthonyabeo/obx/src/sema/scope"
-	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
@@ -17,7 +15,7 @@ import (
 //  2. Ta is declared to equal Tb in a type declaration of the form Ta = Tb, or
 //  3. a and b appear in the same identifier list in a variable, record field,
 //     or formal parameter declaration and are not open arrays.
-func (v *Visitor) sameType(Ta, Tb types.Type) bool {
+func (v *Visitor) sameType(Ta, Tb scope.Type) bool {
 	if Ta == nil || Tb == nil {
 		return false
 	}
@@ -27,8 +25,8 @@ func (v *Visitor) sameType(Ta, Tb types.Type) bool {
 	}
 
 	sym := v.env.Lookup(Ta.String())
-	if sym != nil && sym.Kind() == scope2.TYPE {
-		ty := sym.(*scope2.TypeName)
+	if sym != nil && sym.Kind() == scope.TYPE {
+		ty := sym.(*scope.TypeName)
 		if ty.Type().String() == Tb.String() {
 			return true
 		}
@@ -45,7 +43,7 @@ func (v *Visitor) sameType(Ta, Tb types.Type) bool {
 // 2. Ta and Tb are open array types with equal element types, or
 // 3. Ta and Tb are procedure types whose formal parameters match, or
 // 4. Ta and Tb are pointer types with equal base types.
-func (v *Visitor) equalType(Ta, Tb types.Type) bool {
+func (v *Visitor) equalType(Ta, Tb scope.Type) bool {
 	if Ta == nil || Tb == nil {
 		return false
 	}
@@ -54,24 +52,24 @@ func (v *Visitor) equalType(Ta, Tb types.Type) bool {
 		return true
 	}
 
-	TaArr := Ta.(*Array)
-	TbArr := Tb.(*Array)
+	TaArr := Ta.(*scope.Array)
+	TbArr := Tb.(*scope.Array)
 	if (TaArr != nil && TaArr.IsOpen()) && (TbArr != nil && TbArr.IsOpen()) {
 		if v.equalType(TbArr.ElemTy, TbArr.ElemTy) {
 			return true
 		}
 	}
 
-	TaProc := Ta.(*ProcedureType)
-	TbProc := Tb.(*ProcedureType)
+	TaProc := Ta.(*scope.ProcedureType)
+	TbProc := Tb.(*scope.ProcedureType)
 	if TaProc != nil && TbProc != nil {
 		if v.paramListMatch(TaProc.fp, TbProc.fp) {
 			return true
 		}
 	}
 
-	TaPtr := Ta.(*types.PtrType)
-	TbPtr := Tb.(*types.PtrType)
+	TaPtr := Ta.(*scope.PtrType)
+	TbPtr := Tb.(*scope.PtrType)
 	if TaPtr != nil && TbPtr != nil {
 		if v.equalType(TaPtr.UTy, TbPtr.UTy) {
 			return true
@@ -95,7 +93,7 @@ func (v *Visitor) equalType(Ta, Tb types.Type) bool {
 // 10. Tv is an array of WCHAR, Te is a Unicode BMP or Latin-1 string or character array, and STRLEN(e) < LEN(v);
 // 11. Tv is an array of CHAR, Te is a Latin-1 string or character array, and STRLEN(e) < LEN(v);
 // 12. Tv is a procedure type and e is the name of a procedure whose formal parameters match those of Tv.
-func (v *Visitor) assignCompat(Te, Tv types.Type) bool {
+func (v *Visitor) assignCompat(Te, Tv scope.Type) bool {
 	if Te == nil && Tv == nil {
 		return false
 	}
@@ -104,38 +102,38 @@ func (v *Visitor) assignCompat(Te, Tv types.Type) bool {
 		return true
 	}
 
-	TeBasic, TeBasicOk := Te.(*types.Basic)
-	TvBasic, TvBasicOk := Tv.(*types.Basic)
+	TeBasic, TeBasicOk := Te.(*scope.Basic)
+	TvBasic, TvBasicOk := Tv.(*scope.Basic)
 	if TeBasicOk && TvBasicOk {
-		if TeBasic.Info()|types.IsNumeric == types.IsNumeric && TvBasic.Info()|types.IsNumeric == types.IsNumeric {
+		if TeBasic.Info()|scope.IsNumeric == scope.IsNumeric && TvBasic.Info()|scope.IsNumeric == scope.IsNumeric {
 			return TvBasic.Kind() >= TeBasic.Kind()
 		}
 
-		if TvBasic.Info() == types.IsSet && TeBasic.Kind() < types.Int32 {
+		if TvBasic.Info() == scope.IsSet && TeBasic.Kind() < scope.Int32 {
 			return true
 		}
 
-		if TvBasic.Kind() == types.Byte && TeBasic.Kind() == types.Char {
+		if TvBasic.Kind() == scope.Byte && TeBasic.Kind() == scope.Char {
 			return true
 		}
 	}
 
-	TeEnum, TeEnumOk := Te.(*types.Enum)
+	TeEnum, TeEnumOk := Te.(*scope.Enum)
 	if TeEnumOk && TvBasicOk {
-		if TvBasic.Info() == types.IsInteger && TeEnum != nil {
+		if TvBasic.Info() == scope.IsInteger && TeEnum != nil {
 			return true
 		}
 	}
 
-	_, TeRecOk := Te.(*Record)
-	_, TvRecOk := Tv.(*Record)
+	_, TeRecOk := Te.(*scope.Record)
+	_, TvRecOk := Tv.(*scope.Record)
 	if TeRecOk && TvRecOk {
 		//TODO #6
 		return true
 	}
 
-	_, TePtrOk := Te.(*types.PtrType)
-	_, TvPtrOk := Tv.(*types.PtrType)
+	_, TePtrOk := Te.(*scope.PtrType)
+	_, TvPtrOk := Tv.(*scope.PtrType)
 	if TePtrOk && TvPtrOk {
 		//TODO #7
 		return true
@@ -147,7 +145,7 @@ func (v *Visitor) assignCompat(Te, Tv types.Type) bool {
 
 // If Pa = POINTER TO Ta and Pb = POINTER TO Tb , Pb is an extension of Pa (Pa is a base type of Pb)
 // if Tb is an extension of Ta.
-func (v *Visitor) ptrExt(Ta, Tb *types.PtrType) bool {
+func (v *Visitor) ptrExt(Ta, Tb *scope.PtrType) bool {
 	return true
 }
 
@@ -157,7 +155,7 @@ func (v *Visitor) ptrExt(Ta, Tb *types.PtrType) bool {
 // 1. Ta and Tb are the same types, or
 // 2. Tb is a direct extension of Ta.
 // 3. Ta is of type ANYREC.
-func (v *Visitor) recordTyExt(baseTy, extTy types.Type) bool {
+func (v *Visitor) recordTyExt(baseTy, extTy scope.Type) bool {
 	if baseTy == nil || extTy == nil {
 		return false
 	}
@@ -177,17 +175,17 @@ func (v *Visitor) recordTyExt(baseTy, extTy types.Type) bool {
 	return false
 }
 
-func (v *Visitor) directExt(baseTy, extTy types.Type) bool {
+func (v *Visitor) directExt(baseTy, extTy scope.Type) bool {
 	if baseTy == nil || extTy == nil {
 		return false
 	}
 
 	sym := v.env.Lookup(extTy.String())
-	if sym == nil || sym.Kind() != scope2.TYPE {
+	if sym == nil || sym.Kind() != scope.TYPE {
 		return false
 	}
 
-	ext := sym.Type().(*Record)
+	ext := sym.Type().(*scope.Record)
 	if !v.equalType(ext.base, baseTy) {
 		return false
 	}
@@ -200,7 +198,7 @@ func (v *Visitor) directExt(baseTy, extTy types.Type) bool {
 // 1. Tf and Ta are equal types, or
 // 2. f is a value parameter and Ta is assignment compatible with Tf, or
 // 3. f is an IN or VAR parameter Ta must be the same type as Tf, or Tf must be a record type and Ta an extension of Tf.
-func (v *Visitor) paramCompat(fpKind token.Token, Ta, Tf types.Type) bool {
+func (v *Visitor) paramCompat(fpKind token.Token, Ta, Tf scope.Type) bool {
 	if Tf == nil {
 		return false
 	}
@@ -218,7 +216,7 @@ func (v *Visitor) paramCompat(fpKind token.Token, Ta, Tf types.Type) bool {
 			return true
 		}
 
-		TfRec := Tf.(*Record)
+		TfRec := Tf.(*scope.Record)
 		if TfRec != nil && v.recordTyExt(Tf, Ta) {
 			return true
 		}
@@ -234,7 +232,7 @@ func (v *Visitor) paramCompat(fpKind token.Token, Ta, Tf types.Type) bool {
 // 3. Tf is an open array of CHAR and Ta is a Latin-1 string, or
 // 4. Tf is an open array of WCHAR and Ta is a Unicode BMP or Latin-1 string, or
 // 5. Tf is an open array of BYTE and Ta is a byte string.
-func (v *Visitor) arrayCompat(a, b types.Type) bool { return false }
+func (v *Visitor) arrayCompat(a, b scope.Type) bool { return false }
 
 // Two formal parameter lists match if
 //
@@ -263,7 +261,7 @@ func (v *Visitor) paramListMatch(Ta, Tb *ast.FormalParams) bool {
 	return true
 }
 
-func (v *Visitor) resultTypeMatch(a, b types.Type) bool {
+func (v *Visitor) resultTypeMatch(a, b scope.Type) bool {
 	if a == nil || b == nil {
 		return false
 	}
@@ -276,41 +274,41 @@ func (v *Visitor) resultTypeMatch(a, b types.Type) bool {
 }
 
 func (v *Visitor) checkFuncBuiltin(b *scope.Builtin, call *ast.FuncCall) {
-	proc := scope2.PredeclaredProcedures[b.Id]
+	proc := scope.PredeclaredProcedures[b.Id]
 
 	switch b.Id {
-	case scope2.Abs_:
-	case scope2.Cap_:
-	case scope2.BitAnd_:
-	case scope2.BitAsr_:
-	case scope2.BitNot_:
-	case scope2.BitOr_:
-	case scope2.Bits_:
-	case scope2.BitShl_:
-	case scope2.BitShr_:
-	case scope2.BitXor_:
-	case scope2.Cast_:
-	case scope2.Chr_:
-	case scope2.Default_:
-	case scope2.Floor_:
-	case scope2.Flt_:
-	case scope2.LdCmd_:
-	case scope2.LdMod_:
-	case scope2.Len_:
+	case scope.Abs_:
+	case scope.Cap_:
+	case scope.BitAnd_:
+	case scope.BitAsr_:
+	case scope.BitNot_:
+	case scope.BitOr_:
+	case scope.Bits_:
+	case scope.BitShl_:
+	case scope.BitShr_:
+	case scope.BitXor_:
+	case scope.Cast_:
+	case scope.Chr_:
+	case scope.Default_:
+	case scope.Floor_:
+	case scope.Flt_:
+	case scope.LdCmd_:
+	case scope.LdMod_:
+	case scope.Len_:
 		if len(call.ActualParams) != 1 && len(call.ActualParams) != 2 {
 			v.err.AddError(call.Pos(), fmt.Sprintf("invalid number of arguments to procedure call '%v'", proc.Name))
 		}
 
 		switch ty := call.ActualParams[0].Type().(type) {
-		case *Array:
-		case *types.PtrType:
-			if _, arrOk := ty.UTy.(*Array); !arrOk {
+		case *scope.Array:
+		case *scope.PtrType:
+			if _, arrOk := ty.UTy.(*scope.Array); !arrOk {
 				msg := fmt.Sprintf("'len' function expected (pointer to) array or string as first parameter, got '%s'",
 					call.ActualParams[0].Type())
 				v.err.AddError(call.ActualParams[0].Pos(), msg)
 			}
-		case *types.Basic:
-			if ty.Kind() != types.String {
+		case *scope.Basic:
+			if ty.Kind() != scope.String {
 				msg := fmt.Sprintf("'len' function expected (pointer to) array or string as first parameter, got '%s'",
 					call.ActualParams[0].Type())
 				v.err.AddError(call.ActualParams[0].Pos(), msg)
@@ -322,8 +320,8 @@ func (v *Visitor) checkFuncBuiltin(b *scope.Builtin, call *ast.FuncCall) {
 		}
 
 		if len(call.ActualParams) == 2 {
-			if b, bOk := call.ActualParams[1].Type().(*types.Basic); bOk {
-				if b.Kind() != types.Int32 {
+			if b, bOk := call.ActualParams[1].Type().(*scope.Basic); bOk {
+				if b.Kind() != scope.Int32 {
 					msg := fmt.Sprintf("second argument '%s' in 'new' function must be an integer-type",
 						call.ActualParams[1])
 					v.err.AddError(call.ActualParams[1].Pos(), msg)
@@ -335,57 +333,57 @@ func (v *Visitor) checkFuncBuiltin(b *scope.Builtin, call *ast.FuncCall) {
 			}
 		}
 
-		call.EType = scope2.Typ[types.Int32]
-	case scope2.Long_:
-	case scope2.Max_:
-	case scope2.Min_:
-	case scope2.Odd_:
-	case scope2.Ord_:
+		call.EType = scope.Typ[scope.Int32]
+	case scope.Long_:
+	case scope.Max_:
+	case scope.Min_:
+	case scope.Odd_:
+	case scope.Ord_:
 		obj := v.env.Lookup(call.ActualParams[0].String())
-		if obj == nil || obj.Kind() != scope2.CONST {
+		if obj == nil || obj.Kind() != scope.CONST {
 			msg := fmt.Sprintf("'%s' is not recognised as an enumeration variant", call.ActualParams[0].String())
 			v.err.AddError(call.ActualParams[0].Pos(), msg)
 			v.err.AddError(call.ActualParams[0].Pos(), msg)
 		}
 
-		bl, ok := obj.(*scope2.Const).Value().(*ast.BasicLit)
+		bl, ok := obj.(*scope.Const).Value().(*ast.BasicLit)
 		if !ok {
 			msg := fmt.Sprintf("ordinal value of enum variant '%s' is not an integer", call.ActualParams[0].String())
 			v.err.AddError(call.ActualParams[0].Pos(), msg)
 		}
 
 		i, err := strconv.Atoi(bl.Val)
-		enum := call.ActualParams[0].Type().(*types.Enum)
+		enum := call.ActualParams[0].Type().(*scope.Enum)
 		if err != nil || !enum.IsValidOrd(i) {
 			msg := fmt.Sprintf("'%d' is not a valid ordinal value of the enum '%s'", i, enum)
 			v.err.AddError(call.ActualParams[0].Pos(), msg)
 		}
 
-		call.EType = scope2.Typ[types.Int]
-	case scope2.Short_:
-	case scope2.Size_:
-	case scope2.StrLen_:
-	case scope2.WChr_:
-	case scope2.ASh_:
-	case scope2.ASr_:
-	case scope2.Entier_:
-	case scope2.Lsl_:
-	case scope2.Ror_:
+		call.EType = scope.Typ[scope.Int]
+	case scope.Short_:
+	case scope.Size_:
+	case scope.StrLen_:
+	case scope.WChr_:
+	case scope.ASh_:
+	case scope.ASr_:
+	case scope.Entier_:
+	case scope.Lsl_:
+	case scope.Ror_:
 	}
 }
 
 func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcedureCall) {
-	proc := scope2.PredeclaredProcedures[b.Id]
+	proc := scope.PredeclaredProcedures[b.Id]
 
 	switch b.Id {
-	case scope2.Assert_:
+	case scope.Assert_:
 		if len(call.ActualParams) != 1 && len(call.ActualParams) != 2 {
 			v.err.AddError(call.Pos(), fmt.Sprintf("invalid number of arguments to procedure call '%v'", proc.Name))
 		}
 
-		if !v.assignCompat(scope2.Typ[types.Bool], call.ActualParams[0].Type()) {
+		if !v.assignCompat(scope.Typ[scope.Bool], call.ActualParams[0].Type()) {
 			msg := fmt.Sprintf("argument '%v' does not match the corresponding parameter type '%v'",
-				call.ActualParams[0], scope2.Typ[types.Bool])
+				call.ActualParams[0], scope.Typ[scope.Bool])
 			v.err.AddError(call.ActualParams[0].Pos(), msg)
 		}
 
@@ -397,48 +395,48 @@ func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcedureCall) {
 				v.err.AddError(call.ActualParams[0].Pos(), msg)
 			}
 
-			b, bOk := lit.Type().(*types.Basic)
-			if !bOk || b.Info() != types.IsInteger {
+			b, bOk := lit.Type().(*scope.Basic)
+			if !bOk || b.Info() != scope.IsInteger {
 				msg := fmt.Sprintf("second argument to '%s' must be an integer constant; got '%s'",
 					proc.Name, call.ActualParams[0])
 				v.err.AddError(call.ActualParams[0].Pos(), msg)
 			}
 		}
-	case scope2.Bytes_:
-	case scope2.Dec_:
-	case scope2.Excl_:
-	case scope2.Halt_:
-	case scope2.Inc_:
+	case scope.Bytes_:
+	case scope.Dec_:
+	case scope.Excl_:
+	case scope.Halt_:
+	case scope.Inc_:
 		if len(call.ActualParams) != 1 && len(call.ActualParams) != 2 {
 			v.err.AddError(call.Pos(), fmt.Sprintf("invalid number of arguments to procedure call '%v'", proc.Name))
 		}
 
-		b, bOk := call.ActualParams[0].Type().(*types.Basic)
-		_, enumOk := call.ActualParams[0].Type().(*types.Enum)
+		b, bOk := call.ActualParams[0].Type().(*scope.Basic)
+		_, enumOk := call.ActualParams[0].Type().(*scope.Enum)
 
-		if (!bOk || b.Info() != types.IsInteger) && !enumOk {
+		if (!bOk || b.Info() != scope.IsInteger) && !enumOk {
 			msg := fmt.Sprintf("argument to inc '%s' must be integer or enum type; got '%s'",
 				call.ActualParams[0], call.ActualParams[0].Type())
 			v.err.AddError(call.ActualParams[0].Pos(), msg)
 		}
 
 		if len(call.ActualParams) == 2 {
-			b, bOk := call.ActualParams[1].Type().(*types.Basic)
-			if !bOk || b.Info() != types.IsInteger {
+			b, bOk := call.ActualParams[1].Type().(*scope.Basic)
+			if !bOk || b.Info() != scope.IsInteger {
 				msg := fmt.Sprintf("argument '%s' to '%s' must be an integer-type",
 					call.ActualParams[1], proc.Name)
 				v.err.AddError(call.ActualParams[1].Pos(), msg)
 			}
 		}
-	case scope2.Incl_:
-	case scope2.New_:
+	case scope.Incl_:
+	case scope.New_:
 		if len(call.ActualParams) == 1 {
 			switch ty := call.ActualParams[0].Type().(type) {
-			case *types.PtrType:
-				if _, recOk := ty.UTy.(*Record); !recOk {
+			case *scope.PtrType:
+				if _, recOk := ty.UTy.(*scope.Record); !recOk {
 					v.err.AddError(call.ActualParams[0].Pos(), "expected pointer to record type")
 				}
-			case *Array:
+			case *scope.Array:
 				if ty.IsOpen() {
 					v.err.AddError(call.ActualParams[0].Pos(), "expected fixed array")
 				}
@@ -453,8 +451,8 @@ func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcedureCall) {
 
 		if len(call.ActualParams) > 1 {
 			switch ty := call.ActualParams[0].Type().(type) {
-			case *types.PtrType:
-				arr, arrOk := ty.UTy.(*Array)
+			case *scope.PtrType:
+				arr, arrOk := ty.UTy.(*scope.Array)
 				if !arrOk || !arr.IsOpen() {
 					v.err.AddError(call.ActualParams[0].Pos(), "expected an open array")
 				}
@@ -465,8 +463,8 @@ func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcedureCall) {
 			}
 
 			for i := 1; i < len(call.ActualParams); i++ {
-				if b, bOk := call.ActualParams[i].Type().(*types.Basic); bOk {
-					if b.Info() != types.IsInteger {
+				if b, bOk := call.ActualParams[i].Type().(*scope.Basic); bOk {
+					if b.Info() != scope.IsInteger {
 						msg := fmt.Sprintf("argument number '%d' in new must be an integer-type", i+1)
 						v.err.AddError(call.ActualParams[i].Pos(), msg)
 					}
@@ -476,11 +474,11 @@ func (v *Visitor) checkProcBuiltin(b *scope.Builtin, call *ast.ProcedureCall) {
 				}
 			}
 		}
-	case scope2.Number_:
-	case scope2.PCall_:
-	case scope2.Raise_:
-	case scope2.Copy_:
-	case scope2.Pack_:
-	case scope2.UnPk_:
+	case scope.Number_:
+	case scope.PCall_:
+	case scope.Raise_:
+	case scope.Copy_:
+	case scope.Pack_:
+	case scope.UnPk_:
 	}
 }
