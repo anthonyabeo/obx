@@ -51,6 +51,12 @@ var exprEnd = map[token.Kind]bool{
 	token.RPAREN:    true,
 	token.RBRACK:    true,
 	token.RBRACE:    true,
+	token.THEN:      true,
+	token.OF:        true,
+	token.DO:        true,
+	token.RANGE:     true,
+	token.TO:        true,
+	token.BY:        true,
 }
 
 var typeStart = map[token.Kind]bool{
@@ -119,22 +125,4 @@ func (p *Parser) startsImportOrDecl() bool {
 
 func (p *Parser) startsDecl() bool {
 	return declStart[p.tok]
-}
-
-var basicTypes = map[string]bool{
-	"integer":  true,
-	"real":     true,
-	"longreal": true,
-	"boolean":  true,
-	"byte":     true,
-	"char":     true,
-	"set":      true,
-	"wchar":    true,
-	"int8":     true,
-	"int16":    true,
-	"int32":    true,
-	"int64":    true,
-	"bool":     true,
-	"shortint": true,
-	"longint":  true,
 }

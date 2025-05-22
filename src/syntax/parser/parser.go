@@ -754,7 +754,12 @@ func (p *Parser) parseFactor() ast.Expression {
 		return p.parseLiteral()
 
 	default:
-		p.errorExpected("factor expression")
+		p.err.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  p.lit,
+			Pos:      p.rng.Start,
+			Range:    p.rng,
+		})
 		p.advance(exprEnd)
 		return &ast.BadExpr{}
 	}
@@ -902,11 +907,6 @@ func (p *Parser) parseSetElem() ast.Expression {
 
 	return expr
 }
-
-//func (p *Parser) parseNamedType() ast.Type {
-//	return ast.NewNamedType(p.parseQualifiedIdent())
-//
-//}
 
 // qualident = [ ident '.' ] ident
 func (p *Parser) parseQualifiedIdent() *ast.QualifiedIdent {
@@ -1229,7 +1229,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 			p.next()
 		default:
 			stmt = &ast.BadStmt{}
-			p.errorExpected("assignment or procedure call")
+			p.errorExpected(":= or (")
 			p.advance(stmtStart)
 		}
 	default:

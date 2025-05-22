@@ -2,6 +2,7 @@ package parser
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/report"
@@ -1002,7 +1003,7 @@ module Main
 	proc WriteString(s: []char)
 		var i: integer
 	begin i := 0
-		while (i < len(s)) & (s[i] # 0x) do Write(s[i]); inc(i) end
+		while (i < len(s)) & (s[i] # 5) do Write(s[i]); inc(i) end
 	end WriteString
 	proc log2(x: integer): integer
 		var y: integer 
@@ -1077,6 +1078,72 @@ end Main
 
 		if decl.Head.Name.Name != tt.declName {
 			t.Errorf("expected type name '%s', got '%s'", tt.declName, decl.Head.Name.Name)
+		}
+	}
+}
+
+func TestParserWithSyntaxErrors(t *testing.T) {
+	src := []byte(`
+MODULE BadModule;
+
+VAR x, y: INTEGER
+
+BEGIN
+  y := @;             
+  while x > 0x do     
+    x := x div 2      
+    inc(y);;
+  end                 
+EN BadModule.         
+`)
+	table := ast.NewEnvironment(ast.GlobalEnviron, "BadModule")
+
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	mgr.Load(filename, src)
+	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Source: mgr,
+		Writer: os.Stdout,
+	})
+
+	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
+	p := NewParser(lex, r, table, nil)
+	unit := p.Parse()
+
+	if _, ok := unit.(*ast.Module); !ok {
+		t.Fatal("Expected a partially parsed module, got nil")
+	}
+
+	// Check that errors were recorded
+	diags := p.err.Diagnostics()
+	if len(diags) == 0 {
+		t.Error("Expected diagnostics, got none")
+	}
+
+	// Assert specific diagnostics
+	expectedMessages := []string{
+		"invalid character",             // y := @;
+		"malformed number",              // 0x
+		"expected statement, found ';'", // inc(y);;
+		"expected := or (",
+		"expected 'IDENTIFIER', found 'EOF'",
+		"expected := or (",
+		"expected 'end', found 'EOF'",
+		"expected 'end', found 'EOF'",
+		"expected 'IDENTIFIER', found 'EOF'",
+	}
+
+	found := make([]bool, len(expectedMessages))
+	for _, d := range diags {
+		for i, msg := range expectedMessages {
+			if strings.Contains(d.Message, msg) {
+				found[i] = true
+			}
+		}
+	}
+	for i, ok := range found {
+		if !ok {
+			t.Errorf("Expected diagnostic containing: %q", expectedMessages[i])
 		}
 	}
 }
