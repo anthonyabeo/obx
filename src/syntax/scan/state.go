@@ -56,7 +56,7 @@ func scanNumber(s *Scanner) StateFn {
 
 	// Require at least one digit
 	if !s.acceptDigits("0123456789") {
-		return s.errorf("invalid number: expected digit", rng)
+		return s.errorf("malformed number literal: expected digit", rng)
 	}
 
 	midPos := s.pos
@@ -88,11 +88,11 @@ func scanNumber(s *Scanner) StateFn {
 		}
 		// Ensure all characters before 'H' were valid hex digits
 		if !isValidHex(string(s.src.Content[s.start:midPos])) {
-			return s.errorf("invalid hex digits before 'H'", rng)
+			return s.errorf("malformed number: invalid hex digits before 'H'", rng)
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("invalid character '%c' after hex literal", rng, s.peek())
+			return s.errorf("malformed number: invalid character '%c' after hex literal", rng, s.peek())
 		}
 
 		s.emit(token.INT_LIT, rng)
@@ -110,11 +110,11 @@ func scanNumber(s *Scanner) StateFn {
 
 		// Ensure all characters before 'X' were valid hex digits
 		if !isValidHex(hexValue) {
-			return s.errorf("invalid hex digits before 'X'", rng)
+			return s.errorf("malformed number: invalid hex digits before 'X'", rng)
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("invalid character '%c' after hex literal", rng, s.peek())
+			return s.errorf("malformed number: invalid character '%c' after hex literal", rng, s.peek())
 		}
 
 		var value int
@@ -122,18 +122,18 @@ func scanNumber(s *Scanner) StateFn {
 			// 8-bit value (ISO/IEC 8859-1 Latin-1)
 			parsed, err := strconv.ParseInt(hexValue, 16, 8)
 			if err != nil {
-				return s.errorf("invalid 8-bit character value: %s", rng, hexValue)
+				return s.errorf("malformed number: invalid 8-bit character value: %s", rng, hexValue)
 			}
 			value = int(parsed)
 		} else if len(hexValue) == 4 {
 			// 16-bit value (Unicode BMP)
 			parsed, err := strconv.ParseInt(hexValue, 16, 16)
 			if err != nil {
-				return s.errorf("invalid 16-bit character value: %s", rng, hexValue)
+				return s.errorf("malformed number: invalid 16-bit character value: %s", rng, hexValue)
 			}
 			value = int(parsed)
 		} else {
-			return s.errorf("invalid character literal, hex value must be 2 or 4 digits", rng)
+			return s.errorf("malformed number: invalid character literal, hex value must be 2 or 4 digits", rng)
 		}
 
 		// Convert the value to a rune
@@ -155,7 +155,7 @@ func scanNumber(s *Scanner) StateFn {
 
 		isReal = true
 		if !s.acceptDigits("0123456789") {
-			return s.errorf("invalid real number: no digits after decimal point", rng)
+			return s.errorf("malformed number: invalid real number: no digits after decimal point", rng)
 		}
 	}
 
@@ -170,11 +170,11 @@ func scanNumber(s *Scanner) StateFn {
 		scaleChar = rune(s.src.Content[s.pos-1])
 		s.accept("+-")
 		if !s.acceptDigits("0123456789") {
-			return s.errorf("invalid exponent: expected digit after exponent", rng)
+			return s.errorf("malformed number: invalid exponent: expected digit after exponent", rng)
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("invalid character '%c' after hex literal", rng, s.peek())
+			return s.errorf("malformed number: invalid character '%c' after hex literal", rng, s.peek())
 		}
 	}
 
@@ -205,7 +205,7 @@ func scanNumber(s *Scanner) StateFn {
 			panic(err.Error())
 		}
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("invalid character '%c' after hex literal", rng, s.peek())
+			return s.errorf("malformed number literal. '%c' after hex literal", rng, s.peek())
 		}
 
 		s.emit(token.INT_LIT, rng)
@@ -231,7 +231,7 @@ func scanNumber(s *Scanner) StateFn {
 		}
 	default:
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("invalid character '%c' after hex literal", rng, s.peek())
+			return s.errorf("malformed number literal. '%c' after hex literal", rng, s.peek())
 		}
 
 		s.emit(token.REAL_LIT, rng)
@@ -601,7 +601,9 @@ func scanText(s *Scanner) StateFn {
 				if err != nil {
 					panic(err.Error())
 				}
-				s.errorf("invalid character %c", rng, ch)
+
+				s.ignore()
+				return s.errorf("invalid character %c", rng, ch)
 			}
 		}
 
@@ -610,5 +612,5 @@ func scanText(s *Scanner) StateFn {
 
 	s.emit(token.EOF, &report.Range{})
 
-	return nil
+	return scanText
 }
