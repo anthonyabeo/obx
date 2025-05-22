@@ -18,7 +18,7 @@ type StdoutSink struct {
 }
 
 func (s StdoutSink) Emit(d Diagnostic) {
-	printDiagnosticTo(d, s.Source, s.Writer)
+	printDiagnosticTo(s.Writer, s.Source, d)
 }
 
 type FileSink struct {
@@ -27,7 +27,7 @@ type FileSink struct {
 }
 
 func (s *FileSink) Emit(d Diagnostic) {
-	printDiagnosticTo(d, s.Source, s.File)
+	printDiagnosticTo(s.File, s.Source, d)
 }
 
 type JSONNetworkSink struct {

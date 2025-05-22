@@ -9,6 +9,7 @@ type Reporter interface {
 	Flush()
 	ErrorCount() int
 	LimitReached() bool
+	Diagnostics() []Diagnostic
 }
 
 type BufferedReporter struct {
@@ -25,6 +26,10 @@ func NewBufferedReporter(source *SourceManager, maxErrors int, sink DiagnosticSi
 		MaxErrors: maxErrors,
 		sink:      sink,
 	}
+}
+
+func (r *BufferedReporter) Diagnostics() []Diagnostic {
+	return r.diagnostics
 }
 
 func (r *BufferedReporter) Report(d Diagnostic) {

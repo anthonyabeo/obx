@@ -4,94 +4,106 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"unicode/utf8"
 )
 
-func underlineRange(line string, lineNo int, r Range) string {
-	if lineNo != r.Start.Line {
-		return ""
+const (
+	colorReset  = "\033[0m"
+	colorBold   = "\033[1m"
+	colorRed    = "\033[31m"
+	colorYellow = "\033[33m"
+	colorBlue   = "\033[34m"
+	colorGray   = "\033[90m"
+)
+
+func underlineRange(line string, startCol, endCol int) string {
+	runes := []rune(line)
+	var builder strings.Builder
+
+	for i := 1; i < startCol; i++ {
+		if i-1 < len(runes) && runes[i-1] == '\t' {
+			builder.WriteRune('\t') // maintain tab alignment
+		} else {
+			builder.WriteRune(' ')
+		}
 	}
 
-	start := r.Start.Column - 1
-	end := r.End.Column - 1
-	if end < start || start >= len(line) {
-		return ""
+	marker := "~"
+	if endCol-startCol <= 1 {
+		marker = "^"
 	}
-	width := end - start
-	if width <= 0 {
-		width = 1
+	underlineLen := endCol - startCol
+	if underlineLen <= 0 {
+		underlineLen = 1
 	}
+	builder.WriteString(strings.Repeat(marker, underlineLen))
 
-	return fmt.Sprintf("%s%s", strings.Repeat(" ", start), strings.Repeat("~", width))
+	return builder.String()
 }
 
-func printDiagnosticTo(d Diagnostic, source *SourceManager, out io.Writer) {
-	// 1. Header: Severity, File, Line, Column
-	fmt.Fprintf(out, "%s: %s:%d:%d: %s\n",
-		d.Severity.String(),
-		d.Pos.File,
-		d.Pos.Line,
-		d.Pos.Column,
+func printDiagnosticTo(w io.Writer, sm *SourceManager, d Diagnostic) {
+	pos := d.Range.Start
+	end := d.Range.End
+
+	// Choose color based on severity
+	var sevColor string
+	switch d.Severity {
+	case Error:
+		sevColor = colorRed
+	case Warning:
+		sevColor = colorYellow
+	case Info:
+		sevColor = colorBlue
+	default:
+		sevColor = colorGray
+	}
+
+	// Header: filename:line:col: severity: message
+	fmt.Fprintf(w, "%s%s:%d:%d:%s %s%s%s: %s\n",
+		colorBold, pos.File, pos.Line, pos.Column, colorReset,
+		sevColor, d.Severity.String(), colorReset,
 		d.Message,
 	)
 
-	// 2. Get relevant source line(s)
-	var lines []string
-	if d.LineText != "" {
-		lines = []string{d.LineText}
-	} else if d.Range != nil && source != nil {
-		l, err := source.LinesInRange(*d.Range)
-		if err == nil {
-			lines = l
+	// Get source lines
+	src := sm.GetSourceFile(pos.File)
+	if src == nil || pos.Line-1 >= len(src.Lines) {
+		fmt.Fprintln(w, "  [source not available]")
+		return
+	}
+	lines := src.Lines
+
+	startLine := pos.Line
+	endLine := end.Line
+
+	for lineNum := startLine; lineNum <= endLine; lineNum++ {
+		lineIdx := lineNum - 1
+		if lineIdx < 0 || lineIdx >= len(lines) {
+			continue
 		}
-	} else if source != nil {
-		if line, err := source.Line(d.Pos); err == nil {
-			lines = []string{line}
-		}
-	}
+		line := lines[lineIdx]
+		lineText := string(line)
 
-	// 3. Print source snippet and underline
-	for i, line := range lines {
-		lineNo := d.Pos.Line + i
-		fmt.Fprintf(out, "%4d | %s\n", lineNo, line)
+		// Print source line
+		fmt.Fprintf(w, "%s%4d%s | %s\n", colorGray, lineNum, colorReset, lineText)
 
-		if i == 0 && d.Range == nil {
-			// Single-line position only (no range)
-			fmt.Fprintf(out, "     | %s^\n", spaces(d.Pos.Column-1))
-		} else if d.Range != nil {
-			underline := underlineRange(line, lineNo, *d.Range)
-			if underline != "" {
-				fmt.Fprintf(out, "     | %s\n", underline)
-			}
-		}
-	}
-}
-
-func spaces(n int) string {
-	if n <= 0 {
-		return ""
-	}
-	return strings.Repeat(" ", n)
-}
-
-func offsetToLineCol(src []byte, offset int) (line, col int) {
-	if offset > len(src) {
-		offset = len(src)
-	}
-
-	line = 1
-	col = 1
-
-	for i := 0; i < offset; {
-		r, size := utf8.DecodeRune(src[i:])
-		if r == '\n' {
-			line++
-			col = 1
+		// Calculate column range
+		var startCol, endCol int
+		if lineNum == startLine {
+			startCol = pos.Column
 		} else {
-			col++
+			startCol = 1
 		}
-		i += size
-	}
+		if lineNum == endLine {
+			endCol = end.Column
+		} else {
+			endCol = len([]rune(lineText)) + 1
+		}
 
-	return line, col
+		// Print underline
+		fmt.Fprintf(w, "     | %s%s%s\n",
+			sevColor,
+			underlineRange(lineText, startCol, endCol),
+			colorReset,
+		)
+	}
 }
