@@ -100,14 +100,14 @@ func (sm *SourceManager) LinesInRange(rng Range) ([]string, error) {
 	return src.Lines[rng.Start.Line-1 : rng.End.Line], nil
 }
 
-func (sm *SourceManager) Pos(file string, offset int) (Position, error) {
+func (sm *SourceManager) Pos(file string, offset int) (*Position, error) {
 	sf, ok := sm.files[file]
 	if !ok {
-		return Position{}, fmt.Errorf("file not found: %s", file)
+		return &Position{}, fmt.Errorf("file not found: %s", file)
 	}
 
 	line, col := sf.OffsetToLineCol(offset)
-	return Position{File: file, Offset: offset, Line: line, Column: col}, nil
+	return &Position{File: file, Offset: offset, Line: line, Column: col}, nil
 }
 
 func (sm *SourceManager) Range(file string, start, end int) (*Range, error) {

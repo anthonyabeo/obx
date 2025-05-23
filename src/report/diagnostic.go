@@ -37,12 +37,12 @@ type Position struct {
 type Diagnostic struct {
 	Severity Severity
 	Message  string
-	Pos      Position // still the primary point for caret (`^`)
-	Range    *Range   // optional span
-	LineText string   // optional override (for single-line messages)
+	Pos      *Position // still the primary point for caret (`^`)
+	Range    *Range    // optional span
+	LineText string    // optional override (for single-line messages)
 }
 
 type Range struct {
-	Start Position
-	End   Position
+	Start *Position
+	End   *Position
 }

@@ -25,8 +25,10 @@ func expectTokens(t *testing.T, src []byte, filename string, expected []Expected
 	var tokens []token.Token
 	for {
 		tok := sc.NextToken()
-		tokens = append(tokens, tok)
-		if tok.Kind == token.EOF {
+
+		if tok.Kind != token.EOF {
+			tokens = append(tokens, tok)
+		} else {
 			break
 		}
 	}
@@ -94,7 +96,6 @@ END Hello.
 		{token.END, "END", 7, 1, 7, 4},
 		{token.IDENTIFIER, "Hello", 7, 5, 7, 10},
 		{token.PERIOD, ".", 7, 10, 7, 11},
-		{token.EOF, "", 0, 0, 0, 0},
 	})
 }
 
@@ -180,8 +181,6 @@ END Math.
 		{token.END, "END", 18, 1, 18, 4},
 		{token.IDENTIFIER, "Math", 18, 5, 18, 9},
 		{token.PERIOD, ".", 18, 9, 18, 10},
-
-		{token.EOF, "", 0, 0, 0, 0},
 	})
 
 }
