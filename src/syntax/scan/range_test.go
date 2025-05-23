@@ -243,3 +243,56 @@ func TestLexerTokenRanges(t *testing.T) {
 		}
 	}
 }
+
+func TestOffsetToLineCol_WithTabs(t *testing.T) {
+	src := []byte("a\tb\tc\n1234\t56    ")
+	tests := []struct {
+		Index       int
+		Lexeme      string
+		StartLine   int
+		StartColumn int
+		EndLine     int
+		EndColumn   int
+	}{
+		{0, "a", 1, 1, 1, 2},
+		{1, "b", 1, 5, 1, 6},
+		{2, "c", 1, 9, 1, 10},
+		{3, "1234", 2, 1, 2, 5},
+		{4, "56", 2, 9, 2, 11},
+	}
+
+	file := "test.ob"
+	sm := report.NewSourceManager()
+	sm.Load(file, src)
+
+	sc := Scan(sm.GetSourceFile(file), sm)
+
+	var tokens []token.Token
+	for {
+		tok := sc.NextToken()
+		tokens = append(tokens, tok)
+		if tok.Kind == token.EOF {
+			break
+		}
+	}
+
+	for _, tt := range tests {
+		tok := tokens[tt.Index]
+		if tok.Lexeme != tt.Lexeme {
+			t.Errorf("token %d: expected lexeme %q, got %q", tt.Index, tt.Lexeme, tok.Lexeme)
+		}
+
+		start := tok.Range.Start
+		end := tok.Range.End
+
+		if start.Line != tt.StartLine || start.Column != tt.StartColumn {
+			t.Errorf("token %d (%q): expected start %d:%d, got %d:%d",
+				tt.Index, tt.Lexeme, tt.StartLine, tt.StartColumn, start.Line, start.Column)
+		}
+
+		if end.Line != tt.EndLine || end.Column != tt.EndColumn {
+			t.Errorf("token %d (%q): expected end %d:%d, got %d:%d",
+				tt.Index, tt.Lexeme, tt.EndLine, tt.EndColumn, end.Line, end.Column)
+		}
+	}
+}

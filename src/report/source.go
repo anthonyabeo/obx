@@ -2,7 +2,6 @@ package report
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -31,21 +30,22 @@ func NewSourceFile(name string, content []byte) *SourceFile {
 	}
 }
 
-func (sf *SourceFile) OffsetToLineCol(offset int) (line, col int) {
-	if offset > len(sf.Content) {
-		offset = len(sf.Content)
+func (sf *SourceFile) OffsetToLineCol(offset int, tabWidth int) (line, col int) {
+	line = 1
+	col = 1
+	for i := 0; i < offset && i < len(sf.Content); i++ {
+		b := sf.Content[i]
+		switch b {
+		case '\n':
+			line++
+			col = 1
+		case '\t':
+			spaces := tabWidth - ((col - 1) % tabWidth)
+			col += spaces
+		default:
+			col++
+		}
 	}
-
-	i := sort.Search(len(sf.LineOffsets), func(i int) bool {
-		return sf.LineOffsets[i] > offset
-	}) - 1
-
-	if i < 0 {
-		return 1, 1
-	}
-
-	line = i + 1
-	col = offset - sf.LineOffsets[i] + 1
 	return
 }
 
@@ -57,11 +57,12 @@ func (sf *SourceFile) LineColToOffset(line, col int) int {
 }
 
 type SourceManager struct {
-	files map[string]*SourceFile
+	files    map[string]*SourceFile
+	tabWidth int
 }
 
 func NewSourceManager() *SourceManager {
-	return &SourceManager{files: make(map[string]*SourceFile)}
+	return &SourceManager{files: make(map[string]*SourceFile), tabWidth: 4}
 }
 
 func (sm *SourceManager) Load(name string, content []byte) {
@@ -106,7 +107,7 @@ func (sm *SourceManager) Pos(file string, offset int) (*Position, error) {
 		return &Position{}, fmt.Errorf("file not found: %s", file)
 	}
 
-	line, col := sf.OffsetToLineCol(offset)
+	line, col := sf.OffsetToLineCol(offset, sm.tabWidth)
 	return &Position{File: file, Offset: offset, Line: line, Column: col}, nil
 }
 

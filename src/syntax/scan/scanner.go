@@ -12,14 +12,14 @@ type Scanner struct {
 	src *report.SourceFile
 	mgr *report.SourceManager
 
-	start  int // start position of this item
-	pos    int // current position of the input
-	width  int // width of the last rune read
-	line   int // current line number
-	column int // current column number
-
-	state StateFn
-	items chan token.Token // channel of scanned items
+	start    int // start position of this item
+	pos      int // current position of the input
+	width    int // width of the last rune read
+	line     int // current line number
+	column   int // current column number
+	tabWidth int // tab width
+	state    StateFn
+	items    chan token.Token // channel of scanned items
 }
 
 func (s *Scanner) NextToken() token.Token {
@@ -90,12 +90,13 @@ func (s *Scanner) errorf(format string, rng *report.Range, args ...interface{}) 
 
 func Scan(src *report.SourceFile, mgr *report.SourceManager) *Scanner {
 	scan := &Scanner{
-		src:    src,
-		mgr:    mgr,
-		state:  scanText,
-		items:  make(chan token.Token, 512),
-		line:   1,
-		column: 1,
+		src:      src,
+		mgr:      mgr,
+		state:    scanText,
+		items:    make(chan token.Token, 512),
+		line:     1,
+		column:   1,
+		tabWidth: 4,
 	}
 
 	return scan
