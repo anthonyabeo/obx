@@ -96,32 +96,38 @@ func (p *Parser) metaParams() (seq []*ast.MetaSection) {
 
 // MetaSection      = [ TYPE | CONST ] ident { [','] ident } [ ':' TypeConstraint ]
 func (p *Parser) parseMetaSection() *ast.MetaSection {
-	ms := &ast.MetaSection{}
+	pos := p.rng.Start
+	ms := &ast.MetaSection{Pos: pos}
 
 	if p.tok == token.TYPE || p.tok == token.CONST {
 		ms.Mode = p.tok
 		p.next()
 	}
 
+	ms.Rng = &report.Range{Start: pos, End: p.rng.End}
 	ms.Ids = append(ms.Ids, p.parseIdent())
 	for p.tok == token.COMMA || p.tok == token.IDENTIFIER {
 		if p.tok == token.COMMA {
 			p.next()
 		}
 
+		ms.Rng.End = p.rng.End
 		ms.Ids = append(ms.Ids, p.parseIdent())
 	}
 
 	if p.tok == token.COLON {
 		p.next()
-		ms.TyConst = ast.NewNamedType(p.parseQualifiedIdent())
+		q := p.parseQualifiedIdent()
+		ms.TyConst = ast.NewNamedType(q, q.Pos, q.Rng)
+		ms.Rng.End = q.Rng.End
 	}
 
 	return ms
 }
 
 func (p *Parser) parseModule() *ast.Module {
-	mod := ast.NewModule()
+	pos := p.rng.Start
+	mod := ast.NewModule(pos)
 
 	p.match(token.MODULE)
 	mod.BName = p.parseIdent()
@@ -141,9 +147,12 @@ func (p *Parser) parseModule() *ast.Module {
 		case token.VAR, token.TYPE, token.CONST, token.PROC, token.PROCEDURE:
 			mod.DeclSeq = p.parseDeclarationSeq()
 		default:
+			pos := p.rng.Start
 			p.errorExpected("import or declaration")
 			p.advance(declStart)
-			mod.DeclSeq = append(mod.DeclSeq, &ast.BadDecl{})
+			mod.DeclSeq = append(mod.DeclSeq, &ast.BadDecl{Pos: pos, Rng: &report.Range{
+				Start: pos,
+				End:   p.rng.Start}})
 		}
 	}
 
@@ -153,8 +162,10 @@ func (p *Parser) parseModule() *ast.Module {
 	}
 
 	p.match(token.END)
+	mod.Rng = &report.Range{Start: pos, End: p.rng.End}
 	mod.EName = p.parseIdent()
 	if p.tok == token.PERIOD {
+		mod.Rng.End = p.rng.End
 		p.next()
 	}
 
@@ -163,7 +174,8 @@ func (p *Parser) parseModule() *ast.Module {
 
 // definition   = DEFINITION ident [';']  [ ImportList ] DeclarationSequence2 END ident ['.']
 func (p *Parser) parseDefinition() *ast.Definition {
-	def := ast.NewDefinition()
+	pos := p.rng.Start
+	def := ast.NewDefinition(pos)
 
 	p.match(token.DEFINITION)
 	def.BName = p.parseIdent()
@@ -180,9 +192,10 @@ func (p *Parser) parseDefinition() *ast.Definition {
 	}
 
 	p.match(token.END)
-
+	def.Rng = &report.Range{Start: pos, End: p.rng.End}
 	def.EName = p.parseIdent()
 	if p.tok == token.PERIOD {
+		def.Rng.End = p.rng.End
 		p.next()
 	}
 
@@ -214,8 +227,8 @@ func (p *Parser) parseImportList() []*ast.Import {
 				p.err.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  "duplicate module import",
-					Pos:      p.rng.Start,
-					Range:    p.rng,
+					Pos:      imp.Pos,
+					Range:    imp.Rng,
 				})
 			}
 		} else {
@@ -223,8 +236,8 @@ func (p *Parser) parseImportList() []*ast.Import {
 				p.err.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  "duplicate module import",
-					Pos:      p.rng.Start,
-					Range:    p.rng,
+					Pos:      imp.Pos,
+					Range:    imp.Rng,
 				})
 			}
 		}
@@ -236,45 +249,38 @@ func (p *Parser) parseImportList() []*ast.Import {
 // import = [ ident ':=' ] ImportPath ident [ MetaActuals ]
 // ImportPath = { ident '.' }
 func (p *Parser) parseImport() *ast.Import {
-	imp := &ast.Import{}
-	var avail bool
+	pos := p.rng.Start
+	imp := &ast.Import{Pos: pos}
 
 	id := p.parseIdent()
 	if p.tok == token.BECOMES {
 		imp.Alias = id
 		p.match(token.BECOMES)
-
-		avail = true
-	}
-
-	if avail {
 		id = p.parseIdent()
 	}
 
-ImportPath:
-	if p.tok == token.PERIOD {
+	for {
 		imp.ImportPath = append(imp.ImportPath, id)
+		if p.tok != token.PERIOD {
+			break
+		}
 		p.match(token.PERIOD)
-
 		id = p.parseIdent()
-		goto ImportPath
 	}
 
-	imp.ImportPath = append(imp.ImportPath, id)
 	imp.Name = strings.Join(imp.ImportPath, ".")
+	imp.Rng = &report.Range{Start: pos, End: p.rng.End}
 
 	if p.tok == token.LPAREN {
 		p.next()
 		imp.Meta = append(imp.Meta, p.parseExpression())
 
-		for p.tok == token.COMMA || p.exprStart() {
-			if p.tok == token.COMMA {
-				p.next()
-			}
-
+		for p.tok == token.COMMA {
+			p.next()
 			imp.Meta = append(imp.Meta, p.parseExpression())
 		}
 
+		imp.Rng.End = p.rng.End
 		p.match(token.RPAREN)
 	}
 
@@ -291,25 +297,40 @@ func (p *Parser) parseDeclarationSeq2() (seq []ast.Declaration) {
 	for p.startsDecl() {
 		switch p.tok {
 		case token.VAR:
+			pos := p.rng.Start
 			p.match(token.VAR)
 			for p.tok == token.IDENTIFIER {
-				seq = append(seq, p.parseVariableDecl())
+				decl := p.parseVariableDecl()
+				decl.Pos = pos
+				decl.Rng.Start = pos
+
+				seq = append(seq, decl)
 				if p.tok == token.SEMICOLON {
 					p.next()
 				}
 			}
 		case token.TYPE:
+			pos := p.rng.Start
 			p.match(token.TYPE)
 			for p.tok == token.IDENTIFIER {
-				seq = append(seq, p.parseTypeDecl())
+				decl := p.parseTypeDecl()
+				decl.Pos = pos
+				decl.Rng.Start = pos
+
+				seq = append(seq, decl)
 				if p.tok == token.SEMICOLON {
 					p.next()
 				}
 			}
 		case token.CONST:
+			pos := p.rng.Start
 			p.match(token.CONST)
 			for p.tok == token.IDENTIFIER {
-				seq = append(seq, p.parseConstantDecl())
+				decl := p.parseConstantDecl()
+				decl.Pos = pos
+				decl.Rng.Start = pos
+
+				seq = append(seq, decl)
 				if p.tok == token.SEMICOLON {
 					p.next()
 				}
@@ -320,9 +341,13 @@ func (p *Parser) parseDeclarationSeq2() (seq []ast.Declaration) {
 				p.next()
 			}
 		default:
+			pos := p.rng.Start
 			p.errorExpected("declaration")
 			p.advance(declStart)
-			seq = append(seq, &ast.BadDecl{})
+			seq = append(seq, &ast.BadDecl{Pos: pos, Rng: &report.Range{
+				Start: pos,
+				End:   p.rng.Start,
+			}})
 		}
 	}
 
@@ -339,25 +364,38 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 	for p.startsDecl() {
 		switch p.tok {
 		case token.VAR:
+			pos := p.rng.Start
 			p.match(token.VAR)
 			for p.tok == token.IDENTIFIER {
-				seq = append(seq, p.parseVariableDecl())
+				decl := p.parseVariableDecl()
+				decl.Pos = pos
+				decl.Rng.Start = pos
+
+				seq = append(seq, decl)
 				if p.tok == token.SEMICOLON {
 					p.next()
 				}
 			}
 		case token.TYPE:
+			pos := p.rng.Start
 			p.match(token.TYPE)
 			for p.tok == token.IDENTIFIER {
-				seq = append(seq, p.parseTypeDecl())
+				decl := p.parseTypeDecl()
+				decl.Pos = pos
+				decl.Rng.Start = pos
+				seq = append(seq, decl)
 				if p.tok == token.SEMICOLON {
 					p.next()
 				}
 			}
 		case token.CONST:
+			pos := p.rng.Start
 			p.match(token.CONST)
 			for p.tok == token.IDENTIFIER {
-				seq = append(seq, p.parseConstantDecl())
+				decl := p.parseConstantDecl()
+				decl.Pos = pos
+				decl.Rng.Start = pos
+				seq = append(seq, decl)
 				if p.tok == token.SEMICOLON {
 					p.next()
 				}
@@ -368,9 +406,13 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 				p.next()
 			}
 		default:
+			pos := p.rng.Start
 			p.errorExpected("declaration")
 			p.advance(declStart)
-			seq = append(seq, &ast.BadDecl{})
+			seq = append(seq, &ast.BadDecl{Pos: pos, Rng: &report.Range{
+				Start: pos,
+				End:   p.rng.Start,
+			}})
 		}
 	}
 
@@ -387,12 +429,15 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 		p.err.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  "duplicate type declaration " + name.Name,
-			Pos:      p.rng.Start,
-			Range:    p.rng,
+			Pos:      name.Pos,
+			Range:    name.Rng,
 		})
 	}
 
-	return &ast.TypeDecl{Name: name, DenotedType: Typ}
+	return &ast.TypeDecl{
+		Name:        name,
+		DenotedType: Typ,
+		Rng:         &report.Range{End: Typ.Range().End}}
 }
 
 // ConstDeclaration = identdef '=' ConstExpression
@@ -405,12 +450,15 @@ func (p *Parser) parseConstantDecl() *ast.ConstantDecl {
 		p.err.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  "duplicate constant declaration " + name.Name,
-			Pos:      p.rng.Start,
-			Range:    p.rng,
+			Pos:      name.Pos,
+			Range:    name.Range(),
 		})
 	}
 
-	return &ast.ConstantDecl{Name: name, Value: value}
+	return &ast.ConstantDecl{
+		Name:  name,
+		Value: value,
+		Rng:   &report.Range{End: value.Range().End}}
 }
 
 // VariableDeclaration = IdentList ':' type
@@ -419,6 +467,8 @@ func (p *Parser) parseVariableDecl() *ast.VariableDecl {
 	p.match(token.COLON)
 	decl.Type = p.parseType()
 
+	decl.Rng = &report.Range{End: decl.Type.Range().End}
+
 	// add the variables to the environment
 	for _, id := range decl.IdentList {
 		sym := p.env.Insert(ast.NewVariableSymbol(id.Name, id.Props, decl.Type))
@@ -426,8 +476,8 @@ func (p *Parser) parseVariableDecl() *ast.VariableDecl {
 			p.err.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  "duplicate variable declaration " + id.Name,
-				Pos:      p.rng.Start,
-				Range:    p.rng,
+				Pos:      id.Pos,
+				Range:    id.Rng,
 			})
 		}
 	}
@@ -439,10 +489,11 @@ func (p *Parser) parseType() (ty ast.Type) {
 	switch p.tok {
 	case token.INTEGER, token.BOOLEAN, token.CHAR, token.REAL, token.LONGREAL, token.INT8,
 		token.INT16, token.INT32, token.INT64, token.WCHAR, token.BYTE, token.SHORTINT, token.LONGINT, token.SET:
-		ty = ast.NewBasicType(p.lit)
+		ty = ast.NewBasicType(p.lit, p.rng.Start, p.rng)
 		p.next()
 	case token.IDENTIFIER:
-		ty = ast.NewNamedType(p.parseQualifiedIdent())
+		q := p.parseQualifiedIdent()
+		ty = ast.NewNamedType(q, q.Pos, q.Rng)
 	case token.ARRAY, token.LBRACK:
 		ty = p.parseArrayType()
 	case token.RECORD:
@@ -454,16 +505,24 @@ func (p *Parser) parseType() (ty ast.Type) {
 	case token.LPAREN:
 		ty = p.parseEnumType()
 	default:
+		pos := p.rng.Start
 		p.errorExpected("type")
-		p.advance(typeStart)
-		return &ast.BadType{}
+		p.advance(declStart)
+		return &ast.BadType{
+			pos,
+			&report.Range{
+				Start: pos,
+				End:   p.rng.End,
+			},
+		}
 	}
 
 	return
 }
 
 func (p *Parser) parseEnumType() *ast.EnumType {
-	enum := &ast.EnumType{}
+	pos := p.rng.Start
+	enum := &ast.EnumType{Pos: pos}
 	p.next()
 
 	enum.Variants = append(enum.Variants, p.parseIdent())
@@ -474,13 +533,16 @@ func (p *Parser) parseEnumType() *ast.EnumType {
 		enum.Variants = append(enum.Variants, p.parseIdent())
 	}
 
+	enum.Rng = &report.Range{Start: pos, End: p.rng.End}
 	p.match(token.RPAREN)
 
 	return enum
 }
 
 func (p *Parser) parsePtrType() *ast.PointerType {
-	ptr := &ast.PointerType{}
+	pos := p.rng.Start
+
+	ptr := &ast.PointerType{Pos: pos}
 	tok := p.tok
 
 	p.next()
@@ -489,49 +551,81 @@ func (p *Parser) parsePtrType() *ast.PointerType {
 	}
 
 	ptr.Base = p.parseType()
+	ptr.Rng = &report.Range{Start: pos, End: ptr.Base.Range().End}
 
 	return ptr
 }
 
 func (p *Parser) parseProcedureType() *ast.ProcedureType {
-	proc := &ast.ProcedureType{}
+	pos := p.rng.Start
+	proc := &ast.ProcedureType{Pos: pos, Rng: p.rng}
 	p.match(token.PROCEDURE)
 
 	if p.tok == token.LPAREN {
 		proc.FP = p.parseFormalParameters()
+		if proc.FP != nil && len(proc.FP.Params) != 0 {
+			last := proc.FP.Params[len(proc.FP.Params)-1]
+
+			if proc.FP.RetType != nil {
+				proc.Rng.End = proc.FP.RetType.Range().End
+			} else {
+				proc.Rng.End = last.Rng.End
+			}
+		}
 	}
 
 	return proc
 }
 
 func (p *Parser) parseArrayType() *ast.ArrayType {
-	p.next()
+	pos := p.rng.Start
+	array := &ast.ArrayType{Pos: pos}
 
-	var ll *ast.LenList
-	if p.tok == token.VAR || p.exprStart() {
-		ll = new(ast.LenList)
-		if p.tok == token.VAR {
-			ll.Modifier = p.tok
-			p.next()
-		}
-
-		ll.List = p.parseExprList()
-	}
-
-	if p.tok == token.RBRACK {
+	if p.tok == token.ARRAY {
 		p.next()
-		typ := p.parseType()
-
-		return ast.NewArray(ll, typ)
+		if p.tok != token.OF {
+			array.LenList = p.parseLengthList()
+		}
+		p.match(token.OF)
+		array.ElemType = p.parseType()
+	} else if p.tok == token.LBRACK {
+		p.next()
+		if p.tok != token.RBRACK {
+			array.LenList = p.parseLengthList()
+		}
+		p.match(token.RBRACK)
+		array.ElemType = p.parseType()
 	}
 
-	p.match(token.OF)
+	array.Rng = &report.Range{Start: pos, End: array.ElemType.Range().End}
+	return array
+}
 
-	return ast.NewArray(ll, p.parseType())
+func (p *Parser) parseLengthList() *ast.LenList {
+	pos := p.rng.Start
+	list := &ast.LenList{Modifier: token.ILLEGAL, Pos: pos}
+
+	if p.tok == token.VAR {
+		list.Modifier = p.tok
+		p.next()
+	}
+
+	list.List = append(list.List, p.parseExpression())
+	for p.tok == token.COMMA {
+		p.next()
+		list.List = append(list.List, p.parseExpression())
+	}
+
+	last := list.List[len(list.List)-1]
+	list.Rng = &report.Range{Start: pos, End: last.Range().End}
+
+	return list
 }
 
 func (p *Parser) parseRecordType() *ast.RecordType {
-	rec := &ast.RecordType{}
+	pos := p.rng.Start
+
+	rec := &ast.RecordType{Pos: pos}
 	p.match(token.RECORD)
 
 	baseEnv := p.parseRecordBase(rec)
@@ -541,6 +635,7 @@ func (p *Parser) parseRecordType() *ast.RecordType {
 		rec.Fields = p.parseRecordFields()
 	}
 
+	rec.Rng = &report.Range{Start: pos, End: p.rng.End}
 	p.match(token.END)
 	p.addFieldsToEnv(rec)
 
@@ -553,7 +648,8 @@ func (p *Parser) parseRecordBase(rec *ast.RecordType) *ast.RecordEnv {
 	}
 
 	p.next()
-	rec.Base = ast.NewNamedType(p.parseQualifiedIdent())
+	q := p.parseQualifiedIdent()
+	rec.Base = ast.NewNamedType(q, q.Pos, q.Rng)
 	p.match(token.RPAREN)
 
 	baseType, ok := rec.Base.(*ast.NamedType)
@@ -582,8 +678,8 @@ func (p *Parser) lookupBaseType(baseType *ast.NamedType) ast.Symbol {
 			p.err.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("object %s is not exported", baseType.Name),
-				Pos:      p.rng.Start,
-				Range:    p.rng,
+				Pos:      baseType.Name.Pos,
+				Range:    baseType.Name.Rng,
 			})
 			p.advance(declStart)
 			return nil
@@ -637,8 +733,8 @@ func (p *Parser) addFieldsToEnv(rec *ast.RecordType) {
 				p.err.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  "duplicate field declaration " + id.Name,
-					Pos:      p.rng.Start,
-					Range:    p.rng,
+					Pos:      id.Pos,
+					Range:    id.Rng,
 				})
 			}
 		}
@@ -669,10 +765,14 @@ func (p *Parser) parseExpression() (expr ast.Expression) {
 	expr = p.parseSimpleExpression()
 
 	if p.relation() {
-		relExpr := &ast.BinaryExpr{Left: expr, Op: p.tok}
+		relExpr := &ast.BinaryExpr{Left: expr, Op: p.tok, Pos: expr.Position()}
 		p.next()
 
 		relExpr.Right = p.parseSimpleExpression()
+		relExpr.Rng = &report.Range{
+			Start: relExpr.Left.Range().Start,
+			End:   relExpr.Right.Range().End,
+		}
 		expr = relExpr
 	}
 
@@ -683,6 +783,7 @@ func (p *Parser) parseExpression() (expr ast.Expression) {
 func (p *Parser) parseSimpleExpression() (expr ast.Expression) {
 	var sign = token.ILLEGAL
 
+	pos := p.rng.Start
 	if p.tok == token.MINUS || p.tok == token.PLUS {
 		sign = p.tok
 		p.next()
@@ -690,14 +791,21 @@ func (p *Parser) parseSimpleExpression() (expr ast.Expression) {
 
 	expr = p.parseTerm()
 	if sign != token.ILLEGAL {
-		expr = &ast.UnaryExpr{Op: sign, Operand: expr}
+		expr = &ast.UnaryExpr{Op: sign, Operand: expr, Pos: pos, Rng: &report.Range{
+			Start: pos,
+			End:   expr.Range().End,
+		}}
 	}
 
 	for p.addOp() {
-		bin := &ast.BinaryExpr{Left: expr, Op: p.tok}
+		bin := &ast.BinaryExpr{Left: expr, Op: p.tok, Pos: pos}
 		p.next()
 
 		bin.Right = p.parseTerm()
+		bin.Rng = &report.Range{
+			Start: pos,
+			End:   bin.Right.Range().End,
+		}
 		expr = bin
 	}
 
@@ -709,10 +817,14 @@ func (p *Parser) parseTerm() (expr ast.Expression) {
 	expr = p.parseFactor()
 
 	for p.mulOp() {
-		bin := &ast.BinaryExpr{Left: expr, Op: p.tok}
+		bin := &ast.BinaryExpr{Left: expr, Op: p.tok, Pos: expr.Position()}
 		p.next()
 
 		bin.Right = p.parseFactor()
+		bin.Rng = &report.Range{
+			Start: bin.Left.Range().Start,
+			End:   bin.Right.Range().End,
+		}
 		expr = bin
 	}
 
@@ -723,8 +835,19 @@ func (p *Parser) parseTerm() (expr ast.Expression) {
 func (p *Parser) parseFactor() ast.Expression {
 	switch p.tok {
 	case token.NOT:
+		pos := p.rng.Start
 		p.next()
-		return &ast.UnaryExpr{Op: token.NOT, Operand: p.parseFactor()}
+
+		operand := p.parseFactor()
+		return &ast.UnaryExpr{
+			Op:      token.NOT,
+			Operand: operand,
+			Pos:     pos,
+			Rng: &report.Range{
+				Start: pos,
+				End:   operand.Range().End,
+			},
+		}
 
 	case token.LPAREN:
 		p.match(token.LPAREN)
@@ -739,10 +862,16 @@ func (p *Parser) parseFactor() ast.Expression {
 			env = p.envs[dsg.QIdent.Prefix]
 		}
 
-		if sym := env.Lookup(dsg.QIdent.Name); sym != nil &&
-			sym.Kind() == ast.ProcedureSymbolKind &&
-			p.tok == token.RPAREN {
-			call := &ast.FunctionCall{Callee: dsg, ActualParams: p.list}
+		if sym := env.Lookup(dsg.QIdent.Name); sym != nil && sym.Kind() == ast.ProcedureSymbolKind && p.tok == token.RPAREN {
+			call := &ast.FunctionCall{
+				Callee:       dsg,
+				ActualParams: p.list,
+				Pos:          dsg.Pos,
+				Rng: &report.Range{
+					Start: dsg.Pos,
+					End:   p.rng.End,
+				},
+			}
 			p.list = nil
 			p.next()
 			return call
@@ -760,8 +889,9 @@ func (p *Parser) parseFactor() ast.Expression {
 			Pos:      p.rng.Start,
 			Range:    p.rng,
 		})
+		pos := p.rng.Start
 		p.advance(exprEnd)
-		return &ast.BadExpr{}
+		return &ast.BadExpr{Pos: pos, Rng: p.rng}
 	}
 }
 
@@ -792,27 +922,42 @@ func (p *Parser) parseExprList() (list []ast.Expression) {
 // designator = qualident {selector}
 // selector = '.' ident | '[' ExpList ']' | '^' | '(' qualident ')'
 func (p *Parser) parseDesignator() *ast.Designator {
-	dsg := &ast.Designator{QIdent: p.parseQualifiedIdent()}
+	qident := p.parseQualifiedIdent()
+	dsg := &ast.Designator{QIdent: qident, Pos: qident.Pos, Rng: qident.Rng}
 
 	for p.tok == token.PERIOD || p.tok == token.LBRACK || p.tok == token.CARET || p.tok == token.LPAREN {
 		switch p.tok {
 		case token.PERIOD:
+			pos := p.rng.Start
 			p.next()
-			dsg.Select = append(dsg.Select, &ast.DotOp{Field: p.parseIdent()})
 
+			dot := &ast.DotOp{Pos: pos, Rng: &report.Range{Start: pos, End: p.rng.End}}
+			dot.Field = p.parseIdent()
+			dsg.Select = append(dsg.Select, dot)
+			dsg.Rng = &report.Range{Start: dsg.Pos, End: dot.Range().End}
 		case token.LBRACK:
+			pos := p.rng.Start
 			p.next()
 			list := p.parseExprList()
+			end := p.rng.End
 			p.match(token.RBRACK)
-			dsg.Select = append(dsg.Select, &ast.IndexOp{List: list})
+			dsg.Select = append(dsg.Select, &ast.IndexOp{
+				List: list,
+				Pos:  pos,
+				Rng:  &report.Range{Start: pos, End: end}})
 
+			dsg.Rng = &report.Range{Start: dsg.Pos, End: end}
 		case token.CARET:
+			pos := p.rng.Start
 			p.next()
-			dsg.Select = append(dsg.Select, &ast.PtrDeref{})
-
+			dsg.Select = append(dsg.Select, &ast.PtrDeref{
+				Pos: pos,
+				Rng: &report.Range{Start: pos, End: p.rng.End}})
+			dsg.Rng = &report.Range{Start: dsg.Pos, End: p.rng.End}
 		case token.LPAREN:
+			pos := p.rng.Start
 			p.next()
-			if !p.parseTypeGuard(dsg) {
+			if !p.parseTypeGuard(dsg, pos) {
 				return dsg
 			}
 		}
@@ -821,7 +966,7 @@ func (p *Parser) parseDesignator() *ast.Designator {
 	return dsg
 }
 
-func (p *Parser) parseTypeGuard(dsg *ast.Designator) bool {
+func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos *report.Position) bool {
 	if !p.exprStart() {
 		return false
 	}
@@ -856,7 +1001,12 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator) bool {
 		return false
 	}
 
-	dsg.Select = append(dsg.Select, &ast.TypeGuard{Ty: d.QIdent})
+	dsg.Select = append(dsg.Select, &ast.TypeGuard{
+		Ty:  d.QIdent,
+		Pos: pos,
+		Rng: &report.Range{Start: pos, End: p.rng.End},
+	})
+	dsg.Rng = &report.Range{Start: dsg.Pos, End: p.rng.End}
 	p.match(token.RPAREN)
 	return true
 }
@@ -867,9 +1017,11 @@ func (p *Parser) parseLiteral() (lit ast.Expression) {
 	case token.INT_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
 		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.TRUE, token.FALSE:
 
-		lit = &ast.BasicLit{Kind: p.tok, Val: p.lit}
+		lit = &ast.BasicLit{Kind: p.tok, Val: p.lit, Pos: p.rng.Start, Rng: p.rng}
 		p.next()
 	case token.LBRACE:
+		pos := p.rng.Start
+
 		p.next()
 		set := &ast.Set{}
 
@@ -881,16 +1033,21 @@ func (p *Parser) parseLiteral() (lit ast.Expression) {
 			}
 		}
 
+		end := p.rng.End
 		p.match(token.RBRACE)
+
+		set.Pos = pos
+		set.Rng = &report.Range{Start: pos, End: end}
 
 		lit = set
 	case token.NIL:
+		lit = &ast.Nil{Pos: p.rng.Start, Rng: p.rng}
 		p.next()
-		lit = &ast.Nil{}
 	default:
 		p.errorExpected("literal or set")
+		pos := p.rng.Start
 		p.advance(exprStart)
-		lit = &ast.BadExpr{}
+		lit = &ast.BadExpr{Pos: pos, Rng: p.rng}
 	}
 
 	return
@@ -899,29 +1056,35 @@ func (p *Parser) parseLiteral() (lit ast.Expression) {
 // set = '{' [ element {',' element} ] '}'
 // element = expression ['..' expression]
 func (p *Parser) parseSetElem() ast.Expression {
-	expr := p.parseExpression()
-	if p.tok == token.RANGE {
-		p.next()
-		return &ast.ExprRange{Beg: expr, End: p.parseExpression()}
+	beg := p.parseExpression()
+	if p.tok != token.RANGE {
+		return beg
 	}
 
-	return expr
+	p.next()
+	end := p.parseExpression()
+
+	return &ast.ExprRange{
+		Beg: beg,
+		End: end,
+		Pos: beg.Position(),
+		Rng: &report.Range{Start: beg.Range().Start, End: end.Range().End},
+	}
 }
 
 // qualident = [ ident '.' ] ident
 func (p *Parser) parseQualifiedIdent() *ast.QualifiedIdent {
-	id := &ast.QualifiedIdent{}
+	id := &ast.QualifiedIdent{Pos: p.rng.Start, Rng: p.rng}
 
 	// Parse the first identifier
 	id.Prefix = p.parseIdent()
 
-	sym := p.env.Lookup(id.Prefix)
-	if sym != nil && sym.Kind() == ast.ModuleSymbolKind && p.tok == token.PERIOD {
+	if sym := p.env.Lookup(id.Prefix); sym != nil && sym.Kind() == ast.ModuleSymbolKind && p.tok == token.PERIOD {
 		p.next()
+		id.Rng.End = p.rng.End // Update the end position
 		id.Name = p.parseIdent()
 	} else {
-		id.Name = id.Prefix
-		id.Prefix = ""
+		id.Name, id.Prefix = id.Prefix, "" // Assign Name and clear Prefix
 	}
 
 	return id
@@ -942,18 +1105,26 @@ func (p *Parser) parseIdentList() (list []*ast.IdentifierDef) {
 
 // IdentDef = ident ['*' | '-']
 func (p *Parser) parseIdentifierDef() *ast.IdentifierDef {
-	id := &ast.IdentifierDef{Name: p.parseIdent()}
+	r := &report.Range{Start: p.rng.Start, End: p.rng.End}
 
-	switch p.tok {
-	case token.STAR:
-		id.Props = ast.Exported
-	case token.MINUS:
-		id.Props = ast.ExportedReadOnly
-	default:
-		id.Props = ast.Unexported
+	id := &ast.IdentifierDef{
+		Name: p.parseIdent(),
+		Pos:  r.Start,
+		Rng:  r,
+		Props: func() ast.IdentProps {
+			switch p.tok {
+			case token.STAR:
+				return ast.Exported
+			case token.MINUS:
+				return ast.ExportedReadOnly
+			default:
+				return ast.Unexported
+			}
+		}(),
 	}
 
 	if p.tok == token.STAR || p.tok == token.MINUS {
+		r.End = p.rng.End
 		p.next()
 	}
 
@@ -962,7 +1133,8 @@ func (p *Parser) parseIdentifierDef() *ast.IdentifierDef {
 
 // ProcedureDeclaration = ProcedureHeading [ ';' ] ProcedureBody END [ ident ]
 func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
-	proc = &ast.ProcedureDecl{}
+	pos := p.rng.Start
+	proc = &ast.ProcedureDecl{Pos: pos}
 
 	parent := p.env
 	p.env = ast.NewEnvironment(parent, "")
@@ -978,8 +1150,10 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 
 	proc.Body = p.parseProcBody()
 
+	proc.Rng = &report.Range{Start: pos, End: p.rng.End}
 	p.match(token.END)
 	if p.tok == token.IDENTIFIER {
+		proc.Rng.End = p.rng.End
 		proc.EndName = p.parseIdent()
 	}
 
@@ -989,12 +1163,13 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 // ProcedureHeading = ( PROCEDURE | PROC ) [Receiver] identdef [ FormalParameters ]
 // Receiver = '(' [VAR|IN] ident ':' ident ')'
 func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
-	head = &ast.ProcedureHeading{}
+	pos := p.rng.Start
+	head = &ast.ProcedureHeading{Pos: pos}
 
 	if p.tok != token.PROC && p.tok != token.PROCEDURE {
 		p.errorExpected("proc or procedure")
 		p.advance(declStart)
-		return nil
+		return head
 	}
 
 	p.next()
@@ -1004,24 +1179,40 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 	}
 
 	head.Name = p.parseIdentifierDef()
+	head.Rng = &report.Range{Start: pos, End: head.Name.Rng.End}
+
 	if p.tok == token.LPAREN {
 		head.FP = p.parseFormalParameters()
+		if head.FP != nil {
+			head.Rng.End = head.FP.Rng.End
+		}
 	}
 
 	// check that head.Rcv.Type has been declared as a record type and retrieve its env
 	// insert the receiver into the procedure's environment and the rest of the procedure's
 	// parameters into the receiver's environment
 	if head.Rcv != nil {
-		sym := p.env.Lookup(head.Rcv.Type.String())
+		rcvType := head.Rcv.Type.String()
+		sym := p.env.Lookup(rcvType)
 		if sym == nil {
-			p.errorExpected("record type")
+			p.err.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("reciever type '%s' not declared", rcvType),
+				Pos:      head.Rcv.Pos,
+				Range:    head.Rcv.Rng,
+			})
 			p.advance(declStart)
 			return head
 		}
 
 		typeSymbol, ok := sym.(*ast.TypeSymbol)
 		if !ok || typeSymbol == nil {
-			p.errorExpected("record type")
+			p.err.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("reciever type '%s' not declared as a type", rcvType),
+				Pos:      head.Rcv.Pos,
+				Range:    head.Rcv.Rng,
+			})
 			p.advance(declStart)
 			return head
 		}
@@ -1044,7 +1235,12 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 				return head
 			}
 		default:
-			p.errorExpected("record type")
+			p.err.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("receiver '%s' must be a record type", rcvType),
+				Pos:      head.Rcv.Pos,
+				Range:    head.Rcv.Rng,
+			})
 			p.advance(declStart)
 			return head
 		}
@@ -1054,8 +1250,8 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 			p.err.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  "duplicate parameter declaration",
-				Pos:      p.rng.Start,
-				Range:    p.rng,
+				Pos:      head.Rcv.Pos,
+				Range:    head.Rcv.Rng,
 			})
 		}
 
@@ -1064,8 +1260,8 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 			p.err.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  "duplicate procedure declaration",
-				Pos:      p.rng.Start,
-				Range:    p.rng,
+				Pos:      head.Name.Pos,
+				Range:    head.Name.Rng,
 			})
 		}
 	}
@@ -1076,9 +1272,9 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 			if sym := p.env.Insert(ast.NewParamSymbol(id, param.Mod, param.Type)); sym != nil {
 				p.err.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message:  "duplicate field declaration",
-					Pos:      p.rng.Start,
-					Range:    p.rng,
+					Message:  "duplicate parameter declaration" + id,
+					Pos:      param.Pos,
+					Range:    param.Rng,
 				})
 			}
 		}
@@ -1089,7 +1285,8 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 
 // FormalParameters = '(' [ FPSection { [';'] FPSection } ] ')' [ ':' ReturnType ]
 func (p *Parser) parseFormalParameters() (fp *ast.FormalParams) {
-	fp = &ast.FormalParams{}
+	pos := p.rng.Start
+	fp = &ast.FormalParams{Pos: pos}
 
 	p.match(token.LPAREN)
 
@@ -1102,11 +1299,13 @@ func (p *Parser) parseFormalParameters() (fp *ast.FormalParams) {
 		}
 	}
 
+	fp.Rng = &report.Range{Start: pos, End: p.rng.End}
 	p.match(token.RPAREN)
 
 	if p.tok == token.COLON {
 		p.next()
 		fp.RetType = p.parseType()
+		fp.Rng = &report.Range{Start: pos, End: fp.RetType.Range().End}
 	}
 
 	return
@@ -1114,7 +1313,8 @@ func (p *Parser) parseFormalParameters() (fp *ast.FormalParams) {
 
 // FPSection = [ VAR | IN ] ident { [','] ident } ':' FormalType
 func (p *Parser) parseFPSection() (param *ast.FPSection) {
-	param = &ast.FPSection{}
+	pos := p.rng.Start
+	param = &ast.FPSection{Pos: pos}
 
 	if p.tok == token.VAR || p.tok == token.IN {
 		param.Mod = p.tok
@@ -1130,12 +1330,14 @@ func (p *Parser) parseFPSection() (param *ast.FPSection) {
 	p.match(token.COLON)
 
 	param.Type = p.parseType()
+	param.Rng = &report.Range{Start: pos, End: param.Type.Range().End}
 
 	return
 }
 
 func (p *Parser) parseReceiver() (rcv *ast.Receiver) {
-	rcv = &ast.Receiver{}
+	pos := p.rng.Start
+	rcv = &ast.Receiver{Pos: pos}
 
 	p.match(token.LPAREN)
 	if p.tok == token.VAR || p.tok == token.IN {
@@ -1145,8 +1347,10 @@ func (p *Parser) parseReceiver() (rcv *ast.Receiver) {
 
 	rcv.Var = p.parseIdent()
 	p.match(token.COLON)
-	rcv.Type = ast.NewNamedType(p.parseQualifiedIdent())
+	q := p.parseQualifiedIdent()
+	rcv.Type = ast.NewNamedType(q, q.Pos, q.Rng)
 
+	rcv.Rng = &report.Range{Start: pos, End: p.rng.End}
 	p.match(token.RPAREN)
 
 	return
@@ -1154,17 +1358,51 @@ func (p *Parser) parseReceiver() (rcv *ast.Receiver) {
 
 // ProcedureBody = DeclarationSequence [ BEGIN StatementSequence | ReturnStatement [ ';' ] ]
 func (p *Parser) parseProcBody() (body *ast.ProcedureBody) {
-	body = &ast.ProcedureBody{}
+	var (
+		declSeq   []ast.Declaration
+		stmtSeq   []ast.Statement
+		bodyPos   *report.Position
+		bodyRange *report.Range
+	)
 
-	body.DeclSeq = p.parseDeclarationSeq()
+	declSeq = p.parseDeclarationSeq()
 
 	if p.tok == token.BEGIN {
 		p.next()
-		body.StmtSeq = p.parseStatementSeq()
+		stmtSeq = p.parseStatementSeq()
 
 		if p.tok == token.SEMICOLON {
 			p.next()
 		}
+	}
+
+	if len(declSeq) > 0 && len(stmtSeq) == 0 {
+		bodyPos = declSeq[0].Position()
+		bodyRange = &report.Range{
+			Start: bodyPos,
+			End:   declSeq[len(declSeq)-1].Range().End,
+		}
+	} else if len(declSeq) == 0 && len(stmtSeq) > 0 {
+		bodyPos = stmtSeq[0].Position()
+		bodyRange = &report.Range{
+			Start: bodyPos,
+			End:   stmtSeq[len(stmtSeq)-1].Range().End,
+		}
+	} else if len(declSeq) > 0 && len(stmtSeq) > 0 {
+		bodyPos = declSeq[0].Position()
+		bodyRange = &report.Range{
+			Start: bodyPos,
+			End:   stmtSeq[len(stmtSeq)-1].Range().End,
+		}
+	} else {
+		return
+	}
+
+	body = &ast.ProcedureBody{
+		Pos:     bodyPos,
+		Rng:     bodyRange,
+		DeclSeq: declSeq,
+		StmtSeq: stmtSeq,
 	}
 
 	return
@@ -1218,52 +1456,64 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 	case token.REPEAT:
 		stmt = p.parseRepeatStmt()
 	case token.IDENTIFIER:
+		pos := p.rng.Start
 		dsg := p.parseDesignator()
 		switch p.tok {
 		case token.BECOMES:
 			p.next()
-			stmt = &ast.AssignmentStmt{LValue: dsg, RValue: p.parseExpression()}
+			assign := &ast.AssignmentStmt{LValue: dsg, RValue: p.parseExpression(), Pos: pos}
+			assign.Rng = &report.Range{Start: pos, End: assign.RValue.Range().End}
+			stmt = assign
 		case token.RPAREN:
-			stmt = &ast.ProcedureCall{Callee: dsg, ActualParams: p.list}
+			stmt = &ast.ProcedureCall{
+				Callee:       dsg,
+				ActualParams: p.list,
+				Pos:          pos,
+				Rng:          &report.Range{Start: pos, End: p.rng.End},
+			}
 			p.list = make([]ast.Expression, 0)
 			p.next()
 		default:
-			stmt = &ast.BadStmt{}
+			stmt = &ast.BadStmt{Pos: pos, Rng: p.rng}
 			p.errorExpected(":= or (")
 			p.advance(stmtStart)
 		}
 	default:
 		p.errorExpected("statement")
 		p.advance(stmtStart)
-		stmt = &ast.BadStmt{}
+		stmt = &ast.BadStmt{Pos: p.rng.Start, Rng: p.rng}
 	}
 
 	return
 }
 
 func (p *Parser) parseLoopStmt() (stmt *ast.LoopStmt) {
-	stmt = &ast.LoopStmt{}
+	stmt = &ast.LoopStmt{Pos: p.rng.Start}
 
 	p.match(token.LOOP)
 	stmt.StmtSeq = p.parseStatementSeq()
+
+	stmt.Rng = &report.Range{Start: stmt.Pos, End: p.rng.End}
 	p.match(token.END)
 
 	return
 }
 
 func (p *Parser) parseRepeatStmt() (stmt *ast.RepeatStmt) {
-	stmt = &ast.RepeatStmt{}
+	stmt = &ast.RepeatStmt{Pos: p.rng.Start}
 
 	p.match(token.REPEAT)
 	stmt.StmtSeq = p.parseStatementSeq()
 	p.match(token.UNTIL)
 	stmt.BoolExpr = p.parseExpression()
 
+	stmt.Rng = &report.Range{Start: stmt.Pos, End: stmt.BoolExpr.Range().End}
+
 	return
 }
 
 func (p *Parser) parseWhileStmt() (stmt *ast.WhileStmt) {
-	stmt = &ast.WhileStmt{}
+	stmt = &ast.WhileStmt{Pos: p.rng.Start}
 
 	p.match(token.WHILE)
 	stmt.BoolExpr = p.parseExpression()
@@ -1280,17 +1530,19 @@ func (p *Parser) parseWhileStmt() (stmt *ast.WhileStmt) {
 		stmt.ElsIfs = append(stmt.ElsIfs, elsif)
 	}
 
+	stmt.Rng = &report.Range{Start: stmt.Pos, End: p.rng.End}
 	p.match(token.END)
 
 	return
 }
 
 func (p *Parser) parseReturnStmt() (stmt *ast.ReturnStmt) {
-	stmt = &ast.ReturnStmt{}
+	stmt = &ast.ReturnStmt{Pos: p.rng.Start, Rng: p.rng}
 
 	p.match(token.RETURN)
 	if p.exprStart() {
 		stmt.Value = p.parseExpression()
+		stmt.Rng.End = stmt.Value.Range().End
 	}
 
 	return
@@ -1298,7 +1550,7 @@ func (p *Parser) parseReturnStmt() (stmt *ast.ReturnStmt) {
 
 // IfStatement = IF expression THEN StatementSequence {ElsifStatement} [ElseStatement] END
 func (p *Parser) parseIfStmt() (stmt *ast.IfStmt) {
-	stmt = &ast.IfStmt{}
+	stmt = &ast.IfStmt{Pos: p.rng.Start}
 
 	p.match(token.IF)
 	stmt.BoolExpr = p.parseExpression()
@@ -1320,6 +1572,7 @@ func (p *Parser) parseIfStmt() (stmt *ast.IfStmt) {
 		stmt.ElsePath = p.parseStatementSeq()
 	}
 
+	stmt.Rng = &report.Range{Start: stmt.Pos, End: p.rng.End}
 	p.match(token.END)
 
 	return
@@ -1327,7 +1580,7 @@ func (p *Parser) parseIfStmt() (stmt *ast.IfStmt) {
 
 // CaseStatement = CASE expression OF ['|'] Case { '|' Case } [ ELSE StatementSequence ] END
 func (p *Parser) parseCaseStmt() (stmt *ast.CaseStmt) {
-	stmt = &ast.CaseStmt{}
+	stmt = &ast.CaseStmt{Pos: p.rng.Start}
 
 	p.match(token.CASE)
 
@@ -1349,6 +1602,7 @@ func (p *Parser) parseCaseStmt() (stmt *ast.CaseStmt) {
 		stmt.Else = p.parseStatementSeq()
 	}
 
+	stmt.Rng = &report.Range{Start: stmt.Pos, End: p.rng.End}
 	p.match(token.END)
 
 	return
@@ -1367,14 +1621,24 @@ func (p *Parser) parseCase() *ast.Case {
 
 	c.StmtSeq = p.parseStatementSeq()
 
+	if len(c.CaseLabelList) != 0 && len(c.StmtSeq) != 0 {
+		c.Pos = c.CaseLabelList[0].Begin.Position()
+
+		lastStmt := c.StmtSeq[len(c.StmtSeq)-1]
+		c.Rng = &report.Range{Start: c.Pos, End: lastStmt.Range().End}
+	}
+
 	return c
 }
 
 func (p *Parser) parseLabelRange() *ast.LabelRange {
-	r := &ast.LabelRange{Begin: p.parseExpression()}
+	pos := p.rng.Start
+	rng := p.rng
+	r := &ast.LabelRange{Pos: pos, Rng: rng, Begin: p.parseExpression()}
 	if p.tok == token.RANGE {
 		p.next()
 		r.End = p.parseExpression()
+		r.Rng.End = r.End.Range().End
 	}
 
 	return r
@@ -1382,7 +1646,7 @@ func (p *Parser) parseLabelRange() *ast.LabelRange {
 
 // ForStatement = FOR ident ':=' expression TO expression [BY ConstExpression] DO StatementSequence END
 func (p *Parser) parseForStmt() (stmt *ast.ForStmt) {
-	stmt = &ast.ForStmt{}
+	stmt = &ast.ForStmt{Pos: p.rng.Start}
 
 	p.match(token.FOR)
 	stmt.CtlVar = p.parseIdent()
@@ -1399,6 +1663,7 @@ func (p *Parser) parseForStmt() (stmt *ast.ForStmt) {
 	p.match(token.DO)
 
 	stmt.StmtSeq = p.parseStatementSeq()
+	stmt.Rng = &report.Range{Start: stmt.Pos, End: p.rng.End}
 	p.match(token.END)
 
 	return
@@ -1406,15 +1671,16 @@ func (p *Parser) parseForStmt() (stmt *ast.ForStmt) {
 
 // ExitStatement = EXIT
 func (p *Parser) parseExitStmt() *ast.ExitStmt {
+	stmt := &ast.ExitStmt{Pos: p.rng.Start, Rng: p.rng}
 	p.match(token.EXIT)
 
-	return &ast.ExitStmt{}
+	return stmt
 }
 
 // WithStatement = WITH ['|'] Guard DO StatementSequence { '|' Guard DO StatementSequence} [ ELSE StatementSequence ] END
 // Guard         = qualident ':' qualident
 func (p *Parser) parseWithStmt() *ast.WithStmt {
-	stmt := &ast.WithStmt{}
+	stmt := &ast.WithStmt{Pos: p.rng.Start}
 
 	p.match(token.WITH)
 
@@ -1432,13 +1698,24 @@ func (p *Parser) parseWithStmt() *ast.WithStmt {
 		stmt.Else = p.parseStatementSeq()
 	}
 
+	stmt.Rng = &report.Range{Start: stmt.Pos, End: p.rng.End}
+	p.match(token.END)
+
 	return stmt
 }
 
 func (p *Parser) parseGuard() *ast.Guard {
-	grd := &ast.Guard{Expr: p.parseQualifiedIdent(), Type: p.parseQualifiedIdent()}
+	pos := p.rng.Start
+	grd := &ast.Guard{Expr: p.parseQualifiedIdent(), Pos: pos}
+	p.match(token.COLON)
+	grd.Type = p.parseQualifiedIdent()
+
 	p.match(token.DO)
 	grd.StmtSeq = p.parseStatementSeq()
+	if len(grd.StmtSeq) != 0 {
+		lastStmt := grd.StmtSeq[len(grd.StmtSeq)-1]
+		grd.Rng = &report.Range{Start: grd.Pos, End: lastStmt.Range().End}
+	}
 
 	return grd
 }

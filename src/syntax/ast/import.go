@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+
+	"github.com/anthonyabeo/obx/src/report"
 )
 
 type Import struct {
@@ -11,6 +13,9 @@ type Import struct {
 	Name       string
 	ImportPath []string
 	Meta       []Expression
+
+	Pos *report.Position
+	Rng *report.Range
 }
 
 func (imp *Import) String() string {

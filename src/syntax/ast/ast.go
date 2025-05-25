@@ -1,9 +1,15 @@
 package ast
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/anthonyabeo/obx/src/report"
+)
 
 type Node interface {
 	fmt.Stringer
+	Position() *report.Position
+	Range() *report.Range
 	Accept(Visitor)
 }
 

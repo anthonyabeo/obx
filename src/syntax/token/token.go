@@ -148,7 +148,7 @@ var tokens = [...]string{
 
 	IDENTIFIER: "IDENTIFIER",
 
-	BOOLEAN:  "boolean",
+	BOOLEAN:  "bool",
 	BYTE:     "byte",
 	CHAR:     "char",
 	INT8:     "int8",

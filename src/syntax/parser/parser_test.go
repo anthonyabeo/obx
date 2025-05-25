@@ -197,7 +197,6 @@ begin
 end Main
 `)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-	//table.Insert(ast.NewTypeSymbol("CenterTree", ast.Unexported, &ast.RecordType{}))
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -418,7 +417,7 @@ func TestParseImportDecl(t *testing.T) {
 		D := a.b.c
 		E := a.b.c.d(Bar)
 		H := a.b.c.d(Bar, Baz)
-		G := a.b.c.d(Foo Bar Baz)
+		G := a.b.c.d(Foo, Bar, Baz)
 		Out
 end Drawing
 `)
@@ -637,7 +636,7 @@ module Main
 		t, c: Tree
 end Main
 `)
-	table := ast.NewEnvironment(nil, "Main")
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()

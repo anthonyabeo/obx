@@ -89,9 +89,6 @@ func (r *RecordEnv) Insert(obj Symbol) Symbol {
 	if obj == nil || obj.Name() == "" {
 		return nil
 	}
-	if alt := r.Lookup(obj.Name()); alt != nil {
-		return alt
-	}
 
 	r.insert(obj.Name(), obj)
 	if obj.Parent == nil {

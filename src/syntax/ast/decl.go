@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -12,16 +13,25 @@ type (
 	VariableDecl struct {
 		IdentList []*IdentifierDef
 		Type      Type
+
+		Pos *report.Position
+		Rng *report.Range
 	}
 
 	ConstantDecl struct {
 		Name  *IdentifierDef
 		Value Expression
+
+		Pos *report.Position
+		Rng *report.Range
 	}
 
 	TypeDecl struct {
 		Name        *IdentifierDef
 		DenotedType Type
+
+		Pos *report.Position
+		Rng *report.Range
 	}
 
 	// ProcedureDecl
@@ -31,17 +41,26 @@ type (
 		Body    *ProcedureBody
 		EndName string
 		Env     *Environment
+
+		Pos *report.Position
+		Rng *report.Range
 	}
 
 	ProcedureHeading struct {
 		Rcv  *Receiver
 		Name *IdentifierDef
 		FP   *FormalParams
+
+		Pos *report.Position
+		Rng *report.Range
 	}
 
 	ProcedureBody struct {
 		DeclSeq []Declaration
 		StmtSeq []Statement
+
+		Pos *report.Position
+		Rng *report.Range
 	}
 
 	// FPSection
@@ -50,20 +69,32 @@ type (
 		Mod   token.Kind
 		Names []string
 		Type  Type
+
+		Pos *report.Position
+		Rng *report.Range
 	}
 
 	FormalParams struct {
 		Params  []*FPSection
 		RetType Type
+
+		Pos *report.Position
+		Rng *report.Range
 	}
 
 	Receiver struct {
 		Mod  token.Kind
 		Var  string
 		Type Type
+
+		Pos *report.Position
+		Rng *report.Range
 	}
 
-	BadDecl struct{}
+	BadDecl struct {
+		Pos *report.Position
+		Rng *report.Range
+	}
 )
 
 func (v *VariableDecl) decl() {}
@@ -75,15 +106,21 @@ func (v *VariableDecl) String() string {
 
 	return fmt.Sprintf("%s: %s", strings.Join(list, ", "), v.Type)
 }
-func (v *VariableDecl) Accept(vst Visitor) { vst.VisitVariableDecl(v) }
+func (v *VariableDecl) Accept(vst Visitor)         { vst.VisitVariableDecl(v) }
+func (v *VariableDecl) Position() *report.Position { return v.Pos }
+func (v *VariableDecl) Range() *report.Range       { return v.Rng }
 
-func (c *ConstantDecl) decl()              {}
-func (c *ConstantDecl) String() string     { return fmt.Sprintf("%v = %v", c.Name, c.Value) }
-func (c *ConstantDecl) Accept(vst Visitor) { vst.VisitConstantDecl(c) }
+func (c *ConstantDecl) decl()                      {}
+func (c *ConstantDecl) String() string             { return fmt.Sprintf("%v = %v", c.Name, c.Value) }
+func (c *ConstantDecl) Accept(vst Visitor)         { vst.VisitConstantDecl(c) }
+func (c *ConstantDecl) Position() *report.Position { return c.Pos }
+func (c *ConstantDecl) Range() *report.Range       { return c.Rng }
 
-func (t *TypeDecl) decl()              {}
-func (t *TypeDecl) String() string     { return fmt.Sprintf("%s = %s", t.Name, t.DenotedType) }
-func (t *TypeDecl) Accept(vst Visitor) { vst.VisitTypeDecl(t) }
+func (t *TypeDecl) decl()                      {}
+func (t *TypeDecl) String() string             { return fmt.Sprintf("%s = %s", t.Name, t.DenotedType) }
+func (t *TypeDecl) Accept(vst Visitor)         { vst.VisitTypeDecl(t) }
+func (t *TypeDecl) Position() *report.Position { return t.Pos }
+func (t *TypeDecl) Range() *report.Range       { return t.Rng }
 
 func (p *ProcedureDecl) decl() {}
 func (p *ProcedureDecl) String() string {
@@ -95,7 +132,9 @@ func (p *ProcedureDecl) String() string {
 
 	return buf.String()
 }
-func (p *ProcedureDecl) Accept(vst Visitor) { vst.VisitProcedureDecl(p) }
+func (p *ProcedureDecl) Accept(vst Visitor)         { vst.VisitProcedureDecl(p) }
+func (p *ProcedureDecl) Position() *report.Position { return p.Pos }
+func (p *ProcedureDecl) Range() *report.Range       { return p.Rng }
 
 func (p *ProcedureHeading) String() string {
 	buf := new(bytes.Buffer)
@@ -106,8 +145,10 @@ func (p *ProcedureHeading) String() string {
 
 	return buf.String()
 }
-func (p *ProcedureHeading) Accept(vst Visitor) { vst.VisitProcedureHeading(p) }
-func (p *ProcedureHeading) decl()              {}
+func (p *ProcedureHeading) Accept(vst Visitor)         { vst.VisitProcedureHeading(p) }
+func (p *ProcedureHeading) decl()                      {}
+func (p *ProcedureHeading) Position() *report.Position { return p.Pos }
+func (p *ProcedureHeading) Range() *report.Range       { return p.Rng }
 
 func (p *ProcedureBody) String() string { panic("not implemented") }
 
@@ -155,6 +196,8 @@ func (r *Receiver) String() string {
 	return buf.String()
 }
 
-func (b *BadDecl) Accept(Visitor) {}
-func (b *BadDecl) decl()          {}
-func (b *BadDecl) String() string { return "<BadDecl>" }
+func (b *BadDecl) Accept(Visitor)             {}
+func (b *BadDecl) decl()                      {}
+func (b *BadDecl) String() string             { return "<BadDecl>" }
+func (b *BadDecl) Position() *report.Position { return b.Pos }
+func (b *BadDecl) Range() *report.Range       { return b.Rng }
