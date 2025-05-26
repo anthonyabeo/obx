@@ -339,7 +339,7 @@ func (v *AstPrinter) VisitTypeDecl(d *ast.TypeDecl) any {
 }
 func (v *AstPrinter) VisitProcedureHeading(h *ast.ProcedureHeading) any {
 	var params, rcv any
-	if h.FP == nil {
+	if h.FP != nil {
 		params = h.FP.Accept(v)
 	}
 

@@ -21,6 +21,8 @@ func parseSource(t *testing.T, input []byte) *ast.Oberon {
 	})
 
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+	out := ast.NewEnvironment(table, "Out")
+	out.Insert(ast.NewProcedureSymbol("Out.Int", ast.Exported))
 
 	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
 	p := parser.NewParser(lex, r, table, nil)
@@ -84,5 +86,83 @@ func TestPrettyPrintJSON(t *testing.T) {
 	}
 	if _, ok := firstUnit["statements"]; !ok {
 		t.Errorf("expected 'statements' field in module")
+	}
+}
+
+func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
+	input := []byte(`
+		MODULE Bigger;
+		IMPORT Out;
+
+		CONST Pi = 3.14;
+
+		TYPE
+			Point = RECORD
+				x, y: INTEGER
+			END;
+
+		VAR
+			p: Point;
+			count: INTEGER;
+
+		PROCEDURE Init*;
+		BEGIN
+			p.x := 0; p.y := 0;
+			count := 0
+		END Init;
+
+		PROCEDURE Main*;
+		BEGIN
+			Init();
+			Out.Int(count, 0)
+		END Main;
+
+		BEGIN
+			Main()
+		END Bigger.
+	`)
+
+	node := parseSource(t, input)
+	data, err := PrettyPrintJSON(node)
+	if err != nil {
+		t.Fatalf("PrettyPrintJSON failed: %v", err)
+	}
+
+	// Write the output to a file for debugging (optional)
+	_ = os.WriteFile("test_output.json", data, 0644)
+
+	var result map[string]any
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("Invalid JSON: %v", err)
+	}
+
+	// Ensure top-level type is Oberon
+	if result["type"] != "Oberon" {
+		t.Errorf("expected top-level type 'Oberon', got %v", result["type"])
+	}
+
+	units, ok := result["units"].([]any)
+	if !ok || len(units) == 0 {
+		t.Fatalf("expected non-empty 'units' array, got: %v", result["units"])
+	}
+
+	module, ok := units[0].(map[string]any)
+	if !ok || module["type"] != "Module" {
+		t.Fatalf("expected 'Module' in units[0], got %v", module["type"])
+	}
+
+	proc := FindProcedureByName(result, "Main")
+	if proc == nil {
+		t.Errorf("expected to find procedure with name 'Main'")
+	}
+
+	decl := FindVariableByName(result, "p")
+	if decl == nil {
+		t.Errorf("Expected variable declaration for 'p'")
+	}
+
+	ty := FindTypeByName(result, "Point")
+	if ty == nil {
+		t.Errorf("Expected variable declaration for 'p'")
 	}
 }

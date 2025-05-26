@@ -1267,15 +1267,17 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 	}
 
 	// add the formal parameters into the receiver's environment
-	for _, param := range head.FP.Params {
-		for _, id := range param.Names {
-			if sym := p.env.Insert(ast.NewParamSymbol(id, param.Mod, param.Type)); sym != nil {
-				p.err.Report(report.Diagnostic{
-					Severity: report.Error,
-					Message:  "duplicate parameter declaration" + id,
-					Pos:      param.Pos,
-					Range:    param.Rng,
-				})
+	if head.FP != nil {
+		for _, param := range head.FP.Params {
+			for _, id := range param.Names {
+				if sym := p.env.Insert(ast.NewParamSymbol(id, param.Mod, param.Type)); sym != nil {
+					p.err.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  "duplicate parameter declaration" + id,
+						Pos:      param.Pos,
+						Range:    param.Rng,
+					})
+				}
 			}
 		}
 	}
