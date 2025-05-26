@@ -1065,10 +1065,10 @@ func (p *Parser) parseSetElem() ast.Expression {
 	end := p.parseExpression()
 
 	return &ast.ExprRange{
-		Beg: beg,
-		End: end,
-		Pos: beg.Position(),
-		Rng: &report.Range{Start: beg.Range().Start, End: end.Range().End},
+		Low:  beg,
+		High: end,
+		Pos:  beg.Position(),
+		Rng:  &report.Range{Start: beg.Range().Start, End: end.Range().End},
 	}
 }
 
@@ -1523,7 +1523,7 @@ func (p *Parser) parseWhileStmt() (stmt *ast.WhileStmt) {
 	for p.tok == token.ELSIF {
 		p.next()
 
-		elsif := &ast.ElsIfBranch{BoolExpr: p.parseExpression()}
+		elsif := &ast.ElseIfBranch{BoolExpr: p.parseExpression()}
 		p.match(token.DO)
 		elsif.ThenPath = p.parseStatementSeq()
 
@@ -1560,7 +1560,7 @@ func (p *Parser) parseIfStmt() (stmt *ast.IfStmt) {
 	for p.tok == token.ELSIF {
 		p.next()
 
-		elsif := &ast.ElsIfBranch{BoolExpr: p.parseExpression()}
+		elsif := &ast.ElseIfBranch{BoolExpr: p.parseExpression()}
 		p.match(token.THEN)
 		elsif.ThenPath = p.parseStatementSeq()
 
@@ -1622,7 +1622,7 @@ func (p *Parser) parseCase() *ast.Case {
 	c.StmtSeq = p.parseStatementSeq()
 
 	if len(c.CaseLabelList) != 0 && len(c.StmtSeq) != 0 {
-		c.Pos = c.CaseLabelList[0].Begin.Position()
+		c.Pos = c.CaseLabelList[0].High.Position()
 
 		lastStmt := c.StmtSeq[len(c.StmtSeq)-1]
 		c.Rng = &report.Range{Start: c.Pos, End: lastStmt.Range().End}
@@ -1634,11 +1634,11 @@ func (p *Parser) parseCase() *ast.Case {
 func (p *Parser) parseLabelRange() *ast.LabelRange {
 	pos := p.rng.Start
 	rng := p.rng
-	r := &ast.LabelRange{Pos: pos, Rng: rng, Begin: p.parseExpression()}
+	r := &ast.LabelRange{Pos: pos, Rng: rng, High: p.parseExpression()}
 	if p.tok == token.RANGE {
 		p.next()
-		r.End = p.parseExpression()
-		r.Rng.End = r.End.Range().End
+		r.Low = p.parseExpression()
+		r.Rng.End = r.Low.Range().End
 	}
 
 	return r
