@@ -13,15 +13,15 @@ type (
 	NamedType struct {
 		Name *QualifiedIdent
 
-		pos *report.Position
-		rng *report.Range
+		Pos *report.Position
+		Rng *report.Range
 	}
 
 	BasicType struct {
-		name string // e.g. integer, bool
+		Nname string // e.g. integer, bool
 
-		pos *report.Position
-		rng *report.Range
+		Pos *report.Position
+		Rng *report.Range
 	}
 
 	ArrayType struct {
@@ -77,26 +77,26 @@ type (
 )
 
 func NewNamedType(name *QualifiedIdent, pos *report.Position, rng *report.Range) *NamedType {
-	return &NamedType{Name: name, pos: pos, rng: rng}
+	return &NamedType{Name: name, Pos: pos, Rng: rng}
 }
 
 func (n *NamedType) Width() int                 { panic("implement me") }
 func (n *NamedType) String() string             { return n.Name.String() }
-func (n *NamedType) Accept(vst Visitor)         { vst.VisitNamedType(n) }
+func (n *NamedType) Accept(vst Visitor) any     { return vst.VisitNamedType(n) }
 func (n *NamedType) typ()                       {}
-func (n *NamedType) Position() *report.Position { return n.pos }
-func (n *NamedType) Range() *report.Range       { return n.rng }
+func (n *NamedType) Position() *report.Position { return n.Pos }
+func (n *NamedType) Range() *report.Range       { return n.Rng }
 
 func NewBasicType(name string, pos *report.Position, rng *report.Range) *BasicType {
-	return &BasicType{name: name, pos: pos, rng: rng}
+	return &BasicType{Nname: name, Pos: pos, Rng: rng}
 }
 
-func (b *BasicType) Name() string       { return b.name }
-func (b *BasicType) String() string     { return b.name }
-func (b *BasicType) Accept(vst Visitor) { vst.VisitBasicType(b) }
-func (b *BasicType) typ()               {}
+func (b *BasicType) Name() string           { return b.Nname }
+func (b *BasicType) String() string         { return b.Nname }
+func (b *BasicType) Accept(vst Visitor) any { return vst.VisitBasicType(b) }
+func (b *BasicType) typ()                   {}
 func (b *BasicType) Width() int {
-	switch b.name {
+	switch b.Nname {
 	case "byte", "int8", "bool", "char":
 		return 1
 	case "int16", "wchar":
@@ -106,11 +106,11 @@ func (b *BasicType) Width() int {
 	case "int64", "lreal":
 		return 8
 	default:
-		panic(fmt.Sprintf("'%s' is not a basic type", b.name))
+		panic(fmt.Sprintf("'%s' is not a basic type", b.Nname))
 	}
 }
-func (b *BasicType) Position() *report.Position { return b.pos }
-func (b *BasicType) Range() *report.Range       { return b.rng }
+func (b *BasicType) Position() *report.Position { return b.Pos }
+func (b *BasicType) Range() *report.Range       { return b.Rng }
 
 func NewArray(lenList *LenList, elem Type, pos *report.Position, rng *report.Range) *ArrayType {
 	return &ArrayType{LenList: lenList, ElemType: elem, Pos: pos, Rng: rng}
@@ -126,7 +126,7 @@ func (a *ArrayType) String() string {
 
 	return fmt.Sprintf("[%s]%s", strings.Join(ll, ", "), a.ElemType)
 }
-func (a *ArrayType) Accept(vst Visitor)         { vst.VisitArrayType(a) }
+func (a *ArrayType) Accept(vst Visitor) any     { return vst.VisitArrayType(a) }
 func (a *ArrayType) typ()                       {}
 func (a *ArrayType) Width() int                 { panic("implement me") }
 func (a *ArrayType) Position() *report.Position { return a.Pos }
@@ -140,20 +140,35 @@ type LenList struct {
 	Rng *report.Range
 }
 
+func (l *LenList) Accept(vst Visitor) any { return vst.VisitLenList(l) }
+func (l *LenList) String() string {
+	var lengths []string
+	for _, expr := range l.List {
+		lengths = append(lengths, expr.String())
+	}
+
+	if l.Modifier != token.ILLEGAL {
+		return fmt.Sprintf("%s[%s]", l.Modifier.String(), strings.Join(lengths, ", "))
+	}
+	return fmt.Sprintf("[%s]", strings.Join(lengths, ", "))
+}
+func (l *LenList) Position() *report.Position { return l.Pos }
+func (l *LenList) Range() *report.Range       { return l.Rng }
+
 func (p *ProcedureType) String() string {
 	if p.FP == nil {
 		return "procedure"
 	}
 	return fmt.Sprintf("procedure%s", p.FP.String())
 }
-func (p *ProcedureType) Accept(vst Visitor)         { vst.VisitProcType(p) }
+func (p *ProcedureType) Accept(vst Visitor) any     { return vst.VisitProcedureType(p) }
 func (p *ProcedureType) typ()                       {}
 func (p *ProcedureType) Width() int                 { panic("implement me") }
 func (p *ProcedureType) Position() *report.Position { return p.Pos }
 func (p *ProcedureType) Range() *report.Range       { return p.Rng }
 
 func (p *PointerType) String() string             { return fmt.Sprintf("^%s", p.Base) }
-func (p *PointerType) Accept(vst Visitor)         { vst.VisitPointerType(p) }
+func (p *PointerType) Accept(vst Visitor) any     { return vst.VisitPointerType(p) }
 func (p *PointerType) typ()                       {}
 func (p *PointerType) Width() int                 { panic("implement me") }
 func (p *PointerType) Position() *report.Position { return p.Pos }
@@ -181,21 +196,33 @@ func (r *RecordType) String() string {
 
 	return buf.String()
 }
-func (r *RecordType) Accept(vst Visitor)         { vst.VisitRecordType(r) }
+func (r *RecordType) Accept(vst Visitor) any     { return vst.VisitRecordType(r) }
 func (r *RecordType) typ()                       {}
 func (r *RecordType) Width() int                 { panic("implement me") }
 func (r *RecordType) Position() *report.Position { return r.Pos }
 func (r *RecordType) Range() *report.Range       { return r.Rng }
 
+func (f *FieldList) Accept(vst Visitor) any { return vst.VisitFieldList(f) }
+func (f *FieldList) String() string {
+	var fields []string
+	for _, field := range f.List {
+		fields = append(fields, field.String())
+	}
+
+	return fmt.Sprintf("%s: %s", strings.Join(fields, ", "), f.Type)
+}
+func (f *FieldList) Position() *report.Position { return f.Pos }
+func (f *FieldList) Range() *report.Range       { return f.Rng }
+
 func (e *EnumType) String() string             { return fmt.Sprintf("enum(%s)", strings.Join(e.Variants, ", ")) }
-func (e *EnumType) Accept(vst Visitor)         { vst.VisitEnumType(e) }
+func (e *EnumType) Accept(vst Visitor) any     { return vst.VisitEnumType(e) }
 func (e *EnumType) typ()                       {}
 func (e *EnumType) Width() int                 { panic("implement me") }
 func (e *EnumType) Position() *report.Position { return e.Pos }
 func (e *EnumType) Range() *report.Range       { return e.Rng }
 
 func (b *BadType) String() string             { return "<BadType>" }
-func (b *BadType) Accept(Visitor)             {}
+func (b *BadType) Accept(vst Visitor) any     { return vst.VisitBadType(b) }
 func (b *BadType) typ()                       {}
 func (b *BadType) Width() int                 { panic("implement me") }
 func (b *BadType) Position() *report.Position { return b.Pos }

@@ -36,4 +36,6 @@ func (imp *Import) String() string {
 
 	return buf.String()
 }
-func (imp *Import) Accept(vst Visitor) { vst.VisitImport(imp) }
+func (imp *Import) Accept(vst Visitor) any     { return vst.VisitImport(imp) }
+func (imp *Import) Position() *report.Position { return imp.Pos }
+func (imp *Import) Range() *report.Range       { return imp.Rng }

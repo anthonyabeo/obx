@@ -11,6 +11,22 @@ import (
 // IdentProps is a set of flags denoting the properties of an identifier
 type IdentProps int
 
+func (p IdentProps) String() string {
+	switch p {
+	case Exported:
+		return "Exported"
+	case Unexported:
+		return "Unexported"
+	case ReadOnly:
+		return "ReadOnly"
+	case Predeclared:
+		return "Predeclared"
+	case ExportedReadOnly:
+		return "Exported and Read Only"
+	}
+	return "Unknown"
+}
+
 // Properties of an identifier
 const (
 	Exported IdentProps = 1 << iota
@@ -63,8 +79,8 @@ type (
 	}
 
 	ExprRange struct {
-		Beg Expression
-		End Expression
+		Low  Expression
+		High Expression
 
 		Pos *report.Position
 		Rng *report.Range
@@ -104,7 +120,7 @@ type (
 )
 
 func (*Nil) String() string               { return "nil" }
-func (n *Nil) Accept(vst Visitor)         { vst.VisitNil(n) }
+func (n *Nil) Accept(vst Visitor) any     { return vst.VisitNil(n) }
 func (*Nil) expr()                        {}
 func (n *Nil) Position() *report.Position { return n.Pos }
 func (n *Nil) Range() *report.Range       { return n.Rng }
@@ -123,27 +139,27 @@ func (id *IdentifierDef) String() string {
 }
 func (id *IdentifierDef) Position() *report.Position { return id.Pos }
 func (id *IdentifierDef) Range() *report.Range       { return id.Rng }
-
-func (e *ExprRange) String() string             { return fmt.Sprintf("%s..%s", e.Beg, e.End) }
-func (e *ExprRange) Accept(vst Visitor)         { vst.VisitExprRange(e) }
-func (e *ExprRange) expr()                      {}
-func (e *ExprRange) Position() *report.Position { panic("not implemented") }
-func (e *ExprRange) Range() *report.Range       { panic("not implemented") }
+func (id *IdentifierDef) Accept(vst Visitor) any     { return vst.VisitIdentifierDef(id) }
+func (e *ExprRange) String() string                  { return fmt.Sprintf("%s..%s", e.Low, e.High) }
+func (e *ExprRange) Accept(vst Visitor) any          { return vst.VisitExprRange(e) }
+func (e *ExprRange) expr()                           {}
+func (e *ExprRange) Position() *report.Position      { return e.Pos }
+func (e *ExprRange) Range() *report.Range            { return e.Rng }
 
 func (b *BasicLit) expr()                      {}
 func (b *BasicLit) String() string             { return b.Val }
-func (b *BasicLit) Accept(vst Visitor)         { vst.VisitBasicLit(b) }
+func (b *BasicLit) Accept(vst Visitor) any     { return vst.VisitBasicLit(b) }
 func (b *BasicLit) Position() *report.Position { return b.Pos }
 func (b *BasicLit) Range() *report.Range       { return b.Rng }
 
 func (b *BinaryExpr) expr()                      {}
 func (b *BinaryExpr) String() string             { return fmt.Sprintf("%v %v %v", b.Left, b.Op, b.Right) }
-func (b *BinaryExpr) Accept(vst Visitor)         { vst.VisitBinaryExpr(b) }
+func (b *BinaryExpr) Accept(vst Visitor) any     { return vst.VisitBinaryExpr(b) }
 func (b *BinaryExpr) Position() *report.Position { return b.Pos }
 func (b *BinaryExpr) Range() *report.Range       { return b.Rng }
 
-func (f *FunctionCall) Accept(vst Visitor) { vst.VisitFunctionCall(f) }
-func (f *FunctionCall) expr()              {}
+func (f *FunctionCall) Accept(vst Visitor) any { return vst.VisitFunctionCall(f) }
+func (f *FunctionCall) expr()                  {}
 func (f *FunctionCall) String() string {
 	var args []string
 	for _, arg := range f.ActualParams {
@@ -155,8 +171,8 @@ func (f *FunctionCall) String() string {
 func (f *FunctionCall) Position() *report.Position { return f.Pos }
 func (f *FunctionCall) Range() *report.Range       { return f.Rng }
 
-func (q *QualifiedIdent) Accept(vst Visitor) { vst.VisitQualifiedIdent(q) }
-func (q *QualifiedIdent) expr()              {}
+func (q *QualifiedIdent) Accept(vst Visitor) any { return vst.VisitQualifiedIdent(q) }
+func (q *QualifiedIdent) expr()                  {}
 func (q *QualifiedIdent) String() string {
 	if q.Prefix == "" {
 		return q.Name
@@ -175,18 +191,18 @@ func (s *Set) String() string {
 
 	return fmt.Sprintf("{%s}", strings.Join(elems, ", "))
 }
-func (s *Set) Accept(vst Visitor)         { vst.VisitSet(s) }
+func (s *Set) Accept(vst Visitor) any     { return vst.VisitSet(s) }
 func (s *Set) Position() *report.Position { return s.Pos }
 func (s *Set) Range() *report.Range       { return s.Rng }
 
-func (u *UnaryExpr) Accept(vst Visitor)         { vst.VisitUnaryExpr(u) }
+func (u *UnaryExpr) Accept(vst Visitor) any     { return vst.VisitUnaryExpr(u) }
 func (u *UnaryExpr) expr()                      {}
 func (u *UnaryExpr) String() string             { return fmt.Sprintf("%v%v", u.Op, u.Operand) }
 func (u *UnaryExpr) Position() *report.Position { return u.Pos }
 func (u *UnaryExpr) Range() *report.Range       { return u.Rng }
 
-func (d *Designator) Accept(vst Visitor) { vst.VisitDesignator(d) }
-func (d *Designator) expr()              {}
+func (d *Designator) Accept(vst Visitor) any { return vst.VisitDesignator(d) }
+func (d *Designator) expr()                  {}
 func (d *Designator) String() string {
 	s := d.QIdent.String()
 	for _, sel := range d.Select {
@@ -209,7 +225,7 @@ func (d *Designator) String() string {
 func (d *Designator) Position() *report.Position { return d.Pos }
 func (d *Designator) Range() *report.Range       { return d.Rng }
 
-func (b *BadExpr) Accept(Visitor)             {}
+func (b *BadExpr) Accept(vst Visitor) any     { return vst.VisitBadExpr(b) }
 func (b *BadExpr) expr()                      {}
 func (b *BadExpr) String() string             { return "<bad expr>" }
 func (b *BadExpr) Position() *report.Position { return b.Pos }
@@ -219,10 +235,11 @@ func (b *BadExpr) Range() *report.Range       { return b.Rng }
 // ---------------------
 
 type Selector interface {
+	Node
 	sel()
-	String() string
-	Position() *report.Position
-	Range() *report.Range
+	//String() string
+	//Position() *report.Position
+	//Range() *report.Range
 }
 
 // DotOp
@@ -237,6 +254,7 @@ func (d *DotOp) String() string             { return fmt.Sprintf(".%s", d.Field)
 func (d *DotOp) sel()                       {}
 func (d *DotOp) Position() *report.Position { return d.Pos }
 func (d *DotOp) Range() *report.Range       { return d.Rng }
+func (d *DotOp) Accept(vst Visitor) any     { return vst.VisitDotOp(d) }
 
 // IndexOp
 // ---------------------
@@ -257,6 +275,7 @@ func (id *IndexOp) String() string {
 func (id *IndexOp) sel()                       {}
 func (id *IndexOp) Position() *report.Position { return id.Pos }
 func (id *IndexOp) Range() *report.Range       { return id.Rng }
+func (id *IndexOp) Accept(vst Visitor) any     { return vst.VisitIndexOp(id) }
 
 // TypeGuard
 // ---------------------
@@ -270,6 +289,7 @@ func (t *TypeGuard) String() string             { return fmt.Sprintf("(%s)", t.T
 func (t *TypeGuard) sel()                       {}
 func (t *TypeGuard) Position() *report.Position { return t.Pos }
 func (t *TypeGuard) Range() *report.Range       { return t.Rng }
+func (t *TypeGuard) Accept(vst Visitor) any     { return vst.VisitTypeGuard(t) }
 
 // PtrDeref
 // ---------------------
@@ -282,3 +302,4 @@ func (deref *PtrDeref) sel()                       {}
 func (deref *PtrDeref) String() string             { return "^" }
 func (deref *PtrDeref) Position() *report.Position { return deref.Pos }
 func (deref *PtrDeref) Range() *report.Range       { return deref.Rng }
+func (deref *PtrDeref) Accept(vst Visitor) any     { return vst.VisitPtrDeref(deref) }

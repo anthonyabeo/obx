@@ -10,7 +10,7 @@ type Node interface {
 	fmt.Stringer
 	Position() *report.Position
 	Range() *report.Range
-	Accept(Visitor)
+	Accept(Visitor) any
 }
 
 type Statement interface {
