@@ -5,13 +5,12 @@ package ast
 // are compilation units (Module and Definition) and the edges between
 // them represent their import dependency.
 type Oberon struct {
-	File   string
 	units  map[string]CompilationUnit
 	TopOrd []string
 }
 
-func NewOberon(file string) *Oberon {
-	return &Oberon{File: file, units: make(map[string]CompilationUnit)}
+func NewOberon() *Oberon {
+	return &Oberon{units: make(map[string]CompilationUnit)}
 }
 
 func (obx *Oberon) AddUnit(name string, node CompilationUnit) {

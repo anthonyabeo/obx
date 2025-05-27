@@ -9,8 +9,8 @@ import (
 )
 
 type Scanner struct {
-	Src *report.SourceFile
-	mgr *report.SourceManager
+	ctx     *report.Context
+	content []byte
 
 	start    int // start position of this item
 	pos      int // current position of the input
@@ -41,22 +41,22 @@ func (s *Scanner) run() {
 	close(s.items)
 }
 
-func (s *Scanner) emit(kind token.Kind, pos, end int, file string) {
-	s.emitWithValue(kind, string(s.Src.Content[s.start:s.pos]), pos, end, file)
+func (s *Scanner) emit(kind token.Kind, pos, end int) {
+	s.emitWithValue(kind, string(s.content[s.start:s.pos]), pos, end)
 }
 
-func (s *Scanner) emitWithValue(t token.Kind, value string, pos, end int, file string) {
-	s.items <- token.Token{Kind: t, Lexeme: value /*, Range: rng*/, Pos: pos, End: end, File: file}
+func (s *Scanner) emitWithValue(t token.Kind, value string, pos, end int) {
+	s.items <- token.Token{Kind: t, Lexeme: value, Pos: pos, End: end}
 	s.start = s.pos
 }
 
 func (s *Scanner) next() (r rune) {
-	if s.pos >= len(s.Src.Content) {
+	if s.pos >= len(s.content) {
 		s.width = 0
 		return eof
 	}
 
-	r, s.width = utf8.DecodeRune(s.Src.Content[s.pos:])
+	r, s.width = utf8.DecodeRune(s.content[s.pos:])
 	s.pos += s.width
 
 	if r == '\n' {
@@ -88,9 +88,11 @@ func (s *Scanner) errorf(format string /*, rng *report.Range*/, args ...interfac
 	return scanText
 }
 
-func Scan(src *report.SourceFile) *Scanner {
+func Scan(input []byte, ctx *report.Context) *Scanner {
+	ctx.Source.Load(ctx.FileName, input, ctx.TabWidth)
 	scan := &Scanner{
-		Src:      src,
+		ctx:      ctx,
+		content:  input,
 		state:    scanText,
 		items:    make(chan token.Token, 512),
 		line:     1,

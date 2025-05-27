@@ -35,7 +35,7 @@ func visitList[T ast.Node](nodes []T, v ast.Visitor) []any {
 	return result
 }
 
-func PrettyPrintJSON(obx *ast.Oberon) ([]byte, error) {
-	v := NewAstPrinter(obx)
+func PrettyPrintJSON(obx *ast.Oberon, ctx *report.Context) ([]byte, error) {
+	v := NewAstPrinter(obx, ctx)
 	return json.MarshalIndent(v.Print(), "", "  ")
 }

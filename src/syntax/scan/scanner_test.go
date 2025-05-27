@@ -86,11 +86,15 @@ func TestScanNumber(t *testing.T) {
 	}
 
 	file := "test.ob"
-	sm := report.NewSourceManager()
+	ctx := &report.Context{
+		FileName: file,
+		Source:   report.NewSourceManager(),
+		Reporter: nil,
+		TabWidth: 4,
+	}
 
 	for _, test := range tests {
-		sm.Load(file, []byte(test.input), 4)
-		sc := Scan(sm.GetSourceFile(file))
+		sc := Scan([]byte(test.input), ctx)
 
 		got := sc.NextToken()
 
@@ -129,11 +133,15 @@ func TestScanIdentifiers(t *testing.T) {
 	}
 
 	file := "test.ob"
-	sm := report.NewSourceManager()
+	ctx := &report.Context{
+		FileName: file,
+		Source:   report.NewSourceManager(),
+		Reporter: nil,
+		TabWidth: 4,
+	}
 
 	for _, test := range tests {
-		sm.Load(file, []byte(test.input), 4)
-		sc := Scan(sm.GetSourceFile(file))
+		sc := Scan([]byte(test.input), ctx)
 
 		got := sc.NextToken()
 		if test.wantErr {
@@ -180,11 +188,15 @@ func TestScanDelimitersAndOperators(t *testing.T) {
 	}
 
 	file := "test.ob"
-	sm := report.NewSourceManager()
+	ctx := &report.Context{
+		FileName: file,
+		Source:   report.NewSourceManager(),
+		Reporter: nil,
+		TabWidth: 4,
+	}
 
 	for _, test := range tests {
-		sm.Load(file, []byte(test.input), 4)
-		sc := Scan(sm.GetSourceFile(file))
+		sc := Scan([]byte(test.input), ctx)
 
 		got := sc.NextToken()
 		if test.wantErr {
@@ -228,11 +240,15 @@ func TestScanHexStrings(t *testing.T) {
 	}
 
 	file := "test.ob"
-	sm := report.NewSourceManager()
+	ctx := &report.Context{
+		FileName: file,
+		Source:   report.NewSourceManager(),
+		Reporter: nil,
+		TabWidth: 4,
+	}
 
 	for _, test := range tests {
-		sm.Load(file, []byte(test.input), 4)
-		sc := Scan(sm.GetSourceFile(file))
+		sc := Scan([]byte(test.input), ctx)
 
 		got := sc.NextToken()
 
@@ -272,11 +288,15 @@ func TestScanCharacterLiterals(t *testing.T) {
 	}
 
 	file := "test.ob"
-	sm := report.NewSourceManager()
+	ctx := &report.Context{
+		FileName: file,
+		Source:   report.NewSourceManager(),
+		Reporter: nil,
+		TabWidth: 4,
+	}
 
 	for _, test := range tests {
-		sm.Load(file, []byte(test.input), 4)
-		sc := Scan(sm.GetSourceFile(file))
+		sc := Scan([]byte(test.input), ctx)
 
 		got := sc.NextToken()
 		if test.wantErr {
@@ -325,11 +345,15 @@ next'`, token.ILLEGAL, "", true}, // newline
 	}
 
 	file := "test.ob"
-	sm := report.NewSourceManager()
+	ctx := &report.Context{
+		FileName: file,
+		Source:   report.NewSourceManager(),
+		Reporter: nil,
+		TabWidth: 4,
+	}
 
 	for _, tt := range tests {
-		sm.Load(file, []byte(tt.input), 4)
-		sc := Scan(sm.GetSourceFile(file))
+		sc := Scan([]byte(tt.input), ctx)
 
 		tok := sc.NextToken()
 
@@ -363,11 +387,15 @@ func TestScanComments(t *testing.T) {
 	}
 
 	file := "test.ob"
-	sm := report.NewSourceManager()
+	ctx := &report.Context{
+		FileName: file,
+		Source:   report.NewSourceManager(),
+		Reporter: nil,
+		TabWidth: 4,
+	}
 
 	for _, test := range tests {
-		sm.Load(file, []byte(test.input), 4)
-		sc := Scan(sm.GetSourceFile(file))
+		sc := Scan([]byte(test.input), ctx)
 
 		got := sc.NextToken()
 
@@ -382,7 +410,7 @@ func TestScanComments(t *testing.T) {
 }
 
 func TestLexingOfMinimalObxProgram(t *testing.T) {
-	input := `
+	input := []byte(`
 module Main
 	proc fib(n : integer): integer
 		var a, b: integer 
@@ -401,11 +429,15 @@ begin
 	res := fib(21)
   	assert(res = 10946)
 end Main
-`
+`)
 	file := "test.ob"
-	sm := report.NewSourceManager()
-	sm.Load(file, []byte(input), 4)
-	sc := Scan(sm.GetSourceFile(file))
+	ctx := &report.Context{
+		FileName: file,
+		Source:   report.NewSourceManager(),
+		Reporter: nil,
+		TabWidth: 4,
+	}
+	sc := Scan(input, ctx)
 
 	tests := []struct {
 		tokenKind token.Kind
@@ -511,7 +543,7 @@ end Main
 }
 
 func TestExampleOOPProgram(t *testing.T) {
-	input := `module Drawing
+	input := []byte(`module Drawing
   import F := Fibonacci
          C := Collections(Figure)
 
@@ -560,11 +592,15 @@ begin
   figures.append(square)
   drawAll()
 end Drawing
-`
+`)
 	file := "test.ob"
-	sm := report.NewSourceManager()
-	sm.Load(file, []byte(input), 4)
-	sc := Scan(sm.GetSourceFile(file))
+	ctx := &report.Context{
+		FileName: file,
+		Source:   report.NewSourceManager(),
+		Reporter: nil,
+		TabWidth: 4,
+	}
+	sc := Scan(input, ctx)
 
 	tests := []struct {
 		tokenKind token.Kind

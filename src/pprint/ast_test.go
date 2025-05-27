@@ -8,28 +8,18 @@ import (
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
-	"github.com/anthonyabeo/obx/src/syntax/scan"
 )
 
-func parseSource(t *testing.T, input []byte) *ast.Oberon {
-	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
+func parseSource(t *testing.T, input []byte, ctx *report.Context) *ast.Oberon {
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 	out := ast.NewEnvironment(table, "Out")
 	out.Insert(ast.NewProcedureSymbol("Out.Int", ast.Exported))
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := parser.NewParser(lex, r, table, nil)
+	p := parser.NewParser(ctx, input, table, nil)
 	unit := p.Parse()
 
-	if r.ErrorCount() > 0 {
-		r.Flush()
+	if ctx.Reporter.ErrorCount() > 0 {
+		ctx.Reporter.Flush()
 		t.Fatalf("Parser errors")
 	}
 
@@ -46,8 +36,20 @@ func TestPrettyPrintJSON(t *testing.T) {
 		BEGIN x := 42
 		END Test.
 	`)
-	obx := parseSource(t, input)
-	data, err := PrettyPrintJSON(obx)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+
+	obx := parseSource(t, input, ctx)
+	data, err := PrettyPrintJSON(obx, ctx)
 	if err != nil {
 		t.Fatalf("PrettyPrintJSON failed: %v", err)
 	}
@@ -122,8 +124,20 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 		END Bigger.
 	`)
 
-	node := parseSource(t, input)
-	data, err := PrettyPrintJSON(node)
+	filename := "test.obx"
+	mgr := report.NewSourceManager()
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+
+	obx := parseSource(t, input, ctx)
+	data, err := PrettyPrintJSON(obx, ctx)
 	if err != nil {
 		t.Fatalf("PrettyPrintJSON failed: %v", err)
 	}

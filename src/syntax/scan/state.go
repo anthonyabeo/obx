@@ -27,10 +27,10 @@ func scanIdentifier(s *Scanner) StateFn {
 		}
 	}
 
-	lexeme := strings.ToLower(string(s.Src.Content[s.start:s.pos]))
+	lexeme := strings.ToLower(string(s.content[s.start:s.pos]))
 	kind := token.Lookup(lexeme)
 
-	s.emit(kind, s.start, s.pos, s.Src.Name)
+	s.emit(kind, s.start, s.pos)
 
 	return scanText
 }
@@ -48,17 +48,17 @@ func scanNumber(s *Scanner) StateFn {
 	s.acceptRun("0123456789AaBbCcDdEeFf") // possible hex digits
 	if s.accept("Hh") {
 		if s.accept("Ll") {
-			s.emit(token.INT64_LIT, s.start, s.pos, s.Src.Name)
+			s.emit(token.INT64_LIT, s.start, s.pos)
 			return scanText
 		}
 
 		if s.accept("Ii") {
-			s.emit(token.INT32_LIT, s.start, s.pos, s.Src.Name)
+			s.emit(token.INT32_LIT, s.start, s.pos)
 			return scanText
 		}
 
 		// Ensure all characters before 'H' were valid hex digits
-		if !isValidHex(string(s.Src.Content[s.start:midPos])) {
+		if !isValidHex(string(s.content[s.start:midPos])) {
 			return s.errorf("malformed number: invalid hex digits before 'H'")
 		}
 
@@ -66,13 +66,13 @@ func scanNumber(s *Scanner) StateFn {
 			return s.errorf("malformed number: invalid character '%c' after hex literal", s.peek())
 		}
 
-		s.emit(token.INT_LIT, s.start, s.pos, s.Src.Name)
+		s.emit(token.INT_LIT, s.start, s.pos)
 		return scanText
 	}
 
 	if s.accept("Xx") {
 		// extract the character before 'X'
-		hexValue := string(s.Src.Content[s.start : s.pos-1])
+		hexValue := string(s.content[s.start : s.pos-1])
 
 		// Ensure all characters before 'X' were valid hex digits
 		if !isValidHex(hexValue) {
@@ -106,7 +106,7 @@ func scanNumber(s *Scanner) StateFn {
 		character := rune(value)
 
 		// Emit the character token with its Unicode code point
-		s.emitWithValue(token.CHAR_LIT, string(character), s.start, s.pos, s.Src.Name)
+		s.emitWithValue(token.CHAR_LIT, string(character), s.start, s.pos)
 
 		return scanText
 	}
@@ -123,7 +123,7 @@ func scanNumber(s *Scanner) StateFn {
 	// Check for exponent
 	if s.accept("EeDdSs") {
 		isReal = true
-		scaleChar = rune(s.Src.Content[s.pos-1])
+		scaleChar = rune(s.content[s.pos-1])
 		s.accept("+-")
 		if !s.acceptDigits("0123456789") {
 			return s.errorf("malformed number: invalid exponent: expected digit after exponent")
@@ -137,12 +137,12 @@ func scanNumber(s *Scanner) StateFn {
 	// Optional suffix for integer
 	if !isReal {
 		if s.accept("Ll") {
-			s.emit(token.INT64_LIT, s.start, s.pos, s.Src.Name)
+			s.emit(token.INT64_LIT, s.start, s.pos)
 			return scanText
 		}
 
 		if s.accept("Ii") {
-			s.emit(token.INT32_LIT, s.start, s.pos, s.Src.Name)
+			s.emit(token.INT32_LIT, s.start, s.pos)
 			return scanText
 		}
 
@@ -150,29 +150,29 @@ func scanNumber(s *Scanner) StateFn {
 			return s.errorf("malformed number literal. '%c' after hex literal", s.peek())
 		}
 
-		s.emit(token.INT_LIT, s.start, s.pos, s.Src.Name)
+		s.emit(token.INT_LIT, s.start, s.pos)
 		return scanText
 	}
 
 	// Real number type decision
 	switch scaleChar {
 	case 'D', 'd':
-		s.emit(token.LONGREAL_LIT, s.start, s.pos, s.Src.Name)
+		s.emit(token.LONGREAL_LIT, s.start, s.pos)
 	case 'S', 's':
-		s.emit(token.REAL_LIT, s.start, s.pos, s.Src.Name)
+		s.emit(token.REAL_LIT, s.start, s.pos)
 	case 'E', 'e':
-		fullNum := string(s.Src.Content[s.start:s.pos])
+		fullNum := string(s.content[s.start:s.pos])
 		if canFitInFloat32FromString(fullNum, string(scaleChar)) {
-			s.emit(token.REAL_LIT, s.start, s.pos, s.Src.Name)
+			s.emit(token.REAL_LIT, s.start, s.pos)
 		} else {
-			s.emit(token.LONGREAL_LIT, s.start, s.pos, s.Src.Name)
+			s.emit(token.LONGREAL_LIT, s.start, s.pos)
 		}
 	default:
 		if !isNumberTokenBoundary(s.peek()) {
 			return s.errorf("malformed number literal. '%c' after hex literal", s.peek())
 		}
 
-		s.emit(token.REAL_LIT, s.start, s.pos, s.Src.Name)
+		s.emit(token.REAL_LIT, s.start, s.pos)
 	}
 
 	return scanText
@@ -208,7 +208,7 @@ func scanHexString(s *Scanner) StateFn {
 			}
 
 			// Emit the hex string as a token
-			s.emitWithValue(token.HEX_STR_LIT, string(hexDigits), s.start, s.pos, s.Src.Name)
+			s.emitWithValue(token.HEX_STR_LIT, string(hexDigits), s.start, s.pos)
 			return scanText
 		}
 
@@ -274,7 +274,7 @@ func scanString(s *Scanner) StateFn {
 		case quote: // closing quote
 
 			// Emit the string content (without quotes)
-			s.emitWithValue(token.STR_LIT, string(value), s.start, s.pos, s.Src.Name)
+			s.emitWithValue(token.STR_LIT, string(value), s.start, s.pos)
 			return scanText
 		default:
 			// Just a regular character inside the string
@@ -290,88 +290,88 @@ func scanText(s *Scanner) StateFn {
 			c := s.peek()
 			if c == '.' {
 				s.next()
-				s.emit(token.RANGE, s.start, s.pos, s.Src.Name)
+				s.emit(token.RANGE, s.start, s.pos)
 			} else {
-				s.emit(token.PERIOD, s.start, s.pos, s.Src.Name)
+				s.emit(token.PERIOD, s.start, s.pos)
 			}
 		case '-':
-			s.emit(token.MINUS, s.start, s.pos, s.Src.Name)
+			s.emit(token.MINUS, s.start, s.pos)
 		case '+':
-			s.emit(token.PLUS, s.start, s.pos, s.Src.Name)
+			s.emit(token.PLUS, s.start, s.pos)
 		case '=':
-			s.emit(token.EQUAL, s.start, s.pos, s.Src.Name)
+			s.emit(token.EQUAL, s.start, s.pos)
 		case '<':
 			c := s.peek()
 			if c == '=' {
 				s.next()
-				s.emit(token.LEQ, s.start, s.pos, s.Src.Name)
+				s.emit(token.LEQ, s.start, s.pos)
 			} else {
-				s.emit(token.LESS, s.start, s.pos, s.Src.Name)
+				s.emit(token.LESS, s.start, s.pos)
 			}
 		case '>':
 			c := s.peek()
 			if c == '=' {
 				s.next()
-				s.emit(token.GEQ, s.start, s.pos, s.Src.Name)
+				s.emit(token.GEQ, s.start, s.pos)
 			} else {
-				s.emit(token.GREAT, s.start, s.pos, s.Src.Name)
+				s.emit(token.GREAT, s.start, s.pos)
 			}
 		case '&':
-			s.emit(token.AND, s.start, s.pos, s.Src.Name)
+			s.emit(token.AND, s.start, s.pos)
 		case '|':
-			s.emit(token.BAR, s.start, s.pos, s.Src.Name)
+			s.emit(token.BAR, s.start, s.pos)
 		case '#':
-			s.emit(token.NEQ, s.start, s.pos, s.Src.Name)
+			s.emit(token.NEQ, s.start, s.pos)
 		case '^':
-			s.emit(token.CARET, s.start, s.pos, s.Src.Name)
+			s.emit(token.CARET, s.start, s.pos)
 		case ':':
 			c := s.peek()
 			if c == '=' {
 				s.next()
-				s.emit(token.BECOMES, s.start, s.pos, s.Src.Name)
+				s.emit(token.BECOMES, s.start, s.pos)
 			} else {
-				s.emit(token.COLON, s.start, s.pos, s.Src.Name)
+				s.emit(token.COLON, s.start, s.pos)
 			}
 		case '/':
 			c := s.peek()
 			if c == '/' {
 				s.next()
-				s.emit(token.SL_COMMENT_START, s.start, s.pos, s.Src.Name)
+				s.emit(token.SL_COMMENT_START, s.start, s.pos)
 			} else {
-				s.emit(token.QUOT, s.start, s.pos, s.Src.Name)
+				s.emit(token.QUOT, s.start, s.pos)
 			}
 		case '*':
 			c := s.peek()
 			if c == ')' {
 				s.next()
-				s.emit(token.ML_COMMENT_END, s.start, s.pos, s.Src.Name)
+				s.emit(token.ML_COMMENT_END, s.start, s.pos)
 			} else {
-				s.emit(token.STAR, s.start, s.pos, s.Src.Name)
+				s.emit(token.STAR, s.start, s.pos)
 			}
 		case '{':
-			s.emit(token.LBRACE, s.start, s.pos, s.Src.Name)
+			s.emit(token.LBRACE, s.start, s.pos)
 		case '}':
-			s.emit(token.RBRACE, s.start, s.pos, s.Src.Name)
+			s.emit(token.RBRACE, s.start, s.pos)
 		case '[':
-			s.emit(token.LBRACK, s.start, s.pos, s.Src.Name)
+			s.emit(token.LBRACK, s.start, s.pos)
 		case ']':
-			s.emit(token.RBRACK, s.start, s.pos, s.Src.Name)
+			s.emit(token.RBRACK, s.start, s.pos)
 		case '(':
 			c := s.peek()
 			if c == '*' {
 				s.next()
-				s.emit(token.ML_COMMENT_START, s.start, s.pos, s.Src.Name)
+				s.emit(token.ML_COMMENT_START, s.start, s.pos)
 			} else {
-				s.emit(token.LPAREN, s.start, s.pos, s.Src.Name)
+				s.emit(token.LPAREN, s.start, s.pos)
 			}
 		case ')':
-			s.emit(token.RPAREN, s.start, s.pos, s.Src.Name)
+			s.emit(token.RPAREN, s.start, s.pos)
 		case ',':
-			s.emit(token.COMMA, s.start, s.pos, s.Src.Name)
+			s.emit(token.COMMA, s.start, s.pos)
 		case '~':
-			s.emit(token.NOT, s.start, s.pos, s.Src.Name)
+			s.emit(token.NOT, s.start, s.pos)
 		case ';':
-			s.emit(token.SEMICOLON, s.start, s.pos, s.Src.Name)
+			s.emit(token.SEMICOLON, s.start, s.pos)
 		case ' ', '\t', '\n':
 			s.ignore()
 		case '$':
@@ -396,7 +396,7 @@ func scanText(s *Scanner) StateFn {
 		ch = s.next()
 	}
 
-	s.emit(token.EOF, s.start, s.pos, s.Src.Name)
+	s.emit(token.EOF, s.start, s.pos)
 
 	return scanText
 }

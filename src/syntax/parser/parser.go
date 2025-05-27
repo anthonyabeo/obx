@@ -11,10 +11,8 @@ import (
 )
 
 type Parser struct {
-	scanner *scan.Scanner
-
-	err report.Reporter
-	mgr *report.SourceManager
+	sc  *scan.Scanner
+	ctx *report.Context
 
 	envs map[string]*ast.Environment
 	env  *ast.Environment
@@ -24,13 +22,12 @@ type Parser struct {
 	lexeme string
 	pos    int
 	end    int
-	file   string
 
 	list []ast.Expression
 }
 
-func NewParser(scanner *scan.Scanner, rpt report.Reporter, env *ast.Environment, envs map[string]*ast.Environment, mgr *report.SourceManager) *Parser {
-	p := &Parser{scanner: scanner, err: rpt, env: env, envs: envs, mgr: mgr}
+func NewParser(ctx *report.Context, content []byte, env *ast.Environment, envs map[string]*ast.Environment) *Parser {
+	p := &Parser{sc: scan.Scan(content, ctx), env: env, envs: envs, ctx: ctx}
 	p.next()
 
 	return p
@@ -46,10 +43,10 @@ func (p *Parser) errorExpected(msg string) {
 		msg += ", found '" + p.tok.String() + "'"
 	}
 
-	p.err.Report(report.Diagnostic{
+	p.ctx.Reporter.Report(report.Diagnostic{
 		Severity: report.Error,
 		Message:  msg,
-		Range:    p.mgr.Span(p.file, p.pos, p.end),
+		Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
 	})
 }
 
@@ -62,12 +59,11 @@ func (p *Parser) match(tok token.Kind) {
 }
 
 func (p *Parser) next() {
-	tok := p.scanner.NextToken()
+	tok := p.sc.NextToken()
 	p.tok = tok.Kind
 	p.lexeme = tok.Lexeme
 	p.pos = tok.Pos
 	p.end = tok.End
-	p.file = tok.File
 }
 
 func (p *Parser) Parse() (unit ast.CompilationUnit) {
@@ -228,18 +224,18 @@ func (p *Parser) parseImportList() []*ast.Import {
 	for _, imp := range list {
 		if imp.Alias != "" {
 			if sym := p.env.Insert(ast.NewModuleSymbol(imp.Alias)); sym != nil {
-				p.err.Report(report.Diagnostic{
+				p.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  "duplicate module import",
-					Range:    p.mgr.Span(p.file, imp.StartOffset, imp.EndOffset),
+					Range:    p.ctx.Source.Span(p.ctx.FileName, imp.StartOffset, imp.EndOffset),
 				})
 			}
 		} else {
 			if sym := p.env.Insert(ast.NewModuleSymbol(imp.Name)); sym != nil {
-				p.err.Report(report.Diagnostic{
+				p.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  "duplicate module import",
-					Range:    p.mgr.Span(p.file, imp.StartOffset, imp.EndOffset),
+					Range:    p.ctx.Source.Span(p.ctx.FileName, imp.StartOffset, imp.EndOffset),
 				})
 			}
 		}
@@ -418,10 +414,10 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 	Typ := p.parseType()
 
 	if sym := p.env.Insert(ast.NewTypeSymbol(name.Name, name.Props, Typ)); sym != nil {
-		p.err.Report(report.Diagnostic{
+		p.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  "duplicate type declaration " + name.Name,
-			Range:    p.mgr.Span(p.file, name.StartOffset, name.EndOffset),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, name.StartOffset, name.EndOffset),
 		})
 	}
 
@@ -439,10 +435,10 @@ func (p *Parser) parseConstantDecl() *ast.ConstantDecl {
 	value := p.parseExpression()
 
 	if sym := p.env.Insert(ast.NewConstantSymbol(name.Name, name.Props, value)); sym != nil {
-		p.err.Report(report.Diagnostic{
+		p.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  "duplicate constant declaration " + name.Name,
-			Range:    p.mgr.Span(p.scanner.Src.Name, name.StartOffset, name.EndOffset),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, name.StartOffset, name.EndOffset),
 		})
 	}
 
@@ -465,10 +461,10 @@ func (p *Parser) parseVariableDecl() *ast.VariableDecl {
 	for _, id := range decl.IdentList {
 		sym := p.env.Insert(ast.NewVariableSymbol(id.Name, id.Props, decl.Type))
 		if sym != nil {
-			p.err.Report(report.Diagnostic{
+			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  "duplicate variable declaration " + id.Name,
-				Range:    p.mgr.Span(p.scanner.Src.Name, id.StartOffset, id.EndOffset),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, id.StartOffset, id.EndOffset),
 			})
 		}
 	}
@@ -661,10 +657,10 @@ func (p *Parser) lookupBaseType(baseType *ast.NamedType) ast.Symbol {
 	if env, ok := p.envs[baseType.Name.Prefix]; ok {
 		base := env.Lookup(baseType.Name.Name)
 		if base == nil || base.Props() != ast.Exported {
-			p.err.Report(report.Diagnostic{
+			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("object %s is not exported", baseType.Name),
-				Range:    p.mgr.Span(p.scanner.Src.Name, baseType.Name.StartOffset, baseType.Name.EndOffset),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, baseType.Name.StartOffset, baseType.Name.EndOffset),
 			})
 			p.advance(declStart)
 			return nil
@@ -715,10 +711,10 @@ func (p *Parser) addFieldsToEnv(rec *ast.RecordType) {
 		for _, id := range field.List {
 			sym := rec.Env.Insert(ast.NewFieldSymbol(id.Name, id.Props, field.Type))
 			if sym != nil {
-				p.err.Report(report.Diagnostic{
+				p.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  "duplicate field declaration " + id.Name,
-					Range:    p.mgr.Span(p.scanner.Src.Name, id.StartOffset, id.EndOffset),
+					Range:    p.ctx.Source.Span(p.ctx.FileName, id.StartOffset, id.EndOffset),
 				})
 			}
 		}
@@ -852,10 +848,10 @@ func (p *Parser) parseFactor() ast.Expression {
 		return p.parseLiteral()
 
 	default:
-		p.err.Report(report.Diagnostic{
+		p.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  p.lexeme,
-			Range:    p.mgr.Span(p.scanner.Src.Name, p.pos, p.end),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
 		})
 		pos := p.pos
 		p.advance(exprEnd)
@@ -1174,10 +1170,10 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 		rcvType := head.Rcv.Type.String()
 		sym := p.env.Lookup(rcvType)
 		if sym == nil {
-			p.err.Report(report.Diagnostic{
+			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("reciever type '%s' not declared", rcvType),
-				Range:    p.mgr.Span(p.scanner.Src.Name, head.Rcv.StartOffset, head.Rcv.EndOffset),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Rcv.StartOffset, head.Rcv.EndOffset),
 			})
 			p.advance(declStart)
 			return head
@@ -1185,10 +1181,10 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 
 		typeSymbol, ok := sym.(*ast.TypeSymbol)
 		if !ok || typeSymbol == nil {
-			p.err.Report(report.Diagnostic{
+			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("reciever type '%s' not declared as a type", rcvType),
-				Range:    p.mgr.Span(p.scanner.Src.Name, head.Rcv.StartOffset, head.Rcv.EndOffset),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Rcv.StartOffset, head.Rcv.EndOffset),
 			})
 			p.advance(declStart)
 			return head
@@ -1212,10 +1208,10 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 				return head
 			}
 		default:
-			p.err.Report(report.Diagnostic{
+			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("receiver '%s' must be a record type", rcvType),
-				Range:    p.mgr.Span(p.scanner.Src.Name, head.Rcv.StartOffset, head.Rcv.EndOffset),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Rcv.StartOffset, head.Rcv.EndOffset),
 			})
 			p.advance(declStart)
 			return head
@@ -1223,19 +1219,19 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 
 		// add the receiver to the procedure's parent environment
 		if sym := p.env.Insert(ast.NewParamSymbol(head.Rcv.Var, head.Rcv.Mod, head.Rcv.Type)); sym != nil {
-			p.err.Report(report.Diagnostic{
+			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  "duplicate parameter declaration",
-				Range:    p.mgr.Span(p.scanner.Src.Name, head.Rcv.StartOffset, head.Rcv.EndOffset),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Rcv.StartOffset, head.Rcv.EndOffset),
 			})
 		}
 
 		// add the procedure to the receiver's environment
 		if sym := recordType.Env.Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props)); sym != nil {
-			p.err.Report(report.Diagnostic{
+			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  "duplicate procedure declaration",
-				Range:    p.mgr.Span(p.scanner.Src.Name, head.Name.StartOffset, head.Name.EndOffset),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
 			})
 		}
 	}
@@ -1245,10 +1241,10 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 		for _, param := range head.FP.Params {
 			for _, id := range param.Names {
 				if sym := p.env.Insert(ast.NewParamSymbol(id, param.Mod, param.Type)); sym != nil {
-					p.err.Report(report.Diagnostic{
+					p.ctx.Reporter.Report(report.Diagnostic{
 						Severity: report.Error,
 						Message:  "duplicate parameter declaration" + id,
-						Range:    p.mgr.Span(p.scanner.Src.Name, param.StartOffset, param.EndOffset),
+						Range:    p.ctx.Source.Span(p.ctx.FileName, param.StartOffset, param.EndOffset),
 					})
 				}
 			}

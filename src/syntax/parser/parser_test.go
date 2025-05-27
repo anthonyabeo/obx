@@ -7,7 +7,6 @@ import (
 
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
-	"github.com/anthonyabeo/obx/src/syntax/scan"
 )
 
 func TestParseCaseStatement(t *testing.T) {
@@ -40,19 +39,22 @@ end Main`)
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
 
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -90,19 +92,21 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -142,19 +146,21 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -200,19 +206,21 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	tests := []string{
@@ -279,19 +287,21 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -353,19 +363,21 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	tests := []struct {
@@ -425,19 +437,21 @@ end Drawing
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
 
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	tests := []string{
@@ -542,19 +556,21 @@ end Drawing
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, envs, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, envs)
 	unit := p.Parse()
 
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -640,18 +656,20 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -728,18 +746,20 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -804,18 +824,20 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -912,18 +934,20 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	tests := []struct {
@@ -1027,18 +1051,20 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
-	if p.err.ErrorCount() > 0 {
+	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.err.Flush()
+		p.ctx.Reporter.Flush()
 	}
 
 	tests := []struct {
@@ -1082,7 +1108,7 @@ end Main
 }
 
 func TestParserWithSyntaxErrors(t *testing.T) {
-	src := []byte(`
+	input := []byte(`
 MODULE BadModule;
 
 VAR x, y: INTEGER
@@ -1099,14 +1125,16 @@ EN BadModule.
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, src, 4)
-	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
-		Source: mgr,
-		Writer: os.Stdout,
-	})
-
-	lex := scan.Scan(mgr.GetSourceFile(filename))
-	p := NewParser(lex, r, table, nil, mgr)
+	ctx := &report.Context{
+		FileName: filename,
+		Source:   mgr,
+		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+			Source: mgr,
+			Writer: os.Stdout,
+		}),
+		TabWidth: 4,
+	}
+	p := NewParser(ctx, input, table, nil)
 	unit := p.Parse()
 
 	if _, ok := unit.(*ast.Module); !ok {
@@ -1114,7 +1142,7 @@ EN BadModule.
 	}
 
 	// Check that errors were recorded
-	diags := p.err.Diagnostics()
+	diags := p.ctx.Reporter.Diagnostics()
 	if len(diags) == 0 {
 		t.Error("Expected diagnostics, got none")
 	}

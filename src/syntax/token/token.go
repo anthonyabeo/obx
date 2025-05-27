@@ -250,7 +250,6 @@ type Token struct {
 	Lexeme string
 	Pos    int
 	End    int
-	File   string
 }
 
 func (i Token) String() string {

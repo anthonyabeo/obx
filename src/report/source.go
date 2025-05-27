@@ -81,12 +81,11 @@ func (sf *SourceFile) OffsetToPosition(offset int) *Position {
 }
 
 type SourceManager struct {
-	files    map[string]*SourceFile
-	tabWidth int
+	files map[string]*SourceFile
 }
 
 func NewSourceManager() *SourceManager {
-	return &SourceManager{files: make(map[string]*SourceFile), tabWidth: 4}
+	return &SourceManager{files: make(map[string]*SourceFile)}
 }
 
 func (sm *SourceManager) Load(name string, content []byte, tabWidth int) {
@@ -124,28 +123,6 @@ func (sm *SourceManager) LinesInRange(rng Range) ([]string, error) {
 
 	return src.Lines[rng.Start.Line-1 : rng.End.Line], nil
 }
-
-//func (sm *SourceManager) Pos(file string, offset int) (*Position, error) {
-//	sf, ok := sm.files[file]
-//	if !ok {
-//		return &Position{}, fmt.Errorf("file not found: %s", file)
-//	}
-//
-//	line, col := sf.OffsetToLineCol(offset, sm.tabWidth)
-//	return &Position{File: file, Offset: offset, Line: line, Column: col}, nil
-//}
-
-//func (sm *SourceManager) Range(file string, start, end int) (*Range, error) {
-//	p1, err := sm.Pos(file, start)
-//	if err != nil {
-//		return &Range{}, err
-//	}
-//	p2, err := sm.Pos(file, end)
-//	if err != nil {
-//		return &Range{}, err
-//	}
-//	return &Range{Start: p1, End: p2}, nil
-//}
 
 func (sm *SourceManager) Span(file string, start, end int) *Range {
 	f := sm.files[file]
