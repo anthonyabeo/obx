@@ -44,29 +44,41 @@ func PrintDiagnostic(out io.Writer, sm *SourceManager, diag Diagnostic) {
 		} else {
 			lineEnd = len(sf.Content)
 		}
+
 		lineContent := string(sf.Content[lineStart:lineEnd])
 		trimmedLine := strings.ReplaceAll(strings.TrimRight(lineContent, "\n"), "\t", strings.Repeat(" ", sf.TabWidth))
-
-		// Print source line with line number
 		fmt.Fprintf(out, "%*d | %s\n", lineNumWidth, line, trimmedLine)
 
-		// Compute underline range
+		// Compute underline bounds
 		var startCol, endCol int
-		if line == diag.Range.Start.Line {
+		switch {
+		case line == diag.Range.Start.Line && line == diag.Range.End.Line:
 			startCol = diag.Range.Start.Column - 1
-		} else {
-			startCol = 0
-		}
-		if line == diag.Range.End.Line {
 			endCol = diag.Range.End.Column - 1
-		} else {
+		case line == diag.Range.Start.Line:
+			startCol = diag.Range.Start.Column - 1
+			endCol = len(trimmedLine)
+		case line == diag.Range.End.Line:
+			startCol = 0
+			endCol = diag.Range.End.Column - 1
+		default:
+			startCol = 0
 			endCol = len(trimmedLine)
 		}
+
 		if endCol < startCol {
 			endCol = startCol + 1
 		}
+
+		// Draw marker line
 		marker := strings.Repeat(" ", startCol) + color + strings.Repeat("^", endCol-startCol) + colorReset
-		labelText := fmt.Sprintf(" [%s]", diag.Severity)
-		fmt.Fprintf(out, "%s | %s%s\n", strings.Repeat(" ", lineNumWidth), marker, labelText)
+		fmt.Fprintf(out, "%s | %s", strings.Repeat(" ", lineNumWidth), marker)
+
+		// Only show label on first line
+		if line == diag.Range.Start.Line {
+			fmt.Fprintf(out, " [%s]", diag.Severity)
+		}
+		fmt.Fprintln(out)
 	}
+
 }

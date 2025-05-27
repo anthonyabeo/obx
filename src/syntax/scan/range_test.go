@@ -1,6 +1,8 @@
 package scan
 
 import (
+	"bytes"
+	"os"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/report"
@@ -313,4 +315,42 @@ func TestOffsetToLineCol_WithTabs(t *testing.T) {
 				tt.Index, tt.Lexeme, tt.EndLine, tt.EndColumn, end.Line, end.Column)
 		}
 	}
+}
+
+func TestMultiLineRangeError(t *testing.T) {
+	src := []byte(`
+MODULE Test;
+VAR x: STRING;
+BEGIN
+  x := "This string literal
+continues without closing quote
+and causes an error";
+END Test.
+`)
+
+	file := "test.obx"
+	tabWidth := 4
+
+	// Initialize diagnostic tools
+	sm := report.NewSourceManager()
+	sm.Load(file, []byte(src), tabWidth)
+
+	reporter := report.NewBufferedReporter(sm, 25, report.StdoutSink{
+		Source: sm,
+		Writer: os.Stdout,
+	})
+
+	// Define the range (manually computed for demo purposes)
+	startOffset := bytes.Index([]byte(src), []byte(`"`))                   // Start at quote
+	endOffset := bytes.Index([]byte(src), []byte(`error"`)) + len("error") // End at "error"
+
+	reporter.Report(report.Diagnostic{
+		Severity: report.Error,
+		Message:  "unterminated string literal",
+		Range:    sm.Span(file, startOffset, endOffset),
+	})
+
+	// Print diagnostic
+	reporter.Flush()
+
 }
