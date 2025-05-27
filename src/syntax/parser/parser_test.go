@@ -40,14 +40,14 @@ end Main`)
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 
 	if p.err.ErrorCount() > 0 {
@@ -90,14 +90,14 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 
 	if p.err.ErrorCount() > 0 {
@@ -142,14 +142,14 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 
 	if p.err.ErrorCount() > 0 {
@@ -200,14 +200,14 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 
 	if p.err.ErrorCount() > 0 {
@@ -279,14 +279,14 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 
 	if p.err.ErrorCount() > 0 {
@@ -353,14 +353,14 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 
 	if p.err.ErrorCount() > 0 {
@@ -425,14 +425,14 @@ end Drawing
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 
 	if p.err.ErrorCount() > 0 {
@@ -542,14 +542,14 @@ end Drawing
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, envs)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, envs, mgr)
 	unit := p.Parse()
 
 	if p.err.ErrorCount() > 0 {
@@ -640,14 +640,14 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
@@ -728,14 +728,14 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
@@ -804,14 +804,14 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
@@ -912,14 +912,14 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
@@ -1027,14 +1027,14 @@ end Main
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, input)
+	mgr.Load(filename, input, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 	if p.err.ErrorCount() > 0 {
 		t.Error("found parse errors")
@@ -1099,14 +1099,14 @@ EN BadModule.
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, src)
+	mgr.Load(filename, src, 4)
 	r := report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 		Source: mgr,
 		Writer: os.Stdout,
 	})
 
-	lex := scan.Scan(mgr.GetSourceFile(filename), mgr)
-	p := NewParser(lex, r, table, nil)
+	lex := scan.Scan(mgr.GetSourceFile(filename))
+	p := NewParser(lex, r, table, nil, mgr)
 	unit := p.Parse()
 
 	if _, ok := unit.(*ast.Module); !ok {

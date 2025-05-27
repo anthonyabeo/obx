@@ -18,9 +18,9 @@ type ExpectedToken struct {
 
 func expectTokens(t *testing.T, src []byte, filename string, expected []ExpectedToken) {
 	mgr := report.NewSourceManager()
-	mgr.Load(filename, src)
+	mgr.Load(filename, src, 4)
 
-	sc := Scan(mgr.GetSourceFile(filename), mgr)
+	sc := Scan(mgr.GetSourceFile(filename))
 
 	var tokens []token.Token
 	for {
@@ -48,7 +48,9 @@ func expectTokens(t *testing.T, src []byte, filename string, expected []Expected
 			t.Errorf("token %d: expected lexeme %q, got %q", i, exp.Lexeme, tok.Lexeme)
 		}
 
-		start, end := tok.Range.Start, tok.Range.End
+		r := mgr.Span(filename, tok.Pos, tok.End)
+		start := r.Start
+		end := r.End
 
 		if start.Line != exp.StartLine || start.Column != exp.StartColumn {
 			t.Errorf("token %d (%q): expected start %d:%d, got %d:%d",
@@ -191,9 +193,9 @@ func TestLexerTokenRanges(t *testing.T) {
 `)
 	file := "test.ob"
 	sm := report.NewSourceManager()
-	sm.Load(file, src)
+	sm.Load(file, src, 4)
 
-	lx := Scan(sm.GetSourceFile(file), sm)
+	lx := Scan(sm.GetSourceFile(file))
 
 	var tokens []token.Token
 	for {
@@ -229,8 +231,10 @@ func TestLexerTokenRanges(t *testing.T) {
 			t.Errorf("token %d: expected lexeme %q, got %q", tt.Index, tt.Lexeme, tok.Lexeme)
 		}
 
-		start := tok.Range.Start
-		end := tok.Range.End
+		r := sm.Span(file, tok.Pos, tok.End)
+
+		start := r.Start
+		end := r.End
 
 		if start.Line != tt.StartLine || start.Column != tt.StartColumn {
 			t.Errorf("token %d (%q): expected start %d:%d, got %d:%d",
@@ -255,17 +259,17 @@ func TestOffsetToLineCol_WithTabs(t *testing.T) {
 		EndColumn   int
 	}{
 		{0, "a", 1, 1, 1, 2},
-		{1, "b", 1, 5, 1, 6},
-		{2, "c", 1, 9, 1, 10},
+		{1, "b", 1, 6, 1, 7},
+		{2, "c", 1, 11, 1, 12},
 		{3, "1234", 2, 1, 2, 5},
 		{4, "56", 2, 9, 2, 11},
 	}
 
 	file := "test.ob"
 	sm := report.NewSourceManager()
-	sm.Load(file, src)
+	sm.Load(file, src, 4)
 
-	sc := Scan(sm.GetSourceFile(file), sm)
+	sc := Scan(sm.GetSourceFile(file))
 
 	var tokens []token.Token
 	for {
@@ -282,8 +286,10 @@ func TestOffsetToLineCol_WithTabs(t *testing.T) {
 			t.Errorf("token %d: expected lexeme %q, got %q", tt.Index, tt.Lexeme, tok.Lexeme)
 		}
 
-		start := tok.Range.Start
-		end := tok.Range.End
+		r := sm.Span(file, tok.Pos, tok.End)
+
+		start := r.Start
+		end := r.End
 
 		if start.Line != tt.StartLine || start.Column != tt.StartColumn {
 			t.Errorf("token %d (%q): expected start %d:%d, got %d:%d",

@@ -89,8 +89,8 @@ func TestScanNumber(t *testing.T) {
 	sm := report.NewSourceManager()
 
 	for _, test := range tests {
-		sm.Load(file, []byte(test.input))
-		sc := Scan(sm.GetSourceFile(file), sm)
+		sm.Load(file, []byte(test.input), 4)
+		sc := Scan(sm.GetSourceFile(file))
 
 		got := sc.NextToken()
 
@@ -132,8 +132,8 @@ func TestScanIdentifiers(t *testing.T) {
 	sm := report.NewSourceManager()
 
 	for _, test := range tests {
-		sm.Load(file, []byte(test.input))
-		sc := Scan(sm.GetSourceFile(file), sm)
+		sm.Load(file, []byte(test.input), 4)
+		sc := Scan(sm.GetSourceFile(file))
 
 		got := sc.NextToken()
 		if test.wantErr {
@@ -183,8 +183,8 @@ func TestScanDelimitersAndOperators(t *testing.T) {
 	sm := report.NewSourceManager()
 
 	for _, test := range tests {
-		sm.Load(file, []byte(test.input))
-		sc := Scan(sm.GetSourceFile(file), sm)
+		sm.Load(file, []byte(test.input), 4)
+		sc := Scan(sm.GetSourceFile(file))
 
 		got := sc.NextToken()
 		if test.wantErr {
@@ -231,8 +231,8 @@ func TestScanHexStrings(t *testing.T) {
 	sm := report.NewSourceManager()
 
 	for _, test := range tests {
-		sm.Load(file, []byte(test.input))
-		sc := Scan(sm.GetSourceFile(file), sm)
+		sm.Load(file, []byte(test.input), 4)
+		sc := Scan(sm.GetSourceFile(file))
 
 		got := sc.NextToken()
 
@@ -275,8 +275,8 @@ func TestScanCharacterLiterals(t *testing.T) {
 	sm := report.NewSourceManager()
 
 	for _, test := range tests {
-		sm.Load(file, []byte(test.input))
-		sc := Scan(sm.GetSourceFile(file), sm)
+		sm.Load(file, []byte(test.input), 4)
+		sc := Scan(sm.GetSourceFile(file))
 
 		got := sc.NextToken()
 		if test.wantErr {
@@ -328,8 +328,8 @@ next'`, token.ILLEGAL, "", true}, // newline
 	sm := report.NewSourceManager()
 
 	for _, tt := range tests {
-		sm.Load(file, []byte(tt.input))
-		sc := Scan(sm.GetSourceFile(file), sm)
+		sm.Load(file, []byte(tt.input), 4)
+		sc := Scan(sm.GetSourceFile(file))
 
 		tok := sc.NextToken()
 
@@ -366,8 +366,8 @@ func TestScanComments(t *testing.T) {
 	sm := report.NewSourceManager()
 
 	for _, test := range tests {
-		sm.Load(file, []byte(test.input))
-		sc := Scan(sm.GetSourceFile(file), sm)
+		sm.Load(file, []byte(test.input), 4)
+		sc := Scan(sm.GetSourceFile(file))
 
 		got := sc.NextToken()
 
@@ -404,8 +404,8 @@ end Main
 `
 	file := "test.ob"
 	sm := report.NewSourceManager()
-	sm.Load(file, []byte(input))
-	sc := Scan(sm.GetSourceFile(file), sm)
+	sm.Load(file, []byte(input), 4)
+	sc := Scan(sm.GetSourceFile(file))
 
 	tests := []struct {
 		tokenKind token.Kind
@@ -563,8 +563,8 @@ end Drawing
 `
 	file := "test.ob"
 	sm := report.NewSourceManager()
-	sm.Load(file, []byte(input))
-	sc := Scan(sm.GetSourceFile(file), sm)
+	sm.Load(file, []byte(input), 4)
+	sc := Scan(sm.GetSourceFile(file))
 
 	tests := []struct {
 		tokenKind token.Kind

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -14,24 +13,24 @@ type (
 		IdentList []*IdentifierDef
 		Type      Type
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	ConstantDecl struct {
 		Name  *IdentifierDef
 		Value Expression
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	TypeDecl struct {
 		Name        *IdentifierDef
 		DenotedType Type
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	// ProcedureDecl
@@ -42,8 +41,8 @@ type (
 		EndName string
 		Env     *Environment
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	ProcedureHeading struct {
@@ -51,16 +50,16 @@ type (
 		Name *IdentifierDef
 		FP   *FormalParams
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	ProcedureBody struct {
 		DeclSeq []Declaration
 		StmtSeq []Statement
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	// FPSection
@@ -70,16 +69,16 @@ type (
 		Names []string
 		Type  Type
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	FormalParams struct {
 		Params  []*FPSection
 		RetType Type
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	Receiver struct {
@@ -87,13 +86,13 @@ type (
 		Var  string
 		Type Type
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	BadDecl struct {
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 )
 
@@ -106,21 +105,21 @@ func (v *VariableDecl) String() string {
 
 	return fmt.Sprintf("%s: %s", strings.Join(list, ", "), v.Type)
 }
-func (v *VariableDecl) Accept(vst Visitor) any     { return vst.VisitVariableDecl(v) }
-func (v *VariableDecl) Position() *report.Position { return v.Pos }
-func (v *VariableDecl) Range() *report.Range       { return v.Rng }
+func (v *VariableDecl) Accept(vst Visitor) any { return vst.VisitVariableDecl(v) }
+func (v *VariableDecl) Pos() int               { return v.StartOffset }
+func (v *VariableDecl) End() int               { return v.EndOffset }
 
-func (c *ConstantDecl) decl()                      {}
-func (c *ConstantDecl) String() string             { return fmt.Sprintf("%v = %v", c.Name, c.Value) }
-func (c *ConstantDecl) Accept(vst Visitor) any     { return vst.VisitConstantDecl(c) }
-func (c *ConstantDecl) Position() *report.Position { return c.Pos }
-func (c *ConstantDecl) Range() *report.Range       { return c.Rng }
+func (c *ConstantDecl) decl()                  {}
+func (c *ConstantDecl) String() string         { return fmt.Sprintf("%v = %v", c.Name, c.Value) }
+func (c *ConstantDecl) Accept(vst Visitor) any { return vst.VisitConstantDecl(c) }
+func (c *ConstantDecl) Pos() int               { return c.StartOffset }
+func (c *ConstantDecl) End() int               { return c.EndOffset }
 
-func (t *TypeDecl) decl()                      {}
-func (t *TypeDecl) String() string             { return fmt.Sprintf("%s = %s", t.Name, t.DenotedType) }
-func (t *TypeDecl) Accept(vst Visitor) any     { return vst.VisitTypeDecl(t) }
-func (t *TypeDecl) Position() *report.Position { return t.Pos }
-func (t *TypeDecl) Range() *report.Range       { return t.Rng }
+func (t *TypeDecl) decl()                  {}
+func (t *TypeDecl) String() string         { return fmt.Sprintf("%s = %s", t.Name, t.DenotedType) }
+func (t *TypeDecl) Accept(vst Visitor) any { return vst.VisitTypeDecl(t) }
+func (t *TypeDecl) Pos() int               { return t.StartOffset }
+func (t *TypeDecl) End() int               { return t.EndOffset }
 
 func (p *ProcedureDecl) decl() {}
 func (p *ProcedureDecl) String() string {
@@ -132,9 +131,9 @@ func (p *ProcedureDecl) String() string {
 
 	return buf.String()
 }
-func (p *ProcedureDecl) Accept(vst Visitor) any     { return vst.VisitProcedureDecl(p) }
-func (p *ProcedureDecl) Position() *report.Position { return p.Pos }
-func (p *ProcedureDecl) Range() *report.Range       { return p.Rng }
+func (p *ProcedureDecl) Accept(vst Visitor) any { return vst.VisitProcedureDecl(p) }
+func (p *ProcedureDecl) Pos() int               { return p.StartOffset }
+func (p *ProcedureDecl) End() int               { return p.EndOffset }
 
 func (p *ProcedureHeading) String() string {
 	buf := new(bytes.Buffer)
@@ -145,15 +144,15 @@ func (p *ProcedureHeading) String() string {
 
 	return buf.String()
 }
-func (p *ProcedureHeading) Accept(vst Visitor) any     { return vst.VisitProcedureHeading(p) }
-func (p *ProcedureHeading) decl()                      {}
-func (p *ProcedureHeading) Position() *report.Position { return p.Pos }
-func (p *ProcedureHeading) Range() *report.Range       { return p.Rng }
+func (p *ProcedureHeading) Accept(vst Visitor) any { return vst.VisitProcedureHeading(p) }
+func (p *ProcedureHeading) decl()                  {}
+func (p *ProcedureHeading) Pos() int               { return p.StartOffset }
+func (p *ProcedureHeading) End() int               { return p.EndOffset }
 
-func (p *ProcedureBody) String() string             { panic("not implemented") }
-func (p *ProcedureBody) Position() *report.Position { return p.Pos }
-func (p *ProcedureBody) Range() *report.Range       { return p.Rng }
-func (p *ProcedureBody) Accept(vst Visitor) any     { return vst.VisitProcedureBody(p) }
+func (p *ProcedureBody) String() string         { panic("not implemented") }
+func (p *ProcedureBody) Pos() int               { return p.StartOffset }
+func (p *ProcedureBody) End() int               { return p.EndOffset }
+func (p *ProcedureBody) Accept(vst Visitor) any { return vst.VisitProcedureBody(p) }
 
 func (sec *FPSection) String() string {
 	buf := new(bytes.Buffer)
@@ -169,9 +168,9 @@ func (sec *FPSection) String() string {
 
 	return buf.String()
 }
-func (sec *FPSection) Accept(vst Visitor) any     { return vst.VisitFPSection(sec) }
-func (sec *FPSection) Position() *report.Position { return sec.Pos }
-func (sec *FPSection) Range() *report.Range       { return sec.Rng }
+func (sec *FPSection) Accept(vst Visitor) any { return vst.VisitFPSection(sec) }
+func (sec *FPSection) Pos() int               { return sec.StartOffset }
+func (sec *FPSection) End() int               { return sec.EndOffset }
 
 func (p *FormalParams) String() string {
 	buf := new(bytes.Buffer)
@@ -188,9 +187,9 @@ func (p *FormalParams) String() string {
 
 	return buf.String()
 }
-func (p *FormalParams) Accept(vst Visitor) any     { return vst.VisitFormalParams(p) }
-func (p *FormalParams) Position() *report.Position { return p.Pos }
-func (p *FormalParams) Range() *report.Range       { return p.Rng }
+func (p *FormalParams) Accept(vst Visitor) any { return vst.VisitFormalParams(p) }
+func (p *FormalParams) Pos() int               { return p.StartOffset }
+func (p *FormalParams) End() int               { return p.EndOffset }
 
 func (r *Receiver) String() string {
 	buf := new(bytes.Buffer)
@@ -204,12 +203,12 @@ func (r *Receiver) String() string {
 
 	return buf.String()
 }
-func (r *Receiver) Accept(vst Visitor) any     { return vst.VisitReceiver(r) }
-func (r *Receiver) Position() *report.Position { return r.Pos }
-func (r *Receiver) Range() *report.Range       { return r.Rng }
+func (r *Receiver) Accept(vst Visitor) any { return vst.VisitReceiver(r) }
+func (r *Receiver) Pos() int               { return r.StartOffset }
+func (r *Receiver) End() int               { return r.EndOffset }
 
-func (b *BadDecl) Accept(vst Visitor) any     { return vst.VisitBadDecl(b) }
-func (b *BadDecl) decl()                      {}
-func (b *BadDecl) String() string             { return "<BadDecl>" }
-func (b *BadDecl) Position() *report.Position { return b.Pos }
-func (b *BadDecl) Range() *report.Range       { return b.Rng }
+func (b *BadDecl) Accept(vst Visitor) any { return vst.VisitBadDecl(b) }
+func (b *BadDecl) decl()                  {}
+func (b *BadDecl) String() string         { return "<BadDecl>" }
+func (b *BadDecl) Pos() int               { return b.StartOffset }
+func (b *BadDecl) End() int               { return b.EndOffset }

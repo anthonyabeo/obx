@@ -2,7 +2,6 @@ package ast
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/report"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -42,88 +41,88 @@ type (
 		Name  string
 		Props IdentProps
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	BasicLit struct {
 		Kind token.Kind // token.INT, token.REAL, token.HEXCHAR, or token.STRING
 		Val  string     // literal string; e.g. 42, 0x7f, 3.14, 1e-9, 2.4i, 'a', '\x7f', "foo" or `\m\n\o`
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	BinaryExpr struct {
 		Left, Right Expression // operands
 		Op          token.Kind // operator
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	FunctionCall struct {
 		Callee       *Designator
 		ActualParams []Expression
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	QualifiedIdent struct {
 		Prefix string
 		Name   string
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	ExprRange struct {
 		Low  Expression
 		High Expression
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	Set struct {
-		Elem []Expression
-		Pos  *report.Position
-		Rng  *report.Range
+		Elem        []Expression
+		StartOffset int
+		EndOffset   int
 	}
 
 	UnaryExpr struct {
 		Op      token.Kind
 		Operand Expression
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	Designator struct {
 		QIdent *QualifiedIdent
 		Select []Selector
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	Nil struct {
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	BadExpr struct {
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 )
 
-func (*Nil) String() string               { return "nil" }
-func (n *Nil) Accept(vst Visitor) any     { return vst.VisitNil(n) }
-func (*Nil) expr()                        {}
-func (n *Nil) Position() *report.Position { return n.Pos }
-func (n *Nil) Range() *report.Range       { return n.Rng }
+func (*Nil) expr()                    {}
+func (*Nil) String() string           { return "nil" }
+func (n *Nil) Accept(vst Visitor) any { return vst.VisitNil(n) }
+func (n *Nil) Pos() int               { return n.StartOffset }
+func (n *Nil) End() int               { return n.EndOffset }
 
 func (id *IdentifierDef) String() string {
 	name := id.Name
@@ -137,26 +136,27 @@ func (id *IdentifierDef) String() string {
 
 	return name
 }
-func (id *IdentifierDef) Position() *report.Position { return id.Pos }
-func (id *IdentifierDef) Range() *report.Range       { return id.Rng }
-func (id *IdentifierDef) Accept(vst Visitor) any     { return vst.VisitIdentifierDef(id) }
-func (e *ExprRange) String() string                  { return fmt.Sprintf("%s..%s", e.Low, e.High) }
-func (e *ExprRange) Accept(vst Visitor) any          { return vst.VisitExprRange(e) }
-func (e *ExprRange) expr()                           {}
-func (e *ExprRange) Position() *report.Position      { return e.Pos }
-func (e *ExprRange) Range() *report.Range            { return e.Rng }
+func (id *IdentifierDef) Pos() int               { return id.StartOffset }
+func (id *IdentifierDef) End() int               { return id.EndOffset }
+func (id *IdentifierDef) Accept(vst Visitor) any { return vst.VisitIdentifierDef(id) }
 
-func (b *BasicLit) expr()                      {}
-func (b *BasicLit) String() string             { return b.Val }
-func (b *BasicLit) Accept(vst Visitor) any     { return vst.VisitBasicLit(b) }
-func (b *BasicLit) Position() *report.Position { return b.Pos }
-func (b *BasicLit) Range() *report.Range       { return b.Rng }
+func (e *ExprRange) String() string         { return fmt.Sprintf("%s..%s", e.Low, e.High) }
+func (e *ExprRange) Accept(vst Visitor) any { return vst.VisitExprRange(e) }
+func (e *ExprRange) expr()                  {}
+func (e *ExprRange) Pos() int               { return e.StartOffset }
+func (e *ExprRange) End() int               { return e.EndOffset }
 
-func (b *BinaryExpr) expr()                      {}
-func (b *BinaryExpr) String() string             { return fmt.Sprintf("%v %v %v", b.Left, b.Op, b.Right) }
-func (b *BinaryExpr) Accept(vst Visitor) any     { return vst.VisitBinaryExpr(b) }
-func (b *BinaryExpr) Position() *report.Position { return b.Pos }
-func (b *BinaryExpr) Range() *report.Range       { return b.Rng }
+func (b *BasicLit) expr()                  {}
+func (b *BasicLit) String() string         { return b.Val }
+func (b *BasicLit) Accept(vst Visitor) any { return vst.VisitBasicLit(b) }
+func (b *BasicLit) Pos() int               { return b.StartOffset }
+func (b *BasicLit) End() int               { return b.EndOffset }
+
+func (b *BinaryExpr) expr()                  {}
+func (b *BinaryExpr) String() string         { return fmt.Sprintf("%v %v %v", b.Left, b.Op, b.Right) }
+func (b *BinaryExpr) Accept(vst Visitor) any { return vst.VisitBinaryExpr(b) }
+func (b *BinaryExpr) Pos() int               { return b.StartOffset }
+func (b *BinaryExpr) End() int               { return b.EndOffset }
 
 func (f *FunctionCall) Accept(vst Visitor) any { return vst.VisitFunctionCall(f) }
 func (f *FunctionCall) expr()                  {}
@@ -168,8 +168,8 @@ func (f *FunctionCall) String() string {
 
 	return fmt.Sprintf("%s(%s)", f.Callee, strings.Join(args, ", "))
 }
-func (f *FunctionCall) Position() *report.Position { return f.Pos }
-func (f *FunctionCall) Range() *report.Range       { return f.Rng }
+func (f *FunctionCall) Pos() int { return f.StartOffset }
+func (f *FunctionCall) End() int { return f.EndOffset }
 
 func (q *QualifiedIdent) Accept(vst Visitor) any { return vst.VisitQualifiedIdent(q) }
 func (q *QualifiedIdent) expr()                  {}
@@ -179,8 +179,8 @@ func (q *QualifiedIdent) String() string {
 	}
 	return fmt.Sprintf("%v.%v", q.Prefix, q.Name)
 }
-func (q *QualifiedIdent) Position() *report.Position { return q.Pos }
-func (q *QualifiedIdent) Range() *report.Range       { return q.Rng }
+func (q *QualifiedIdent) Pos() int { return q.StartOffset }
+func (q *QualifiedIdent) End() int { return q.EndOffset }
 
 func (s *Set) expr() {}
 func (s *Set) String() string {
@@ -191,15 +191,15 @@ func (s *Set) String() string {
 
 	return fmt.Sprintf("{%s}", strings.Join(elems, ", "))
 }
-func (s *Set) Accept(vst Visitor) any     { return vst.VisitSet(s) }
-func (s *Set) Position() *report.Position { return s.Pos }
-func (s *Set) Range() *report.Range       { return s.Rng }
+func (s *Set) Accept(vst Visitor) any { return vst.VisitSet(s) }
+func (s *Set) Pos() int               { return s.StartOffset }
+func (s *Set) End() int               { return s.EndOffset }
 
-func (u *UnaryExpr) Accept(vst Visitor) any     { return vst.VisitUnaryExpr(u) }
-func (u *UnaryExpr) expr()                      {}
-func (u *UnaryExpr) String() string             { return fmt.Sprintf("%v%v", u.Op, u.Operand) }
-func (u *UnaryExpr) Position() *report.Position { return u.Pos }
-func (u *UnaryExpr) Range() *report.Range       { return u.Rng }
+func (u *UnaryExpr) Accept(vst Visitor) any { return vst.VisitUnaryExpr(u) }
+func (u *UnaryExpr) expr()                  {}
+func (u *UnaryExpr) String() string         { return fmt.Sprintf("%v%v", u.Op, u.Operand) }
+func (u *UnaryExpr) Pos() int               { return u.StartOffset }
+func (u *UnaryExpr) End() int               { return u.EndOffset }
 
 func (d *Designator) Accept(vst Visitor) any { return vst.VisitDesignator(d) }
 func (d *Designator) expr()                  {}
@@ -222,14 +222,14 @@ func (d *Designator) String() string {
 
 	return s
 }
-func (d *Designator) Position() *report.Position { return d.Pos }
-func (d *Designator) Range() *report.Range       { return d.Rng }
+func (d *Designator) Pos() int { return d.StartOffset }
+func (d *Designator) End() int { return d.EndOffset }
 
-func (b *BadExpr) Accept(vst Visitor) any     { return vst.VisitBadExpr(b) }
-func (b *BadExpr) expr()                      {}
-func (b *BadExpr) String() string             { return "<bad expr>" }
-func (b *BadExpr) Position() *report.Position { return b.Pos }
-func (b *BadExpr) Range() *report.Range       { return b.Rng }
+func (b *BadExpr) Accept(vst Visitor) any { return vst.VisitBadExpr(b) }
+func (b *BadExpr) expr()                  {}
+func (b *BadExpr) String() string         { return "<bad expr>" }
+func (b *BadExpr) Pos() int               { return b.StartOffset }
+func (b *BadExpr) End() int               { return b.EndOffset }
 
 // Selectors
 // ---------------------
@@ -237,31 +237,28 @@ func (b *BadExpr) Range() *report.Range       { return b.Rng }
 type Selector interface {
 	Node
 	sel()
-	//String() string
-	//Position() *report.Position
-	//Range() *report.Range
 }
 
 // DotOp
 // ---------------------
 type DotOp struct {
-	Field string
-	Pos   *report.Position
-	Rng   *report.Range
+	Field       string
+	StartOffset int
+	EndOffset   int
 }
 
-func (d *DotOp) String() string             { return fmt.Sprintf(".%s", d.Field) }
-func (d *DotOp) sel()                       {}
-func (d *DotOp) Position() *report.Position { return d.Pos }
-func (d *DotOp) Range() *report.Range       { return d.Rng }
-func (d *DotOp) Accept(vst Visitor) any     { return vst.VisitDotOp(d) }
+func (d *DotOp) String() string         { return fmt.Sprintf(".%s", d.Field) }
+func (d *DotOp) sel()                   {}
+func (d *DotOp) Pos() int               { return d.StartOffset }
+func (d *DotOp) End() int               { return d.EndOffset }
+func (d *DotOp) Accept(vst Visitor) any { return vst.VisitDotOp(d) }
 
 // IndexOp
 // ---------------------
 type IndexOp struct {
-	List []Expression
-	Pos  *report.Position
-	Rng  *report.Range
+	List        []Expression
+	StartOffset int
+	EndOffset   int
 }
 
 func (id *IndexOp) String() string {
@@ -272,34 +269,34 @@ func (id *IndexOp) String() string {
 
 	return fmt.Sprintf("[%v]", strings.Join(list, ","))
 }
-func (id *IndexOp) sel()                       {}
-func (id *IndexOp) Position() *report.Position { return id.Pos }
-func (id *IndexOp) Range() *report.Range       { return id.Rng }
-func (id *IndexOp) Accept(vst Visitor) any     { return vst.VisitIndexOp(id) }
+func (id *IndexOp) sel()                   {}
+func (id *IndexOp) Pos() int               { return id.StartOffset }
+func (id *IndexOp) End() int               { return id.EndOffset }
+func (id *IndexOp) Accept(vst Visitor) any { return vst.VisitIndexOp(id) }
 
 // TypeGuard
 // ---------------------
 type TypeGuard struct {
-	Ty  Expression
-	Pos *report.Position
-	Rng *report.Range
+	Ty          Expression
+	StartOffset int
+	EndOffset   int
 }
 
-func (t *TypeGuard) String() string             { return fmt.Sprintf("(%s)", t.Ty) }
-func (t *TypeGuard) sel()                       {}
-func (t *TypeGuard) Position() *report.Position { return t.Pos }
-func (t *TypeGuard) Range() *report.Range       { return t.Rng }
-func (t *TypeGuard) Accept(vst Visitor) any     { return vst.VisitTypeGuard(t) }
+func (t *TypeGuard) String() string         { return fmt.Sprintf("(%s)", t.Ty) }
+func (t *TypeGuard) sel()                   {}
+func (t *TypeGuard) Pos() int               { return t.StartOffset }
+func (t *TypeGuard) End() int               { return t.EndOffset }
+func (t *TypeGuard) Accept(vst Visitor) any { return vst.VisitTypeGuard(t) }
 
 // PtrDeref
 // ---------------------
 type PtrDeref struct {
-	Pos *report.Position
-	Rng *report.Range
+	StartOffset int
+	EndOffset   int
 }
 
-func (deref *PtrDeref) sel()                       {}
-func (deref *PtrDeref) String() string             { return "^" }
-func (deref *PtrDeref) Position() *report.Position { return deref.Pos }
-func (deref *PtrDeref) Range() *report.Range       { return deref.Rng }
-func (deref *PtrDeref) Accept(vst Visitor) any     { return vst.VisitPtrDeref(deref) }
+func (deref *PtrDeref) sel()                   {}
+func (deref *PtrDeref) String() string         { return "^" }
+func (deref *PtrDeref) Pos() int               { return deref.StartOffset }
+func (deref *PtrDeref) End() int               { return deref.EndOffset }
+func (deref *PtrDeref) Accept(vst Visitor) any { return vst.VisitPtrDeref(deref) }

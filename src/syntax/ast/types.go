@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -13,37 +12,37 @@ type (
 	NamedType struct {
 		Name *QualifiedIdent
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	BasicType struct {
 		Nname string // e.g. integer, bool
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	ArrayType struct {
 		LenList  *LenList
 		ElemType Type
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	ProcedureType struct {
 		FP *FormalParams
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	PointerType struct {
 		Base Type
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	RecordType struct {
@@ -51,44 +50,44 @@ type (
 		Fields []*FieldList
 		Env    *RecordEnv
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	FieldList struct {
 		List []*IdentifierDef
 		Type Type
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	EnumType struct {
 		Variants []string
 
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 
 	BadType struct {
-		Pos *report.Position
-		Rng *report.Range
+		StartOffset int
+		EndOffset   int
 	}
 )
 
-func NewNamedType(name *QualifiedIdent, pos *report.Position, rng *report.Range) *NamedType {
-	return &NamedType{Name: name, Pos: pos, Rng: rng}
+func NewNamedType(name *QualifiedIdent, pos int, rng int) *NamedType {
+	return &NamedType{Name: name, StartOffset: pos, EndOffset: rng}
 }
 
-func (n *NamedType) Width() int                 { panic("implement me") }
-func (n *NamedType) String() string             { return n.Name.String() }
-func (n *NamedType) Accept(vst Visitor) any     { return vst.VisitNamedType(n) }
-func (n *NamedType) typ()                       {}
-func (n *NamedType) Position() *report.Position { return n.Pos }
-func (n *NamedType) Range() *report.Range       { return n.Rng }
+func (n *NamedType) Width() int             { panic("implement me") }
+func (n *NamedType) String() string         { return n.Name.String() }
+func (n *NamedType) Accept(vst Visitor) any { return vst.VisitNamedType(n) }
+func (n *NamedType) typ()                   {}
+func (n *NamedType) Pos() int               { return n.StartOffset }
+func (n *NamedType) End() int               { return n.EndOffset }
 
-func NewBasicType(name string, pos *report.Position, rng *report.Range) *BasicType {
-	return &BasicType{Nname: name, Pos: pos, Rng: rng}
+func NewBasicType(name string, pos int, rng int) *BasicType {
+	return &BasicType{Nname: name, StartOffset: pos, EndOffset: rng}
 }
 
 func (b *BasicType) Name() string           { return b.Nname }
@@ -109,11 +108,11 @@ func (b *BasicType) Width() int {
 		panic(fmt.Sprintf("'%s' is not a basic type", b.Nname))
 	}
 }
-func (b *BasicType) Position() *report.Position { return b.Pos }
-func (b *BasicType) Range() *report.Range       { return b.Rng }
+func (b *BasicType) Pos() int { return b.StartOffset }
+func (b *BasicType) End() int { return b.EndOffset }
 
-func NewArray(lenList *LenList, elem Type, pos *report.Position, rng *report.Range) *ArrayType {
-	return &ArrayType{LenList: lenList, ElemType: elem, Pos: pos, Rng: rng}
+func NewArray(lenList *LenList, elem Type, pos int, rng int) *ArrayType {
+	return &ArrayType{LenList: lenList, ElemType: elem, StartOffset: pos, EndOffset: rng}
 }
 
 func (a *ArrayType) String() string {
@@ -126,18 +125,18 @@ func (a *ArrayType) String() string {
 
 	return fmt.Sprintf("[%s]%s", strings.Join(ll, ", "), a.ElemType)
 }
-func (a *ArrayType) Accept(vst Visitor) any     { return vst.VisitArrayType(a) }
-func (a *ArrayType) typ()                       {}
-func (a *ArrayType) Width() int                 { panic("implement me") }
-func (a *ArrayType) Position() *report.Position { return a.Pos }
-func (a *ArrayType) Range() *report.Range       { return a.Rng }
+func (a *ArrayType) Accept(vst Visitor) any { return vst.VisitArrayType(a) }
+func (a *ArrayType) typ()                   {}
+func (a *ArrayType) Width() int             { panic("implement me") }
+func (a *ArrayType) Pos() int               { return a.StartOffset }
+func (a *ArrayType) End() int               { return a.EndOffset }
 
 type LenList struct {
 	Modifier token.Kind
 	List     []Expression
 
-	Pos *report.Position
-	Rng *report.Range
+	StartOffset int
+	EndOffset   int
 }
 
 func (l *LenList) Accept(vst Visitor) any { return vst.VisitLenList(l) }
@@ -152,8 +151,8 @@ func (l *LenList) String() string {
 	}
 	return fmt.Sprintf("[%s]", strings.Join(lengths, ", "))
 }
-func (l *LenList) Position() *report.Position { return l.Pos }
-func (l *LenList) Range() *report.Range       { return l.Rng }
+func (l *LenList) Pos() int { return l.StartOffset }
+func (l *LenList) End() int { return l.EndOffset }
 
 func (p *ProcedureType) String() string {
 	if p.FP == nil {
@@ -161,18 +160,18 @@ func (p *ProcedureType) String() string {
 	}
 	return fmt.Sprintf("procedure%s", p.FP.String())
 }
-func (p *ProcedureType) Accept(vst Visitor) any     { return vst.VisitProcedureType(p) }
-func (p *ProcedureType) typ()                       {}
-func (p *ProcedureType) Width() int                 { panic("implement me") }
-func (p *ProcedureType) Position() *report.Position { return p.Pos }
-func (p *ProcedureType) Range() *report.Range       { return p.Rng }
+func (p *ProcedureType) Accept(vst Visitor) any { return vst.VisitProcedureType(p) }
+func (p *ProcedureType) typ()                   {}
+func (p *ProcedureType) Width() int             { panic("implement me") }
+func (p *ProcedureType) Pos() int               { return p.StartOffset }
+func (p *ProcedureType) End() int               { return p.EndOffset }
 
-func (p *PointerType) String() string             { return fmt.Sprintf("^%s", p.Base) }
-func (p *PointerType) Accept(vst Visitor) any     { return vst.VisitPointerType(p) }
-func (p *PointerType) typ()                       {}
-func (p *PointerType) Width() int                 { panic("implement me") }
-func (p *PointerType) Position() *report.Position { return p.Pos }
-func (p *PointerType) Range() *report.Range       { return p.Rng }
+func (p *PointerType) String() string         { return fmt.Sprintf("^%s", p.Base) }
+func (p *PointerType) Accept(vst Visitor) any { return vst.VisitPointerType(p) }
+func (p *PointerType) typ()                   {}
+func (p *PointerType) Width() int             { panic("implement me") }
+func (p *PointerType) Pos() int               { return p.StartOffset }
+func (p *PointerType) End() int               { return p.EndOffset }
 
 func NewRecordType(base Type, fields []*FieldList, env *RecordEnv) *RecordType {
 	return &RecordType{Base: base, Fields: fields, Env: env}
@@ -196,11 +195,11 @@ func (r *RecordType) String() string {
 
 	return buf.String()
 }
-func (r *RecordType) Accept(vst Visitor) any     { return vst.VisitRecordType(r) }
-func (r *RecordType) typ()                       {}
-func (r *RecordType) Width() int                 { panic("implement me") }
-func (r *RecordType) Position() *report.Position { return r.Pos }
-func (r *RecordType) Range() *report.Range       { return r.Rng }
+func (r *RecordType) Accept(vst Visitor) any { return vst.VisitRecordType(r) }
+func (r *RecordType) typ()                   {}
+func (r *RecordType) Width() int             { panic("implement me") }
+func (r *RecordType) Pos() int               { return r.StartOffset }
+func (r *RecordType) End() int               { return r.EndOffset }
 
 func (f *FieldList) Accept(vst Visitor) any { return vst.VisitFieldList(f) }
 func (f *FieldList) String() string {
@@ -211,19 +210,19 @@ func (f *FieldList) String() string {
 
 	return fmt.Sprintf("%s: %s", strings.Join(fields, ", "), f.Type)
 }
-func (f *FieldList) Position() *report.Position { return f.Pos }
-func (f *FieldList) Range() *report.Range       { return f.Rng }
+func (f *FieldList) Pos() int { return f.StartOffset }
+func (f *FieldList) End() int { return f.EndOffset }
 
-func (e *EnumType) String() string             { return fmt.Sprintf("enum(%s)", strings.Join(e.Variants, ", ")) }
-func (e *EnumType) Accept(vst Visitor) any     { return vst.VisitEnumType(e) }
-func (e *EnumType) typ()                       {}
-func (e *EnumType) Width() int                 { panic("implement me") }
-func (e *EnumType) Position() *report.Position { return e.Pos }
-func (e *EnumType) Range() *report.Range       { return e.Rng }
+func (e *EnumType) String() string         { return fmt.Sprintf("enum(%s)", strings.Join(e.Variants, ", ")) }
+func (e *EnumType) Accept(vst Visitor) any { return vst.VisitEnumType(e) }
+func (e *EnumType) typ()                   {}
+func (e *EnumType) Width() int             { panic("implement me") }
+func (e *EnumType) Pos() int               { return e.StartOffset }
+func (e *EnumType) End() int               { return e.EndOffset }
 
-func (b *BadType) String() string             { return "<BadType>" }
-func (b *BadType) Accept(vst Visitor) any     { return vst.VisitBadType(b) }
-func (b *BadType) typ()                       {}
-func (b *BadType) Width() int                 { panic("implement me") }
-func (b *BadType) Position() *report.Position { return b.Pos }
-func (b *BadType) Range() *report.Range       { return b.Rng }
+func (b *BadType) String() string         { return "<BadType>" }
+func (b *BadType) Accept(vst Visitor) any { return vst.VisitBadType(b) }
+func (b *BadType) typ()                   {}
+func (b *BadType) Width() int             { panic("implement me") }
+func (b *BadType) Pos() int               { return b.StartOffset }
+func (b *BadType) End() int               { return b.EndOffset }

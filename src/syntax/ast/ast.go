@@ -2,14 +2,12 @@ package ast
 
 import (
 	"fmt"
-
-	"github.com/anthonyabeo/obx/src/report"
 )
 
 type Node interface {
 	fmt.Stringer
-	Position() *report.Position
-	Range() *report.Range
+	Pos() int
+	End() int
 	Accept(Visitor) any
 }
 

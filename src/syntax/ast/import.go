@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
-
-	"github.com/anthonyabeo/obx/src/report"
 )
 
 type Import struct {
@@ -14,8 +12,8 @@ type Import struct {
 	ImportPath []string
 	Meta       []Expression
 
-	Pos *report.Position
-	Rng *report.Range
+	StartOffset int
+	EndOffset   int
 }
 
 func (imp *Import) String() string {
@@ -36,6 +34,6 @@ func (imp *Import) String() string {
 
 	return buf.String()
 }
-func (imp *Import) Accept(vst Visitor) any     { return vst.VisitImport(imp) }
-func (imp *Import) Position() *report.Position { return imp.Pos }
-func (imp *Import) Range() *report.Range       { return imp.Rng }
+func (imp *Import) Accept(vst Visitor) any { return vst.VisitImport(imp) }
+func (imp *Import) Pos() int               { return imp.StartOffset }
+func (imp *Import) End() int               { return imp.EndOffset }

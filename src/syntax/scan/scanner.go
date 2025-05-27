@@ -9,7 +9,7 @@ import (
 )
 
 type Scanner struct {
-	src *report.SourceFile
+	Src *report.SourceFile
 	mgr *report.SourceManager
 
 	start    int // start position of this item
@@ -41,22 +41,22 @@ func (s *Scanner) run() {
 	close(s.items)
 }
 
-func (s *Scanner) emit(kind token.Kind, rng *report.Range) {
-	s.emitWithValue(kind, string(s.src.Content[s.start:s.pos]), rng)
+func (s *Scanner) emit(kind token.Kind, pos, end int, file string) {
+	s.emitWithValue(kind, string(s.Src.Content[s.start:s.pos]), pos, end, file)
 }
 
-func (s *Scanner) emitWithValue(t token.Kind, value string, rng *report.Range) {
-	s.items <- token.Token{Kind: t, Lexeme: value, Range: rng}
+func (s *Scanner) emitWithValue(t token.Kind, value string, pos, end int, file string) {
+	s.items <- token.Token{Kind: t, Lexeme: value /*, Range: rng*/, Pos: pos, End: end, File: file}
 	s.start = s.pos
 }
 
 func (s *Scanner) next() (r rune) {
-	if s.pos >= len(s.src.Content) {
+	if s.pos >= len(s.Src.Content) {
 		s.width = 0
 		return eof
 	}
 
-	r, s.width = utf8.DecodeRune(s.src.Content[s.pos:])
+	r, s.width = utf8.DecodeRune(s.Src.Content[s.pos:])
 	s.pos += s.width
 
 	if r == '\n' {
@@ -83,15 +83,14 @@ func (s *Scanner) peek() rune {
 	return r
 }
 
-func (s *Scanner) errorf(format string, rng *report.Range, args ...interface{}) StateFn {
-	s.items <- token.Token{Kind: token.ILLEGAL, Lexeme: fmt.Sprintf(format, args...), Range: rng}
+func (s *Scanner) errorf(format string /*, rng *report.Range*/, args ...interface{}) StateFn {
+	s.items <- token.Token{Kind: token.ILLEGAL, Lexeme: fmt.Sprintf(format, args...) /*, Range: rng*/, Pos: s.start, End: s.pos}
 	return scanText
 }
 
-func Scan(src *report.SourceFile, mgr *report.SourceManager) *Scanner {
+func Scan(src *report.SourceFile) *Scanner {
 	scan := &Scanner{
-		src:      src,
-		mgr:      mgr,
+		Src:      src,
 		state:    scanText,
 		items:    make(chan token.Token, 512),
 		line:     1,

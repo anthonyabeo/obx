@@ -1,7 +1,6 @@
 package ast
 
 import (
-	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -19,12 +18,12 @@ type Module struct {
 	Env   *Environment
 	edges map[string]CompilationUnit
 
-	Pos *report.Position
-	Rng *report.Range
+	StartOffset int
+	EndOffset   int
 }
 
-func NewModule(pos *report.Position) *Module {
-	return &Module{Pos: pos, edges: map[string]CompilationUnit{}}
+func NewModule(pos int) *Module {
+	return &Module{StartOffset: pos, edges: map[string]CompilationUnit{}}
 }
 
 func (m *Module) Edges() map[string]CompilationUnit         { return m.edges }
@@ -33,22 +32,22 @@ func (m *Module) Name() string                              { return m.BName }
 func (m *Module) ListImport() []*Import                     { return m.ImportList }
 func (m *Module) Accept(vst Visitor) any                    { return vst.VisitModule(m) }
 func (m *Module) String() string                            { panic("implement me") }
-func (m *Module) Position() *report.Position                { return m.Pos }
-func (m *Module) Range() *report.Range                      { return m.Rng }
+func (m *Module) Pos() int                                  { return m.StartOffset }
+func (m *Module) End() int                                  { return m.EndOffset }
 
 type MetaSection struct {
 	Mode    token.Kind
 	Ids     []string
 	TyConst Type
 
-	Pos *report.Position
-	Rng *report.Range
+	StartOffset int
+	EndOffset   int
 }
 
-func (ms *MetaSection) Accept(vst Visitor) any     { return vst.VisitMetaSection(ms) }
-func (ms *MetaSection) String() string             { panic("implement me") }
-func (ms *MetaSection) Position() *report.Position { return ms.Pos }
-func (ms *MetaSection) Range() *report.Range       { return ms.Rng }
+func (ms *MetaSection) Accept(vst Visitor) any { return vst.VisitMetaSection(ms) }
+func (ms *MetaSection) String() string         { panic("implement me") }
+func (ms *MetaSection) Pos() int               { return ms.StartOffset }
+func (ms *MetaSection) End() int               { return ms.EndOffset }
 
 // Definition
 // -------------------
@@ -61,12 +60,12 @@ type Definition struct {
 
 	edges map[string]CompilationUnit
 
-	Pos *report.Position
-	Rng *report.Range
+	StartOffset int
+	EndOffset   int
 }
 
-func NewDefinition(pos *report.Position) *Definition {
-	return &Definition{Pos: pos}
+func NewDefinition(pos int) *Definition {
+	return &Definition{StartOffset: pos}
 }
 
 func (def *Definition) Edges() map[string]CompilationUnit         { return def.edges }
@@ -75,5 +74,5 @@ func (def *Definition) Accept(vst Visitor) any                    { return vst.V
 func (def *Definition) Name() string                              { return def.BName }
 func (def *Definition) ListImport() []*Import                     { return def.ImportList }
 func (def *Definition) String() string                            { panic("implement me") }
-func (def *Definition) Position() *report.Position                { return def.Pos }
-func (def *Definition) Range() *report.Range                      { return def.Rng }
+func (def *Definition) Pos() int                                  { return def.StartOffset }
+func (def *Definition) End() int                                  { return def.EndOffset }
