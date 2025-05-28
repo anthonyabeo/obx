@@ -88,11 +88,11 @@ func (s *Scanner) errorf(format string /*, rng *report.Range*/, args ...interfac
 	return scanText
 }
 
-func Scan(input []byte, ctx *report.Context) *Scanner {
-	ctx.Source.Load(ctx.FileName, input, ctx.TabWidth)
+func Scan(ctx *report.Context) *Scanner {
+	ctx.Source.Load(ctx.FileName, ctx.Content, ctx.TabWidth)
 	scan := &Scanner{
 		ctx:      ctx,
-		content:  input,
+		content:  ctx.Content,
 		state:    scanText,
 		items:    make(chan token.Token, 512),
 		line:     1,

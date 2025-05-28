@@ -94,7 +94,8 @@ func TestScanNumber(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		sc := Scan([]byte(test.input), ctx)
+		ctx.Content = []byte(test.input)
+		sc := Scan(ctx)
 
 		got := sc.NextToken()
 
@@ -141,7 +142,8 @@ func TestScanIdentifiers(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		sc := Scan([]byte(test.input), ctx)
+		ctx.Content = []byte(test.input)
+		sc := Scan(ctx)
 
 		got := sc.NextToken()
 		if test.wantErr {
@@ -196,7 +198,8 @@ func TestScanDelimitersAndOperators(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		sc := Scan([]byte(test.input), ctx)
+		ctx.Content = []byte(test.input)
+		sc := Scan(ctx)
 
 		got := sc.NextToken()
 		if test.wantErr {
@@ -248,7 +251,8 @@ func TestScanHexStrings(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		sc := Scan([]byte(test.input), ctx)
+		ctx.Content = []byte(test.input)
+		sc := Scan(ctx)
 
 		got := sc.NextToken()
 
@@ -296,7 +300,8 @@ func TestScanCharacterLiterals(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		sc := Scan([]byte(test.input), ctx)
+		ctx.Content = []byte(test.input)
+		sc := Scan(ctx)
 
 		got := sc.NextToken()
 		if test.wantErr {
@@ -353,7 +358,8 @@ next'`, token.ILLEGAL, "", true}, // newline
 	}
 
 	for _, tt := range tests {
-		sc := Scan([]byte(tt.input), ctx)
+		ctx.Content = []byte(tt.input)
+		sc := Scan(ctx)
 
 		tok := sc.NextToken()
 
@@ -395,7 +401,8 @@ func TestScanComments(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		sc := Scan([]byte(test.input), ctx)
+		ctx.Content = []byte(test.input)
+		sc := Scan(ctx)
 
 		got := sc.NextToken()
 
@@ -433,18 +440,22 @@ end Main
 	file := "test.ob"
 	ctx := &report.Context{
 		FileName: file,
+		Content:  input,
 		Source:   report.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
-	sc := Scan(input, ctx)
+	sc := Scan(ctx)
 
 	tests := []struct {
 		tokenKind token.Kind
 		tokenLit  string
 	}{
+		{token.NEWLINE, "\n"},
+
 		{token.MODULE, "module"},
 		{token.IDENTIFIER, "Main"},
+		{token.NEWLINE, "\n"},
 
 		{token.PROC, "proc"},
 		{token.IDENTIFIER, "fib"},
@@ -455,6 +466,7 @@ end Main
 		{token.RPAREN, ")"},
 		{token.COLON, ":"},
 		{token.INTEGER, "integer"},
+		{token.NEWLINE, "\n"},
 
 		{token.VAR, "var"},
 		{token.IDENTIFIER, "a"},
@@ -462,8 +474,11 @@ end Main
 		{token.IDENTIFIER, "b"},
 		{token.COLON, ":"},
 		{token.INTEGER, "integer"},
+		{token.NEWLINE, "\n"},
+		{token.NEWLINE, "\n"},
 
 		{token.BEGIN, "begin"},
+		{token.NEWLINE, "\n"},
 
 		{token.IF, "if"},
 		{token.LPAREN, "("},
@@ -478,11 +493,14 @@ end Main
 		{token.INT_LIT, "1"},
 		{token.RPAREN, ")"},
 		{token.THEN, "then"},
+		{token.NEWLINE, "\n"},
 
 		{token.RETURN, "return"},
 		{token.IDENTIFIER, "n"},
+		{token.NEWLINE, "\n"},
 
 		{token.ELSE, "else"},
+		{token.NEWLINE, "\n"},
 
 		{token.IDENTIFIER, "a"},
 		{token.BECOMES, ":="},
@@ -492,6 +510,7 @@ end Main
 		{token.MINUS, "-"},
 		{token.INT_LIT, "1"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
 
 		{token.IDENTIFIER, "b"},
 		{token.BECOMES, ":="},
@@ -501,23 +520,32 @@ end Main
 		{token.MINUS, "-"},
 		{token.INT_LIT, "2"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
 
 		{token.RETURN, "return"},
 		{token.IDENTIFIER, "a"},
 		{token.PLUS, "+"},
 		{token.IDENTIFIER, "b"},
+		{token.NEWLINE, "\n"},
 
 		{token.END, "end"},
+		{token.NEWLINE, "\n"},
+
 		{token.END, "end"},
 		{token.IDENTIFIER, "fib"},
+		{token.NEWLINE, "\n"},
+		{token.NEWLINE, "\n"},
 
 		{token.BEGIN, "begin"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "res"},
 		{token.BECOMES, ":="},
 		{token.IDENTIFIER, "fib"},
 		{token.LPAREN, "("},
 		{token.INT_LIT, "21"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
 
 		{token.IDENTIFIER, "assert"},
 		{token.LPAREN, "("},
@@ -525,9 +553,11 @@ end Main
 		{token.EQUAL, "="},
 		{token.INT_LIT, "10946"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
 
 		{token.END, "end"},
 		{token.IDENTIFIER, "Main"},
+		{token.NEWLINE, "\n"},
 	}
 
 	for _, tt := range tests {
@@ -596,11 +626,12 @@ end Drawing
 	file := "test.ob"
 	ctx := &report.Context{
 		FileName: file,
+		Content:  input,
 		Source:   report.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
-	sc := Scan(input, ctx)
+	sc := Scan(ctx)
 
 	tests := []struct {
 		tokenKind token.Kind
@@ -608,16 +639,22 @@ end Drawing
 	}{
 		{token.MODULE, "module"},
 		{token.IDENTIFIER, "Drawing"},
+		{token.NEWLINE, "\n"},
 		{token.IMPORT, "import"},
 		{token.IDENTIFIER, "F"},
 		{token.BECOMES, ":="},
 		{token.IDENTIFIER, "Fibonacci"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "C"},
 		{token.BECOMES, ":="},
 		{token.IDENTIFIER, "Collections"},
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "Figure"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+		{token.NEWLINE, "\n"},
+
 		{token.TYPE, "type"},
 		{token.IDENTIFIER, "Figure"},
 		{token.STAR, "*"},
@@ -625,16 +662,26 @@ end Drawing
 		{token.POINTER, "pointer"},
 		{token.TO, "to"},
 		{token.RECORD, "record"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "position"},
 		{token.COLON, ":"},
 		{token.RECORD, "record"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "x"},
 		{token.COMMA, ","},
 		{token.IDENTIFIER, "y"},
 		{token.COLON, ":"},
 		{token.INTEGER, "integer"},
+		{token.NEWLINE, "\n"},
+
 		{token.END, "end"},
+		{token.NEWLINE, "\n"},
+
 		{token.END, "end"},
+		{token.NEWLINE, "\n"},
+
 		{token.PROC, "proc"},
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "this"},
@@ -646,7 +693,12 @@ end Drawing
 		{token.LPAREN, "("},
 		{token.RPAREN, ")"},
 		{token.END, "end"},
+		{token.NEWLINE, "\n"},
+		{token.NEWLINE, "\n"},
+
 		{token.TYPE, "type"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "Circle"},
 		{token.STAR, "*"},
 		{token.EQUAL, "="},
@@ -656,10 +708,16 @@ end Drawing
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "Figure"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "diameter"},
 		{token.COLON, ":"},
 		{token.INTEGER, "integer"},
+		{token.NEWLINE, "\n"},
+
 		{token.END, "end"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "Square"},
 		{token.STAR, "*"},
 		{token.EQUAL, "="},
@@ -669,10 +727,14 @@ end Drawing
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "Figure"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "width"},
 		{token.COLON, ":"},
 		{token.INTEGER, "integer"},
 		{token.END, "end"},
+		{token.NEWLINE, "\n"},
+
 		{token.PROC, "proc"},
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "this"},
@@ -684,6 +746,8 @@ end Drawing
 		{token.LPAREN, "("},
 		{token.RPAREN, ")"},
 		{token.END, "end"},
+		{token.NEWLINE, "\n"},
+
 		{token.PROC, "proc"},
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "this"},
@@ -695,22 +759,34 @@ end Drawing
 		{token.LPAREN, "("},
 		{token.RPAREN, ")"},
 		{token.END, "end"},
+		{token.NEWLINE, "\n"},
+		{token.NEWLINE, "\n"},
+
 		{token.VAR, "var"},
 		{token.IDENTIFIER, "figures"},
 		{token.COLON, ":"},
 		{token.IDENTIFIER, "C"},
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "Deque"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "circle"},
 		{token.COLON, ":"},
 		{token.IDENTIFIER, "Circle"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "square"},
 		{token.COLON, ":"},
 		{token.IDENTIFIER, "Square"},
+		{token.NEWLINE, "\n"},
+		{token.NEWLINE, "\n"},
+
 		{token.PROC, "proc"},
 		{token.IDENTIFIER, "drawAll"},
 		{token.LPAREN, "("},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.TYPE, "type"},
 		{token.IDENTIFIER, "I"},
 		{token.EQUAL, "="},
@@ -724,6 +800,8 @@ end Drawing
 		{token.COLON, ":"},
 		{token.INTEGER, "integer"},
 		{token.END, "end"},
+		{token.NEWLINE, "\n"},
+
 		{token.PROC, "proc"},
 		{token.LPAREN, "("},
 		{token.VAR, "var"},
@@ -738,7 +816,11 @@ end Drawing
 		{token.COLON, ":"},
 		{token.IDENTIFIER, "Figure"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.BEGIN, "begin"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "figure"},
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "draw"},
@@ -751,19 +833,29 @@ end Drawing
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "count"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.END, "end"},
 		{token.IDENTIFIER, "apply"},
+		{token.NEWLINE, "\n"},
+
 		{token.VAR, "var"},
 		{token.IDENTIFIER, "i"},
 		{token.COLON, ":"},
 		{token.IDENTIFIER, "I"},
+		{token.NEWLINE, "\n"},
+
 		{token.BEGIN, "begin"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "figures"},
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "forEach"},
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "i"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "assert"},
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "i"},
@@ -772,9 +864,15 @@ end Drawing
 		{token.EQUAL, "="},
 		{token.INT_LIT, "2"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.END, "end"},
 		{token.IDENTIFIER, "drawAll"},
+		{token.NEWLINE, "\n"},
+
 		{token.BEGIN, "begin"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "figures"},
 		{token.BECOMES, ":="},
 		{token.IDENTIFIER, "C"},
@@ -782,10 +880,14 @@ end Drawing
 		{token.IDENTIFIER, "createDeque"},
 		{token.LPAREN, "("},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "new"},
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "circle"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "circle"},
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "position"},
@@ -798,6 +900,8 @@ end Drawing
 		{token.LPAREN, "("},
 		{token.INT_LIT, "3"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "circle"},
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "position"},
@@ -810,21 +914,29 @@ end Drawing
 		{token.LPAREN, "("},
 		{token.INT_LIT, "4"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "circle"},
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "diameter"},
 		{token.BECOMES, ":="},
 		{token.INT_LIT, "3"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "figures"},
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "append"},
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "circle"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "new"},
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "square"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "square"},
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "position"},
@@ -837,6 +949,8 @@ end Drawing
 		{token.LPAREN, "("},
 		{token.INT_LIT, "5"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "square"},
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "position"},
@@ -849,22 +963,31 @@ end Drawing
 		{token.LPAREN, "("},
 		{token.INT_LIT, "6"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "square"},
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "width"},
 		{token.BECOMES, ":="},
 		{token.INT_LIT, "4"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "figures"},
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "append"},
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "square"},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.IDENTIFIER, "drawAll"},
 		{token.LPAREN, "("},
 		{token.RPAREN, ")"},
+		{token.NEWLINE, "\n"},
+
 		{token.END, "end"},
 		{token.IDENTIFIER, "Drawing"},
+		{token.NEWLINE, "\n"},
 	}
 
 	for _, tt := range tests {

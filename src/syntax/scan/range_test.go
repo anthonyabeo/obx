@@ -21,12 +21,13 @@ type ExpectedToken struct {
 func expectTokens(t *testing.T, src []byte, filename string, expected []ExpectedToken) {
 	ctx := &report.Context{
 		FileName: filename,
+		Content:  src,
 		Source:   report.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
 
-	sc := Scan(src, ctx)
+	sc := Scan(ctx)
 
 	var tokens []token.Token
 	for {
@@ -81,9 +82,11 @@ END Hello.
 `)
 
 	expectTokens(t, src, "example.ob", []ExpectedToken{
+		{token.NEWLINE, "\n", 1, 1, 2, 1},
 		{token.MODULE, "MODULE", 2, 1, 2, 7},
 		{token.IDENTIFIER, "Hello", 2, 8, 2, 13},
 		{token.SEMICOLON, ";", 2, 13, 2, 14},
+		{token.NEWLINE, "\n", 2, 14, 3, 1},
 		{token.VAR, "VAR", 3, 1, 3, 4},
 		{token.IDENTIFIER, "x", 3, 5, 3, 6},
 		{token.COMMA, ",", 3, 6, 3, 7},
@@ -91,19 +94,28 @@ END Hello.
 		{token.COLON, ":", 3, 9, 3, 10},
 		{token.INTEGER, "INTEGER", 3, 11, 3, 18},
 		{token.SEMICOLON, ";", 3, 18, 3, 19},
+		{token.NEWLINE, "\n", 3, 19, 4, 1},
+
 		{token.BEGIN, "BEGIN", 4, 1, 4, 6},
+		{token.NEWLINE, "\n", 4, 6, 5, 1},
+
 		{token.IDENTIFIER, "x", 5, 3, 5, 4},
 		{token.BECOMES, ":=", 5, 5, 5, 7},
 		{token.INT_LIT, "42", 5, 8, 5, 10},
 		{token.SEMICOLON, ";", 5, 10, 5, 11},
+		{token.NEWLINE, "\n", 5, 11, 6, 1},
+
 		{token.IDENTIFIER, "y", 6, 3, 6, 4},
 		{token.BECOMES, ":=", 6, 5, 6, 7},
 		{token.IDENTIFIER, "x", 6, 8, 6, 9},
 		{token.PLUS, "+", 6, 10, 6, 11},
 		{token.INT_LIT, "1", 6, 12, 6, 13},
+		{token.NEWLINE, "\n", 6, 13, 7, 1},
+
 		{token.END, "END", 7, 1, 7, 4},
 		{token.IDENTIFIER, "Hello", 7, 5, 7, 10},
 		{token.PERIOD, ".", 7, 10, 7, 11},
+		{token.NEWLINE, "\n", 7, 11, 8, 1},
 	})
 }
 
@@ -129,9 +141,13 @@ END Math.
 `)
 
 	expectTokens(t, src, "math.ob", []ExpectedToken{
+		{token.NEWLINE, "\n", 1, 1, 2, 1},
+
 		{token.MODULE, "MODULE", 2, 1, 2, 7},
 		{token.IDENTIFIER, "Math", 2, 8, 2, 12},
 		{token.SEMICOLON, ";", 2, 12, 2, 13},
+		{token.NEWLINE, "\n", 2, 13, 3, 1},
+		{token.NEWLINE, "\n", 3, 1, 4, 1},
 
 		{token.VAR, "VAR", 4, 1, 4, 4},
 		{token.IDENTIFIER, "a", 4, 5, 4, 6},
@@ -142,53 +158,67 @@ END Math.
 		{token.COLON, ":", 4, 17, 4, 18},
 		{token.INTEGER, "INTEGER", 4, 19, 4, 26},
 		{token.SEMICOLON, ";", 4, 26, 4, 27},
+		{token.NEWLINE, "\n", 4, 27, 5, 1},
+		{token.NEWLINE, "\n", 5, 1, 6, 1},
 
 		{token.BEGIN, "BEGIN", 6, 1, 6, 6},
+		{token.NEWLINE, "\n", 6, 6, 7, 1},
 
 		{token.IDENTIFIER, "a", 7, 3, 7, 4},
 		{token.BECOMES, ":=", 7, 5, 7, 7},
 		{token.INT_LIT, "10", 7, 8, 7, 10},
 		{token.SEMICOLON, ";", 7, 10, 7, 11},
+		{token.NEWLINE, "\n", 7, 11, 8, 1},
 
 		{token.IDENTIFIER, "b", 8, 3, 8, 4},
 		{token.BECOMES, ":=", 8, 5, 8, 7},
 		{token.INT_LIT, "20", 8, 8, 8, 10},
 		{token.SEMICOLON, ";", 8, 10, 8, 11},
-
-		// Comment is ignored by token
+		{token.NEWLINE, "\n", 8, 11, 9, 1},
+		{token.NEWLINE, "\n", 9, 1, 10, 1},
 
 		{token.IF, "IF", 10, 3, 10, 5},
 		{token.IDENTIFIER, "a", 10, 6, 10, 7},
 		{token.LESS, "<", 10, 8, 10, 9},
 		{token.IDENTIFIER, "b", 10, 10, 10, 11},
 		{token.THEN, "THEN", 10, 12, 10, 16},
+		{token.NEWLINE, "\n", 10, 16, 11, 1},
 
 		{token.IDENTIFIER, "result", 11, 5, 11, 11},
 		{token.BECOMES, ":=", 11, 12, 11, 14},
 		{token.IDENTIFIER, "a", 11, 15, 11, 16},
 		{token.STAR, "*", 11, 17, 11, 18},
 		{token.IDENTIFIER, "b", 11, 19, 11, 20},
+		{token.NEWLINE, "\n", 11, 20, 12, 1},
 
 		{token.END, "END", 12, 3, 12, 6},
 		{token.SEMICOLON, ";", 12, 6, 12, 7},
+		{token.NEWLINE, "\n", 12, 7, 13, 1},
+		{token.NEWLINE, "\n", 13, 1, 14, 1},
 
 		{token.WHILE, "WHILE", 14, 3, 14, 8},
 		{token.IDENTIFIER, "result", 14, 9, 14, 15},
 		{token.GREAT, ">", 14, 16, 14, 17},
 		{token.INT_LIT, "0", 14, 18, 14, 19},
 		{token.DO, "DO", 14, 20, 14, 22},
+		{token.NEWLINE, "\n", 14, 22, 15, 1},
 
 		{token.IDENTIFIER, "result", 15, 5, 15, 11},
 		{token.BECOMES, ":=", 15, 12, 15, 14},
 		{token.IDENTIFIER, "result", 15, 15, 15, 21},
 		{token.MINUS, "-", 15, 22, 15, 23},
 		{token.INT_LIT, "1", 15, 24, 15, 25},
+		{token.NEWLINE, "\n", 15, 25, 16, 1},
 
 		{token.END, "END", 16, 3, 16, 6},
+		{token.NEWLINE, "\n", 16, 6, 17, 1},
+		{token.NEWLINE, "\n", 17, 1, 18, 1},
 
 		{token.END, "END", 18, 1, 18, 4},
 		{token.IDENTIFIER, "Math", 18, 5, 18, 9},
 		{token.PERIOD, ".", 18, 9, 18, 10},
+
+		{token.NEWLINE, "\n", 18, 10, 19, 1},
 	})
 
 }
@@ -200,12 +230,13 @@ func TestLexerTokenRanges(t *testing.T) {
 	file := "test.ob"
 	ctx := &report.Context{
 		FileName: file,
+		Content:  src,
 		Source:   report.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
 
-	lx := Scan(src, ctx)
+	lx := Scan(ctx)
 
 	var tokens []token.Token
 	for {
@@ -228,11 +259,13 @@ func TestLexerTokenRanges(t *testing.T) {
 		{1, "x", 1, 5, 1, 6},
 		{2, ":=", 1, 7, 1, 9},
 		{3, "42", 1, 10, 1, 12},
-		{4, "y", 2, 5, 2, 6},
-		{5, ":=", 2, 7, 2, 9},
-		{6, "x", 2, 10, 2, 11},
-		{7, "+", 2, 12, 2, 13},
-		{8, "1", 2, 14, 2, 15},
+		{4, "\n", 1, 12, 2, 1},
+		{5, "y", 2, 5, 2, 6},
+		{6, ":=", 2, 7, 2, 9},
+		{7, "x", 2, 10, 2, 11},
+		{8, "+", 2, 12, 2, 13},
+		{9, "1", 2, 14, 2, 15},
+		{10, "\n", 2, 15, 3, 1},
 	}
 
 	for _, tt := range tests {
@@ -271,19 +304,21 @@ func TestOffsetToLineCol_WithTabs(t *testing.T) {
 		{0, "a", 1, 1, 1, 2},
 		{1, "b", 1, 6, 1, 7},
 		{2, "c", 1, 11, 1, 12},
-		{3, "1234", 2, 1, 2, 5},
-		{4, "56", 2, 9, 2, 11},
+		{3, "\n", 1, 12, 2, 1},
+		{4, "1234", 2, 1, 2, 5},
+		{5, "56", 2, 9, 2, 11},
 	}
 
 	file := "test.ob"
 	ctx := &report.Context{
 		FileName: file,
+		Content:  src,
 		Source:   report.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
 
-	sc := Scan(src, ctx)
+	sc := Scan(ctx)
 
 	var tokens []token.Token
 	for {
@@ -349,8 +384,4 @@ END Test.
 		Message:  "unterminated string literal",
 		Range:    sm.Span(file, startOffset, endOffset),
 	})
-
-	// Print diagnostic
-	reporter.Flush()
-
 }

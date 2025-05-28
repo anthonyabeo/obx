@@ -42,6 +42,8 @@ end Main`)
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -49,7 +51,7 @@ end Main`)
 		TabWidth: 4,
 	}
 
-	p := NewParser(ctx, input, table, nil)
+	p := NewParser(ctx)
 	unit := p.Parse()
 
 	if p.ctx.Reporter.ErrorCount() > 0 {
@@ -95,13 +97,15 @@ end Main
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, nil)
+	p := NewParser(ctx)
 	unit := p.Parse()
 
 	if p.ctx.Reporter.ErrorCount() > 0 {
@@ -149,13 +153,15 @@ end Main
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, nil)
+	p := NewParser(ctx)
 	unit := p.Parse()
 
 	if p.ctx.Reporter.ErrorCount() > 0 {
@@ -209,13 +215,15 @@ end Main
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, nil)
+	p := NewParser(ctx)
 	unit := p.Parse()
 
 	if p.ctx.Reporter.ErrorCount() > 0 {
@@ -290,13 +298,15 @@ end Main
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, nil)
+	p := NewParser(ctx)
 	unit := p.Parse()
 
 	if p.ctx.Reporter.ErrorCount() > 0 {
@@ -366,13 +376,15 @@ end Main
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, nil)
+	p := NewParser(ctx)
 	unit := p.Parse()
 
 	if p.ctx.Reporter.ErrorCount() > 0 {
@@ -440,13 +452,15 @@ end Drawing
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, nil)
+	p := NewParser(ctx)
 	unit := p.Parse()
 
 	if p.ctx.Reporter.ErrorCount() > 0 {
@@ -559,13 +573,16 @@ end Drawing
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
+		Envs:     envs,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, envs)
+	p := NewParser(ctx)
 	unit := p.Parse()
 
 	if p.ctx.Reporter.ErrorCount() > 0 {
@@ -659,13 +676,15 @@ end Main
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, nil)
+	p := NewParser(ctx)
 	unit := p.Parse()
 	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
@@ -749,13 +768,16 @@ end Main
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, nil)
+
+	p := NewParser(ctx)
 	unit := p.Parse()
 	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
@@ -827,13 +849,16 @@ end Main
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, nil)
+
+	p := NewParser(ctx)
 	unit := p.Parse()
 	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
@@ -929,21 +954,24 @@ end Main
 	table := ast.NewEnvironment(nil, "Main")
 	table.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
 
-	InsertScope := ast.NewEnvironment(table, "Insert")
-	InsertScope.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
+	//InsertScope := ast.NewEnvironment(table, "Insert")
+	//InsertScope.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, nil)
+
+	p := NewParser(ctx)
 	unit := p.Parse()
 	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
@@ -1054,13 +1082,15 @@ end Main
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
+		Content:  input,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, nil)
+	p := NewParser(ctx)
 	unit := p.Parse()
 	if p.ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
@@ -1127,14 +1157,16 @@ EN BadModule.
 	mgr := report.NewSourceManager()
 	ctx := &report.Context{
 		FileName: filename,
+		Content:  input,
 		Source:   mgr,
+		Env:      table,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
 		TabWidth: 4,
 	}
-	p := NewParser(ctx, input, table, nil)
+	p := NewParser(ctx)
 	unit := p.Parse()
 
 	if _, ok := unit.(*ast.Module); !ok {

@@ -11,11 +11,7 @@ import (
 )
 
 func parseSource(t *testing.T, input []byte, ctx *report.Context) *ast.Oberon {
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-	out := ast.NewEnvironment(table, "Out")
-	out.Insert(ast.NewProcedureSymbol("Out.Int", ast.Exported))
-
-	p := parser.NewParser(ctx, input, table, nil)
+	p := parser.NewParser(ctx)
 	unit := p.Parse()
 
 	if ctx.Reporter.ErrorCount() > 0 {
@@ -36,10 +32,14 @@ func TestPrettyPrintJSON(t *testing.T) {
 		BEGIN x := 42
 		END Test.
 	`)
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
 	ctx := &report.Context{
 		FileName: filename,
+		Content:  input,
+		Env:      table,
 		Source:   mgr,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
@@ -124,10 +124,16 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 		END Bigger.
 	`)
 
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+	out := ast.NewEnvironment(table, "Out")
+	out.Insert(ast.NewProcedureSymbol("Out.Int", ast.Exported))
+
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
 	ctx := &report.Context{
 		FileName: filename,
+		Content:  input,
+		Env:      table,
 		Source:   mgr,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,

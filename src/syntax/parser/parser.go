@@ -26,8 +26,8 @@ type Parser struct {
 	list []ast.Expression
 }
 
-func NewParser(ctx *report.Context, content []byte, env *ast.Environment, envs map[string]*ast.Environment) *Parser {
-	p := &Parser{sc: scan.Scan(content, ctx), env: env, envs: envs, ctx: ctx}
+func NewParser(ctx *report.Context) *Parser {
+	p := &Parser{sc: scan.Scan(ctx), ctx: ctx}
 	p.next()
 
 	return p
@@ -246,7 +246,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 	// add module imports to the environment
 	for _, imp := range list {
 		if imp.Alias != "" {
-			if sym := p.env.Insert(ast.NewModuleSymbol(imp.Alias)); sym != nil {
+			if sym := p.ctx.Env.Insert(ast.NewModuleSymbol(imp.Alias)); sym != nil {
 				p.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  "duplicate module import",
@@ -254,7 +254,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 				})
 			}
 		} else {
-			if sym := p.env.Insert(ast.NewModuleSymbol(imp.Name)); sym != nil {
+			if sym := p.ctx.Env.Insert(ast.NewModuleSymbol(imp.Name)); sym != nil {
 				p.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  "duplicate module import",
@@ -436,7 +436,7 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 	p.match(token.EQUAL)
 	Typ := p.parseType()
 
-	if sym := p.env.Insert(ast.NewTypeSymbol(name.Name, name.Props, Typ)); sym != nil {
+	if sym := p.ctx.Env.Insert(ast.NewTypeSymbol(name.Name, name.Props, Typ)); sym != nil {
 		p.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  "duplicate type declaration " + name.Name,
@@ -457,7 +457,7 @@ func (p *Parser) parseConstantDecl() *ast.ConstantDecl {
 	p.match(token.EQUAL)
 	value := p.parseExpression()
 
-	if sym := p.env.Insert(ast.NewConstantSymbol(name.Name, name.Props, value)); sym != nil {
+	if sym := p.ctx.Env.Insert(ast.NewConstantSymbol(name.Name, name.Props, value)); sym != nil {
 		p.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  "duplicate constant declaration " + name.Name,
@@ -482,7 +482,7 @@ func (p *Parser) parseVariableDecl() *ast.VariableDecl {
 
 	// add the variables to the environment
 	for _, id := range decl.IdentList {
-		sym := p.env.Insert(ast.NewVariableSymbol(id.Name, id.Props, decl.Type))
+		sym := p.ctx.Env.Insert(ast.NewVariableSymbol(id.Name, id.Props, decl.Type))
 		if sym != nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
@@ -634,7 +634,7 @@ func (p *Parser) parseRecordType() *ast.RecordType {
 	p.match(token.RECORD)
 
 	baseEnv := p.parseRecordBase(rec)
-	rec.Env = ast.NewRecordEnv(baseEnv, p.env)
+	rec.Env = ast.NewRecordEnv(baseEnv, p.ctx.Env)
 
 	if p.tok == token.IDENTIFIER {
 		rec.Fields = p.parseRecordFields()
@@ -677,7 +677,7 @@ func (p *Parser) parseRecordBase(rec *ast.RecordType) *ast.RecordEnv {
 }
 
 func (p *Parser) lookupBaseType(baseType *ast.NamedType) ast.Symbol {
-	if env, ok := p.envs[baseType.Name.Prefix]; ok {
+	if env, ok := p.ctx.Envs[baseType.Name.Prefix]; ok {
 		base := env.Lookup(baseType.Name.Name)
 		if base == nil || base.Props() != ast.Exported {
 			p.ctx.Reporter.Report(report.Diagnostic{
@@ -691,7 +691,7 @@ func (p *Parser) lookupBaseType(baseType *ast.NamedType) ast.Symbol {
 		return base
 	}
 
-	return p.env.Lookup(baseType.Name.Name)
+	return p.ctx.Env.Lookup(baseType.Name.Name)
 }
 
 func (p *Parser) getRecordType(base ast.Symbol) *ast.RecordType {
@@ -848,9 +848,9 @@ func (p *Parser) parseFactor() ast.Expression {
 
 	case token.IDENTIFIER:
 		dsg := p.parseDesignator()
-		env := p.env
+		env := p.ctx.Env
 		if dsg.QIdent.Prefix != "" {
-			env = p.envs[dsg.QIdent.Prefix]
+			env = p.ctx.Envs[dsg.QIdent.Prefix]
 		}
 
 		if sym := env.Lookup(dsg.QIdent.Name); sym != nil && sym.Kind() == ast.ProcedureSymbolKind && p.tok == token.RPAREN {
@@ -977,9 +977,9 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
 		return false
 	}
 
-	env := p.env
+	env := p.ctx.Env
 	if d.QIdent.Prefix != "" {
-		env = p.envs[d.QIdent.Prefix]
+		env = p.ctx.Envs[d.QIdent.Prefix]
 	}
 
 	sym := env.Lookup(d.QIdent.Name)
@@ -1077,7 +1077,7 @@ func (p *Parser) parseQualifiedIdent() *ast.QualifiedIdent {
 	// Parse the first identifier
 	id.Prefix = p.parseIdent()
 
-	if sym := p.env.Lookup(id.Prefix); sym != nil && sym.Kind() == ast.ModuleSymbolKind && p.tok == token.PERIOD {
+	if sym := p.ctx.Env.Lookup(id.Prefix); sym != nil && sym.Kind() == ast.ModuleSymbolKind && p.tok == token.PERIOD {
 		p.next()
 		id.EndOffset = p.end // Update the end position
 		id.Name = p.parseIdent()
@@ -1134,11 +1134,11 @@ func (p *Parser) parseIdentifierDef() *ast.IdentifierDef {
 func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 	proc = &ast.ProcedureDecl{StartOffset: p.pos}
 
-	parent := p.env
-	p.env = ast.NewEnvironment(parent, "")
-	proc.Env = p.env
+	parent := p.ctx.Env
+	p.ctx.Env = ast.NewEnvironment(parent, "")
+	proc.Env = p.ctx.Env
 	defer func() {
-		p.env = parent
+		p.ctx.Env = parent
 	}()
 
 	proc.Head = p.parseProcHeading()
@@ -1191,7 +1191,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 	// parameters into the receiver's environment
 	if head.Rcv != nil {
 		rcvType := head.Rcv.Type.String()
-		sym := p.env.Lookup(rcvType)
+		sym := p.ctx.Env.Lookup(rcvType)
 		if sym == nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
@@ -1241,7 +1241,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 		}
 
 		// add the receiver to the procedure's parent environment
-		if sym := p.env.Insert(ast.NewParamSymbol(head.Rcv.Var, head.Rcv.Mod, head.Rcv.Type)); sym != nil {
+		if sym := p.ctx.Env.Insert(ast.NewParamSymbol(head.Rcv.Var, head.Rcv.Mod, head.Rcv.Type)); sym != nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  "duplicate parameter declaration",
@@ -1263,7 +1263,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 	if head.FP != nil {
 		for _, param := range head.FP.Params {
 			for _, id := range param.Names {
-				if sym := p.env.Insert(ast.NewParamSymbol(id, param.Mod, param.Type)); sym != nil {
+				if sym := p.ctx.Env.Insert(ast.NewParamSymbol(id, param.Mod, param.Type)); sym != nil {
 					p.ctx.Reporter.Report(report.Diagnostic{
 						Severity: report.Error,
 						Message:  "duplicate parameter declaration" + id,
