@@ -80,7 +80,7 @@ func scanNumber(s *Scanner) StateFn {
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("malformed number: invalid character '%c' after hex literal", s.peek())
+			return s.errorf("malformed number: invalid character '%c' after char literal", s.peek())
 		}
 
 		var value int
@@ -130,7 +130,7 @@ func scanNumber(s *Scanner) StateFn {
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("malformed number: invalid character '%c' after hex literal", s.peek())
+			return s.errorf("malformed number: invalid character '%c' after real literal", s.peek())
 		}
 	}
 
@@ -147,7 +147,7 @@ func scanNumber(s *Scanner) StateFn {
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("malformed number literal. '%c' after hex literal", s.peek())
+			return s.errorf("malformed number literal. '%c' after integer literal", s.peek())
 		}
 
 		s.emit(token.INT_LIT, s.start, s.pos)
@@ -169,7 +169,7 @@ func scanNumber(s *Scanner) StateFn {
 		}
 	default:
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("malformed number literal. '%c' after hex literal", s.peek())
+			return s.errorf("malformed number literal. '%c' after real literal", s.peek())
 		}
 
 		s.emit(token.REAL_LIT, s.start, s.pos)
@@ -372,8 +372,10 @@ func scanText(s *Scanner) StateFn {
 			s.emit(token.NOT, s.start, s.pos)
 		case ';':
 			s.emit(token.SEMICOLON, s.start, s.pos)
-		case ' ', '\t', '\n':
+		case ' ', '\t':
 			s.ignore()
+		case '\n':
+			s.emit(token.NEWLINE, s.start, s.pos)
 		case '$':
 			s.backup()
 			return scanHexString
