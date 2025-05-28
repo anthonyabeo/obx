@@ -1152,9 +1152,9 @@ EN BadModule.
 		"invalid character",             // y := @;
 		"malformed number",              // 0x
 		"expected statement, found ';'", // inc(y);;
-		"expected := or (",
+		"is not a valid statement",
 		"expected 'IDENTIFIER', found 'EOF'",
-		"expected := or (",
+		"is not a valid statement",
 		"expected 'end', found 'EOF'",
 		"expected 'end', found 'EOF'",
 		"expected 'IDENTIFIER', found 'EOF'",
