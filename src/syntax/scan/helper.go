@@ -107,6 +107,6 @@ func isValidHex(s string) bool {
 func isNumberTokenBoundary(r rune) bool {
 	return r == eof ||
 		unicode.IsSpace(r) ||
-		strings.ContainsRune(";,(){}[]", r) || // statement and grouping
-		strings.ContainsRune("+-*/%=!<>", r) // typical operators
+		strings.ContainsRune(":;,(){}[]", r) || // statement and grouping
+		strings.ContainsRune("+-*/%=<>#", r) // typical operators
 }
