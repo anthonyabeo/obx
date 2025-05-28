@@ -59,11 +59,34 @@ func (p *Parser) match(tok token.Kind) {
 }
 
 func (p *Parser) next() {
-	tok := p.sc.NextToken()
-	p.tok = tok.Kind
-	p.lexeme = tok.Lexeme
-	p.pos = tok.Pos
-	p.end = tok.End
+	for {
+		tok := p.sc.NextToken()
+		p.tok = tok.Kind
+		p.lexeme = tok.Lexeme
+		p.pos = tok.Pos
+		p.end = tok.End
+
+		switch tok.Kind {
+		case token.SL_COMMENT_START:
+			// Skip until end of line
+			for tok.Kind != token.EOF && tok.Kind != token.NEWLINE {
+				tok = p.sc.NextToken()
+			}
+		case token.ML_COMMENT_START:
+			// Skip until ML_COMMENT_END
+			for tok.Kind != token.EOF && tok.Kind != token.ML_COMMENT_END {
+				tok = p.sc.NextToken()
+			}
+			if tok.Kind == token.ML_COMMENT_END {
+				tok = p.sc.NextToken() // Consume the end token
+			}
+		case token.NEWLINE:
+			continue
+		default:
+			return
+		}
+	}
+
 }
 
 func (p *Parser) Parse() (unit ast.CompilationUnit) {
@@ -1436,7 +1459,11 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 			p.list = make([]ast.Expression, 0)
 			p.next()
 		default:
-			p.errorExpected(":= or (")
+			p.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("%s is not a valid statement", dsg),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, dsg.StartOffset, dsg.EndOffset),
+			})
 			p.advance(stmtStart)
 			stmt = &ast.BadStmt{StartOffset: pos, EndOffset: p.pos}
 		}
