@@ -19,8 +19,8 @@ func (l *LoopContextAnalyzer) Analyse(unit ast.CompilationUnit) {
 	unit.Accept(l)
 }
 
-func (l *LoopContextAnalyzer) VisitOberon(oberon *ast.Oberon) any {
-	for _, unit := range oberon.Units() {
+func (l *LoopContextAnalyzer) VisitOberon(oberon *ast.OberonX) any {
+	for _, unit := range oberon.Units {
 		unit.Accept(l)
 	}
 

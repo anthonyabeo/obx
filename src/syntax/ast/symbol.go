@@ -90,6 +90,7 @@ type ProcedureSymbol struct {
 	name        string
 	kind        SymbolKind
 	props       IdentProps
+	Env         *Environment
 	parent      *Environment
 	typ         Type
 	mangledName string
@@ -104,8 +105,8 @@ func (p *ProcedureSymbol) MangledName() string           { return p.mangledName 
 func (p *ProcedureSymbol) SetMangledName(name string)    { p.mangledName = name }
 func (p *ProcedureSymbol) Type() Type                    { return p.typ }
 
-func NewProcedureSymbol(name string, props IdentProps) *ProcedureSymbol {
-	return &ProcedureSymbol{name: name, kind: ProcedureSymbolKind, props: props}
+func NewProcedureSymbol(name string, props IdentProps, env *Environment) *ProcedureSymbol {
+	return &ProcedureSymbol{name: name, kind: ProcedureSymbolKind, props: props, Env: env}
 }
 
 type ImportSymbol struct {
@@ -217,11 +218,11 @@ func (p *ParamSymbol) SetMangledName(name string)    { p.mangledName = name }
 
 func Mangle(sym Symbol) string {
 	var parts []string
-	for env := sym.Parent(); env != nil; env = env.Parent() {
+	for env := sym.Parent(); env != nil && env.name != "global"; env = env.Parent() {
 		if env.Name() != "" {
 			parts = append([]string{env.Name()}, parts...)
 		}
 	}
 	parts = append(parts, sym.Name())
-	return strings.Join(parts, ".")
+	return strings.Join(parts, "$")
 }

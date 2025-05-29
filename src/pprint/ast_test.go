@@ -125,8 +125,6 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 	`)
 
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-	out := ast.NewEnvironment(table, "Out")
-	out.Insert(ast.NewProcedureSymbol("Out.Int", ast.Exported))
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()

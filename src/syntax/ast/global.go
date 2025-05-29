@@ -119,7 +119,7 @@ func defPredeclaredProcedures() {
 	for i := range PredeclaredProcedures {
 		id := PreDeclFuncProc(i)
 
-		GlobalEnviron.Insert(NewProcedureSymbol(PredeclaredProcedures[id].Name, Predeclared))
+		GlobalEnviron.Insert(NewProcedureSymbol(PredeclaredProcedures[id].Name, Predeclared, nil))
 	}
 }
 

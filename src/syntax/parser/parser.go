@@ -1250,10 +1250,18 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 		}
 
 		// add the procedure to the receiver's environment
-		if sym := recordType.Env.Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props)); sym != nil {
+		if sym := recordType.Env.Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, p.ctx.Env)); sym != nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  "duplicate procedure declaration",
+				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
+			})
+		}
+	} else {
+		if sym := p.ctx.Env.Parent().Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, p.ctx.Env)); sym != nil {
+			p.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("duplicate procedure declaration: '%v'" + head.Name.Name),
 				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
 			})
 		}

@@ -261,6 +261,8 @@ END M.
 
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
+			table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+
 			src := []byte(tt.Source)
 
 			// Set up source manager and reporter
@@ -268,6 +270,8 @@ END M.
 			mgr := report.NewSourceManager()
 			ctx := &report.Context{
 				FileName: filename,
+				Content:  src,
+				Env:      table,
 				Source:   mgr,
 				Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 					Source: mgr,
@@ -276,8 +280,7 @@ END M.
 				TabWidth: 4,
 			}
 
-			table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-			p := parser.NewParser(ctx, src, table, nil)
+			p := parser.NewParser(ctx)
 			unit := p.Parse()
 			if ctx.Reporter.ErrorCount() > 0 {
 				t.Error("found parse errors")

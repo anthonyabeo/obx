@@ -31,11 +31,7 @@ begin
    end
 end Main`)
 
-	table := ast.NewEnvironment(nil, "Main")
-	table.Insert(ast.NewProcedureSymbol("ReadIdentifier", ast.Unexported))
-	table.Insert(ast.NewProcedureSymbol("ReadNumber", ast.Unexported))
-	table.Insert(ast.NewProcedureSymbol("ReadString", ast.Unexported))
-	table.Insert(ast.NewProcedureSymbol("SpecialCharacter", ast.Unexported))
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -90,7 +86,6 @@ end Main
 `)
 
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-	table.Insert(ast.NewProcedureSymbol("fib", ast.Unexported))
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -290,8 +285,6 @@ begin
 end Main
 `)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-	table.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
-	table.Insert(ast.NewProcedureSymbol("t.Insert", ast.Unexported))
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -369,7 +362,6 @@ begin
 end Main
 `)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-	table.Insert(ast.NewProcedureSymbol("log2", ast.Unexported))
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -550,15 +542,15 @@ end Drawing
 `)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 	figures := ast.NewEnvironment(ast.GlobalEnviron, "Figure")
-	figures.Insert(ast.NewProcedureSymbol("calc", ast.Exported))
+	figures.Insert(ast.NewProcedureSymbol("calc", ast.Exported, nil))
 
 	collections := ast.NewEnvironment(ast.GlobalEnviron, "Collections")
 	collections.Insert(ast.NewTypeSymbol("Iterator", ast.Exported, &ast.RecordType{}))
-	collections.Insert(ast.NewProcedureSymbol("createDeque", ast.Exported))
+	collections.Insert(ast.NewProcedureSymbol("createDeque", ast.Exported, nil))
 
 	env := ast.NewRecordEnv(nil, collections)
-	env.Insert(ast.NewProcedureSymbol("forEach", ast.Exported))
-	env.Insert(ast.NewProcedureSymbol("append", ast.Exported))
+	env.Insert(ast.NewProcedureSymbol("forEach", ast.Exported, nil))
+	env.Insert(ast.NewProcedureSymbol("append", ast.Exported, nil))
 	collections.Insert(ast.NewTypeSymbol("Deque", ast.Exported, &ast.RecordType{Env: env}))
 
 	envs := map[string]*ast.Environment{
@@ -951,11 +943,7 @@ module Main
 
 end Main
 `)
-	table := ast.NewEnvironment(nil, "Main")
-	table.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
-
-	//InsertScope := ast.NewEnvironment(table, "Insert")
-	//InsertScope.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -1070,12 +1058,6 @@ module Main
 end Main
 `)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-	table.Insert(ast.NewProcedureSymbol("Read", ast.Unexported))
-	table.Insert(ast.NewProcedureSymbol("Write", ast.Unexported))
-	table.Insert(ast.NewProcedureSymbol("WriteInt", ast.Unexported))
-	table.Insert(ast.NewProcedureSymbol("WriteString", ast.Unexported))
-	table.Insert(ast.NewProcedureSymbol("log2", ast.Unexported))
-	table.Insert(ast.NewProcedureSymbol("ReadInt", ast.Unexported))
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
