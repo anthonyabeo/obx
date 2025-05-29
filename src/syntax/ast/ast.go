@@ -35,7 +35,5 @@ type Type interface {
 type CompilationUnit interface {
 	Node
 	Name() string
-	ListImport() []*Import
-	Edges() map[string]CompilationUnit
-	addEdge(string, CompilationUnit)
+	Imports() []*Import
 }

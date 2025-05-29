@@ -66,7 +66,7 @@ type (
 	// ----------------------------------------------
 	FPSection struct {
 		Mod   token.Kind
-		Names []string
+		Names []*IdentifierDef
 		Type  Type
 
 		StartOffset int
@@ -162,7 +162,7 @@ func (sec *FPSection) String() string {
 
 	var names []string
 	for _, name := range sec.Names {
-		names = append(names, name)
+		names = append(names, name.Name)
 	}
 	buf.WriteString(fmt.Sprintf("%s: %s", strings.Join(names, ", "), sec.Type))
 

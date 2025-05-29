@@ -14,9 +14,6 @@ type Parser struct {
 	sc  *scan.Scanner
 	ctx *report.Context
 
-	envs map[string]*ast.Environment
-	env  *ast.Environment
-
 	// Next token
 	tok    token.Kind
 	lexeme string
@@ -130,14 +127,14 @@ func (p *Parser) parseMetaSection() *ast.MetaSection {
 	}
 
 	ms.EndOffset = p.end
-	ms.Ids = append(ms.Ids, p.parseIdent())
+	ms.Ids = append(ms.Ids, p.parseIdentifierDef())
 	for p.tok == token.COMMA || p.tok == token.IDENTIFIER {
 		if p.tok == token.COMMA {
 			p.next()
 		}
 
 		ms.EndOffset = p.end
-		ms.Ids = append(ms.Ids, p.parseIdent())
+		ms.Ids = append(ms.Ids, p.parseIdentifierDef())
 	}
 
 	if p.tok == token.COLON {
@@ -152,7 +149,7 @@ func (p *Parser) parseMetaSection() *ast.MetaSection {
 
 func (p *Parser) parseModule() *ast.Module {
 	pos := p.pos
-	mod := ast.NewModule(pos)
+	mod := ast.NewModule(pos, p.ctx.Env)
 
 	p.match(token.MODULE)
 	mod.BName = p.parseIdent()
@@ -191,6 +188,8 @@ func (p *Parser) parseModule() *ast.Module {
 		mod.EndOffset = p.end
 		p.next()
 	}
+
+	mod.Env.SetName(mod.BName)
 
 	return mod
 }
@@ -246,7 +245,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 	// add module imports to the environment
 	for _, imp := range list {
 		if imp.Alias != "" {
-			if sym := p.ctx.Env.Insert(ast.NewModuleSymbol(imp.Alias)); sym != nil {
+			if sym := p.ctx.Env.Insert(ast.NewImportSymbol(imp.Alias)); sym != nil {
 				p.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  "duplicate module import",
@@ -254,7 +253,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 				})
 			}
 		} else {
-			if sym := p.ctx.Env.Insert(ast.NewModuleSymbol(imp.Name)); sym != nil {
+			if sym := p.ctx.Env.Insert(ast.NewImportSymbol(imp.Name)); sym != nil {
 				p.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  "duplicate module import",
@@ -1077,7 +1076,7 @@ func (p *Parser) parseQualifiedIdent() *ast.QualifiedIdent {
 	// Parse the first identifier
 	id.Prefix = p.parseIdent()
 
-	if sym := p.ctx.Env.Lookup(id.Prefix); sym != nil && sym.Kind() == ast.ModuleSymbolKind && p.tok == token.PERIOD {
+	if sym := p.ctx.Env.Lookup(id.Prefix); sym != nil && sym.Kind() == ast.ImportSymbolKind && p.tok == token.PERIOD {
 		p.next()
 		id.EndOffset = p.end // Update the end position
 		id.Name = p.parseIdent()
@@ -1155,6 +1154,7 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 		proc.EndName = p.parseIdent()
 	}
 
+	proc.Env.SetName(proc.Head.Name.Name)
 	return
 }
 
@@ -1263,11 +1263,11 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 	if head.FP != nil {
 		for _, param := range head.FP.Params {
 			for _, id := range param.Names {
-				if sym := p.ctx.Env.Insert(ast.NewParamSymbol(id, param.Mod, param.Type)); sym != nil {
+				if sym := p.ctx.Env.Insert(ast.NewParamSymbol(id.Name, param.Mod, param.Type)); sym != nil {
 					p.ctx.Reporter.Report(report.Diagnostic{
 						Severity: report.Error,
-						Message:  "duplicate parameter declaration" + id,
-						Range:    p.ctx.Source.Span(p.ctx.FileName, param.StartOffset, param.EndOffset),
+						Message:  "duplicate parameter declaration" + id.Name,
+						Range:    p.ctx.Source.Span(p.ctx.FileName, id.StartOffset, id.EndOffset),
 					})
 				}
 			}
@@ -1315,10 +1315,10 @@ func (p *Parser) parseFPSection() (param *ast.FPSection) {
 		p.next()
 	}
 
-	param.Names = append(param.Names, p.parseIdent())
+	param.Names = append(param.Names, p.parseIdentifierDef())
 	for p.tok == token.COMMA {
 		p.next()
-		param.Names = append(param.Names, p.parseIdent())
+		param.Names = append(param.Names, p.parseIdentifierDef())
 	}
 
 	p.match(token.COLON)
@@ -1641,7 +1641,7 @@ func (p *Parser) parseForStmt() (stmt *ast.ForStmt) {
 	stmt = &ast.ForStmt{StartOffset: p.pos}
 
 	p.match(token.FOR)
-	stmt.CtlVar = p.parseIdent()
+	stmt.CtlVar = p.parseIdentifierDef()
 	p.match(token.BECOMES)
 	stmt.InitVal = p.parseExpression()
 	p.match(token.TO)

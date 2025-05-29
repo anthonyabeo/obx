@@ -11,6 +11,8 @@ func NewEnvironment(parent *Environment, name string) *Environment {
 	return &Environment{parent: parent, name: name}
 }
 
+func (s *Environment) Name() string         { return s.name }
+func (s *Environment) SetName(name string)  { s.name = name }
 func (s *Environment) Parent() *Environment { return s.parent }
 func (s *Environment) Size() int            { return len(s.elems) }
 

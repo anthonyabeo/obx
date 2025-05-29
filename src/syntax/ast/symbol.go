@@ -1,6 +1,9 @@
 package ast
 
-import "github.com/anthonyabeo/obx/src/syntax/token"
+import (
+	"github.com/anthonyabeo/obx/src/syntax/token"
+	"strings"
+)
 
 type SymbolKind int
 
@@ -10,7 +13,7 @@ const (
 	ProcedureSymbolKind
 	TypeSymbolKind
 	ConstantSymbolKind
-	ModuleSymbolKind
+	ImportSymbolKind
 	DefinitionSymbolKind
 	FieldSymbolKind
 	ParamSymbolKind
@@ -27,8 +30,8 @@ func (s SymbolKind) String() string {
 		return "Type"
 	case ConstantSymbolKind:
 		return "ConstantSymbolKind"
-	case ModuleSymbolKind:
-		return "Module"
+	case ImportSymbolKind:
+		return "ImportSymbolKind"
 	case DefinitionSymbolKind:
 		return "Definition"
 	case FieldSymbolKind:
@@ -56,14 +59,17 @@ type Symbol interface {
 	SetParent(*Environment)
 	Type() Type
 	Props() IdentProps
+	SetMangledName(string)
+	MangledName() string
 }
 
 type TypeSymbol struct {
-	name   string
-	kind   SymbolKind
-	props  IdentProps
-	typ    Type
-	parent *Environment
+	name        string
+	kind        SymbolKind
+	props       IdentProps
+	typ         Type
+	parent      *Environment
+	mangledName string
 }
 
 func (t *TypeSymbol) Name() string                  { return t.name }
@@ -72,6 +78,8 @@ func (t *TypeSymbol) Type() Type                    { return t.typ }
 func (t *TypeSymbol) Parent() *Environment          { return t.parent }
 func (t *TypeSymbol) SetParent(parent *Environment) { t.parent = parent }
 func (t *TypeSymbol) Props() IdentProps             { return t.props }
+func (t *TypeSymbol) MangledName() string           { return t.mangledName }
+func (t *TypeSymbol) SetMangledName(name string)    { t.mangledName = name }
 
 func NewTypeSymbol(name string, props IdentProps, typ Type) *TypeSymbol {
 	return &TypeSymbol{name: name, kind: TypeSymbolKind, props: props, typ: typ}
@@ -79,11 +87,12 @@ func NewTypeSymbol(name string, props IdentProps, typ Type) *TypeSymbol {
 
 // ProcedureSymbol ...
 type ProcedureSymbol struct {
-	name   string
-	kind   SymbolKind
-	props  IdentProps
-	parent *Environment
-	typ    Type
+	name        string
+	kind        SymbolKind
+	props       IdentProps
+	parent      *Environment
+	typ         Type
+	mangledName string
 }
 
 func (p *ProcedureSymbol) Name() string                  { return p.name }
@@ -91,35 +100,42 @@ func (p *ProcedureSymbol) Kind() SymbolKind              { return p.kind }
 func (p *ProcedureSymbol) Props() IdentProps             { return p.props }
 func (p *ProcedureSymbol) Parent() *Environment          { return p.parent }
 func (p *ProcedureSymbol) SetParent(parent *Environment) { p.parent = parent }
+func (p *ProcedureSymbol) MangledName() string           { return p.mangledName }
+func (p *ProcedureSymbol) SetMangledName(name string)    { p.mangledName = name }
 func (p *ProcedureSymbol) Type() Type                    { return p.typ }
 
 func NewProcedureSymbol(name string, props IdentProps) *ProcedureSymbol {
 	return &ProcedureSymbol{name: name, kind: ProcedureSymbolKind, props: props}
 }
 
-type ModuleSymbol struct {
-	name   string
-	kind   SymbolKind
-	parent *Environment
-	typ    Type
+type ImportSymbol struct {
+	name        string
+	kind        SymbolKind
+	unit        CompilationUnit
+	parent      *Environment
+	typ         Type
+	mangledName string
 }
 
-func NewModuleSymbol(name string) *ModuleSymbol {
-	return &ModuleSymbol{name: name, kind: ModuleSymbolKind}
+func NewImportSymbol(name string) *ImportSymbol {
+	return &ImportSymbol{name: name, kind: ImportSymbolKind}
 }
-func (m *ModuleSymbol) Name() string                  { return m.name }
-func (m *ModuleSymbol) Kind() SymbolKind              { return m.kind }
-func (m *ModuleSymbol) Parent() *Environment          { return m.parent }
-func (m *ModuleSymbol) SetParent(parent *Environment) { m.parent = parent }
-func (m *ModuleSymbol) Type() Type                    { return m.typ }
-func (m *ModuleSymbol) Props() IdentProps             { panic("not implemented") }
+func (m *ImportSymbol) Name() string                  { return m.name }
+func (m *ImportSymbol) Kind() SymbolKind              { return m.kind }
+func (m *ImportSymbol) Parent() *Environment          { return m.parent }
+func (m *ImportSymbol) SetParent(parent *Environment) { m.parent = parent }
+func (m *ImportSymbol) Type() Type                    { return m.typ }
+func (m *ImportSymbol) Props() IdentProps             { panic("not implemented") }
+func (m *ImportSymbol) MangledName() string           { return m.mangledName }
+func (m *ImportSymbol) SetMangledName(name string)    { m.mangledName = name }
 
 type VariableSymbol struct {
-	name   string
-	kind   SymbolKind
-	props  IdentProps
-	typ    Type
-	parent *Environment
+	name        string
+	kind        SymbolKind
+	props       IdentProps
+	typ         Type
+	parent      *Environment
+	mangledName string
 }
 
 func NewVariableSymbol(name string, props IdentProps, typ Type) *VariableSymbol {
@@ -131,14 +147,17 @@ func (v *VariableSymbol) Parent() *Environment          { return v.parent }
 func (v *VariableSymbol) SetParent(parent *Environment) { v.parent = parent }
 func (v *VariableSymbol) Type() Type                    { return v.typ }
 func (v *VariableSymbol) Props() IdentProps             { return v.props }
+func (v *VariableSymbol) MangledName() string           { return v.mangledName }
+func (v *VariableSymbol) SetMangledName(name string)    { v.mangledName = name }
 
 type ConstantSymbol struct {
-	name   string
-	kind   SymbolKind
-	props  IdentProps
-	value  Expression
-	parent *Environment
-	typ    Type
+	name        string
+	kind        SymbolKind
+	props       IdentProps
+	value       Expression
+	parent      *Environment
+	typ         Type
+	mangledName string
 }
 
 func NewConstantSymbol(name string, props IdentProps, value Expression) *ConstantSymbol {
@@ -150,13 +169,16 @@ func (c *ConstantSymbol) Parent() *Environment          { return c.parent }
 func (c *ConstantSymbol) SetParent(parent *Environment) { c.parent = parent }
 func (c *ConstantSymbol) Type() Type                    { return c.typ }
 func (c *ConstantSymbol) Props() IdentProps             { return c.props }
+func (c *ConstantSymbol) MangledName() string           { return c.mangledName }
+func (c *ConstantSymbol) SetMangledName(name string)    { c.mangledName = name }
 
 type FieldSymbol struct {
-	name   string
-	kind   SymbolKind
-	props  IdentProps
-	typ    Type
-	parent *Environment
+	name        string
+	kind        SymbolKind
+	props       IdentProps
+	typ         Type
+	parent      *Environment
+	mangledName string
 }
 
 func NewFieldSymbol(name string, props IdentProps, typ Type) *FieldSymbol {
@@ -168,13 +190,16 @@ func (f *FieldSymbol) Parent() *Environment         { return f.parent }
 func (f *FieldSymbol) SetParent(table *Environment) { f.parent = table }
 func (f *FieldSymbol) Type() Type                   { return f.typ }
 func (f *FieldSymbol) Props() IdentProps            { return f.props }
+func (f *FieldSymbol) MangledName() string          { return f.mangledName }
+func (f *FieldSymbol) SetMangledName(name string)   { f.mangledName = name }
 
 type ParamSymbol struct {
-	name   string
-	kind   SymbolKind
-	mod    token.Kind
-	typ    Type
-	parent *Environment
+	name        string
+	kind        SymbolKind
+	mod         token.Kind
+	typ         Type
+	parent      *Environment
+	mangledName string
 }
 
 func NewParamSymbol(name string, mod token.Kind, typ Type) *ParamSymbol {
@@ -187,3 +212,16 @@ func (p *ParamSymbol) Parent() *Environment          { return p.parent }
 func (p *ParamSymbol) SetParent(parent *Environment) { p.parent = parent }
 func (p *ParamSymbol) Type() Type                    { return p.typ }
 func (p *ParamSymbol) Props() IdentProps             { panic("not implemented") }
+func (p *ParamSymbol) MangledName() string           { return p.mangledName }
+func (p *ParamSymbol) SetMangledName(name string)    { p.mangledName = name }
+
+func Mangle(sym Symbol) string {
+	var parts []string
+	for env := sym.Parent(); env != nil; env = env.Parent() {
+		if env.Name() != "" {
+			parts = append([]string{env.Name()}, parts...)
+		}
+	}
+	parts = append(parts, sym.Name())
+	return strings.Join(parts, ".")
+}

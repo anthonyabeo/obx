@@ -7,11 +7,11 @@ import (
 )
 
 type AstPrinter struct {
-	obx *ast.Oberon
+	obx *ast.OberonX
 	ctx *report.Context
 }
 
-func NewAstPrinter(obx *ast.Oberon, ctx *report.Context) *AstPrinter {
+func NewAstPrinter(obx *ast.OberonX, ctx *report.Context) *AstPrinter {
 
 	return &AstPrinter{obx: obx, ctx: ctx}
 }
@@ -20,14 +20,14 @@ func (v *AstPrinter) Print() any {
 	return v.VisitOberon(v.obx)
 }
 
-func (v *AstPrinter) VisitOberon(n *ast.Oberon) any {
+func (v *AstPrinter) VisitOberon(n *ast.OberonX) any {
 	var list []ast.CompilationUnit
-	for _, unit := range n.Units() {
+	for _, unit := range n.Units {
 		list = append(list, unit)
 	}
 
 	return map[string]any{
-		"type":  "Oberon",
+		"type":  "OberonX",
 		"units": visitList(list, v),
 	}
 }

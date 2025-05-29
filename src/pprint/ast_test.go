@@ -10,7 +10,7 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
 
-func parseSource(t *testing.T, input []byte, ctx *report.Context) *ast.Oberon {
+func parseSource(t *testing.T, ctx *report.Context) *ast.OberonX {
 	p := parser.NewParser(ctx)
 	unit := p.Parse()
 
@@ -19,7 +19,7 @@ func parseSource(t *testing.T, input []byte, ctx *report.Context) *ast.Oberon {
 		t.Fatalf("Parser errors")
 	}
 
-	obx := ast.NewOberon()
+	obx := ast.NewOberonX()
 	obx.AddUnit(unit.Name(), unit)
 
 	return obx
@@ -48,7 +48,7 @@ func TestPrettyPrintJSON(t *testing.T) {
 		TabWidth: 4,
 	}
 
-	obx := parseSource(t, input, ctx)
+	obx := parseSource(t, ctx)
 	data, err := PrettyPrintJSON(obx, ctx)
 	if err != nil {
 		t.Fatalf("PrettyPrintJSON failed: %v", err)
@@ -63,8 +63,8 @@ func TestPrettyPrintJSON(t *testing.T) {
 	}
 
 	// Validate top-level type
-	if result["type"] != "Oberon" {
-		t.Errorf("expected top-level type 'Oberon', got %v", result["type"])
+	if result["type"] != "OberonX" {
+		t.Errorf("expected top-level type 'OberonX', got %v", result["type"])
 	}
 
 	// Check "units" array
@@ -142,7 +142,7 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 		TabWidth: 4,
 	}
 
-	obx := parseSource(t, input, ctx)
+	obx := parseSource(t, ctx)
 	data, err := PrettyPrintJSON(obx, ctx)
 	if err != nil {
 		t.Fatalf("PrettyPrintJSON failed: %v", err)
@@ -156,9 +156,9 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 		t.Fatalf("Invalid JSON: %v", err)
 	}
 
-	// Ensure top-level type is Oberon
-	if result["type"] != "Oberon" {
-		t.Errorf("expected top-level type 'Oberon', got %v", result["type"])
+	// Ensure top-level type is OberonX
+	if result["type"] != "OberonX" {
+		t.Errorf("expected top-level type 'OberonX', got %v", result["type"])
 	}
 
 	units, ok := result["units"].([]any)

@@ -38,9 +38,9 @@ const (
 
 type (
 	IdentifierDef struct {
-		Name  string
-		Props IdentProps
-
+		Name        string
+		Props       IdentProps
+		Symbol      Symbol
 		StartOffset int
 		EndOffset   int
 	}
@@ -70,9 +70,9 @@ type (
 	}
 
 	QualifiedIdent struct {
-		Prefix string
-		Name   string
-
+		Prefix      string
+		Name        string
+		Symbol      Symbol
 		StartOffset int
 		EndOffset   int
 	}

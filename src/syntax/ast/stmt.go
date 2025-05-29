@@ -7,7 +7,7 @@ import (
 
 type (
 	ForStmt struct {
-		CtlVar   string
+		CtlVar   *IdentifierDef
 		InitVal  Expression
 		FinalVal Expression
 		By       Expression
@@ -45,7 +45,6 @@ type (
 		ActualParams []Expression
 		StartOffset  int
 		EndOffset    int
-		FileName     string
 	}
 
 	WhileStmt struct {
@@ -94,7 +93,6 @@ type (
 		ElsePath       []Statement
 		StartOffset    int
 		EndOffset      int
-		FileName       string
 	}
 
 	AssignmentStmt struct {
