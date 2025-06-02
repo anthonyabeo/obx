@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
@@ -125,6 +126,12 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 	`)
 
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+	out := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+	out.Insert(ast.NewProcedureSymbol("Int", ast.Exported, nil))
+	envs := map[string]*ast.Environment{
+		"Bigger": table,
+		"Out":    out,
+	}
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -132,6 +139,7 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 		FileName: filename,
 		Content:  input,
 		Env:      table,
+		Envs:     envs,
 		Source:   mgr,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
@@ -141,6 +149,10 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 	}
 
 	obx := parseSource(t, ctx)
+
+	s := sema.NewSema(ctx, obx)
+	s.Validate()
+
 	data, err := PrettyPrintJSON(obx, ctx)
 	if err != nil {
 		t.Fatalf("PrettyPrintJSON failed: %v", err)
@@ -169,17 +181,17 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 		t.Fatalf("expected 'Module' in units[0], got %v", module["type"])
 	}
 
-	proc := FindProcedureByName(result, "Main")
+	proc := FindProcedureByName(result, "Bigger$Main")
 	if proc == nil {
 		t.Errorf("expected to find procedure with name 'Main'")
 	}
 
-	decl := FindVariableByName(result, "p")
+	decl := FindVariableByName(result, "Bigger$p")
 	if decl == nil {
 		t.Errorf("Expected variable declaration for 'p'")
 	}
 
-	ty := FindTypeByName(result, "Point")
+	ty := FindTypeByName(result, "Bigger$Point")
 	if ty == nil {
 		t.Errorf("Expected variable declaration for 'p'")
 	}

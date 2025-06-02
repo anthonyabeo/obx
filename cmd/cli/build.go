@@ -69,7 +69,6 @@ var buildCmd = &cobra.Command{
 			Source:   srcMgr,
 			Reporter: reporter,
 			TabWidth: tabWidth,
-			Obx:      obx,
 			Envs:     make(map[string]*ast.Environment),
 		}
 
