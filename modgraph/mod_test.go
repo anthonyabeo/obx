@@ -41,11 +41,11 @@ MODULE Main;
 		t.Fatalf("expected 3 headers, got %d", len(headers))
 	}
 
-	if headers[0].ID.Name != "Math" || headers[1].ID.Name != "Util" || headers[2].ID.Name != "Main" {
+	if headers[0].Name != "Math" || headers[1].Name != "Util" || headers[2].Name != "Main" {
 		t.Errorf("unexpected modgraph names: %+v", headers)
 	}
 
-	if len(headers[1].Imports) != 1 || headers[1].Imports[0].ID.Name != "Math" {
+	if len(headers[1].Imports) != 1 || headers[1].Imports[0].Name != "Math" {
 		t.Errorf("Util should import Math")
 	}
 
@@ -99,7 +99,7 @@ MODULE Main;
 	// ensure topological order: Math -> Util -> Main
 	gotOrder := []string{}
 	for _, h := range sorted {
-		gotOrder = append(gotOrder, h.ID.Name)
+		gotOrder = append(gotOrder, h.Name)
 	}
 
 	wantOrder := []string{"Math", "Util", "Main"}
@@ -151,7 +151,7 @@ END A.`
 	// Step 4: Check order
 	gotOrder := []string{}
 	for _, h := range sorted {
-		gotOrder = append(gotOrder, h.ID.Name)
+		gotOrder = append(gotOrder, h.Name)
 	}
 
 	wantOrder := []string{"C", "B", "A"}
@@ -269,14 +269,14 @@ END A.`
 func TestTopoSortValid(t *testing.T) {
 	graph := &ImportGraph{
 		Headers: map[ModuleID]Header{
-			{"", "A"}: {ID: ModuleID{"", "A"}, File: "a.mod"},
-			{"", "B"}: {ID: ModuleID{"", "B"}, File: "b.mod"},
-			{"", "C"}: {ID: ModuleID{"", "C"}, File: "c.mod"},
+			1: {ID: 1, Path: "", Name: "A", File: "a.mod"},
+			2: {ID: 2, Path: "", Name: "B", File: "b.mod"},
+			3: {ID: 3, Path: "", Name: "C", File: "c.mod"},
 		},
 		Adj: map[ModuleID][]ModuleID{
-			{"", "A"}: {{"", "B"}},
-			{"", "B"}: {{"", "C"}},
-			{"", "C"}: {},
+			1: {2},
+			2: {3},
+			3: {},
 		},
 	}
 
@@ -287,7 +287,7 @@ func TestTopoSortValid(t *testing.T) {
 
 	var got []string
 	for _, h := range order {
-		got = append(got, h.ID.Name)
+		got = append(got, h.Name)
 	}
 	want := []string{"C", "B", "A"}
 
@@ -299,14 +299,14 @@ func TestTopoSortValid(t *testing.T) {
 func TestTopoSortCycle(t *testing.T) {
 	graph := &ImportGraph{
 		Headers: map[ModuleID]Header{
-			{"", "Main"}: {ID: ModuleID{"", "Main"}, File: "main.mod"},
-			{"", "A"}:    {ID: ModuleID{"", "A"}, File: "a.mod"},
-			{"", "B"}:    {ID: ModuleID{"", "B"}, File: "b.mod"},
+			1: {ID: 1, Path: "", Name: "Main", File: "main.mod"},
+			2: {ID: 2, Path: "", Name: "A", File: "a.mod"},
+			3: {ID: 3, Path: "", Name: "B", File: "b.mod"},
 		},
 		Adj: map[ModuleID][]ModuleID{
-			{"", "Main"}: {{"", "A"}},
-			{"", "A"}:    {{"", "B"}},
-			{"", "B"}:    {{"", "Main"}}, // cycle here
+			1: {2},
+			2: {3},
+			3: {1}, // cycle here
 		},
 	}
 
@@ -332,10 +332,10 @@ func TestTopoSortCycle(t *testing.T) {
 func TestTopoSortSelfImport(t *testing.T) {
 	graph := &ImportGraph{
 		Headers: map[ModuleID]Header{
-			{"", "Self"}: {ID: ModuleID{"", "Self"}, File: "self.mod"},
+			1: {ID: 1, Path: "", Name: "Self", File: "self.mod"},
 		},
 		Adj: map[ModuleID][]ModuleID{
-			{"", "Self"}: {{"", "Self"}}, // self import
+			1: {1}, // self import
 		},
 	}
 
