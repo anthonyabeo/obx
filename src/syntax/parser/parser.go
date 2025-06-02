@@ -154,6 +154,11 @@ func (p *Parser) parseModule() *ast.Module {
 	p.match(token.MODULE)
 	mod.BName = p.parseIdent()
 
+	if p.ctx.Env == nil || p.ctx.Env.Name() != mod.BName {
+		p.ctx.Env = ast.NewEnvironment(ast.GlobalEnviron, mod.BName)
+	}
+	mod.Env = p.ctx.Env
+
 	if p.tok == token.LPAREN {
 		mod.MetaParams = p.metaParams()
 	}
@@ -189,8 +194,6 @@ func (p *Parser) parseModule() *ast.Module {
 		p.next()
 	}
 
-	mod.Env.SetName(mod.BName)
-
 	return mod
 }
 
@@ -204,6 +207,9 @@ func (p *Parser) parseDefinition() *ast.Definition {
 	if p.tok == token.SEMICOLON {
 		p.next()
 	}
+
+	def.Env = ast.NewEnvironment(ast.GlobalEnviron, def.BName)
+	p.ctx.Env = def.Env
 
 	if p.tok == token.IMPORT {
 		def.ImportList = p.parseImportList()
@@ -849,7 +855,16 @@ func (p *Parser) parseFactor() ast.Expression {
 		dsg := p.parseDesignator()
 		env := p.ctx.Env
 		if dsg.QIdent.Prefix != "" {
-			env = p.ctx.Envs[dsg.QIdent.Prefix]
+			if env = p.ctx.Envs[dsg.QIdent.Prefix]; env == nil {
+				p.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Fatal,
+					Message:  fmt.Sprintf("cannot find definition or modgraph for %s", dsg.QIdent.Prefix),
+					Range:    p.ctx.Source.Span(p.ctx.FileName, dsg.StartOffset, dsg.EndOffset),
+				})
+
+				p.advance(exprEnd)
+				return &ast.BadExpr{StartOffset: dsg.StartOffset, EndOffset: dsg.EndOffset}
+			}
 		}
 
 		if sym := env.Lookup(dsg.QIdent.Name); sym != nil && sym.Kind() == ast.ProcedureSymbolKind && p.tok == token.RPAREN {
@@ -863,6 +878,7 @@ func (p *Parser) parseFactor() ast.Expression {
 			p.next()
 			return call
 		}
+
 		return dsg
 
 	case token.INT_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
