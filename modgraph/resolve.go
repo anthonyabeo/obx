@@ -2,8 +2,6 @@ package modgraph
 
 import (
 	"fmt"
-	"path/filepath"
-	"strings"
 )
 
 func BuildImportGraph(rootDir string, headers []Header) (*ImportGraph, error) {
@@ -12,70 +10,37 @@ func BuildImportGraph(rootDir string, headers []Header) (*ImportGraph, error) {
 		Adj:     make(map[ModuleID][]ModuleID),
 	}
 
-	// Step 1: Index all modules by their ModuleID
+	// Step 1: Index modules by their full ID (Path + Name)
 	for _, header := range headers {
-		path, err := extractPathFromFile(rootDir, header.File)
-		if err != nil {
-			return nil, err
-		}
-
-		id := ModuleID{
-			Path: path,
-			Name: header.ID.Name,
-		}
-		graph.Headers[id] = header
+		graph.Headers[header.ID] = header
 	}
 
-	// Step 2: Link each modgraph to its dependencies
+	// Step 2: Build adjacency list from imports
 	for modID, header := range graph.Headers {
 		for _, imp := range header.Imports {
-			var target ModuleID
-
-			// If path is not given, inherit from current modgraph's path (relative import)
-			if imp.ID.Path == "" {
-				target = ModuleID{Path: modID.Path, Name: imp.ID.Name}
-			} else {
-				target = ModuleID{Path: imp.ID.Path, Name: imp.ID.Name}
+			if imp.ID == 0 {
+				for moduleID, h := range graph.Headers {
+					if h.Name == imp.Name {
+						imp.ID = moduleID
+						break
+					}
+				}
 			}
 
-			if modID == target {
-				return nil, fmt.Errorf("modgraph %s cannot import itself", modID.String())
+			// Self-import check
+			if modID == imp.ID {
+				return nil, fmt.Errorf("module '%s' cannot import itself (in file %s)", header.String(), header.File)
 			}
 
-			// Validate that the imported modgraph actually exists
-			if _, ok := graph.Headers[target]; !ok {
-				return nil, fmt.Errorf("imported modgraph %s not found (imported in %s)", target.String(), modID.String())
+			// Check existence
+			if _, ok := graph.Headers[imp.ID]; !ok {
+				return nil, fmt.Errorf("module '%s' imports '%s', which was not found",
+					header.String(), graph.Headers[imp.ID].String())
 			}
 
-			graph.Adj[modID] = append(graph.Adj[modID], target)
+			graph.Adj[modID] = append(graph.Adj[modID], imp.ID)
 		}
 	}
 
 	return graph, nil
-}
-
-// root is the base directory containing all modules.
-func extractPathFromFile(root, absFilePath string) (string, error) {
-	// Ensure the file has a .mod extension
-	if !strings.HasSuffix(absFilePath, ".obx") {
-		return "", fmt.Errorf("invalid modgraph file (expected .mod): %s", absFilePath)
-	}
-
-	// Make paths absolute and clean
-	root = filepath.Clean(root)
-	absFilePath = filepath.Clean(absFilePath)
-
-	// Make absFilePath relative to root
-	relPath, err := filepath.Rel(root, absFilePath)
-	if err != nil {
-		return "", fmt.Errorf("file %q is not under root %q: %w", absFilePath, root, err)
-	}
-
-	// Strip the .mod suffix
-	relPath = strings.TrimSuffix(relPath, ".obx")
-
-	// Normalize to slash-separated import path (regardless of OS)
-	importPath := filepath.ToSlash(relPath)
-
-	return importPath, nil
 }

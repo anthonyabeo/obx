@@ -16,19 +16,17 @@ func TopoSort(graph *ImportGraph) ([]Header, error) {
 		if temp[id] {
 			// Build cycle description with source file info
 			var cycle []string
-			//start := -1
 			for i := len(stack) - 1; i >= 0; i-- {
 				mod := stack[i]
 				header := graph.Headers[mod]
-				cycle = append([]string{fmt.Sprintf("%s (%s)", mod.String(), header.File)}, cycle...)
+				cycle = append([]string{fmt.Sprintf("%s (%s)", header.String(), header.File)}, cycle...)
 				if mod == id {
-					//start = i
 					break
 				}
 			}
 			// Add the closing edge
 			header := graph.Headers[id]
-			cycle = append(cycle, fmt.Sprintf("%s (%s)", id.String(), header.File))
+			cycle = append(cycle, fmt.Sprintf("%s (%s)", header.String(), header.File))
 			return fmt.Errorf("import cycle detected:\n  %s", strings.Join(cycle, "\n  -> "))
 		}
 		if visited[id] {

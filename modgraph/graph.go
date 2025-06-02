@@ -1,21 +1,29 @@
 package modgraph
 
-type ModuleID struct {
-	Path string // logical import path (may be empty)
-	Name string // name of the modgraph
+type ModuleID int
+
+var id ModuleID
+
+func nextModID() ModuleID {
+	id++
+	return id
 }
 
-func (id ModuleID) String() string {
+type Header struct {
+	ID       ModuleID
+	Path     string // logical import path (may be empty)
+	Name     string // name of the module
+	File     string // name of the file containing the module e.g. math.obx
+	StartPos int
+	EndPos   int
+	Imports  []Import
+}
+
+func (id Header) String() string {
 	if id.Path != "" {
 		return id.Path + "." + id.Name
 	}
 	return id.Name
-}
-
-type Header struct {
-	ID      ModuleID
-	File    string
-	Imports []Import
 }
 
 type ImportGraph struct {
@@ -25,5 +33,7 @@ type ImportGraph struct {
 
 type Import struct {
 	Alias string // optional alias
+	Path  string // logical import path (may be empty)
+	Name  string // name of the module
 	ID    ModuleID
 }
