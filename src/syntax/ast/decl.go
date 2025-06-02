@@ -108,18 +108,30 @@ func (v *VariableDecl) String() string {
 func (v *VariableDecl) Accept(vst Visitor) any { return vst.VisitVariableDecl(v) }
 func (v *VariableDecl) Pos() int               { return v.StartOffset }
 func (v *VariableDecl) End() int               { return v.EndOffset }
+func (v *VariableDecl) Children() []Node {
+	children := make([]Node, 0)
+	children = append(children, v.Type)
+
+	for _, def := range v.IdentList {
+		children = append(children, def)
+	}
+
+	return children
+}
 
 func (c *ConstantDecl) decl()                  {}
 func (c *ConstantDecl) String() string         { return fmt.Sprintf("%v = %v", c.Name, c.Value) }
 func (c *ConstantDecl) Accept(vst Visitor) any { return vst.VisitConstantDecl(c) }
 func (c *ConstantDecl) Pos() int               { return c.StartOffset }
 func (c *ConstantDecl) End() int               { return c.EndOffset }
+func (c *ConstantDecl) Children() []Node       { panic("not implemented") }
 
 func (t *TypeDecl) decl()                  {}
 func (t *TypeDecl) String() string         { return fmt.Sprintf("%s = %s", t.Name, t.DenotedType) }
 func (t *TypeDecl) Accept(vst Visitor) any { return vst.VisitTypeDecl(t) }
 func (t *TypeDecl) Pos() int               { return t.StartOffset }
 func (t *TypeDecl) End() int               { return t.EndOffset }
+func (t *TypeDecl) Children() []Node       { panic("not implemented") }
 
 func (p *ProcedureDecl) decl() {}
 func (p *ProcedureDecl) String() string {
@@ -134,6 +146,9 @@ func (p *ProcedureDecl) String() string {
 func (p *ProcedureDecl) Accept(vst Visitor) any { return vst.VisitProcedureDecl(p) }
 func (p *ProcedureDecl) Pos() int               { return p.StartOffset }
 func (p *ProcedureDecl) End() int               { return p.EndOffset }
+func (p *ProcedureDecl) Children() []Node {
+	return []Node{p.Head, p.Body}
+}
 
 func (p *ProcedureHeading) String() string {
 	buf := new(bytes.Buffer)
@@ -148,11 +163,35 @@ func (p *ProcedureHeading) Accept(vst Visitor) any { return vst.VisitProcedureHe
 func (p *ProcedureHeading) decl()                  {}
 func (p *ProcedureHeading) Pos() int               { return p.StartOffset }
 func (p *ProcedureHeading) End() int               { return p.EndOffset }
+func (p *ProcedureHeading) Children() []Node {
+	children := []Node{p.Name}
+	if p.Rcv != nil {
+		children = append(children, p.Rcv)
+	}
+
+	if p.FP != nil {
+		children = append(children, p.FP)
+	}
+
+	return children
+}
 
 func (p *ProcedureBody) String() string         { panic("not implemented") }
 func (p *ProcedureBody) Pos() int               { return p.StartOffset }
 func (p *ProcedureBody) End() int               { return p.EndOffset }
 func (p *ProcedureBody) Accept(vst Visitor) any { return vst.VisitProcedureBody(p) }
+func (p *ProcedureBody) Children() []Node {
+	children := make([]Node, 0)
+	for _, statement := range p.StmtSeq {
+		children = append(children, statement)
+	}
+
+	for _, decl := range p.DeclSeq {
+		children = append(children, decl)
+	}
+
+	return children
+}
 
 func (sec *FPSection) String() string {
 	buf := new(bytes.Buffer)
@@ -171,6 +210,14 @@ func (sec *FPSection) String() string {
 func (sec *FPSection) Accept(vst Visitor) any { return vst.VisitFPSection(sec) }
 func (sec *FPSection) Pos() int               { return sec.StartOffset }
 func (sec *FPSection) End() int               { return sec.EndOffset }
+func (sec *FPSection) Children() []Node {
+	children := []Node{sec.Type}
+	for _, name := range sec.Names {
+		children = append(children, name)
+	}
+
+	return children
+}
 
 func (p *FormalParams) String() string {
 	buf := new(bytes.Buffer)
@@ -190,6 +237,14 @@ func (p *FormalParams) String() string {
 func (p *FormalParams) Accept(vst Visitor) any { return vst.VisitFormalParams(p) }
 func (p *FormalParams) Pos() int               { return p.StartOffset }
 func (p *FormalParams) End() int               { return p.EndOffset }
+func (p *FormalParams) Children() []Node {
+	children := []Node{p.RetType}
+	for _, param := range p.Params {
+		children = append(children, param)
+	}
+
+	return children
+}
 
 func (r *Receiver) String() string {
 	buf := new(bytes.Buffer)
@@ -206,9 +261,13 @@ func (r *Receiver) String() string {
 func (r *Receiver) Accept(vst Visitor) any { return vst.VisitReceiver(r) }
 func (r *Receiver) Pos() int               { return r.StartOffset }
 func (r *Receiver) End() int               { return r.EndOffset }
+func (r *Receiver) Children() []Node {
+	return []Node{r.Type}
+}
 
 func (b *BadDecl) Accept(vst Visitor) any { return vst.VisitBadDecl(b) }
 func (b *BadDecl) decl()                  {}
 func (b *BadDecl) String() string         { return "<BadDecl>" }
 func (b *BadDecl) Pos() int               { return b.StartOffset }
 func (b *BadDecl) End() int               { return b.EndOffset }
+func (b *BadDecl) Children() []Node       { panic("not implemented") }

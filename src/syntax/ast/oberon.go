@@ -24,24 +24,3 @@ func (obx *OberonX) Lookup(name string) (CompilationUnit, bool) {
 	unit, ok := obx.Units[name]
 	return unit, ok
 }
-
-//func (obx *OberonX) AddEdge(src, dst string) {
-//	if _, ok := obx.Units[src]; !ok {
-//		return
-//	}
-//	if _, ok := obx.Units[dst]; !ok {
-//		return
-//	}
-//
-//	obx.Units[src].addEdge(dst, obx.Units[dst])
-//}
-//
-//func (obx *OberonX) Neighbors(src string) []string {
-//	var result []string
-//
-//	for _, edge := range obx.Units[src].Edges() {
-//		result = append(result, edge.Name())
-//	}
-//
-//	return result
-//}

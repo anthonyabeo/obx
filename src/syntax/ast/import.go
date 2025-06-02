@@ -37,3 +37,4 @@ func (imp *Import) String() string {
 func (imp *Import) Accept(vst Visitor) any { return vst.VisitImport(imp) }
 func (imp *Import) Pos() int               { return imp.StartOffset }
 func (imp *Import) End() int               { return imp.EndOffset }
+func (imp *Import) Children() []Node       { panic("not implemented") }

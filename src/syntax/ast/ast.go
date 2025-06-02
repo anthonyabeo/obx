@@ -9,6 +9,7 @@ type Node interface {
 	Pos() int
 	End() int
 	Accept(Visitor) any
+	Children() []Node
 }
 
 type Statement interface {
@@ -36,4 +37,18 @@ type CompilationUnit interface {
 	Node
 	Name() string
 	Imports() []*Import
+	Environ() *Environment
+}
+
+func Walk(fn func(Node) bool, node Node) {
+	var visit func(Node)
+	visit = func(n Node) {
+		if n == nil || !fn(n) {
+			return
+		}
+		for _, child := range n.Children() {
+			visit(child)
+		}
+	}
+	visit(node)
 }

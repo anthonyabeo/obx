@@ -123,6 +123,7 @@ func (*Nil) String() string           { return "nil" }
 func (n *Nil) Accept(vst Visitor) any { return vst.VisitNil(n) }
 func (n *Nil) Pos() int               { return n.StartOffset }
 func (n *Nil) End() int               { return n.EndOffset }
+func (n *Nil) Children() []Node       { panic("not implemented") }
 
 func (id *IdentifierDef) String() string {
 	name := id.Name
@@ -139,24 +140,30 @@ func (id *IdentifierDef) String() string {
 func (id *IdentifierDef) Pos() int               { return id.StartOffset }
 func (id *IdentifierDef) End() int               { return id.EndOffset }
 func (id *IdentifierDef) Accept(vst Visitor) any { return vst.VisitIdentifierDef(id) }
+func (id *IdentifierDef) Children() []Node {
+	return []Node{}
+}
 
 func (e *ExprRange) String() string         { return fmt.Sprintf("%s..%s", e.Low, e.High) }
 func (e *ExprRange) Accept(vst Visitor) any { return vst.VisitExprRange(e) }
 func (e *ExprRange) expr()                  {}
 func (e *ExprRange) Pos() int               { return e.StartOffset }
 func (e *ExprRange) End() int               { return e.EndOffset }
+func (e *ExprRange) Children() []Node       { panic("not implemented") }
 
 func (b *BasicLit) expr()                  {}
 func (b *BasicLit) String() string         { return b.Val }
 func (b *BasicLit) Accept(vst Visitor) any { return vst.VisitBasicLit(b) }
 func (b *BasicLit) Pos() int               { return b.StartOffset }
 func (b *BasicLit) End() int               { return b.EndOffset }
+func (b *BasicLit) Children() []Node       { panic("not implemented") }
 
 func (b *BinaryExpr) expr()                  {}
 func (b *BinaryExpr) String() string         { return fmt.Sprintf("%v %v %v", b.Left, b.Op, b.Right) }
 func (b *BinaryExpr) Accept(vst Visitor) any { return vst.VisitBinaryExpr(b) }
 func (b *BinaryExpr) Pos() int               { return b.StartOffset }
 func (b *BinaryExpr) End() int               { return b.EndOffset }
+func (b *BinaryExpr) Children() []Node       { panic("not implemented") }
 
 func (f *FunctionCall) Accept(vst Visitor) any { return vst.VisitFunctionCall(f) }
 func (f *FunctionCall) expr()                  {}
@@ -168,8 +175,9 @@ func (f *FunctionCall) String() string {
 
 	return fmt.Sprintf("%s(%s)", f.Callee, strings.Join(args, ", "))
 }
-func (f *FunctionCall) Pos() int { return f.StartOffset }
-func (f *FunctionCall) End() int { return f.EndOffset }
+func (f *FunctionCall) Pos() int         { return f.StartOffset }
+func (f *FunctionCall) End() int         { return f.EndOffset }
+func (f *FunctionCall) Children() []Node { panic("not implemented") }
 
 func (q *QualifiedIdent) Accept(vst Visitor) any { return vst.VisitQualifiedIdent(q) }
 func (q *QualifiedIdent) expr()                  {}
@@ -179,8 +187,9 @@ func (q *QualifiedIdent) String() string {
 	}
 	return fmt.Sprintf("%v.%v", q.Prefix, q.Name)
 }
-func (q *QualifiedIdent) Pos() int { return q.StartOffset }
-func (q *QualifiedIdent) End() int { return q.EndOffset }
+func (q *QualifiedIdent) Pos() int         { return q.StartOffset }
+func (q *QualifiedIdent) End() int         { return q.EndOffset }
+func (q *QualifiedIdent) Children() []Node { return []Node{} }
 
 func (s *Set) expr() {}
 func (s *Set) String() string {
@@ -194,12 +203,14 @@ func (s *Set) String() string {
 func (s *Set) Accept(vst Visitor) any { return vst.VisitSet(s) }
 func (s *Set) Pos() int               { return s.StartOffset }
 func (s *Set) End() int               { return s.EndOffset }
+func (s *Set) Children() []Node       { panic("not implemented") }
 
 func (u *UnaryExpr) Accept(vst Visitor) any { return vst.VisitUnaryExpr(u) }
 func (u *UnaryExpr) expr()                  {}
 func (u *UnaryExpr) String() string         { return fmt.Sprintf("%v%v", u.Op, u.Operand) }
 func (u *UnaryExpr) Pos() int               { return u.StartOffset }
 func (u *UnaryExpr) End() int               { return u.EndOffset }
+func (u *UnaryExpr) Children() []Node       { panic("not implemented") }
 
 func (d *Designator) Accept(vst Visitor) any { return vst.VisitDesignator(d) }
 func (d *Designator) expr()                  {}
@@ -224,12 +235,24 @@ func (d *Designator) String() string {
 }
 func (d *Designator) Pos() int { return d.StartOffset }
 func (d *Designator) End() int { return d.EndOffset }
+func (d *Designator) Children() []Node {
+	children := []Node{d.QIdent}
+	if len(d.Select) > 0 {
+		for _, selector := range d.Select {
+			children = append(children, selector)
+
+		}
+	}
+
+	return children
+}
 
 func (b *BadExpr) Accept(vst Visitor) any { return vst.VisitBadExpr(b) }
 func (b *BadExpr) expr()                  {}
 func (b *BadExpr) String() string         { return "<bad expr>" }
 func (b *BadExpr) Pos() int               { return b.StartOffset }
 func (b *BadExpr) End() int               { return b.EndOffset }
+func (b *BadExpr) Children() []Node       { panic("not implemented") }
 
 // Selectors
 // ---------------------
@@ -252,6 +275,7 @@ func (d *DotOp) sel()                   {}
 func (d *DotOp) Pos() int               { return d.StartOffset }
 func (d *DotOp) End() int               { return d.EndOffset }
 func (d *DotOp) Accept(vst Visitor) any { return vst.VisitDotOp(d) }
+func (d *DotOp) Children() []Node       { panic("not implemented") }
 
 // IndexOp
 // ---------------------
@@ -273,6 +297,7 @@ func (id *IndexOp) sel()                   {}
 func (id *IndexOp) Pos() int               { return id.StartOffset }
 func (id *IndexOp) End() int               { return id.EndOffset }
 func (id *IndexOp) Accept(vst Visitor) any { return vst.VisitIndexOp(id) }
+func (id *IndexOp) Children() []Node       { panic("not implemented") }
 
 // TypeGuard
 // ---------------------
@@ -287,6 +312,7 @@ func (t *TypeGuard) sel()                   {}
 func (t *TypeGuard) Pos() int               { return t.StartOffset }
 func (t *TypeGuard) End() int               { return t.EndOffset }
 func (t *TypeGuard) Accept(vst Visitor) any { return vst.VisitTypeGuard(t) }
+func (t *TypeGuard) Children() []Node       { panic("not implemented") }
 
 // PtrDeref
 // ---------------------
@@ -300,3 +326,4 @@ func (deref *PtrDeref) String() string         { return "^" }
 func (deref *PtrDeref) Pos() int               { return deref.StartOffset }
 func (deref *PtrDeref) End() int               { return deref.EndOffset }
 func (deref *PtrDeref) Accept(vst Visitor) any { return vst.VisitPtrDeref(deref) }
+func (deref *PtrDeref) Children() []Node       { panic("not implemented") }

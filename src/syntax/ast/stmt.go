@@ -138,18 +138,21 @@ func (stmt *ForStmt) String() string         { panic("not implemented") }
 func (stmt *ForStmt) Accept(vst Visitor) any { return vst.VisitForStmt(stmt) }
 func (stmt *ForStmt) Pos() int               { return stmt.StartOffset }
 func (stmt *ForStmt) End() int               { return stmt.EndOffset }
+func (stmt *ForStmt) Children() []Node       { panic("not implemented") }
 
 func (stmt *ExitStmt) stmt()                  {}
 func (stmt *ExitStmt) String() string         { return "exit" }
 func (stmt *ExitStmt) Accept(vst Visitor) any { return vst.VisitExitStmt(stmt) }
 func (stmt *ExitStmt) Pos() int               { return stmt.StartOffset }
 func (stmt *ExitStmt) End() int               { return stmt.EndOffset }
+func (stmt *ExitStmt) Children() []Node       { panic("not implemented") }
 
 func (w *WithStmt) stmt()                  {}
 func (w *WithStmt) String() string         { panic("not implemented") }
 func (w *WithStmt) Accept(vst Visitor) any { return vst.VisitWithStmt(w) }
 func (w *WithStmt) Pos() int               { return w.StartOffset }
 func (w *WithStmt) End() int               { return w.EndOffset }
+func (w *WithStmt) Children() []Node       { panic("not implemented") }
 
 func (g *Guard) Accept(vst Visitor) any { return vst.VisitGuard(g) }
 func (g *Guard) String() string {
@@ -160,8 +163,9 @@ func (g *Guard) String() string {
 
 	return fmt.Sprintf("guard %s: %s", g.Expr, strings.Join(stmts, "; "))
 }
-func (g *Guard) Pos() int { return g.StartOffset }
-func (g *Guard) End() int { return g.EndOffset }
+func (g *Guard) Pos() int         { return g.StartOffset }
+func (g *Guard) End() int         { return g.EndOffset }
+func (g *Guard) Children() []Node { panic("not implemented") }
 
 func (p *ProcedureCall) stmt()                  {}
 func (p *ProcedureCall) Accept(vst Visitor) any { return vst.VisitProcedureCall(p) }
@@ -173,14 +177,16 @@ func (p *ProcedureCall) String() string {
 
 	return fmt.Sprintf("%s(%s)", p.Callee, strings.Join(args, ", "))
 }
-func (p *ProcedureCall) Pos() int { return p.StartOffset }
-func (p *ProcedureCall) End() int { return p.EndOffset }
+func (p *ProcedureCall) Pos() int         { return p.StartOffset }
+func (p *ProcedureCall) End() int         { return p.EndOffset }
+func (p *ProcedureCall) Children() []Node { panic("not implemented") }
 
 func (w *WhileStmt) stmt()                  {}
 func (w *WhileStmt) Accept(vst Visitor) any { return vst.VisitWhileStmt(w) }
 func (w *WhileStmt) String() string         { panic("not implement") }
 func (w *WhileStmt) Pos() int               { return w.StartOffset }
 func (w *WhileStmt) End() int               { return w.EndOffset }
+func (w *WhileStmt) Children() []Node       { panic("not implemented") }
 
 func (r *ReturnStmt) stmt()                  {}
 func (r *ReturnStmt) Accept(vst Visitor) any { return vst.VisitReturnStmt(r) }
@@ -192,43 +198,50 @@ func (r *ReturnStmt) String() string {
 
 	return s
 }
-func (r *ReturnStmt) Pos() int { return r.StartOffset }
-func (r *ReturnStmt) End() int { return r.EndOffset }
+func (r *ReturnStmt) Pos() int         { return r.StartOffset }
+func (r *ReturnStmt) End() int         { return r.EndOffset }
+func (r *ReturnStmt) Children() []Node { panic("not implemented") }
 
 func (r *RepeatStmt) stmt()                  {}
 func (r *RepeatStmt) Accept(vst Visitor) any { return vst.VisitRepeatStmt(r) }
 func (r *RepeatStmt) String() string         { panic("not implemented") }
 func (r *RepeatStmt) Pos() int               { return r.StartOffset }
 func (r *RepeatStmt) End() int               { return r.EndOffset }
+func (r *RepeatStmt) Children() []Node       { panic("not implemented") }
 
 func (l *LoopStmt) stmt()                  {}
 func (l *LoopStmt) Accept(vst Visitor) any { return vst.VisitLoopStmt(l) }
 func (l *LoopStmt) String() string         { panic("not implemented") }
 func (l *LoopStmt) Pos() int               { return l.StartOffset }
 func (l *LoopStmt) End() int               { return l.EndOffset }
+func (l *LoopStmt) Children() []Node       { panic("not implemented") }
 
 func (stmt *IfStmt) stmt()                  {}
 func (stmt *IfStmt) Accept(vst Visitor) any { return vst.VisitIfStmt(stmt) }
 func (stmt *IfStmt) String() string         { panic("not implemented") }
 func (stmt *IfStmt) Pos() int               { return stmt.StartOffset }
 func (stmt *IfStmt) End() int               { return stmt.EndOffset }
+func (stmt *IfStmt) Children() []Node       { panic("not implemented") }
 
 func (e *ElseIfBranch) Accept(vst Visitor) any { return vst.VisitElseIfBranch(e) }
 func (e *ElseIfBranch) String() string         { panic("not implemented") }
 func (e *ElseIfBranch) Pos() int               { return e.StartOffset }
 func (e *ElseIfBranch) End() int               { return e.EndOffset }
+func (e *ElseIfBranch) Children() []Node       { panic("not implemented") }
 
 func (a *AssignmentStmt) stmt()                  {}
 func (a *AssignmentStmt) Accept(vst Visitor) any { return vst.VisitAssignmentStmt(a) }
 func (a *AssignmentStmt) String() string         { return fmt.Sprintf("%v := %v", a.LValue, a.RValue) }
 func (a *AssignmentStmt) Pos() int               { return a.StartOffset }
 func (a *AssignmentStmt) End() int               { return a.EndOffset }
+func (a *AssignmentStmt) Children() []Node       { return []Node{a.LValue, a.RValue} }
 
 func (stmt *CaseStmt) stmt()                  {}
 func (stmt *CaseStmt) Accept(vst Visitor) any { return vst.VisitCaseStmt(stmt) }
 func (stmt *CaseStmt) String() string         { panic("not implemented") }
 func (stmt *CaseStmt) Pos() int               { return stmt.StartOffset }
 func (stmt *CaseStmt) End() int               { return stmt.EndOffset }
+func (stmt *CaseStmt) Children() []Node       { panic("not implemented") }
 
 func (c *Case) Accept(vst Visitor) any { return vst.VisitCase(c) }
 func (c *Case) String() string {
@@ -239,16 +252,19 @@ func (c *Case) String() string {
 
 	return fmt.Sprintf("case %s: %s", strings.Join(cases, ", "), c.StmtSeq)
 }
-func (c *Case) Pos() int { return c.StartOffset }
-func (c *Case) End() int { return c.EndOffset }
+func (c *Case) Pos() int         { return c.StartOffset }
+func (c *Case) End() int         { return c.EndOffset }
+func (c *Case) Children() []Node { panic("not implemented") }
 
 func (l *LabelRange) Accept(vst Visitor) any { return vst.VisitLabelRange(l) }
 func (l *LabelRange) String() string         { return fmt.Sprintf("%s..%s", l.High, l.Low) }
 func (l *LabelRange) Pos() int               { return l.StartOffset }
 func (l *LabelRange) End() int               { return l.EndOffset }
+func (l *LabelRange) Children() []Node       { panic("not implemented") }
 
 func (b *BadStmt) stmt()                  {}
 func (b *BadStmt) Accept(vst Visitor) any { return vst.VisitBadStmt(b) }
 func (b *BadStmt) String() string         { return "<BadStmt>" }
 func (b *BadStmt) Pos() int               { return b.StartOffset }
 func (b *BadStmt) End() int               { return b.EndOffset }
+func (b *BadStmt) Children() []Node       { panic("not implemented") }
