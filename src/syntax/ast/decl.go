@@ -124,14 +124,14 @@ func (c *ConstantDecl) String() string         { return fmt.Sprintf("%v = %v", c
 func (c *ConstantDecl) Accept(vst Visitor) any { return vst.VisitConstantDecl(c) }
 func (c *ConstantDecl) Pos() int               { return c.StartOffset }
 func (c *ConstantDecl) End() int               { return c.EndOffset }
-func (c *ConstantDecl) Children() []Node       { panic("not implemented") }
+func (c *ConstantDecl) Children() []Node       { return []Node{c.Name, c.Value} }
 
 func (t *TypeDecl) decl()                  {}
 func (t *TypeDecl) String() string         { return fmt.Sprintf("%s = %s", t.Name, t.DenotedType) }
 func (t *TypeDecl) Accept(vst Visitor) any { return vst.VisitTypeDecl(t) }
 func (t *TypeDecl) Pos() int               { return t.StartOffset }
 func (t *TypeDecl) End() int               { return t.EndOffset }
-func (t *TypeDecl) Children() []Node       { panic("not implemented") }
+func (t *TypeDecl) Children() []Node       { return []Node{t.Name, t.DenotedType} }
 
 func (p *ProcedureDecl) decl() {}
 func (p *ProcedureDecl) String() string {
@@ -146,9 +146,7 @@ func (p *ProcedureDecl) String() string {
 func (p *ProcedureDecl) Accept(vst Visitor) any { return vst.VisitProcedureDecl(p) }
 func (p *ProcedureDecl) Pos() int               { return p.StartOffset }
 func (p *ProcedureDecl) End() int               { return p.EndOffset }
-func (p *ProcedureDecl) Children() []Node {
-	return []Node{p.Head, p.Body}
-}
+func (p *ProcedureDecl) Children() []Node       { return []Node{p.Head, p.Body} }
 
 func (p *ProcedureHeading) String() string {
 	buf := new(bytes.Buffer)
@@ -270,4 +268,4 @@ func (b *BadDecl) decl()                  {}
 func (b *BadDecl) String() string         { return "<BadDecl>" }
 func (b *BadDecl) Pos() int               { return b.StartOffset }
 func (b *BadDecl) End() int               { return b.EndOffset }
-func (b *BadDecl) Children() []Node       { panic("not implemented") }
+func (b *BadDecl) Children() []Node       { return []Node{} }

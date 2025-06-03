@@ -85,7 +85,7 @@ func (n *NamedType) Accept(vst Visitor) any { return vst.VisitNamedType(n) }
 func (n *NamedType) typ()                   {}
 func (n *NamedType) Pos() int               { return n.StartOffset }
 func (n *NamedType) End() int               { return n.EndOffset }
-func (n *NamedType) Children() []Node       { panic("implement me") }
+func (n *NamedType) Children() []Node       { return []Node{n.Name} }
 
 func NewBasicType(name string, pos int, rng int) *BasicType {
 	return &BasicType{Nname: name, StartOffset: pos, EndOffset: rng}
@@ -132,7 +132,7 @@ func (a *ArrayType) typ()                   {}
 func (a *ArrayType) Width() int             { panic("implement me") }
 func (a *ArrayType) Pos() int               { return a.StartOffset }
 func (a *ArrayType) End() int               { return a.EndOffset }
-func (a *ArrayType) Children() []Node       { panic("implement me") }
+func (a *ArrayType) Children() []Node       { return []Node{a.LenList, a.ElemType} }
 
 type LenList struct {
 	Modifier token.Kind
@@ -154,9 +154,16 @@ func (l *LenList) String() string {
 	}
 	return fmt.Sprintf("[%s]", strings.Join(lengths, ", "))
 }
-func (l *LenList) Pos() int         { return l.StartOffset }
-func (l *LenList) End() int         { return l.EndOffset }
-func (l *LenList) Children() []Node { panic("implement me") }
+func (l *LenList) Pos() int { return l.StartOffset }
+func (l *LenList) End() int { return l.EndOffset }
+func (l *LenList) Children() []Node {
+	children := make([]Node, len(l.List))
+	for _, expression := range l.List {
+		children = append(children, expression)
+	}
+
+	return children
+}
 
 func (p *ProcedureType) String() string {
 	if p.FP == nil {
@@ -169,7 +176,13 @@ func (p *ProcedureType) typ()                   {}
 func (p *ProcedureType) Width() int             { panic("implement me") }
 func (p *ProcedureType) Pos() int               { return p.StartOffset }
 func (p *ProcedureType) End() int               { return p.EndOffset }
-func (p *ProcedureType) Children() []Node       { panic("implement me") }
+func (p *ProcedureType) Children() []Node {
+	if p.FP != nil {
+		return []Node{p.FP}
+	}
+
+	return []Node{}
+}
 
 func (p *PointerType) String() string         { return fmt.Sprintf("^%s", p.Base) }
 func (p *PointerType) Accept(vst Visitor) any { return vst.VisitPointerType(p) }
@@ -177,7 +190,7 @@ func (p *PointerType) typ()                   {}
 func (p *PointerType) Width() int             { panic("implement me") }
 func (p *PointerType) Pos() int               { return p.StartOffset }
 func (p *PointerType) End() int               { return p.EndOffset }
-func (p *PointerType) Children() []Node       { panic("implement me") }
+func (p *PointerType) Children() []Node       { return []Node{p.Base} }
 
 func NewRecordType(base Type, fields []*FieldList, env *RecordEnv) *RecordType {
 	return &RecordType{Base: base, Fields: fields, Env: env}
@@ -206,7 +219,18 @@ func (r *RecordType) typ()                   {}
 func (r *RecordType) Width() int             { panic("implement me") }
 func (r *RecordType) Pos() int               { return r.StartOffset }
 func (r *RecordType) End() int               { return r.EndOffset }
-func (r *RecordType) Children() []Node       { panic("implement me") }
+func (r *RecordType) Children() []Node {
+	children := make([]Node, 0)
+	for _, field := range r.Fields {
+		children = append(children, field)
+	}
+
+	if r.Base != nil {
+		children = append(children, r.Base)
+	}
+
+	return children
+}
 
 func (f *FieldList) Accept(vst Visitor) any { return vst.VisitFieldList(f) }
 func (f *FieldList) String() string {
@@ -217,9 +241,16 @@ func (f *FieldList) String() string {
 
 	return fmt.Sprintf("%s: %s", strings.Join(fields, ", "), f.Type)
 }
-func (f *FieldList) Pos() int         { return f.StartOffset }
-func (f *FieldList) End() int         { return f.EndOffset }
-func (f *FieldList) Children() []Node { panic("implement me") }
+func (f *FieldList) Pos() int { return f.StartOffset }
+func (f *FieldList) End() int { return f.EndOffset }
+func (f *FieldList) Children() []Node {
+	children := []Node{f.Type}
+	for _, def := range f.List {
+		children = append(children, def)
+	}
+
+	return children
+}
 
 func (e *EnumType) String() string         { return fmt.Sprintf("enum(%s)", strings.Join(e.Variants, ", ")) }
 func (e *EnumType) Accept(vst Visitor) any { return vst.VisitEnumType(e) }
@@ -227,7 +258,7 @@ func (e *EnumType) typ()                   {}
 func (e *EnumType) Width() int             { panic("implement me") }
 func (e *EnumType) Pos() int               { return e.StartOffset }
 func (e *EnumType) End() int               { return e.EndOffset }
-func (e *EnumType) Children() []Node       { panic("implement me") }
+func (e *EnumType) Children() []Node       { return []Node{} }
 
 func (b *BadType) String() string         { return "<BadType>" }
 func (b *BadType) Accept(vst Visitor) any { return vst.VisitBadType(b) }
@@ -235,4 +266,4 @@ func (b *BadType) typ()                   {}
 func (b *BadType) Width() int             { panic("implement me") }
 func (b *BadType) Pos() int               { return b.StartOffset }
 func (b *BadType) End() int               { return b.EndOffset }
-func (b *BadType) Children() []Node       { panic("implement me") }
+func (b *BadType) Children() []Node       { return []Node{} }

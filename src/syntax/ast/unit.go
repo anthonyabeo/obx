@@ -64,7 +64,14 @@ func (ms *MetaSection) Accept(vst Visitor) any { return vst.VisitMetaSection(ms)
 func (ms *MetaSection) String() string         { panic("implement me") }
 func (ms *MetaSection) Pos() int               { return ms.StartOffset }
 func (ms *MetaSection) End() int               { return ms.EndOffset }
-func (ms *MetaSection) Children() []Node       { panic("implement me") }
+func (ms *MetaSection) Children() []Node {
+	children := []Node{ms.TyConst}
+	for _, id := range ms.Ids {
+		children = append(children, id)
+	}
+
+	return children
+}
 
 // Definition
 // -------------------

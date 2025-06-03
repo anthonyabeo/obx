@@ -5,22 +5,24 @@ package ast
 // are compilation units (Module and Definition) and the edges between
 // them represent their import dependency.
 type OberonX struct {
-	Units map[string]CompilationUnit
+	//Units map[string]CompilationUnit
+	Units []CompilationUnit
 }
 
 func NewOberonX() *OberonX {
-	return &OberonX{Units: make(map[string]CompilationUnit)}
+	return &OberonX{Units: make([]CompilationUnit, 0)}
 }
 
-func (obx *OberonX) AddUnit(name string, node CompilationUnit) {
-	if _, exist := obx.Units[name]; exist {
-		return
-	}
-
-	obx.Units[name] = node
+func (obx *OberonX) AddUnit(node CompilationUnit) {
+	obx.Units = append(obx.Units, node)
 }
 
 func (obx *OberonX) Lookup(name string) (CompilationUnit, bool) {
-	unit, ok := obx.Units[name]
-	return unit, ok
+	for _, unit := range obx.Units {
+		if unit.Name() == name {
+			return unit, true
+		}
+	}
+
+	return nil, false
 }
