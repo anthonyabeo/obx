@@ -16,6 +16,8 @@ func NewSema(ctx *report.Context, obx *ast.OberonX) *Sema {
 
 func (s *Sema) Validate() {
 	for _, unit := range s.obx.Units {
+		s.ctx.Env = s.ctx.Envs[unit.Name()]
+
 		// validate and annotate loops for EXIT support:
 		loop := NewLoopContextAnalyzer(s.ctx)
 		loop.Analyse(unit)

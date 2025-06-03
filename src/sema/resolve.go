@@ -83,6 +83,7 @@ func (n *NamesResolver) VisitIdentifierDef(def *ast.IdentifierDef) any {
 
 	sym.SetMangledName(ast.Mangle(sym))
 	def.Symbol = sym
+	def.Name = sym.MangledName()
 
 	return def
 }
@@ -118,37 +119,58 @@ func (n *NamesResolver) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 }
 
 func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
-	var sym ast.Symbol
-	if ident.Prefix != "" {
-		if n.ctx.Envs[ident.Prefix] == nil {
-			n.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  fmt.Sprintf("environment for module '%s' not found", ident.Prefix),
-				Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
-			})
-			return ident
-		}
-
-		sym = n.ctx.Envs[ident.Prefix].Lookup(ident.Name)
-		if sym == nil || sym.Props() != ast.Exported {
-			n.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  fmt.Sprintf("identifier '%s' not found or is not exported", ident.Name),
-				Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
-			})
-		}
-	} else {
-		sym = n.ctx.Env.Lookup(ident.Name)
+	if ident.Prefix == "" {
+		sym := n.ctx.Env.Lookup(ident.Name)
 		if sym == nil {
 			n.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message:  fmt.Sprintf("identifier '%s' not found", ident.Name),
+				Message:  fmt.Sprintf("undeclared identifier: '%s'", ident.Name),
 				Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
 			})
+
+			return ident
 		}
+
+		ident.Symbol = sym
+		ident.Name = sym.MangledName()
+		return ident
+	}
+
+	sym := n.ctx.Env.Lookup(ident.Prefix)
+	if sym == nil || sym.Kind() != ast.ImportSymbolKind {
+		n.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("'%s' is not defined as a module", ident.Prefix),
+			Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
+		})
+
+		return ident
+	}
+
+	env := n.ctx.Envs[ident.Prefix]
+	if env == nil {
+		n.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Fatal,
+			Message:  fmt.Sprintf("identifier '%s' not found or is not exported", ident.Name),
+			Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
+		})
+
+		return ident
+	}
+
+	sym = env.Lookup(ident.Name)
+	if sym == nil || sym.Props() != ast.Exported {
+		n.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("identifier '%s' not found or is not exported", ident.Name),
+			Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
+		})
+
+		return ident
 	}
 
 	ident.Symbol = sym
+	ident.Name = sym.MangledName()
 	return ident
 }
 
@@ -283,7 +305,27 @@ func (n *NamesResolver) VisitWithStmt(stmt *ast.WithStmt) any {
 	return stmt
 }
 
-func (n *NamesResolver) VisitImport(i *ast.Import) any { return i }
+func (n *NamesResolver) VisitImport(i *ast.Import) any {
+	name := i.Alias
+	if name == "" {
+		name = i.Name
+	}
+
+	sym := n.ctx.Env.Lookup(name)
+	if sym == nil || sym.Kind() != ast.ImportSymbolKind {
+		n.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("'%s' is not a known module", name),
+			Range:    n.ctx.Source.Span(n.ctx.FileName, i.StartOffset, i.EndOffset),
+		})
+
+		return i
+	}
+
+	//sym.(*ast.ImportSymbol).Env = n.ctx.Envs[name]
+
+	return i
+}
 
 func (n *NamesResolver) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	tmp := n.ctx.Env
@@ -299,11 +341,18 @@ func (n *NamesResolver) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 }
 
 func (n *NamesResolver) VisitVariableDecl(decl *ast.VariableDecl) any {
-	for _, def := range decl.IdentList {
-		def.Accept(n)
+	for _, id := range decl.IdentList {
+		def := id.Accept(n)
+		if def == nil {
+			n.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("'%s' is not a known variable", id.Name),
+				Range:    n.ctx.Source.Span(n.ctx.FileName, id.StartOffset, id.EndOffset),
+			})
+		}
 	}
 
-	decl.Type.Accept(n)
+	//decl.Type.Accept(n)
 
 	return decl
 }

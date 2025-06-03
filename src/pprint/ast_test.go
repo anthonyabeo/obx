@@ -21,7 +21,7 @@ func parseSource(t *testing.T, ctx *report.Context) *ast.OberonX {
 	}
 
 	obx := ast.NewOberonX()
-	obx.AddUnit(unit.Name(), unit)
+	obx.AddUnit(unit)
 
 	return obx
 }
@@ -125,8 +125,8 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 		END Bigger.
 	`)
 
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-	out := ast.NewEnvironment(ast.GlobalEnviron, "Main")
+	table := ast.NewEnvironment(ast.GlobalEnviron, "Bigger")
+	out := ast.NewEnvironment(ast.GlobalEnviron, "Out")
 	out.Insert(ast.NewProcedureSymbol("Int", ast.Exported, nil))
 	envs := map[string]*ast.Environment{
 		"Bigger": table,
@@ -188,11 +188,11 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 
 	decl := FindVariableByName(result, "Bigger$p")
 	if decl == nil {
-		t.Errorf("Expected variable declaration for 'p'")
+		t.Errorf("Expected variable declaration for 'Bigger$p'")
 	}
 
 	ty := FindTypeByName(result, "Bigger$Point")
 	if ty == nil {
-		t.Errorf("Expected variable declaration for 'p'")
+		t.Errorf("Expected variable declaration for 'Bigger$Point'")
 	}
 }
