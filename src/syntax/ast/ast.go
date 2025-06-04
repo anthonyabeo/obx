@@ -2,6 +2,8 @@ package ast
 
 import (
 	"fmt"
+
+	"github.com/anthonyabeo/obx/src/types"
 )
 
 type Node interface {
@@ -19,6 +21,7 @@ type Statement interface {
 
 type Expression interface {
 	Node
+	Type() types.Type
 	expr()
 }
 
@@ -30,7 +33,6 @@ type Declaration interface {
 type Type interface {
 	Node
 	typ()
-	Width() int
 }
 
 type CompilationUnit interface {
