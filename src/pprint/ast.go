@@ -334,7 +334,7 @@ func (v *AstPrinter) VisitProcedureHeading(h *ast.ProcedureHeading) any {
 func (v *AstPrinter) VisitBasicType(t *ast.BasicType) any {
 	return map[string]any{
 		"type":  "BasicType",
-		"name":  t.Nname,
+		"name":  t.Kind.String(),
 		"range": formatRange(v.ctx.Source.Span(v.ctx.FileName, t.StartOffset, t.EndOffset)),
 	}
 }

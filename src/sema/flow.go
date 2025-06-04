@@ -5,21 +5,21 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
-type LoopContextAnalyzer struct {
+type FlowControlAnalyzer struct {
 	ctx *report.Context
 
 	label string
 }
 
-func NewLoopContextAnalyzer(ctx *report.Context) *LoopContextAnalyzer {
-	return &LoopContextAnalyzer{ctx: ctx}
+func NewFlowControlAnalyzer(ctx *report.Context) *FlowControlAnalyzer {
+	return &FlowControlAnalyzer{ctx: ctx}
 }
 
-func (l *LoopContextAnalyzer) Analyse(unit ast.CompilationUnit) {
+func (l *FlowControlAnalyzer) Analyse(unit ast.CompilationUnit) {
 	unit.Accept(l)
 }
 
-func (l *LoopContextAnalyzer) VisitOberon(oberon *ast.OberonX) any {
+func (l *FlowControlAnalyzer) VisitOberon(oberon *ast.OberonX) any {
 	for _, unit := range oberon.Units {
 		unit.Accept(l)
 	}
@@ -27,7 +27,7 @@ func (l *LoopContextAnalyzer) VisitOberon(oberon *ast.OberonX) any {
 	return oberon
 }
 
-func (l *LoopContextAnalyzer) VisitModule(module *ast.Module) any {
+func (l *FlowControlAnalyzer) VisitModule(module *ast.Module) any {
 	for _, decl := range module.DeclSeq {
 		decl.Accept(l)
 	}
@@ -39,27 +39,27 @@ func (l *LoopContextAnalyzer) VisitModule(module *ast.Module) any {
 	return module
 }
 
-func (l *LoopContextAnalyzer) VisitDefinition(def *ast.Definition) any { return def }
+func (l *FlowControlAnalyzer) VisitDefinition(def *ast.Definition) any { return def }
 
-func (l *LoopContextAnalyzer) VisitBinaryExpr(expr *ast.BinaryExpr) any { return expr }
+func (l *FlowControlAnalyzer) VisitBinaryExpr(expr *ast.BinaryExpr) any { return expr }
 
-func (l *LoopContextAnalyzer) VisitDesignator(dsg *ast.Designator) any { return dsg }
+func (l *FlowControlAnalyzer) VisitDesignator(dsg *ast.Designator) any { return dsg }
 
-func (l *LoopContextAnalyzer) VisitFunctionCall(call *ast.FunctionCall) any { return call }
+func (l *FlowControlAnalyzer) VisitFunctionCall(call *ast.FunctionCall) any { return call }
 
-func (l *LoopContextAnalyzer) VisitUnaryExpr(expr *ast.UnaryExpr) any { return expr }
+func (l *FlowControlAnalyzer) VisitUnaryExpr(expr *ast.UnaryExpr) any { return expr }
 
-func (l *LoopContextAnalyzer) VisitQualifiedIdent(ident *ast.QualifiedIdent) any { return ident }
+func (l *FlowControlAnalyzer) VisitQualifiedIdent(ident *ast.QualifiedIdent) any { return ident }
 
-func (l *LoopContextAnalyzer) VisitSet(set *ast.Set) any { return set }
+func (l *FlowControlAnalyzer) VisitSet(set *ast.Set) any { return set }
 
-func (l *LoopContextAnalyzer) VisitBasicLit(lit *ast.BasicLit) any { return lit }
+func (l *FlowControlAnalyzer) VisitBasicLit(lit *ast.BasicLit) any { return lit }
 
-func (l *LoopContextAnalyzer) VisitExprRange(rng *ast.ExprRange) any { return rng }
+func (l *FlowControlAnalyzer) VisitExprRange(rng *ast.ExprRange) any { return rng }
 
-func (l *LoopContextAnalyzer) VisitNil(n *ast.Nil) any { return n }
+func (l *FlowControlAnalyzer) VisitNil(n *ast.Nil) any { return n }
 
-func (l *LoopContextAnalyzer) VisitIfStmt(stmt *ast.IfStmt) any {
+func (l *FlowControlAnalyzer) VisitIfStmt(stmt *ast.IfStmt) any {
 	for _, s := range stmt.ThenPath {
 		s.Accept(l)
 	}
@@ -77,13 +77,13 @@ func (l *LoopContextAnalyzer) VisitIfStmt(stmt *ast.IfStmt) any {
 	return stmt
 }
 
-func (l *LoopContextAnalyzer) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any { return stmt }
+func (l *FlowControlAnalyzer) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any { return stmt }
 
-func (l *LoopContextAnalyzer) VisitReturnStmt(stmt *ast.ReturnStmt) any { return stmt }
+func (l *FlowControlAnalyzer) VisitReturnStmt(stmt *ast.ReturnStmt) any { return stmt }
 
-func (l *LoopContextAnalyzer) VisitProcedureCall(call *ast.ProcedureCall) any { return call }
+func (l *FlowControlAnalyzer) VisitProcedureCall(call *ast.ProcedureCall) any { return call }
 
-func (l *LoopContextAnalyzer) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
+func (l *FlowControlAnalyzer) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
 	tmp := l.label
 	defer func() { l.label = tmp }()
 
@@ -97,7 +97,7 @@ func (l *LoopContextAnalyzer) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
 	return stmt
 }
 
-func (l *LoopContextAnalyzer) VisitWhileStmt(stmt *ast.WhileStmt) any {
+func (l *FlowControlAnalyzer) VisitWhileStmt(stmt *ast.WhileStmt) any {
 	tmp := l.label
 	defer func() { l.label = tmp }()
 
@@ -118,7 +118,7 @@ func (l *LoopContextAnalyzer) VisitWhileStmt(stmt *ast.WhileStmt) any {
 	return stmt
 }
 
-func (l *LoopContextAnalyzer) VisitLoopStmt(stmt *ast.LoopStmt) any {
+func (l *FlowControlAnalyzer) VisitLoopStmt(stmt *ast.LoopStmt) any {
 	tmp := l.label
 	defer func() { l.label = tmp }()
 
@@ -133,7 +133,7 @@ func (l *LoopContextAnalyzer) VisitLoopStmt(stmt *ast.LoopStmt) any {
 	return stmt
 }
 
-func (l *LoopContextAnalyzer) VisitCaseStmt(stmt *ast.CaseStmt) any {
+func (l *FlowControlAnalyzer) VisitCaseStmt(stmt *ast.CaseStmt) any {
 	for _, caseClause := range stmt.Cases {
 		for _, s := range caseClause.StmtSeq {
 			s.Accept(l)
@@ -147,7 +147,7 @@ func (l *LoopContextAnalyzer) VisitCaseStmt(stmt *ast.CaseStmt) any {
 	return stmt
 }
 
-func (l *LoopContextAnalyzer) VisitForStmt(stmt *ast.ForStmt) any {
+func (l *FlowControlAnalyzer) VisitForStmt(stmt *ast.ForStmt) any {
 	tmp := l.label
 	defer func() { l.label = tmp }()
 
@@ -162,7 +162,7 @@ func (l *LoopContextAnalyzer) VisitForStmt(stmt *ast.ForStmt) any {
 	return stmt
 }
 
-func (l *LoopContextAnalyzer) VisitExitStmt(stmt *ast.ExitStmt) any {
+func (l *FlowControlAnalyzer) VisitExitStmt(stmt *ast.ExitStmt) any {
 	if l.label == "" {
 		l.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
@@ -176,7 +176,7 @@ func (l *LoopContextAnalyzer) VisitExitStmt(stmt *ast.ExitStmt) any {
 	return stmt
 }
 
-func (l *LoopContextAnalyzer) VisitWithStmt(stmt *ast.WithStmt) any {
+func (l *FlowControlAnalyzer) VisitWithStmt(stmt *ast.WithStmt) any {
 	for _, arm := range stmt.Arms {
 		for _, arm := range arm.StmtSeq {
 			arm.Accept(l)
@@ -190,9 +190,9 @@ func (l *LoopContextAnalyzer) VisitWithStmt(stmt *ast.WithStmt) any {
 	return stmt
 }
 
-func (l *LoopContextAnalyzer) VisitImport(i *ast.Import) any { return i }
+func (l *FlowControlAnalyzer) VisitImport(i *ast.Import) any { return i }
 
-func (l *LoopContextAnalyzer) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
+func (l *FlowControlAnalyzer) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	if decl.Body != nil {
 		for _, s := range decl.Body.StmtSeq {
 			s.Accept(l)
@@ -202,45 +202,45 @@ func (l *LoopContextAnalyzer) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	return decl
 }
 
-func (l *LoopContextAnalyzer) VisitVariableDecl(decl *ast.VariableDecl) any { return decl }
+func (l *FlowControlAnalyzer) VisitVariableDecl(decl *ast.VariableDecl) any { return decl }
 
-func (l *LoopContextAnalyzer) VisitConstantDecl(decl *ast.ConstantDecl) any { return decl }
+func (l *FlowControlAnalyzer) VisitConstantDecl(decl *ast.ConstantDecl) any { return decl }
 
-func (l *LoopContextAnalyzer) VisitTypeDecl(decl *ast.TypeDecl) any { return decl }
+func (l *FlowControlAnalyzer) VisitTypeDecl(decl *ast.TypeDecl) any { return decl }
 
-func (l *LoopContextAnalyzer) VisitProcedureHeading(heading *ast.ProcedureHeading) any {
+func (l *FlowControlAnalyzer) VisitProcedureHeading(heading *ast.ProcedureHeading) any {
 	return heading
 }
 
-func (l *LoopContextAnalyzer) VisitBasicType(basic *ast.BasicType) any { return basic }
+func (l *FlowControlAnalyzer) VisitBasicType(basic *ast.BasicType) any { return basic }
 
-func (l *LoopContextAnalyzer) VisitArrayType(array *ast.ArrayType) any { return array }
+func (l *FlowControlAnalyzer) VisitArrayType(array *ast.ArrayType) any { return array }
 
-func (l *LoopContextAnalyzer) VisitPointerType(pointer *ast.PointerType) any { return pointer }
+func (l *FlowControlAnalyzer) VisitPointerType(pointer *ast.PointerType) any { return pointer }
 
-func (l *LoopContextAnalyzer) VisitProcedureType(procedure *ast.ProcedureType) any { return procedure }
+func (l *FlowControlAnalyzer) VisitProcedureType(procedure *ast.ProcedureType) any { return procedure }
 
-func (l *LoopContextAnalyzer) VisitRecordType(record *ast.RecordType) any { return record }
+func (l *FlowControlAnalyzer) VisitRecordType(record *ast.RecordType) any { return record }
 
-func (l *LoopContextAnalyzer) VisitEnumType(enum *ast.EnumType) any { return enum }
+func (l *FlowControlAnalyzer) VisitEnumType(enum *ast.EnumType) any { return enum }
 
-func (l *LoopContextAnalyzer) VisitNamedType(named *ast.NamedType) any { return named }
+func (l *FlowControlAnalyzer) VisitNamedType(named *ast.NamedType) any { return named }
 
-func (l *LoopContextAnalyzer) VisitMetaSection(section *ast.MetaSection) any {
+func (l *FlowControlAnalyzer) VisitMetaSection(section *ast.MetaSection) any {
 	return section
 }
 
-func (l *LoopContextAnalyzer) VisitIdentifierDef(def *ast.IdentifierDef) any { return def }
+func (l *FlowControlAnalyzer) VisitIdentifierDef(def *ast.IdentifierDef) any { return def }
 
-func (l *LoopContextAnalyzer) VisitIndexOp(op *ast.IndexOp) any { return op }
+func (l *FlowControlAnalyzer) VisitIndexOp(op *ast.IndexOp) any { return op }
 
-func (l *LoopContextAnalyzer) VisitPtrDeref(deref *ast.PtrDeref) any { return deref }
+func (l *FlowControlAnalyzer) VisitPtrDeref(deref *ast.PtrDeref) any { return deref }
 
-func (l *LoopContextAnalyzer) VisitDotOp(op *ast.DotOp) any { return op }
+func (l *FlowControlAnalyzer) VisitDotOp(op *ast.DotOp) any { return op }
 
-func (l *LoopContextAnalyzer) VisitTypeGuard(guard *ast.TypeGuard) any { return guard }
+func (l *FlowControlAnalyzer) VisitTypeGuard(guard *ast.TypeGuard) any { return guard }
 
-func (l *LoopContextAnalyzer) VisitProcedureBody(body *ast.ProcedureBody) any {
+func (l *FlowControlAnalyzer) VisitProcedureBody(body *ast.ProcedureBody) any {
 	for _, decl := range body.DeclSeq {
 		decl.Accept(l)
 	}
@@ -252,11 +252,11 @@ func (l *LoopContextAnalyzer) VisitProcedureBody(body *ast.ProcedureBody) any {
 	return body
 }
 
-func (l *LoopContextAnalyzer) VisitFieldList(list *ast.FieldList) any { return list }
+func (l *FlowControlAnalyzer) VisitFieldList(list *ast.FieldList) any { return list }
 
-func (l *LoopContextAnalyzer) VisitLenList(list *ast.LenList) any { return list }
+func (l *FlowControlAnalyzer) VisitLenList(list *ast.LenList) any { return list }
 
-func (l *LoopContextAnalyzer) VisitElseIfBranch(branch *ast.ElseIfBranch) any {
+func (l *FlowControlAnalyzer) VisitElseIfBranch(branch *ast.ElseIfBranch) any {
 	for _, s := range branch.ThenPath {
 		s.Accept(l)
 	}
@@ -264,13 +264,13 @@ func (l *LoopContextAnalyzer) VisitElseIfBranch(branch *ast.ElseIfBranch) any {
 	return branch
 }
 
-func (l *LoopContextAnalyzer) VisitReceiver(receiver *ast.Receiver) any { return receiver }
+func (l *FlowControlAnalyzer) VisitReceiver(receiver *ast.Receiver) any { return receiver }
 
-func (l *LoopContextAnalyzer) VisitFPSection(section *ast.FPSection) any { return section }
+func (l *FlowControlAnalyzer) VisitFPSection(section *ast.FPSection) any { return section }
 
-func (l *LoopContextAnalyzer) VisitFormalParams(params *ast.FormalParams) any { return params }
+func (l *FlowControlAnalyzer) VisitFormalParams(params *ast.FormalParams) any { return params }
 
-func (l *LoopContextAnalyzer) VisitCase(c *ast.Case) any {
+func (l *FlowControlAnalyzer) VisitCase(c *ast.Case) any {
 	for _, s := range c.StmtSeq {
 		s.Accept(l)
 	}
@@ -278,9 +278,9 @@ func (l *LoopContextAnalyzer) VisitCase(c *ast.Case) any {
 	return c
 }
 
-func (l *LoopContextAnalyzer) VisitLabelRange(labelRange *ast.LabelRange) any { return labelRange }
+func (l *FlowControlAnalyzer) VisitLabelRange(labelRange *ast.LabelRange) any { return labelRange }
 
-func (l *LoopContextAnalyzer) VisitGuard(guard *ast.Guard) any {
+func (l *FlowControlAnalyzer) VisitGuard(guard *ast.Guard) any {
 	for _, s := range guard.StmtSeq {
 		s.Accept(l)
 	}
@@ -288,10 +288,10 @@ func (l *LoopContextAnalyzer) VisitGuard(guard *ast.Guard) any {
 	return guard
 }
 
-func (l *LoopContextAnalyzer) VisitBadExpr(expr *ast.BadExpr) any { return expr }
+func (l *FlowControlAnalyzer) VisitBadExpr(expr *ast.BadExpr) any { return expr }
 
-func (l *LoopContextAnalyzer) VisitBadDecl(decl *ast.BadDecl) any { return decl }
+func (l *FlowControlAnalyzer) VisitBadDecl(decl *ast.BadDecl) any { return decl }
 
-func (l *LoopContextAnalyzer) VisitBadStmt(stmt *ast.BadStmt) any { return stmt }
+func (l *FlowControlAnalyzer) VisitBadStmt(stmt *ast.BadStmt) any { return stmt }
 
-func (l *LoopContextAnalyzer) VisitBadType(badType *ast.BadType) any { return badType }
+func (l *FlowControlAnalyzer) VisitBadType(badType *ast.BadType) any { return badType }

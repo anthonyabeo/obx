@@ -504,7 +504,7 @@ func (p *Parser) parseType() (ty ast.Type) {
 	switch p.tok {
 	case token.INTEGER, token.BOOLEAN, token.CHAR, token.REAL, token.LONGREAL, token.INT8,
 		token.INT16, token.INT32, token.INT64, token.WCHAR, token.BYTE, token.SHORTINT, token.LONGINT, token.SET:
-		ty = ast.NewBasicType(p.lexeme, p.pos, p.end)
+		ty = ast.NewBasicType(p.tok, p.pos, p.end)
 		p.next()
 	case token.IDENTIFIER:
 		q := p.parseQualifiedIdent()

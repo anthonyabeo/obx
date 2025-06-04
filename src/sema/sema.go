@@ -19,7 +19,7 @@ func (s *Sema) Validate() {
 		s.ctx.Env = s.ctx.Envs[unit.Name()]
 
 		// validate and annotate loops for EXIT support:
-		loop := NewLoopContextAnalyzer(s.ctx)
+		loop := NewFlowControlAnalyzer(s.ctx)
 		loop.Analyse(unit)
 
 		resolve := NewNameResolver(s.ctx)

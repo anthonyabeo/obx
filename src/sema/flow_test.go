@@ -288,7 +288,7 @@ END M.
 			}
 
 			// Run semantic analysis: loop labeling
-			labeler := NewLoopContextAnalyzer(ctx)
+			labeler := NewFlowControlAnalyzer(ctx)
 			labeler.Analyse(unit)
 
 			// Filter diagnostics
