@@ -13,6 +13,14 @@ func (s StringType) String() string {
 	return fmt.Sprintf("StringType(%d)", s.Length)
 }
 
+func (s StringType) Width() int {
+	panic("Not implemented")
+}
+
+func (s StringType) Alignment() int {
+	panic("Not implemented")
+}
+
 func (s StringType) Equals(t Type) bool {
 	//TODO implement me
 	panic("implement me")

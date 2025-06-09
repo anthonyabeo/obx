@@ -1,8 +1,6 @@
 package types
 
-import (
-	"github.com/anthonyabeo/obx/src/syntax/token"
-)
+import "github.com/anthonyabeo/obx/src/syntax/token"
 
 var PredefinedTypes = map[token.Kind]Type{
 	token.BYTE:     ByteType,
@@ -213,4 +211,25 @@ func IsLatin1OrByteString(t Type) bool {
 func IsUnicodeOrLatin1String(t Type) bool {
 	arr, ok := t.(*ArrayType)
 	return ok && (arr.Base == WCharType || arr.Base == CharType || arr.Base == ByteType)
+}
+
+func IsPointerToRecord(t Type) bool {
+	ptr, ok := Underlying(t).(*PointerType)
+	if !ok {
+		return false
+	}
+	_, ok = Underlying(ptr.Base).(*RecordType)
+	return ok
+}
+
+func BaseRecord(t Type) *RecordType {
+	switch t := t.(type) {
+	case *PointerType:
+		if rec, ok := t.Base.(*RecordType); ok {
+			return rec
+		}
+	case *RecordType:
+		return t
+	}
+	return nil
 }

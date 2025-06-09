@@ -27,6 +27,14 @@ func (p *ProcedureType) String() string {
 	return ""
 }
 
+func (p *ProcedureType) Alignment() int {
+	panic("Not implemented")
+}
+
+func (p *ProcedureType) Width() int {
+	panic("Not implemented")
+}
+
 func (p *ProcedureType) Equals(other Type) bool {
 	//o, ok := other.(*ProcedureType)
 	//if !ok || len(p.Params) != len(o.Params) || len(p.Results) != len(o.Results) {

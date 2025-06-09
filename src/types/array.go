@@ -11,6 +11,14 @@ func (a *ArrayType) String() string {
 	return fmt.Sprintf("ARRAY %d OF %s", a.Length, a.Base.String())
 }
 
+func (a *ArrayType) Width() int {
+	panic("Not implemented")
+}
+
+func (a *ArrayType) Alignment() int {
+	panic("Not implemented")
+}
+
 func (a *ArrayType) Equals(other Type) bool {
 	o, ok := other.(*ArrayType)
 	if !ok {

@@ -23,6 +23,14 @@ func (r *RecordType) String() string {
 	return fmt.Sprintf("RECORD %s END", strings.Join(parts, "; "))
 }
 
+func (r *RecordType) Alignment() int {
+	panic("Not implemented")
+}
+
+func (r *RecordType) Width() int {
+	panic("Not implemented")
+}
+
 func (r *RecordType) Equals(other Type) bool {
 	o, ok := other.(*RecordType)
 	if !ok || len(r.Fields) != len(o.Fields) {

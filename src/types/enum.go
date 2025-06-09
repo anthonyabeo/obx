@@ -1,19 +1,29 @@
 package types
 
 type EnumType struct {
-	Variants map[int]string
+	Variants map[string]int
 }
 
 func NewEnumWithVariants(variants ...string) *EnumType {
-	elems := make(map[int]string)
+	elems := make(map[string]int)
 	for i, v := range variants {
-		elems[i] = v
+		elems[v] = i
 	}
 
 	return &EnumType{Variants: elems}
 }
 
 func (e EnumType) String() string {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (e EnumType) Width() int {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (e EnumType) Alignment() int {
 	//TODO implement me
 	panic("implement me")
 }

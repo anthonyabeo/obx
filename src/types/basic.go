@@ -22,27 +22,35 @@ const (
 )
 
 var (
-	ByteType     = &BasicType{BYTE}
-	Int8Type     = &BasicType{INT8}
-	Int16Type    = &BasicType{INT16}
-	Int32Type    = &BasicType{INT32}
-	Int64Type    = &BasicType{INT64}
-	ShortIntType = &BasicType{SHORTINT}
-	IntegerType  = &BasicType{INTEGER}
-	LongIntType  = &BasicType{LONGINT}
-	RealType     = &BasicType{REAL}
-	LongRealType = &BasicType{LONGREAL}
-	CharType     = &BasicType{CHAR}
-	WCharType    = &BasicType{WCHAR}
-	BooleanType  = &BasicType{BOOLEAN}
-	NilType      = &BasicType{NIL}
-	SetType      = &BasicType{SET}
+	ByteType     = &BasicType{BYTE, 1, 1}
+	Int8Type     = &BasicType{INT8, 1, 1}
+	Int16Type    = &BasicType{INT16, 2, 2}
+	Int32Type    = &BasicType{INT32, 4, 4}
+	Int64Type    = &BasicType{INT64, 8, 8}
+	ShortIntType = &BasicType{SHORTINT, 2, 2}
+	IntegerType  = &BasicType{INTEGER, 4, 4}
+	LongIntType  = &BasicType{LONGINT, 8, 8}
+	RealType     = &BasicType{REAL, 4, 4}
+	LongRealType = &BasicType{LONGREAL, 8, 8}
+	CharType     = &BasicType{CHAR, 1, 1}
+	WCharType    = &BasicType{WCHAR, 2, 2}
+	BooleanType  = &BasicType{BOOLEAN, 1, 1}
+	NilType      = &BasicType{NIL, 8, 8}
+	SetType      = &BasicType{SET, 4, 4}
 
-	UnknownType = &BasicType{UNKNOWN}
+	UnknownType = &BasicType{UNKNOWN, 0, 0}
 )
 
 type BasicType struct {
-	Kind BasicKind
+	Kind  BasicKind
+	Size  int
+	Align int
+}
+
+func (b *BasicType) Width() int { return b.Size }
+
+func (b *BasicType) Alignment() int {
+	panic("Not implemented")
 }
 
 func (b *BasicType) String() string {

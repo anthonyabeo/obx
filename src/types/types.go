@@ -4,6 +4,8 @@ import "github.com/anthonyabeo/obx/src/syntax/token"
 
 type Type interface {
 	String() string
+	Width() int
+	Alignment() int
 	Equals(Type) bool
 }
 
