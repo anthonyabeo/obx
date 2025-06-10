@@ -27,6 +27,9 @@ func TypeIncludes(b, a Type) bool {
 		return b == Int16Type
 	case WCharType:
 		return b == CharType
+	case CharType:
+		s := b.(*StringType)
+		return s != nil && s.Length == 1
 	}
 
 	return false
@@ -354,6 +357,8 @@ func Identical(a, b Type) bool {
 	case *PointerType:
 		pb, ok := b.(*PointerType)
 		return ok && Identical(a.Base, pb.Base)
+	case *StringType:
+		return a.Length == 1 && (b == CharType || b == WCharType)
 	// Add more composite types as needed
 	default:
 		return false

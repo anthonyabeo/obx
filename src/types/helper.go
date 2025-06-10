@@ -112,6 +112,11 @@ func IsReal(ty Type) bool {
 }
 
 func IsChar(ty Type) bool {
+	switch t := ty.(type) {
+	case StringType:
+		return t.Length == 1
+	}
+	
 	return ty == CharType || ty == WCharType
 }
 
