@@ -881,14 +881,14 @@ func (p *Parser) parseFactor() ast.Expression {
 
 		return dsg
 
-	case token.INT_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
+	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
 		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.NIL, token.TRUE, token.FALSE, token.LBRACE:
 		return p.parseLiteral()
 
 	default:
 		p.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
-			Message:  p.lexeme,
+			Message:  "unexpected token: " + p.lexeme,
 			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
 		})
 		pos := p.pos
@@ -983,7 +983,7 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
 	}
 
 	p.list = p.parseExprList()
-	if len(p.list) == 0 {
+	if len(p.list) != 1 {
 		return false
 	}
 
@@ -1027,7 +1027,7 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
 // literal = number | string | hexstring | hexchar | NIL | TRUE | FALSE | set
 func (p *Parser) parseLiteral() (lit ast.Expression) {
 	switch p.tok {
-	case token.INT_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
+	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
 		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.TRUE, token.FALSE:
 
 		lit = &ast.BasicLit{Kind: p.tok, Val: p.lexeme, StartOffset: p.pos, EndOffset: p.end}
@@ -1474,12 +1474,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 			assign.EndOffset = assign.RValue.End()
 			stmt = assign
 		case token.RPAREN:
-			stmt = &ast.ProcedureCall{
-				Callee:       dsg,
-				ActualParams: p.list,
-				StartOffset:  pos,
-				EndOffset:    p.end,
-			}
+			stmt = &ast.ProcedureCall{Callee: dsg, ActualParams: p.list, StartOffset: pos, EndOffset: p.end}
 			p.list = make([]ast.Expression, 0)
 			p.next()
 		default:
@@ -1636,9 +1631,7 @@ func (p *Parser) parseCase() *ast.Case {
 
 	if len(c.CaseLabelList) > 0 && len(c.StmtSeq) > 0 {
 		c.StartOffset = c.CaseLabelList[0].Low.Pos()
-
-		lastStmt := c.StmtSeq[len(c.StmtSeq)-1]
-		c.EndOffset = lastStmt.End()
+		c.EndOffset = c.StmtSeq[len(c.StmtSeq)-1].End()
 	} else if len(c.CaseLabelList) > 0 && len(c.StmtSeq) == 0 {
 		c.StartOffset = c.CaseLabelList[0].Low.Pos()
 		c.EndOffset = c.CaseLabelList[len(c.CaseLabelList)-1].High.End()

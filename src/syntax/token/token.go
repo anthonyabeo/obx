@@ -34,7 +34,9 @@ const (
 	IDENTIFIER // main
 
 	literal_begin
-	INT_LIT
+	BYTE_LIT
+	INT8_LIT
+	INT16_LIT
 	INT32_LIT
 	INT64_LIT
 	REAL_LIT
@@ -145,7 +147,7 @@ var tokens = [...]string{
 	ML_COMMENT_START: "(*",
 	ML_COMMENT_END:   "*)",
 	NEWLINE:          "\n",
-	
+
 	IDENTIFIER: "IDENTIFIER",
 
 	BOOLEAN:  "bool",

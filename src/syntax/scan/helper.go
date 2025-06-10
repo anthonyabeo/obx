@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"github.com/anthonyabeo/obx/src/syntax/token"
 	"math"
 	"strconv"
 	"strings"
@@ -109,4 +110,31 @@ func isNumberTokenBoundary(r rune) bool {
 		unicode.IsSpace(r) ||
 		strings.ContainsRune(":;,(){}[]", r) || // statement and grouping
 		strings.ContainsRune("+-*/%=<>#", r) // typical operators
+}
+
+const (
+	maxBYTE  = 255
+	maxCHAR  = 255
+	minINT8  = -128
+	maxINT8  = 127
+	minINT16 = -32768
+	maxINT16 = 32767
+	minINT32 = -2147483648
+	maxINT32 = 2147483647
+	// INT64 covers full int64 range, which ParseInt handles
+)
+
+func MinimalIntToken(value int64) token.Kind {
+	switch {
+	case value >= 0 && value <= maxBYTE:
+		return token.BYTE_LIT
+	case value >= minINT8 && value <= maxINT8:
+		return token.INT8_LIT
+	case value >= minINT16 && value <= maxINT16:
+		return token.INT16_LIT
+	case value >= minINT32 && value <= maxINT32:
+		return token.INT32_LIT
+	default:
+		return token.INT64_LIT
+	}
 }

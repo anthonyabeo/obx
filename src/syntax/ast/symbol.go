@@ -155,14 +155,14 @@ type ConstantSymbol struct {
 	name        string
 	kind        SymbolKind
 	props       IdentProps
-	value       Expression
+	Value       Expression
 	parent      *Environment
 	typ         Type
 	mangledName string
 }
 
 func NewConstantSymbol(name string, props IdentProps, value Expression) *ConstantSymbol {
-	return &ConstantSymbol{name: name, kind: ConstantSymbolKind, props: props, value: value}
+	return &ConstantSymbol{name: name, kind: ConstantSymbolKind, props: props, Value: value}
 }
 func (c *ConstantSymbol) Name() string                  { return c.name }
 func (c *ConstantSymbol) Kind() SymbolKind              { return c.kind }
@@ -197,14 +197,14 @@ func (f *FieldSymbol) SetMangledName(name string)   { f.mangledName = name }
 type ParamSymbol struct {
 	name        string
 	kind        SymbolKind
-	mod         token.Kind
+	Mod         token.Kind
 	typ         Type
 	parent      *Environment
 	mangledName string
 }
 
 func NewParamSymbol(name string, mod token.Kind, typ Type) *ParamSymbol {
-	return &ParamSymbol{name: name, kind: ParamSymbolKind, mod: mod, typ: typ}
+	return &ParamSymbol{name: name, kind: ParamSymbolKind, Mod: mod, typ: typ}
 }
 
 func (p *ParamSymbol) Name() string                  { return p.name }
@@ -225,4 +225,17 @@ func Mangle(sym Symbol) string {
 	}
 	parts = append(parts, sym.Name())
 	return strings.Join(parts, "$")
+}
+
+func IsVarParam(dsg *Designator) bool {
+	if dsg.QIdent == nil || dsg.QIdent.Symbol == nil {
+		return false
+	}
+
+	paramSym, ok := dsg.QIdent.Symbol.(*ParamSymbol)
+	if !ok {
+		return false
+	}
+
+	return paramSym.kind == ParamSymbolKind && paramSym.Mod == token.VAR
 }

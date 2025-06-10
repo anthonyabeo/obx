@@ -2,10 +2,10 @@ package ast
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/types"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/syntax/token"
+	"github.com/anthonyabeo/obx/src/types"
 )
 
 // IdentProps is a set of flags denoting the properties of an identifier
@@ -132,6 +132,7 @@ func (n *Nil) End() int               { return n.EndOffset }
 func (n *Nil) Children() []Node       { return []Node{} }
 func (n *Nil) Type() types.Type       { return n.SemaType }
 
+func (id *IdentifierDef) expr() {}
 func (id *IdentifierDef) String() string {
 	name := id.Name
 	switch id.Props {
@@ -295,6 +296,7 @@ type Selector interface {
 // ---------------------
 type DotOp struct {
 	Field       string
+	Symbol      Symbol
 	StartOffset int
 	EndOffset   int
 }

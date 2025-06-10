@@ -36,11 +36,12 @@ var exprStart = map[token.Kind]bool{
 	token.STR_LIT:      true,
 	token.HEX_STR_LIT:  true,
 	token.CHAR_LIT:     true,
-	token.INT_LIT:      true,
-	token.REAL_LIT:     true,
-	token.NOT:          true,
+	token.INT8_LIT:     true,
+	token.INT16_LIT:    true,
 	token.INT32_LIT:    true,
 	token.INT64_LIT:    true,
+	token.REAL_LIT:     true,
+	token.NOT:          true,
 	token.LONGREAL_LIT: true,
 }
 
@@ -107,12 +108,14 @@ func (p *Parser) exprStart() bool {
 		p.tok == token.STR_LIT ||
 		p.tok == token.HEX_STR_LIT ||
 		p.tok == token.CHAR_LIT ||
-		p.tok == token.INT_LIT ||
-		p.tok == token.REAL_LIT ||
-		p.tok == token.NOT ||
+		p.tok == token.BYTE_LIT ||
+		p.tok == token.INT8_LIT ||
+		p.tok == token.INT16_LIT ||
 		p.tok == token.INT32_LIT ||
 		p.tok == token.INT64_LIT ||
-		p.tok == token.LONGREAL_LIT
+		p.tok == token.REAL_LIT ||
+		p.tok == token.LONGREAL_LIT ||
+		p.tok == token.NOT
 }
 
 func (p *Parser) stmtStart() bool {

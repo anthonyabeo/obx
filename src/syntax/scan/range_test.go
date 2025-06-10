@@ -101,7 +101,7 @@ END Hello.
 
 		{token.IDENTIFIER, "x", 5, 3, 5, 4},
 		{token.BECOMES, ":=", 5, 5, 5, 7},
-		{token.INT_LIT, "42", 5, 8, 5, 10},
+		{token.BYTE_LIT, "42", 5, 8, 5, 10},
 		{token.SEMICOLON, ";", 5, 10, 5, 11},
 		{token.NEWLINE, "\n", 5, 11, 6, 1},
 
@@ -109,7 +109,7 @@ END Hello.
 		{token.BECOMES, ":=", 6, 5, 6, 7},
 		{token.IDENTIFIER, "x", 6, 8, 6, 9},
 		{token.PLUS, "+", 6, 10, 6, 11},
-		{token.INT_LIT, "1", 6, 12, 6, 13},
+		{token.BYTE_LIT, "1", 6, 12, 6, 13},
 		{token.NEWLINE, "\n", 6, 13, 7, 1},
 
 		{token.END, "END", 7, 1, 7, 4},
@@ -166,13 +166,13 @@ END Math.
 
 		{token.IDENTIFIER, "a", 7, 3, 7, 4},
 		{token.BECOMES, ":=", 7, 5, 7, 7},
-		{token.INT_LIT, "10", 7, 8, 7, 10},
+		{token.BYTE_LIT, "10", 7, 8, 7, 10},
 		{token.SEMICOLON, ";", 7, 10, 7, 11},
 		{token.NEWLINE, "\n", 7, 11, 8, 1},
 
 		{token.IDENTIFIER, "b", 8, 3, 8, 4},
 		{token.BECOMES, ":=", 8, 5, 8, 7},
-		{token.INT_LIT, "20", 8, 8, 8, 10},
+		{token.BYTE_LIT, "20", 8, 8, 8, 10},
 		{token.SEMICOLON, ";", 8, 10, 8, 11},
 		{token.NEWLINE, "\n", 8, 11, 9, 1},
 		{token.NEWLINE, "\n", 9, 1, 10, 1},
@@ -199,7 +199,7 @@ END Math.
 		{token.WHILE, "WHILE", 14, 3, 14, 8},
 		{token.IDENTIFIER, "result", 14, 9, 14, 15},
 		{token.GREAT, ">", 14, 16, 14, 17},
-		{token.INT_LIT, "0", 14, 18, 14, 19},
+		{token.BYTE_LIT, "0", 14, 18, 14, 19},
 		{token.DO, "DO", 14, 20, 14, 22},
 		{token.NEWLINE, "\n", 14, 22, 15, 1},
 
@@ -207,7 +207,7 @@ END Math.
 		{token.BECOMES, ":=", 15, 12, 15, 14},
 		{token.IDENTIFIER, "result", 15, 15, 15, 21},
 		{token.MINUS, "-", 15, 22, 15, 23},
-		{token.INT_LIT, "1", 15, 24, 15, 25},
+		{token.BYTE_LIT, "1", 15, 24, 15, 25},
 		{token.NEWLINE, "\n", 15, 25, 16, 1},
 
 		{token.END, "END", 16, 3, 16, 6},

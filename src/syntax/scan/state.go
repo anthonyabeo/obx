@@ -66,7 +66,15 @@ func scanNumber(s *Scanner) StateFn {
 			return s.errorf("malformed number: invalid character '%c' after hex literal", s.peek())
 		}
 
-		s.emit(token.INT_LIT, s.start, s.pos)
+		fullNum := string(s.content[s.start : s.pos-1])
+		value, err := strconv.ParseInt(fullNum, 16, 64)
+		if err != nil {
+			return s.errorf("malformed number: invalid hex digits")
+		}
+
+		kind := MinimalIntToken(value)
+
+		s.emit(kind, s.start, s.pos)
 		return scanText
 	}
 
@@ -150,7 +158,15 @@ func scanNumber(s *Scanner) StateFn {
 			return s.errorf("malformed number literal. '%c' after integer literal", s.peek())
 		}
 
-		s.emit(token.INT_LIT, s.start, s.pos)
+		fullNum := string(s.content[s.start:s.pos])
+		value, err := strconv.ParseInt(fullNum, 10, 64)
+		if err != nil {
+			return s.errorf("malformed number: invalid hex digits")
+		}
+
+		kind := MinimalIntToken(value)
+
+		s.emit(kind, s.start, s.pos)
 		return scanText
 	}
 

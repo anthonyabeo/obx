@@ -58,6 +58,7 @@ type (
 	FieldList struct {
 		List []*IdentifierDef
 		Type Type
+		Env  *RecordEnv
 
 		StartOffset int
 		EndOffset   int

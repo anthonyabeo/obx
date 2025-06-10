@@ -1,35 +1,6 @@
-package env
+package ast
 
 var GlobalEnviron *Environment
-
-// IdentProps is a set of flags denoting the properties of an identifier
-type IdentProps int
-
-func (p IdentProps) String() string {
-	switch p {
-	case Exported:
-		return "Exported"
-	case Unexported:
-		return "Unexported"
-	case ReadOnly:
-		return "ReadOnly"
-	case Predeclared:
-		return "Predeclared"
-	case ExportedReadOnly:
-		return "Exported and Read Only"
-	}
-	return "Unknown"
-}
-
-// Properties of an identifier
-const (
-	Exported IdentProps = 1 << iota
-	Unexported
-	ReadOnly
-	Predeclared
-
-	ExportedReadOnly = Exported | ReadOnly
-)
 
 // A PreDeclFuncProc is the id of a predeclared function or procedure.
 type PreDeclFuncProc int

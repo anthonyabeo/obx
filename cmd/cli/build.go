@@ -89,7 +89,7 @@ var buildCmd = &cobra.Command{
 				log.Fatalf("%d errors found", ctx.Reporter.ErrorCount())
 			}
 
-			obx.Units[unit.Name()] = unit
+			obx.AddUnit(unit)
 			ctx.Envs[unit.Name()] = unit.Environ()
 		}
 

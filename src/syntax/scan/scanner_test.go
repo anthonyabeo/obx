@@ -15,36 +15,36 @@ func TestScanNumber(t *testing.T) {
 		wantErr  bool
 	}{
 		// Valid cases
-		{"123", token.INT_LIT, false},
-		{"97", token.INT_LIT, false},
+		{"123", token.BYTE_LIT, false},
+		{"97", token.BYTE_LIT, false},
 		{"97L", token.INT64_LIT, false},
 		{"97938l", token.INT64_LIT, false},
-		{"0123", token.INT_LIT, false},
+		{"0123", token.BYTE_LIT, false},
 		{"123L", token.INT64_LIT, false},
 		{"123I", token.INT32_LIT, false},
 		{"123l", token.INT64_LIT, false},
 		{"123i", token.INT32_LIT, false},
-		{"1A2BH", token.INT_LIT, false},
+		{"1A2BH", token.INT16_LIT, false},
 		{"1A2BHL", token.INT64_LIT, false},
 		{"1A2BHI", token.INT32_LIT, false},
-		{"0", token.INT_LIT, false},
+		{"0", token.BYTE_LIT, false},
 		{"0L", token.INT64_LIT, false},
 		{"0I", token.INT32_LIT, false},
 		{"0l", token.INT64_LIT, false},
 		{"0i", token.INT32_LIT, false},
-		{"0FFH", token.INT_LIT, false},
+		{"0FFH", token.BYTE_LIT, false},
 		{"0FFHL", token.INT64_LIT, false},
 		{"0FFHI", token.INT32_LIT, false},
 		{"0FFhL", token.INT64_LIT, false},
 		{"0FFhI", token.INT32_LIT, false},
 		{"0FFhl", token.INT64_LIT, false},
 		{"0FFhi", token.INT32_LIT, false},
-		{"9", token.INT_LIT, false},
+		{"9", token.BYTE_LIT, false},
 		{"9L", token.INT64_LIT, false},
 		{"9I", token.INT32_LIT, false},
 		{"9l", token.INT64_LIT, false},
 		{"9i", token.INT32_LIT, false},
-		{"0FFFFFFFFH", token.INT_LIT, false},
+		{"0FFFFFFFFH", token.INT64_LIT, false},
 		{"123.456", token.REAL_LIT, false},
 		{"123.456E2", token.REAL_LIT, false},
 		{"123.456e-2", token.REAL_LIT, false},
@@ -54,8 +54,8 @@ func TestScanNumber(t *testing.T) {
 		{"0.0E0", token.REAL_LIT, false},     // zero with exponent
 		{"0.0D0", token.LONGREAL_LIT, false}, // zero with long real exponent
 		{"123.0", token.REAL_LIT, false},     // integer with decimal point
-		{"0H", token.INT_LIT, false},         // minimal valid hex
-		{"0h", token.INT_LIT, false},         // minimal valid hex
+		{"0H", token.BYTE_LIT, false},        // minimal valid hex
+		{"0h", token.BYTE_LIT, false},        // minimal valid hex
 		{"123.456D2", token.LONGREAL_LIT, false},
 		{"123.456S-2", token.REAL_LIT, false},
 		{"123.456E2147483648", token.LONGREAL_LIT, false},  // exponent larger than 32 bits
@@ -126,7 +126,7 @@ func TestScanIdentifiers(t *testing.T) {
 		{"abcdefghijklmnopqrstuvwxyz", token.IDENTIFIER, false},     // all lowercase letters
 		{"_ABCDEFGHIJKLMNOPQRSTUVWXYZ123", token.IDENTIFIER, false}, // mixed case with digits
 		{"123main", token.ILLEGAL, true},                            // starts with a digit
-		{"123", token.INT_LIT, false},                               // only digits
+		{"123", token.BYTE_LIT, false},                              // only digits
 		{"!main", token.ILLEGAL, true},                              // starts with invalid character
 		{"", token.EOF, false},                                      // empty input
 		{"_", token.IDENTIFIER, false},                              // single underscore
@@ -287,7 +287,7 @@ func TestScanCharacterLiterals(t *testing.T) {
 		{"12345x", token.ILLEGAL, "", true},  // Too many hex digits
 		{"1Fz", token.ILLEGAL, "", true},     // Invalid suffix 'z'
 		{"x", token.IDENTIFIER, "", false},   // Empty literal
-		{"1234", token.INT_LIT, "", false},   // Missing 'x'
+		{"1234", token.INT16_LIT, "", false}, // Missing 'x'
 		{"1F x", token.ILLEGAL, "", true},    // Whitespace between hex and 'x'
 	}
 
@@ -484,13 +484,13 @@ end Main
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "n"},
 		{token.EQUAL, "="},
-		{token.INT_LIT, "0"},
+		{token.BYTE_LIT, "0"},
 		{token.RPAREN, ")"},
 		{token.OR, "or"},
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "n"},
 		{token.EQUAL, "="},
-		{token.INT_LIT, "1"},
+		{token.BYTE_LIT, "1"},
 		{token.RPAREN, ")"},
 		{token.THEN, "then"},
 		{token.NEWLINE, "\n"},
@@ -508,7 +508,7 @@ end Main
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "n"},
 		{token.MINUS, "-"},
-		{token.INT_LIT, "1"},
+		{token.BYTE_LIT, "1"},
 		{token.RPAREN, ")"},
 		{token.NEWLINE, "\n"},
 
@@ -518,7 +518,7 @@ end Main
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "n"},
 		{token.MINUS, "-"},
-		{token.INT_LIT, "2"},
+		{token.BYTE_LIT, "2"},
 		{token.RPAREN, ")"},
 		{token.NEWLINE, "\n"},
 
@@ -543,7 +543,7 @@ end Main
 		{token.BECOMES, ":="},
 		{token.IDENTIFIER, "fib"},
 		{token.LPAREN, "("},
-		{token.INT_LIT, "21"},
+		{token.BYTE_LIT, "21"},
 		{token.RPAREN, ")"},
 		{token.NEWLINE, "\n"},
 
@@ -551,7 +551,7 @@ end Main
 		{token.LPAREN, "("},
 		{token.IDENTIFIER, "res"},
 		{token.EQUAL, "="},
-		{token.INT_LIT, "10946"},
+		{token.INT16_LIT, "10946"},
 		{token.RPAREN, ")"},
 		{token.NEWLINE, "\n"},
 
@@ -862,7 +862,7 @@ end Drawing
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "count"},
 		{token.EQUAL, "="},
-		{token.INT_LIT, "2"},
+		{token.BYTE_LIT, "2"},
 		{token.RPAREN, ")"},
 		{token.NEWLINE, "\n"},
 
@@ -898,7 +898,7 @@ end Drawing
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "calc"},
 		{token.LPAREN, "("},
-		{token.INT_LIT, "3"},
+		{token.BYTE_LIT, "3"},
 		{token.RPAREN, ")"},
 		{token.NEWLINE, "\n"},
 
@@ -912,7 +912,7 @@ end Drawing
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "calc"},
 		{token.LPAREN, "("},
-		{token.INT_LIT, "4"},
+		{token.BYTE_LIT, "4"},
 		{token.RPAREN, ")"},
 		{token.NEWLINE, "\n"},
 
@@ -920,7 +920,7 @@ end Drawing
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "diameter"},
 		{token.BECOMES, ":="},
-		{token.INT_LIT, "3"},
+		{token.BYTE_LIT, "3"},
 		{token.NEWLINE, "\n"},
 
 		{token.IDENTIFIER, "figures"},
@@ -947,7 +947,7 @@ end Drawing
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "calc"},
 		{token.LPAREN, "("},
-		{token.INT_LIT, "5"},
+		{token.BYTE_LIT, "5"},
 		{token.RPAREN, ")"},
 		{token.NEWLINE, "\n"},
 
@@ -961,7 +961,7 @@ end Drawing
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "calc"},
 		{token.LPAREN, "("},
-		{token.INT_LIT, "6"},
+		{token.BYTE_LIT, "6"},
 		{token.RPAREN, ")"},
 		{token.NEWLINE, "\n"},
 
@@ -969,7 +969,7 @@ end Drawing
 		{token.PERIOD, "."},
 		{token.IDENTIFIER, "width"},
 		{token.BECOMES, ":="},
-		{token.INT_LIT, "4"},
+		{token.BYTE_LIT, "4"},
 		{token.NEWLINE, "\n"},
 
 		{token.IDENTIFIER, "figures"},
