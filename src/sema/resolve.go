@@ -5,6 +5,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/types"
 )
 
 type NamesResolver struct {
@@ -106,6 +107,20 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 
 func (n *NamesResolver) VisitFunctionCall(call *ast.FunctionCall) any {
 	call.Callee.Accept(n)
+
+	sym := call.Callee.QIdent.Symbol
+	proc, ok := sym.(*ast.ProcedureSymbol)
+	if !ok {
+		n.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("called object, '%s' is not a procedure or function", call.Callee),
+			Range:    n.ctx.Source.Span(n.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
+		})
+		return call
+	}
+
+	call.Callee.SemaType = proc.Type().Accept(n).(types.Type)
+
 	for _, param := range call.ActualParams {
 		param.Accept(n)
 	}
@@ -169,6 +184,7 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 		return ident
 	}
 
+	sym.SetMangledName(ast.Mangle(sym))
 	ident.Symbol = sym
 	ident.Name = sym.MangledName()
 	return ident
@@ -194,6 +210,7 @@ func (n *NamesResolver) VisitNil(n2 *ast.Nil) any { return n2 }
 
 func (n *NamesResolver) VisitIfStmt(stmt *ast.IfStmt) any {
 	stmt.BoolExpr.Accept(n)
+
 	for _, statement := range stmt.ThenPath {
 		statement.Accept(n)
 	}
@@ -244,6 +261,7 @@ func (n *NamesResolver) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
 
 func (n *NamesResolver) VisitWhileStmt(stmt *ast.WhileStmt) any {
 	stmt.BoolExpr.Accept(n)
+
 	for _, statement := range stmt.StmtSeq {
 		statement.Accept(n)
 	}
@@ -432,6 +450,7 @@ func (n *NamesResolver) VisitEnumType(ty *ast.EnumType) any { return ty }
 
 func (n *NamesResolver) VisitNamedType(ty *ast.NamedType) any {
 	ty.Name.Accept(n)
+	ty.Symbol = ty.Name.Symbol
 	return ty
 }
 

@@ -51,10 +51,8 @@ func TestNameResolution_BasicProcedure(t *testing.T) {
 	p := parser.NewParser(ctx)
 	unit := p.Parse()
 
-	// Set up OberonX and semantic analysis
-	obx := &ast.OberonX{Units: []ast.CompilationUnit{unit}}
-	sema := NewSema(ctx, obx)
-	sema.Validate()
+	resolve := NewNameResolver(ctx)
+	resolve.Resolve(unit)
 
 	// Check for diagnostics (should be none)
 	if diags := ctx.Reporter.Diagnostics(); len(diags) > 0 {
@@ -181,12 +179,13 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 		}
 
 		obx.AddUnit(unit)
-		//obx.Units[unit.Name()] = unit
 		ctx.Envs[unit.Name()] = unit.Environ()
 	}
 
-	sema := NewSema(ctx, obx)
-	sema.Validate()
+	for _, unit := range obx.Units {
+		resolve := NewNameResolver(ctx)
+		resolve.Resolve(unit)
+	}
 
 	// Look into the AST for `Math.Pi` reference
 	main, _ := obx.Lookup("Main")
@@ -236,10 +235,8 @@ func TestNameResolutionUndefined(t *testing.T) {
 	p := parser.NewParser(ctx)
 	unit := p.Parse()
 
-	// Set up OberonX and semantic analysis
-	obx := &ast.OberonX{Units: []ast.CompilationUnit{unit}}
-	sema := NewSema(ctx, obx)
-	sema.Validate()
+	resolve := NewNameResolver(ctx)
+	resolve.Resolve(unit)
 
 	if ctx.Reporter.ErrorCount() == 0 {
 		t.Fatal("expected errors, got none")
@@ -291,10 +288,8 @@ func TestNameResolution_Basic(t *testing.T) {
 
 	assign := findAssignmentTo("y", unit)
 
-	// Set up OberonX and semantic analysis
-	obx := &ast.OberonX{Units: []ast.CompilationUnit{unit}}
-	sema := NewSema(ctx, obx)
-	sema.Validate()
+	resolve := NewNameResolver(ctx)
+	resolve.Resolve(unit)
 
 	dsg, ok := assign.LValue.(*ast.Designator)
 	if !ok {

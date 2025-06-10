@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/report"
-	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
@@ -149,10 +148,7 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 	}
 
 	obx := parseSource(t, ctx)
-
-	s := sema.NewSema(ctx, obx)
-	s.Validate()
-
+	
 	data, err := PrettyPrintJSON(obx, ctx)
 	if err != nil {
 		t.Fatalf("PrettyPrintJSON failed: %v", err)
@@ -181,18 +177,18 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 		t.Fatalf("expected 'Module' in units[0], got %v", module["type"])
 	}
 
-	proc := FindProcedureByName(result, "Bigger$Main")
+	proc := FindProcedureByName(result, "Main")
 	if proc == nil {
 		t.Errorf("expected to find procedure with name 'Main'")
 	}
 
-	decl := FindVariableByName(result, "Bigger$p")
+	decl := FindVariableByName(result, "p")
 	if decl == nil {
-		t.Errorf("Expected variable declaration for 'Bigger$p'")
+		t.Errorf("Expected variable declaration for 'p'")
 	}
 
-	ty := FindTypeByName(result, "Bigger$Point")
+	ty := FindTypeByName(result, "Point")
 	if ty == nil {
-		t.Errorf("Expected variable declaration for 'Bigger$Point'")
+		t.Errorf("Expected variable declaration for 'Point'")
 	}
 }
