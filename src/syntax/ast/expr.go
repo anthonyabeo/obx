@@ -106,6 +106,7 @@ type (
 	Designator struct {
 		QIdent      *QualifiedIdent
 		Select      []Selector
+		Symbol      Symbol
 		SemaType    types.Type
 		StartOffset int
 		EndOffset   int

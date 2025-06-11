@@ -707,7 +707,7 @@ func (p *Parser) getRecordType(base ast.Symbol) *ast.RecordType {
 		return nil
 	}
 
-	switch ty := typeSymbol.Type().(type) {
+	switch ty := typeSymbol.TypeNode().(type) {
 	case *ast.RecordType:
 		return ty
 	case *ast.PointerType:
@@ -1002,7 +1002,7 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
 		return false
 	}
 
-	switch t := sym.Type().(type) {
+	switch t := sym.(*ast.TypeSymbol).TypeNode().(type) {
 	case *ast.RecordType:
 	case *ast.PointerType:
 		if _, ok := t.Base.(*ast.RecordType); !ok {
@@ -1230,7 +1230,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 		}
 
 		var recordType *ast.RecordType
-		switch t := typeSymbol.Type().(type) {
+		switch t := typeSymbol.TypeNode().(type) {
 		case *ast.RecordType:
 			recordType = t
 		case *ast.PointerType:

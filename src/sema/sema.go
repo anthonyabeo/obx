@@ -24,5 +24,8 @@ func (s *Sema) Validate() {
 
 		resolve := NewNameResolver(s.ctx)
 		resolve.Resolve(unit)
+
+		checker := NewTypeChecker(s.ctx)
+		checker.TypeCheck(unit)
 	}
 }

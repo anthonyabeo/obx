@@ -5,7 +5,6 @@ import (
 
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
-	"github.com/anthonyabeo/obx/src/types"
 )
 
 type NamesResolver struct {
@@ -84,7 +83,6 @@ func (n *NamesResolver) VisitIdentifierDef(def *ast.IdentifierDef) any {
 
 	sym.SetMangledName(ast.Mangle(sym))
 	def.Symbol = sym
-	def.Name = sym.MangledName()
 
 	return def
 }
@@ -97,7 +95,10 @@ func (n *NamesResolver) VisitBinaryExpr(expr *ast.BinaryExpr) any {
 }
 
 func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
-	dsg.QIdent.Accept(n)
+	if dsg.QIdent.Accept(n) != nil {
+		dsg.Symbol = dsg.QIdent.Symbol
+	}
+
 	for _, selector := range dsg.Select {
 		selector.Accept(n)
 	}
@@ -109,7 +110,7 @@ func (n *NamesResolver) VisitFunctionCall(call *ast.FunctionCall) any {
 	call.Callee.Accept(n)
 
 	sym := call.Callee.QIdent.Symbol
-	proc, ok := sym.(*ast.ProcedureSymbol)
+	_, ok := sym.(*ast.ProcedureSymbol)
 	if !ok {
 		n.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
@@ -119,7 +120,7 @@ func (n *NamesResolver) VisitFunctionCall(call *ast.FunctionCall) any {
 		return call
 	}
 
-	call.Callee.SemaType = proc.Type().Accept(n).(types.Type)
+	//call.Callee.SemaType = proc.Type().Accept(n).(types.Type)
 
 	for _, param := range call.ActualParams {
 		param.Accept(n)
@@ -143,11 +144,10 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 				Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
 			})
 
-			return ident
+			return nil
 		}
 
 		ident.Symbol = sym
-		ident.Name = sym.MangledName()
 		return ident
 	}
 
@@ -340,8 +340,6 @@ func (n *NamesResolver) VisitImport(i *ast.Import) any {
 		return i
 	}
 
-	//sym.(*ast.ImportSymbol).Env = n.ctx.Envs[name]
-
 	return i
 }
 
@@ -370,14 +368,20 @@ func (n *NamesResolver) VisitVariableDecl(decl *ast.VariableDecl) any {
 		}
 	}
 
-	//decl.Type.Accept(n)
-
 	return decl
 }
 
 func (n *NamesResolver) VisitConstantDecl(decl *ast.ConstantDecl) any {
-	decl.Name.Accept(n)
+	if def := decl.Name.Accept(n); def == nil {
+		n.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("'%s' is not a known constant", decl.Name.Name),
+			Range:    n.ctx.Source.Span(n.ctx.FileName, decl.Name.StartOffset, decl.Name.EndOffset),
+		})
+	}
+
 	decl.Value.Accept(n)
+
 	return decl
 }
 
@@ -475,8 +479,6 @@ func (n *NamesResolver) VisitFieldList(list *ast.FieldList) any {
 	for _, def := range list.List {
 		def.Accept(n)
 	}
-
-	list.Type.Accept(n)
 
 	return list
 }

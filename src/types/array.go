@@ -3,7 +3,7 @@ package types
 import "fmt"
 
 type ArrayType struct {
-	Length int
+	Length int64
 	Base   Type
 }
 

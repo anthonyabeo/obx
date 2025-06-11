@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
-	"github.com/anthonyabeo/obx/src/syntax/scan"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/types"
 	"math"
@@ -76,21 +75,8 @@ func (t *TypeChecker) VisitIdentifierDef(def *ast.IdentifierDef) any {
 			Range:    t.ctx.Source.Span(t.ctx.FileName, def.StartOffset, def.EndOffset),
 		})
 
-		return def
+		return nil
 	}
-
-	ty := def.Symbol.Type().Accept(t).(types.Type)
-	if ty == nil {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
-			Message:  "unresolved identifier: " + def.Name,
-			Range:    t.ctx.Source.Span(t.ctx.FileName, def.StartOffset, def.EndOffset),
-		})
-
-		return def
-	}
-
-	def.SemaType = ty
 
 	return def
 }
@@ -134,7 +120,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 			case *types.ArrayType:
 				for _, expr := range s.List {
 					expr.Accept(t)
-					if !types.SameType(expr.Type(), types.IntegerType) {
+					if !types.IsInteger(expr.Type()) {
 						t.ctx.Reporter.Report(report.Diagnostic{
 							Severity: report.Error,
 							Message:  fmt.Sprintf("array index '%s' does not resolve to an integer", expr),
@@ -174,7 +160,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				})
 			}
 		case *ast.DotOp:
-			_, ok := types.Underlying(typ).(*types.RecordType)
+			rec, ok := types.Underlying(typ).(*types.RecordType)
 			if !ok {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
@@ -185,17 +171,24 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				return dsg
 			}
 
-			if s.Symbol == nil {
+			var field *types.Field
+			for _, f := range rec.Fields {
+				if f.Name == s.Field {
+					field = &f
+				}
+			}
+
+			if field == nil {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message:  "unresolved field '%v' of record '%v'",
+					Message:  fmt.Sprintf("record field '%v' not found", s.Field),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 				})
 
 				return dsg
 			}
 
-			typ = s.Symbol.Type().Accept(t).(types.Type)
+			typ = field.Type
 		case *ast.PtrDeref:
 			ptr, ok := typ.(*types.PointerType)
 			if !ok {
@@ -222,7 +215,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				})
 			}
 
-			ty := NamedTy.Symbol.Type().Accept(t).(types.Type)
+			ty := NamedTy.Symbol.TypeNode().Accept(t).(types.Type)
 			target := ty // s.Type is an ast.Type node
 
 			// 1. Check if base is allowed (must be VAR param of record, or pointer to record)
@@ -346,33 +339,54 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 				Range:    t.ctx.Source.Span(t.ctx.FileName, expr.StartOffset, expr.EndOffset),
 			})
 			expr.SemaType = types.UnknownType
-		} else if op == token.MINUS {
-			val := expr.Operand.(*ast.BasicLit).Val
-			value, err := strconv.ParseInt(val, 10, 64)
-			if err != nil {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Fatal,
-					Message:  fmt.Sprintf("could not parse '%s' to int", val),
-					Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Operand.Pos(), expr.Operand.End()),
-				})
-			}
-			scan.MinimalIntToken(-value)
-
-			switch {
-			case -value >= 0 && -value <= 255:
-				expr.SemaType = types.ByteType
-			case value >= -128 && value <= 127:
-				expr.SemaType = types.Int8Type
-			case value >= -32768 && value <= 32767:
-				expr.SemaType = types.Int16Type
-			case value >= -2147483648 && value <= 2147483647:
-				expr.SemaType = types.Int32Type
-			default:
-				expr.SemaType = types.Int64Type
-			}
-
 		} else {
-			expr.SemaType = tx
+			switch e := expr.Operand.(type) {
+			case *ast.BasicLit:
+				if e.Kind == token.REAL || e.Kind == token.LONGREAL {
+					value, err := strconv.ParseFloat(e.Val, 10)
+					if err != nil {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Fatal,
+							Message:  fmt.Sprintf("could not parse '%s' to real", e.Val),
+							Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Operand.Pos(), expr.Operand.End()),
+						})
+					}
+
+					f32 := float32(value)
+					back := float64(f32)
+					if back == value {
+						expr.SemaType = types.RealType
+					} else {
+						expr.SemaType = types.LongRealType
+					}
+				} else {
+					value, err := strconv.ParseInt(e.Val, 10, 64)
+					if err != nil {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Fatal,
+							Message:  fmt.Sprintf("could not parse '%s' to int", e.Val),
+							Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Operand.Pos(), expr.Operand.End()),
+						})
+					}
+
+					switch {
+					case -value >= 0 && -value <= 255:
+						expr.SemaType = types.ByteType
+					case value >= -128 && value <= 127:
+						expr.SemaType = types.Int8Type
+					case value >= -32768 && value <= 32767:
+						expr.SemaType = types.Int16Type
+					case value >= -2147483648 && value <= 2147483647:
+						expr.SemaType = types.Int32Type
+					default:
+						expr.SemaType = types.Int64Type
+					}
+				}
+
+			default:
+				expr.SemaType = tx
+			}
+
 		}
 
 	case token.NOT:
@@ -408,10 +422,10 @@ func (t *TypeChecker) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 		})
 
 		ident.SemaType = types.UnknownType
-		return ident
+		return nil
 	}
 
-	ident.SemaType = ident.Symbol.Type().Accept(t).(types.Type)
+	ident.SemaType = ident.Symbol.Type()
 	return ident
 }
 
@@ -792,6 +806,7 @@ func (t *TypeChecker) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 func (t *TypeChecker) VisitVariableDecl(decl *ast.VariableDecl) any {
 	ty := decl.Type.Accept(t).(types.Type)
 	for _, id := range decl.IdentList {
+		id.Symbol.SetType(ty)
 		id.SemaType = ty
 	}
 
@@ -799,6 +814,14 @@ func (t *TypeChecker) VisitVariableDecl(decl *ast.VariableDecl) any {
 }
 
 func (t *TypeChecker) VisitConstantDecl(decl *ast.ConstantDecl) any {
+	if !ast.IsConstExpr(decl.Value) {
+		t.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  "operands of constant expression must be constants",
+			Range:    t.ctx.Source.Span(t.ctx.FileName, decl.Value.Pos(), decl.Value.End()),
+		})
+	}
+
 	decl.Value.Accept(t)
 	if types.IsUnknownType(decl.Value.Type()) {
 		t.ctx.Reporter.Report(report.Diagnostic{
@@ -810,7 +833,10 @@ func (t *TypeChecker) VisitConstantDecl(decl *ast.ConstantDecl) any {
 		return decl
 	}
 
-	decl.Name.SemaType = decl.Value.Type()
+	ty := decl.Value.Type()
+
+	decl.Name.Symbol.SetType(ty)
+	decl.Name.SemaType = ty
 
 	return decl
 }
@@ -904,7 +930,7 @@ func (t *TypeChecker) VisitArrayType(ty *ast.ArrayType) any {
 		}
 	}
 
-	dims := t.VisitLenList(ty.LenList).([]int)
+	dims := t.VisitLenList(ty.LenList).([]int64)
 
 	// Wrap innermost to outermost
 	typ := elemType
@@ -924,7 +950,7 @@ func (t *TypeChecker) VisitLenList(list *ast.LenList) any {
 	}
 
 	isVar := list.Modifier == token.VAR
-	var lengths []int
+	var lengths []int64
 
 	for _, expr := range list.List {
 		expr.Accept(t)
@@ -942,7 +968,7 @@ func (t *TypeChecker) VisitLenList(list *ast.LenList) any {
 		} else {
 			// Constant-length expression
 			val := ast.EvalConstExpr(expr)
-			n, ok := val.(int)
+			n, ok := val.(int64)
 			if !ok || n < 0 {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
@@ -976,7 +1002,6 @@ func (t *TypeChecker) VisitProcedureType(ty *ast.ProcedureType) any {
 	proc := &types.ProcedureType{}
 	if ty.FP != nil {
 		proc.Params = ty.FP.Accept(t).([]types.FormalParam)
-
 		proc.Result = ty.FP.RetType.Accept(t).(types.Type)
 	}
 
@@ -1012,7 +1037,7 @@ func (t *TypeChecker) VisitRecordType(ty *ast.RecordType) any {
 func (t *TypeChecker) VisitFieldList(list *ast.FieldList) any {
 	typ := list.Type.Accept(t).(types.Type)
 
-	fields := make([]types.Field, len(list.List))
+	fields := make([]types.Field, 0)
 	for _, def := range list.List {
 		if sym := list.Env.Lookup(def.Name); sym == nil || sym.Kind() != ast.FieldSymbolKind {
 			t.ctx.Reporter.Report(report.Diagnostic{

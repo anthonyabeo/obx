@@ -11,6 +11,9 @@ func IsConstExpr(expr Expression) bool {
 	case *BasicLit:
 		return true
 
+	case *Set:
+		return true
+
 	case *IdentifierDef:
 		if sym, ok := e.Symbol.(*ConstantSymbol); ok {
 			return sym.Value != nil // Constant must have a known value
@@ -22,6 +25,18 @@ func IsConstExpr(expr Expression) bool {
 
 	case *BinaryExpr:
 		return IsConstExpr(e.Left) && IsConstExpr(e.Right)
+
+	case *Designator:
+		if sym, ok := e.Symbol.(*ConstantSymbol); ok {
+			return sym.Value != nil // Constant must have a known value
+		}
+		return false
+
+	case *QualifiedIdent:
+		if sym, ok := e.Symbol.(*ConstantSymbol); ok {
+			return sym.Value != nil // Constant must have a known value
+		}
+		return false
 
 	default:
 		return false
