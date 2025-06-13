@@ -15,6 +15,7 @@ func TestScanNumber(t *testing.T) {
 		wantErr  bool
 	}{
 		// Valid cases
+		{"9223372036854775807", token.INT64_LIT, false},
 		{"123", token.BYTE_LIT, false},
 		{"97", token.BYTE_LIT, false},
 		{"97L", token.INT64_LIT, false},

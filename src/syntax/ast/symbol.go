@@ -122,6 +122,7 @@ type ImportSymbol struct {
 	name        string
 	kind        SymbolKind
 	unit        CompilationUnit
+	Env         *Environment
 	parent      *Environment
 	typ         types.Type
 	mangledName string

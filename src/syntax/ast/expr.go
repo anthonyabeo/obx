@@ -266,12 +266,6 @@ func (d *Designator) Pos() int { return d.StartOffset }
 func (d *Designator) End() int { return d.EndOffset }
 func (d *Designator) Children() []Node {
 	children := []Node{d.QIdent}
-	if len(d.Select) > 0 {
-		for _, selector := range d.Select {
-			children = append(children, selector)
-
-		}
-	}
 
 	return children
 }
@@ -289,7 +283,7 @@ func (b *BadExpr) Type() types.Type       { return b.SemaType }
 // ---------------------
 
 type Selector interface {
-	Node
+	//Node
 	sel()
 }
 
@@ -302,12 +296,10 @@ type DotOp struct {
 	EndOffset   int
 }
 
-func (d *DotOp) String() string         { return fmt.Sprintf(".%s", d.Field) }
-func (d *DotOp) sel()                   {}
-func (d *DotOp) Pos() int               { return d.StartOffset }
-func (d *DotOp) End() int               { return d.EndOffset }
-func (d *DotOp) Accept(vst Visitor) any { return vst.VisitDotOp(d) }
-func (d *DotOp) Children() []Node       { return []Node{} }
+func (d *DotOp) String() string { return fmt.Sprintf(".%s", d.Field) }
+func (d *DotOp) sel()           {}
+func (d *DotOp) Pos() int       { return d.StartOffset }
+func (d *DotOp) End() int       { return d.EndOffset }
 
 // IndexOp
 // ---------------------
@@ -325,18 +317,9 @@ func (id *IndexOp) String() string {
 
 	return fmt.Sprintf("[%v]", strings.Join(list, ","))
 }
-func (id *IndexOp) sel()                   {}
-func (id *IndexOp) Pos() int               { return id.StartOffset }
-func (id *IndexOp) End() int               { return id.EndOffset }
-func (id *IndexOp) Accept(vst Visitor) any { return vst.VisitIndexOp(id) }
-func (id *IndexOp) Children() []Node {
-	children := make([]Node, len(id.List))
-	for _, expression := range id.List {
-		children = append(children, expression)
-	}
-
-	return children
-}
+func (id *IndexOp) sel()     {}
+func (id *IndexOp) Pos() int { return id.StartOffset }
+func (id *IndexOp) End() int { return id.EndOffset }
 
 // TypeGuard
 // ---------------------
@@ -346,12 +329,10 @@ type TypeGuard struct {
 	EndOffset   int
 }
 
-func (t *TypeGuard) String() string         { return fmt.Sprintf("(%s)", t.Ty) }
-func (t *TypeGuard) sel()                   {}
-func (t *TypeGuard) Pos() int               { return t.StartOffset }
-func (t *TypeGuard) End() int               { return t.EndOffset }
-func (t *TypeGuard) Accept(vst Visitor) any { return vst.VisitTypeGuard(t) }
-func (t *TypeGuard) Children() []Node       { return []Node{t.Ty} }
+func (t *TypeGuard) String() string { return fmt.Sprintf("(%s)", t.Ty) }
+func (t *TypeGuard) sel()           {}
+func (t *TypeGuard) Pos() int       { return t.StartOffset }
+func (t *TypeGuard) End() int       { return t.EndOffset }
 
 // PtrDeref
 // ---------------------
@@ -360,9 +341,7 @@ type PtrDeref struct {
 	EndOffset   int
 }
 
-func (deref *PtrDeref) sel()                   {}
-func (deref *PtrDeref) String() string         { return "^" }
-func (deref *PtrDeref) Pos() int               { return deref.StartOffset }
-func (deref *PtrDeref) End() int               { return deref.EndOffset }
-func (deref *PtrDeref) Accept(vst Visitor) any { return vst.VisitPtrDeref(deref) }
-func (deref *PtrDeref) Children() []Node       { return []Node{} }
+func (deref *PtrDeref) sel()           {}
+func (deref *PtrDeref) String() string { return "^" }
+func (deref *PtrDeref) Pos() int       { return deref.StartOffset }
+func (deref *PtrDeref) End() int       { return deref.EndOffset }

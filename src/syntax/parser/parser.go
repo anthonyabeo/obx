@@ -858,7 +858,7 @@ func (p *Parser) parseFactor() ast.Expression {
 			if env = p.ctx.Envs[dsg.QIdent.Prefix]; env == nil {
 				p.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Fatal,
-					Message:  fmt.Sprintf("cannot find definition or modgraph for %s", dsg.QIdent.Prefix),
+					Message:  fmt.Sprintf("cannot find definition or module for %s", dsg.QIdent.Prefix),
 					Range:    p.ctx.Source.Span(p.ctx.FileName, dsg.StartOffset, dsg.EndOffset),
 				})
 
@@ -888,7 +888,7 @@ func (p *Parser) parseFactor() ast.Expression {
 	default:
 		p.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
-			Message:  "unexpected token: " + p.lexeme,
+			Message:  "unexpected token: " + p.lexeme + "does not initiate an expression",
 			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
 		})
 		pos := p.pos

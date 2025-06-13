@@ -40,10 +40,6 @@ type Visitor interface {
 	VisitRecordType(*RecordType) any
 	VisitEnumType(*EnumType) any
 	VisitNamedType(*NamedType) any
-	VisitIndexOp(*IndexOp) any
-	VisitPtrDeref(*PtrDeref) any
-	VisitDotOp(*DotOp) any
-	VisitTypeGuard(*TypeGuard) any
 	VisitFieldList(*FieldList) any
 	VisitLenList(*LenList) any
 	VisitElseIfBranch(*ElseIfBranch) any

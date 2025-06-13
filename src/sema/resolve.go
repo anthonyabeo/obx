@@ -99,8 +99,103 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 		dsg.Symbol = dsg.QIdent.Symbol
 	}
 
+	if dsg.QIdent.Symbol == nil {
+		n.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("designator '%s' not found", dsg.QIdent),
+			Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.StartOffset, dsg.EndOffset),
+		})
+
+		return nil
+	}
+
+	symbol := dsg.QIdent.Symbol
+	typeNode := symbol.TypeNode()
+
 	for _, selector := range dsg.Select {
-		selector.Accept(n)
+		if typeNode == nil {
+			n.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("'%s' must have a denoted type", dsg.QIdent),
+				Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, dsg.QIdent.EndOffset),
+			})
+
+			continue
+		}
+
+		switch s := selector.(type) {
+		case *ast.DotOp:
+			rec, ok := typeNode.(*ast.RecordType)
+			if !ok {
+				n.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("cannot select field of non-record '%s'", dsg.QIdent),
+					Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
+				})
+
+				continue
+			}
+
+			sym := rec.Env.Lookup(s.Field)
+			if sym == nil {
+				n.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("record '%s' has no field named '%s'", dsg.QIdent, s.Field),
+					Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
+				})
+
+				continue
+			}
+
+			sym.SetMangledName(ast.Mangle(sym))
+			s.Symbol = sym
+
+			symbol = sym
+			typeNode = sym.TypeNode()
+		case *ast.IndexOp:
+			arr, ok := typeNode.(*ast.ArrayType)
+			if !ok {
+				n.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("cannot index non-array type '%s'", dsg.QIdent),
+					Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
+				})
+
+				continue
+			}
+
+			for _, expr := range s.List {
+				expr.Accept(n)
+			}
+
+			typeNode = arr.ElemType
+		case *ast.PtrDeref:
+			ptr, ok := symbol.TypeNode().(*ast.PointerType)
+			if !ok {
+				n.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("cannot dereference a non-pointer '%s'", dsg.QIdent),
+					Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
+				})
+
+				continue
+			}
+
+			typeNode = ptr.Base
+		case *ast.TypeGuard:
+			s.Ty.Accept(n)
+			ty, ok := s.Ty.(*ast.QualifiedIdent)
+			if !ok && ty.Symbol == nil && ty.Symbol.Kind() != ast.TypeSymbolKind {
+				n.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("type-guard expression must be a (qualified) identifier: '%v'", dsg.QIdent),
+					Range:    n.ctx.Source.Span(n.ctx.FileName, s.Ty.Pos(), s.Ty.End()),
+				})
+			}
+
+			symbol = ty.Symbol
+			typeNode = ty.Symbol.TypeNode()
+		}
 	}
 
 	return dsg
@@ -117,10 +212,7 @@ func (n *NamesResolver) VisitFunctionCall(call *ast.FunctionCall) any {
 			Message:  fmt.Sprintf("called object, '%s' is not a procedure or function", call.Callee),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
 		})
-		return call
 	}
-
-	//call.Callee.SemaType = proc.Type().Accept(n).(types.Type)
 
 	for _, param := range call.ActualParams {
 		param.Accept(n)
@@ -162,18 +254,7 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 		return ident
 	}
 
-	env := n.ctx.Envs[ident.Prefix]
-	if env == nil {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Fatal,
-			Message:  fmt.Sprintf("identifier '%s' not found or is not exported", ident.Name),
-			Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
-		})
-
-		return ident
-	}
-
-	sym = env.Lookup(ident.Name)
+	sym = sym.(*ast.ImportSymbol).Env.Lookup(ident.Name)
 	if sym == nil || sym.Props() != ast.Exported {
 		n.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
@@ -186,7 +267,7 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 
 	sym.SetMangledName(ast.Mangle(sym))
 	ident.Symbol = sym
-	ident.Name = sym.MangledName()
+
 	return ident
 }
 
@@ -242,6 +323,16 @@ func (n *NamesResolver) VisitReturnStmt(stmt *ast.ReturnStmt) any {
 
 func (n *NamesResolver) VisitProcedureCall(call *ast.ProcedureCall) any {
 	call.Callee.Accept(n)
+
+	sym := call.Callee.QIdent.Symbol
+	_, ok := sym.(*ast.ProcedureSymbol)
+	if !ok {
+		n.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("called object, '%s' is not a procedure", call.Callee),
+			Range:    n.ctx.Source.Span(n.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
+		})
+	}
 
 	for _, arg := range call.ActualParams {
 		arg.Accept(n)
@@ -340,6 +431,8 @@ func (n *NamesResolver) VisitImport(i *ast.Import) any {
 		return i
 	}
 
+	sym.(*ast.ImportSymbol).Env = n.ctx.Envs[name]
+
 	return i
 }
 
@@ -375,7 +468,7 @@ func (n *NamesResolver) VisitConstantDecl(decl *ast.ConstantDecl) any {
 	if def := decl.Name.Accept(n); def == nil {
 		n.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
-			Message:  fmt.Sprintf("'%s' is not a known constant", decl.Name.Name),
+			Message:  fmt.Sprintf("undeclared constant '%s'", decl.Name.Name),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, decl.Name.StartOffset, decl.Name.EndOffset),
 		})
 	}
@@ -456,23 +549,6 @@ func (n *NamesResolver) VisitNamedType(ty *ast.NamedType) any {
 	ty.Name.Accept(n)
 	ty.Symbol = ty.Name.Symbol
 	return ty
-}
-
-func (n *NamesResolver) VisitIndexOp(op *ast.IndexOp) any {
-	for _, expr := range op.List {
-		expr.Accept(n)
-	}
-
-	return op
-}
-
-func (n *NamesResolver) VisitPtrDeref(deref *ast.PtrDeref) any { return deref }
-
-func (n *NamesResolver) VisitDotOp(op *ast.DotOp) any { return op }
-
-func (n *NamesResolver) VisitTypeGuard(guard *ast.TypeGuard) any {
-	guard.Ty.Accept(n)
-	return guard
 }
 
 func (n *NamesResolver) VisitFieldList(list *ast.FieldList) any {

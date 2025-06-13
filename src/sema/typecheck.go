@@ -210,7 +210,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 			if !ok {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message:  fmt.Sprintf("cannot identify non-qualified identifier: '%v'", dsg.QIdent),
+					Message:  fmt.Sprintf("name identifier: '%v'", dsg.QIdent),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, s.Ty.Pos(), s.Ty.End()),
 				})
 			}
@@ -257,26 +257,6 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 
 	dsg.SemaType = typ
 	return dsg
-}
-
-func (t *TypeChecker) VisitIndexOp(op *ast.IndexOp) any {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (t *TypeChecker) VisitPtrDeref(deref *ast.PtrDeref) any {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (t *TypeChecker) VisitDotOp(op *ast.DotOp) any {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (t *TypeChecker) VisitTypeGuard(guard *ast.TypeGuard) any {
-	//TODO implement me
-	panic("implement me")
 }
 
 func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
@@ -372,11 +352,11 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 					switch {
 					case -value >= 0 && -value <= 255:
 						expr.SemaType = types.ByteType
-					case value >= -128 && value <= 127:
+					case -value >= -128 && -value <= 127:
 						expr.SemaType = types.Int8Type
-					case value >= -32768 && value <= 32767:
+					case -value >= -32768 && -value <= 32767:
 						expr.SemaType = types.Int16Type
-					case value >= -2147483648 && value <= 2147483647:
+					case -value >= -2147483648 && -value <= 2147483647:
 						expr.SemaType = types.Int32Type
 					default:
 						expr.SemaType = types.Int64Type

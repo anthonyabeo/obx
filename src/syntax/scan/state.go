@@ -161,7 +161,7 @@ func scanNumber(s *Scanner) StateFn {
 		fullNum := string(s.content[s.start:s.pos])
 		value, err := strconv.ParseInt(fullNum, 10, 64)
 		if err != nil {
-			return s.errorf("malformed number: invalid hex digits")
+			return s.errorf("malformed number: invalid hex digits ")
 		}
 
 		kind := MinimalIntToken(value)

@@ -93,14 +93,14 @@ func TestNameResolution_BasicProcedure(t *testing.T) {
 		t.Errorf("symbol y: expected mangled name %q, got %v", "Test$DoSomething$y", symY)
 	}
 
-	assign := findAssignmentTo("Test$x", module)
+	assign := findAssignmentTo("x", module)
 	d, ok := assign.LValue.(*ast.Designator)
-	if !ok || d.QIdent.Name != "Test$x" {
+	if !ok || d.QIdent.Symbol.MangledName() != "Test$x" {
 		t.Errorf("assignment to x: expected mangled name 'Test$x', got %q", d.QIdent.Name)
 	}
 
 	d, ok = assign.RValue.(*ast.Designator)
-	if !ok || d.QIdent.Name != "Test$DoSomething$y" {
+	if !ok || d.QIdent.Symbol.MangledName() != "Test$DoSomething$y" {
 		t.Errorf("assignment to x: expected mangled name of RHS to be 'Test$DoSomething$y', got %q", d.QIdent.Name)
 	}
 
@@ -189,7 +189,7 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 
 	// Look into the AST for `Math.Pi` reference
 	main, _ := obx.Lookup("Main")
-	assign := findAssignmentTo("Main$x", main) // helper to drill down AST
+	assign := findAssignmentTo("x", main) // helper to drill down AST
 
 	dsg, ok := assign.RValue.(*ast.Designator)
 	if !ok {
@@ -296,7 +296,7 @@ func TestNameResolution_Basic(t *testing.T) {
 		t.Errorf("expected designator, got %T", assign.LValue)
 	}
 
-	if dsg.QIdent.Symbol == nil || dsg.QIdent.Name != "Main$Foo$y" {
+	if dsg.QIdent.Symbol == nil || dsg.QIdent.Symbol.MangledName() != "Main$Foo$y" {
 		t.Errorf("expected y to resolve to local Main$Foo$y, got %v", dsg.QIdent.Name)
 	}
 }

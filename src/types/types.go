@@ -19,7 +19,8 @@ func TypeIncludes(b, a Type) bool {
 		return b == Int32Type || b == Int16Type || b == Int8Type || b == ByteType ||
 			b == IntegerType || b == ShortIntType || b == Int64Type || b == LongIntType
 	case Int32Type, IntegerType:
-		return b == Int16Type || b == Int8Type || b == ByteType || b == ShortIntType
+		return b == Int16Type || b == Int8Type || b == ByteType || b == ShortIntType ||
+			b == Int32Type || b == IntegerType
 	case Int16Type, ShortIntType:
 		return b == Int8Type || b == ByteType || b == Int16Type || b == ShortIntType
 	case LongRealType:
@@ -282,8 +283,12 @@ func ExpressionCompatible(op token.Kind, lhs, rhs Type) (bool, Type) {
 		if IsBoolean(lhs) && IsBoolean(rhs) {
 			return true, BooleanType
 		}
-	case token.EQUAL, token.NEQ, token.LESS:
+	case token.EQUAL, token.NEQ, token.LESS, token.LEQ, token.GEQ, token.GREAT:
 		if IsNumeric(lhs) && IsNumeric(rhs) {
+			return true, BooleanType
+		}
+
+		if IsEnum(lhs) && IsEnum(rhs) {
 			return true, BooleanType
 		}
 
@@ -307,7 +312,11 @@ func ExpressionCompatible(op token.Kind, lhs, rhs Type) (bool, Type) {
 		if IsNil(rhs) && (IsPointer(lhs) || IsProcedure(lhs)) {
 			return true, BooleanType
 		}
-	case token.LEQ, token.GEQ, token.GREAT:
+
+		if IsNil(lhs) && IsNil(rhs) {
+			return true, BooleanType
+		}
+
 		if IsChar(lhs) && IsChar(rhs) {
 			return true, BooleanType
 		}
