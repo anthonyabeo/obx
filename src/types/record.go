@@ -43,3 +43,13 @@ func (r *RecordType) Equals(other Type) bool {
 	}
 	return true
 }
+
+func (r *RecordType) GetField(name string) *Field {
+	for _, f := range r.Fields {
+		if f.Name == name {
+			return &f
+		}
+	}
+
+	return nil
+}
