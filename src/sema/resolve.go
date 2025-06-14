@@ -125,8 +125,37 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 
 		switch s := selector.(type) {
 		case *ast.DotOp:
-			rec, ok := typeNode.(*ast.RecordType)
-			if !ok {
+			var rec *ast.RecordType
+
+			switch tn := typeNode.(type) {
+			case *ast.RecordType:
+				rec = tn
+			case *ast.PointerType:
+				ptr, ok := tn.Base.(*ast.RecordType)
+				if !ok {
+					n.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  fmt.Sprintf("cannot select field of non-record '%s'", dsg.QIdent),
+						Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
+					})
+
+					continue
+				}
+
+				rec = ptr
+			case *ast.NamedType:
+				t, ok := tn.Symbol.TypeNode().(*ast.RecordType)
+				if !ok {
+					n.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  fmt.Sprintf("%s\\'s type, '%s' is not an alias for a record", dsg.QIdent, tn.Name),
+						Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
+					})
+
+					continue
+				}
+				rec = t
+			default:
 				n.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  fmt.Sprintf("cannot select field of non-record '%s'", dsg.QIdent),
@@ -153,15 +182,41 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 			symbol = sym
 			typeNode = sym.TypeNode()
 		case *ast.IndexOp:
-			arr, ok := typeNode.(*ast.ArrayType)
-			if !ok {
+			var arr *ast.ArrayType
+
+			switch tn := typeNode.(type) {
+			case *ast.ArrayType:
+				arr = tn
+			case *ast.PointerType:
+				ptr, ok := tn.Base.(*ast.ArrayType)
+				if !ok {
+					n.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  fmt.Sprintf("cannot index non-array type '%s'", dsg.QIdent),
+						Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
+					})
+
+					continue
+				}
+				arr = ptr
+			case *ast.NamedType:
+				t, ok := tn.Symbol.TypeNode().(*ast.ArrayType)
+				if !ok {
+					n.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  fmt.Sprintf("%s\\'s type, '%s', is not an alias for an array", dsg.QIdent, tn.Name),
+						Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
+					})
+
+					continue
+				}
+				arr = t
+			default:
 				n.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  fmt.Sprintf("cannot index non-array type '%s'", dsg.QIdent),
 					Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 				})
-
-				continue
 			}
 
 			for _, expr := range s.List {
@@ -461,6 +516,8 @@ func (n *NamesResolver) VisitVariableDecl(decl *ast.VariableDecl) any {
 		}
 	}
 
+	decl.Type.Accept(n)
+
 	return decl
 }
 
@@ -537,6 +594,7 @@ func (n *NamesResolver) VisitRecordType(ty *ast.RecordType) any {
 	}
 
 	for _, field := range ty.Fields {
+		field.Env = ty.Env
 		field.Accept(n)
 	}
 
@@ -553,7 +611,19 @@ func (n *NamesResolver) VisitNamedType(ty *ast.NamedType) any {
 
 func (n *NamesResolver) VisitFieldList(list *ast.FieldList) any {
 	for _, def := range list.List {
-		def.Accept(n)
+		sym := list.Env.Lookup(def.Name)
+		if sym == nil {
+			n.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("field '%s' not found in record", def.Name),
+				Range:    n.ctx.Source.Span(n.ctx.FileName, def.StartOffset, def.EndOffset),
+			})
+
+			continue
+		}
+
+		sym.SetMangledName(ast.Mangle(sym))
+		def.Symbol = sym
 	}
 
 	return list

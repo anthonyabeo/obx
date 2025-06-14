@@ -71,12 +71,23 @@ func TestTypeCheckerPrograms(t *testing.T) {
 			filename: "test.obx",
 			source: `
 		MODULE Test;
+		TYPE User = RECORD 
+				username: array 32 of char
+  				age: integer
+  				salary: real
+		END
+		TYPE Table = ARRAY 10 OF real;
+
 		VAR
 			x: INTEGER;
 			y: INTEGER;
 			b: BOOL;
 			a: ARRAY 3 OF INTEGER;
 			p: POINTER TO RECORD f: INTEGER END;
+			usr: User
+			c: CHAR;
+			ptr: POINTER TO User;
+			t: Table;
 
 		BEGIN
 			x := 42;                      (* int literal *)
@@ -91,6 +102,12 @@ func TestTypeCheckerPrograms(t *testing.T) {
 			(* x := ORD(TRUE);               built-in function *)
 			b := x < y + 1              (* combined binary ops *)
 			(* x := ABS(-y)                 built-in call with unary *)
+			usr.username := "foobar"
+			usr.age := x
+			usr.salary := 346.32
+			c := usr.username[0] (* record field access *)
+			ptr^.username[3] := "A" (* pointer dereference and field access *)
+			t[0] := 3.14                (* array assignment *)
 		END Test.
 	`,
 		},

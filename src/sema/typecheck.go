@@ -171,13 +171,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				return dsg
 			}
 
-			var field *types.Field
-			for _, f := range rec.Fields {
-				if f.Name == s.Field {
-					field = &f
-				}
-			}
-
+			field := rec.GetField(s.Field)
 			if field == nil {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
@@ -824,6 +818,7 @@ func (t *TypeChecker) VisitConstantDecl(decl *ast.ConstantDecl) any {
 func (t *TypeChecker) VisitTypeDecl(decl *ast.TypeDecl) any {
 	ty := decl.DenotedType.Accept(t).(types.Type)
 	decl.Name.SemaType = ty
+	decl.Name.Symbol.SetType(ty)
 
 	return decl
 }
