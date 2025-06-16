@@ -8,11 +8,24 @@ type ArrayType struct {
 }
 
 func (a *ArrayType) String() string {
+	if a.Length == -1 {
+		return fmt.Sprintf("ARRAY OF %s", a.Base.String())
+	}
+
 	return fmt.Sprintf("ARRAY %d OF %s", a.Length, a.Base.String())
+
 }
 
 func (a *ArrayType) Width() int {
-	panic("Not implemented")
+	if a.Length == -1 {
+		return -1 // Open array, width is not defined
+	}
+
+	baseWidth := a.Base.Width()
+	if baseWidth == -1 {
+		return -1 // If base type has undefined width, return -1
+	}
+	return int(a.Length) * baseWidth
 }
 
 func (a *ArrayType) Alignment() int {

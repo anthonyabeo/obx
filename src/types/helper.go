@@ -48,6 +48,11 @@ var realTypeRank = map[BasicKind]int{
 	LONGREAL: 1,
 }
 
+var charTypeRank = map[BasicKind]int{
+	CHAR:  0,
+	WCHAR: 1,
+}
+
 func SmallestIntegerType(a, b Type) Type {
 	ra, ok1 := integerTypeRank[UnderlyingBasic(a).Kind]
 	rb, ok2 := integerTypeRank[UnderlyingBasic(b).Kind]
@@ -75,6 +80,18 @@ func SmallestNumericType(a, b Type) Type {
 func SmallestRealType(a, b Type) Type {
 	ra, ok1 := realTypeRank[UnderlyingBasic(a).Kind]
 	rb, ok2 := realTypeRank[UnderlyingBasic(b).Kind]
+	if ok1 && ok2 {
+		if ra < rb {
+			return b
+		}
+		return a
+	}
+	return nil
+}
+
+func SmallestCharType(a, b Type) Type {
+	ra, ok1 := charTypeRank[UnderlyingBasic(a).Kind]
+	rb, ok2 := charTypeRank[UnderlyingBasic(b).Kind]
 	if ok1 && ok2 {
 		if ra < rb {
 			return b
@@ -116,7 +133,7 @@ func IsChar(ty Type) bool {
 	case StringType:
 		return t.Length == 1
 	}
-	
+
 	return ty == CharType || ty == WCharType
 }
 
@@ -153,6 +170,11 @@ func IsByte(t Type) bool {
 
 func IsProcedure(t Type) bool {
 	_, ok := t.(*ProcedureType)
+	return ok
+}
+
+func IsArray(t Type) bool {
+	_, ok := t.(*ArrayType)
 	return ok
 }
 
@@ -237,4 +259,21 @@ func BaseRecord(t Type) *RecordType {
 		return t
 	}
 	return nil
+}
+
+func IsOrdinal(t Type) bool {
+	switch t := Underlying(t).(type) {
+	case *BasicType:
+		return t.Kind == BOOLEAN || IsInteger(t) || IsChar(t)
+	case *EnumType:
+		return true
+	case *NamedType:
+		return IsOrdinal(t.Def)
+	case *PointerType:
+		return false // Pointers are not ordinal types
+	case *ArrayType:
+		return false // Arrays are not ordinal types
+	default:
+		return false // Other types are not ordinal
+	}
 }

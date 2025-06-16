@@ -9,6 +9,7 @@ type StringType struct {
 func NewStringType(len int) *StringType {
 	return &StringType{Length: len}
 }
+
 func (s StringType) String() string {
 	return fmt.Sprintf("StringType(%d)", s.Length)
 }
@@ -22,6 +23,8 @@ func (s StringType) Alignment() int {
 }
 
 func (s StringType) Equals(t Type) bool {
-	//TODO implement me
-	panic("implement me")
+	if other, ok := t.(*StringType); ok {
+		return s.Length == other.Length
+	}
+	return false
 }
