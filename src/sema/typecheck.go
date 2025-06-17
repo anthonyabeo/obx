@@ -2,12 +2,14 @@ package sema
 
 import (
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
+
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/types"
-	"math"
-	"strconv"
 )
 
 type TypeChecker struct {
@@ -253,47 +255,1738 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 	return dsg
 }
 
-func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
-	call.Callee.Accept(t)
-
-	calleeType := call.Callee.Type()
-	procType, ok := calleeType.(*types.ProcedureType)
-	if !ok {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
-			Message:  fmt.Sprintf("cannot call '%v' of non-procedure", call.Callee),
-			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
-		})
-		return call
-	}
-
-	if len(call.ActualParams) != len(procType.Params) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
-			Message: fmt.Sprintf("wrong number of arguments for '%v'. expected %d arguments, got %d",
-				call.Callee, len(procType.Params), len(call.ActualParams)),
-		})
-
-		return call
-	}
-
-	for i, arg := range call.ActualParams {
-		arg.Accept(t)
-
-		formal := procType.Params[i]
-		actual := arg.Type()
-
-		if !types.ParameterCompatible(actual, formal) {
+func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast.ProcedureSymbol) {
+	switch strings.ToLower(pre.Name()) {
+	case "abs":
+		var argType types.Type = types.UnknownType
+		if len(call.ActualParams) != 1 {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("argument %d: of type, '%s' incompatible with parameter of type '%s'",
-					i+1, actual.String(), formal.Type.String()),
-				Range: t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+		} else {
+			call.ActualParams[0].Accept(t)
+			argType = call.ActualParams[0].Type()
+			if !types.IsNumeric(argType) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects a numeric argument, got %s",
+						pre.Name(), argType),
+					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+			}
+		}
+		call.SemaType = argType // ABS returns the same type as its argument
+	case "cap":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+
+		if !types.IsChar(argType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects a char argument, got %s",
+					pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		call.SemaType = types.CharType
+	case "bitand":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		for _, arg := range call.ActualParams {
+			arg.Accept(t)
+			argType := arg.Type()
+			if argType != types.Int32Type && argType != types.Int64Type {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be int32 or int64, "+
+						"got %s", pre.Name(), argType),
+					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+				})
+				return
+			}
+		}
+
+		// BitAnd returns an Int32Type if both arguments are Int32Type, otherwise it returns Int64Type
+		call.SemaType = types.Int32Type
+		if call.ActualParams[0].Type() == types.Int64Type || call.ActualParams[1].Type() == types.Int64Type {
+			call.SemaType = types.Int64Type
+		}
+	case "bitasr":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+
+		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be int32 or int64, "+
+					"got %s", pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
+			})
+			return
+		}
+
+		if arg2Type != types.Int32Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32, "+
+					"got %s", pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		// BitAst returns an Int32Type if the first argument is Int32Type, otherwise it returns Int64Type
+		call.SemaType = types.Int32Type
+		if arg1Type == types.Int64Type {
+			call.SemaType = types.Int64Type
+		}
+	case "bitnot":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+		if argType != types.Int32Type && argType != types.Int64Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an int32 or int64 argument, got %s",
+					pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		// BitNot returns an Int32Type if the argument is Int32Type, otherwise it returns Int64Type
+		call.SemaType = types.Int32Type
+		if argType == types.Int64Type {
+			call.SemaType = types.Int64Type
+		}
+	case "bitor":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		for _, arg := range call.ActualParams {
+			arg.Accept(t)
+			argType := arg.Type()
+			if argType != types.Int32Type && argType != types.Int64Type {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be int32 or int64, "+
+						"got %s", pre.Name(), argType),
+					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+				})
+				return
+			}
+		}
+
+		// result is INT64 if x or y is INT64, else INT32
+		call.SemaType = types.Int32Type
+		if call.ActualParams[0].Type() == types.Int64Type || call.ActualParams[1].Type() == types.Int64Type {
+			call.SemaType = types.Int64Type
+		}
+	case "bits":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+		if argType != types.Int32Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an int32 argument, got %s",
+					pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		// Bits returns a set of bits, which is an Int32Type
+		call.SemaType = types.SetType
+	case "bitshl":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+
+		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be int32 or int64, "+
+					"got %s", pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
+			})
+			return
+		}
+
+		if arg2Type != types.Int32Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32, "+
+					"got %s", pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		// BitShl returns an Int32Type if the first argument is Int32Type, otherwise it returns Int64Type
+		call.SemaType = types.Int32Type
+		if arg1Type == types.Int64Type {
+			call.SemaType = types.Int64Type
+		}
+	case "bitshr":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be int32 or int64, "+
+					"got %s", pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
+			})
+			return
+		}
+
+		if arg2Type != types.Int32Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32, "+
+					"got %s", pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		// BitShr returns an Int32Type if the first argument is Int32Type, otherwise it returns Int64Type
+		call.SemaType = types.Int32Type
+		if arg1Type == types.Int64Type {
+			call.SemaType = types.Int64Type
+		}
+	case "bitxor":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		for _, arg := range call.ActualParams {
+			arg.Accept(t)
+			argType := arg.Type()
+			if argType != types.Int32Type && argType != types.Int64Type {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be int32 or int64, "+
+						"got %s", pre.Name(), argType),
+					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+				})
+				return
+			}
+		}
+
+		// BitXor returns an Int32Type if x or y is Int32Type, else Int64Type
+		call.SemaType = types.Int32Type
+		if call.ActualParams[0].Type() == types.Int64Type || call.ActualParams[1].Type() == types.Int64Type {
+			call.SemaType = types.Int64Type
+		}
+	case "cast":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		T, ok := call.ActualParams[0].Accept(t).(types.Type)
+		if !ok {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects a type as the first argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		E, ok := call.ActualParams[1].(ast.Expression)
+		if !ok {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects an expression as the second argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[1].Pos(), call.ActualParams[1].End()),
+			})
+			return
+		}
+		E.Accept(t)
+		exprType := E.Type()
+
+		if types.IsEnum(T) && types.IsOrdinal(exprType) {
+			call.SemaType = T // Cast returns the type of the enum
+			return
+		}
+
+		if types.IsInteger(T) && types.IsInteger(exprType) {
+			call.SemaType = T // Cast returns the type of the integer
+			return
+		}
+
+		// TODO: T, x: cpointer to cstruct or void -> T
+		// TODO: T: integer type, x: cpointer to void -> T
+		// TODO: T: cpointer to void, x: integer type -> T
+	case "chr":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+		if !types.IsInteger(argType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer "+
+					"argument, got %s", pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		// Convert integer to char
+		value := t.EvalConstUint32(call.ActualParams[0])
+		if value < 0 || value > math.MaxUint8 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer "+
+					"in the range [0, 255], got %d", pre.Name(), value),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		// If the value is within the valid range for a char which is 0 to 255 for a byte in
+		// Oberon, set the type to CharType
+		call.SemaType = types.CharType
+	case "default":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		T, ok := call.ActualParams[0].(types.Type)
+		if !ok {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects a type as the argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		call.SemaType = T // Default returns the type of the argument
+	case "floor":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+		if !types.IsReal(argType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects a real argument, got %s",
+					pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		call.SemaType = types.Int32Type
+		if argType == types.LongRealType {
+			call.SemaType = types.Int64Type
+		}
+	case "flt":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+
+		if argType != types.Int32Type && argType != types.Int64Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an int32 or int64 argument, got %s",
+					pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		call.SemaType = types.RealType
+		if argType == types.Int64Type {
+			call.SemaType = types.LongRealType
+		}
+	case "ldcmd":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		// both arguments are strings. the first is the module name and the second is the procedure name
+		for _, arg := range call.ActualParams {
+			arg.Accept(t)
+			argType := arg.Type()
+			if !types.IsCharArrayOrString(argType) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects a string argument, got %s",
+						pre.Name(), argType),
+					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+				})
+				return
+			}
+		}
+
+		// TODO: Implement dynamic module loading and procedure invocation. Needs triage
+		call.SemaType = types.NilType
+	case "ldmod":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+		if !types.IsCharArrayOrString(argType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects a string argument, got %s",
+					pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		call.SemaType = types.BooleanType
+	case "len":
+		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects one or two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		if len(call.ActualParams) == 1 {
+			call.ActualParams[0].Accept(t)
+			T := call.ActualParams[0].Type()
+
+			switch T.(type) {
+			case *types.ArrayType:
+				call.SemaType = types.Int32Type
+			case *types.StringType:
+				call.SemaType = types.Int32Type
+			default:
+				call.SemaType = types.UnknownType
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects an array or string type, got %s",
+						pre.Name(), T),
+					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+			}
+		}
+
+		if len(call.ActualParams) == 2 {
+			x, xOk := call.ActualParams[0].(ast.Expression)
+			y, yOk := call.ActualParams[1].(ast.Expression)
+			if !xOk || !yOk {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("predeclared procedure '%s' expects two expressions", pre.Name()),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+				})
+				return
+			}
+
+			x.Accept(t)
+			y.Accept(t)
+			tx := x.Type()
+			ty := y.Type()
+
+			if !types.IsArray(tx) && ty != types.Int32Type {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an array "+
+						"and the second argument to be an integer, got %s and %s", pre.Name(), tx.String(), ty.String()),
+					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), y.End()),
+				})
+			}
+
+			call.SemaType = types.Int32Type
+		}
+	case "long":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+
+		if argType != types.Int8Type || argType != types.ByteType || argType != types.Int16Type ||
+			argType != types.Int32Type || argType != types.RealType || argType != types.CharType {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an int8, byte, int16, int32, "+
+					"real or char argument, got %s", pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
 		}
+
+		switch argType {
+		case types.Int8Type, types.ByteType:
+			call.SemaType = types.Int16Type
+		case types.Int16Type:
+			call.SemaType = types.Int32Type
+		case types.Int32Type:
+			call.SemaType = types.Int64Type
+		case types.RealType:
+			call.SemaType = types.LongRealType
+		case types.CharType:
+			call.SemaType = types.WCharType // Long of a char is a wchar
+		}
+	case "max":
+		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects one or two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		if len(call.ActualParams) == 1 {
+			T, ok := call.ActualParams[0].Accept(t).(types.Type)
+			if !ok {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("predeclared procedure '%s' expects a single type argument", pre.Name()),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+				return
+			}
+
+			switch ty := T.(type) {
+			case *types.BasicType:
+				if ty == types.SetType {
+					call.SemaType = types.Int32Type
+				} else {
+					call.SemaType = ty
+				}
+			case types.EnumType:
+				call.SemaType = types.ByteType
+			default:
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("predeclared procedure 'max' expects a basic type or enum, got %s", T),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+			}
+		}
+
+		if len(call.ActualParams) == 2 {
+			x, xOk := call.ActualParams[0].(ast.Expression)
+			y, yOk := call.ActualParams[1].(ast.Expression)
+			if !xOk || !yOk {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("predeclared procedure '%s' expects two expressions", pre.Name()),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+				})
+				return
+			}
+
+			x.Accept(t)
+			y.Accept(t)
+			tx := x.Type()
+			ty := y.Type()
+
+			if types.IsNumeric(tx) && types.IsNumeric(ty) {
+				call.SemaType = types.SmallestNumericType(tx, ty)
+			} else if types.IsChar(tx) && types.IsChar(ty) {
+				call.SemaType = types.SmallestCharType(tx, ty)
+			} else {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be numeric"+
+						" or char types, got %s and %s", pre.Name(), tx.String(), ty.String()),
+					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), y.End()),
+				})
+				return
+			}
+		}
+	case "min":
+		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects one or two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		if len(call.ActualParams) == 1 {
+			T, ok := call.ActualParams[0].Accept(t).(types.Type)
+			if !ok {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("predeclared procedure '%s' expects a single type argument", pre.Name()),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+				return
+			}
+
+			switch ty := T.(type) {
+			case *types.BasicType:
+				if ty == types.SetType {
+					call.SemaType = types.Int32Type
+				} else {
+					call.SemaType = ty
+				}
+			case types.EnumType:
+				call.SemaType = types.ByteType
+			default:
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("predeclared procedure 'min' expects a basic type or enum, got %s", T),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+			}
+
+		}
+
+		if len(call.ActualParams) == 2 {
+			x, xOk := call.ActualParams[0].(ast.Expression)
+			y, yOk := call.ActualParams[1].(ast.Expression)
+			if !xOk || !yOk {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("predeclared procedure '%s' expects two expressions", pre.Name()),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+				})
+				return
+			}
+
+			x.Accept(t)
+			y.Accept(t)
+			tx := x.Type()
+			ty := y.Type()
+
+			if types.IsNumeric(tx) && types.IsNumeric(ty) {
+				call.SemaType = types.SmallestNumericType(tx, ty)
+			} else if types.IsChar(tx) && types.IsChar(ty) {
+				call.SemaType = types.SmallestCharType(tx, ty)
+			} else {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be numeric"+
+						" or char types, got %s and %s", pre.Name(), tx.String(), ty.String()),
+					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), y.End()),
+				})
+				return
+			}
+		}
+	case "odd":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+
+		if !types.IsInteger(argType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer argument, got %s",
+					pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		// Odd returns a boolean
+		call.SemaType = types.BooleanType
+	case "ord":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+
+		switch argType {
+		case types.CharType, types.BooleanType:
+			call.SemaType = types.ByteType
+		case types.WCharType:
+			call.SemaType = types.ShortIntType
+		case types.SetType:
+			call.SemaType = types.Int32Type // Ordinal of a set is an integer
+		default:
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' cannot be applied to type %s", pre.Name(), argType),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+		}
+	case "short":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+		if argType != types.Int16Type && argType != types.Int32Type && argType != types.Int64Type &&
+			argType != types.RealType && argType != types.LongRealType && argType != types.WCharType {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an int16, int32, int64, "+
+					"longreal or wchar argument, got %s", pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+		}
+
+		switch argType {
+		case types.Int16Type:
+			call.SemaType = types.Int8Type
+		case types.Int32Type:
+			call.SemaType = types.Int16Type
+		case types.Int64Type:
+			call.SemaType = types.Int32Type
+		case types.LongRealType:
+			call.SemaType = types.RealType
+		case types.WCharType:
+			call.SemaType = types.CharType
+		}
+	case "size":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		if T, ok := call.ActualParams[0].(types.Type); !ok {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects a type as the argument, got '%v'", pre.Name(), T),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		call.SemaType = types.Int32Type
+	case "strlen":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+		if !types.IsCharArrayOrString(argType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects a string argument, got %s",
+					pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		call.SemaType = types.Int32Type
+	case "wchr":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+		if !types.IsInteger(argType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer argument, got %s",
+					pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		// If the value is within the valid range for a wchar which is 0 to 65535 for a short int in
+		// Oberon, set the type to WCharType
+		value := t.EvalConstUint32(call.ActualParams[0])
+		if value < 0 || value > math.MaxUint16 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer in the range [0, 65535], "+
+					"got %d", pre.Name(), value),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		call.SemaType = types.WCharType
+	case "ash":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+
+		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be int32 or int64, "+
+					"got %s", pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
+			})
+			return
+		}
+
+		if arg2Type != types.Int32Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32, got %s",
+					pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		// Ash returns an Int32Type if the first argument is Int32Type, else Int64Type
+		call.SemaType = types.Int32Type
+		if arg1Type == types.Int64Type {
+			call.SemaType = types.Int64Type
+		}
+	case "asr":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+
+		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be int32 or int64, "+
+					"got %s", pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
+			})
+			return
+		}
+
+		if arg2Type != types.Int32Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32, got %s",
+					pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		// Asr returns an Int32Type if the first argument is Int32Type, else Int64Type
+		call.SemaType = types.Int32Type
+		if arg1Type == types.Int64Type {
+			call.SemaType = types.Int64Type
+		}
+	case "entier":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+		if !types.IsReal(argType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects a real argument, got %s",
+					pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		call.SemaType = types.Int64Type
+	case "lsl":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be int32 or int64, "+
+					"got %s", pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
+			})
+			return
+		}
+
+		if arg2Type != types.Int32Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32, got %s",
+					pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		// Lsl returns an Int32Type if the first argument is Int32Type, else Int64Type
+		call.SemaType = types.Int32Type
+		if arg1Type == types.Int64Type {
+			call.SemaType = types.Int64Type
+		}
+	case "ror":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+
+		if arg1Type != types.Int32Type && arg2Type != types.Int32Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be int32, got %s and %s",
+					pre.Name(), arg1Type, arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		call.SemaType = types.Int32Type
+
+	case "assert":
+		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects one or two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		if len(call.ActualParams) == 1 {
+			call.ActualParams[0].Accept(t)
+			T := call.ActualParams[0].Type()
+
+			if !types.IsBoolean(T) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects a boolean type, got %s",
+						pre.Name(), T),
+					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+			}
+
+			call.SemaType = types.NilType
+			return
+		}
+
+		if len(call.ActualParams) == 2 {
+			x, xOk := call.ActualParams[0].(ast.Expression)
+			y, yOk := call.ActualParams[1].(ast.Expression)
+			if !xOk || !yOk {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("predeclared procedure '%s' expects two expressions", pre.Name()),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+				})
+				return
+			}
+
+			x.Accept(t)
+			y.Accept(t)
+			tx := x.Type()
+			ty := y.Type()
+
+			if !types.IsBoolean(tx) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be boolean, got %s",
+						pre.Name(), tx),
+					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), x.End()),
+				})
+			}
+
+			if !types.IsInteger(ty) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be integer, got %s",
+						pre.Name(), ty),
+					Range: t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
+				})
+			}
+
+			call.SemaType = types.NilType
+			return
+		}
+	case "bytes":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+
+		if !types.IsArrayOf(arg1Type, types.ByteType) && !types.IsArrayOf(arg1Type, types.CharType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an array of byte or char, "+
+					"got %s", pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
+			})
+			return
+		}
+
+		if !types.IsNumeric(arg2Type) && !types.IsSet(arg2Type) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be numeric or set, got %s",
+					pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		call.SemaType = types.NilType
+	case "dec":
+		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects one or two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		if len(call.ActualParams) == 1 {
+			call.ActualParams[0].Accept(t)
+			T := call.ActualParams[0].Type()
+
+			if !types.IsInteger(T) && !types.IsEnum(T) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects an integer or enum type, got %s",
+						pre.Name(), T),
+					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+				return
+			}
+
+			call.SemaType = types.NilType
+			return
+		}
+
+		if len(call.ActualParams) == 2 {
+			call.ActualParams[0].Accept(t)
+			call.ActualParams[1].Accept(t)
+			x, xOk := call.ActualParams[0].(ast.Expression)
+			y, yOk := call.ActualParams[1].(ast.Expression)
+			if !xOk || !yOk {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("predeclared procedure '%s' expects two expressions", pre.Name()),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+				})
+				return
+			}
+
+			tx := x.Type()
+			ty := y.Type()
+			if !types.IsInteger(tx) && !types.IsInteger(ty) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be integers, got %s and %s",
+						pre.Name(), tx.String(), ty.String()),
+					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), y.End()),
+				})
+				return
+			}
+
+			call.SemaType = types.NilType
+			return
+		}
+	case "excl":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+
+		if !types.IsSet(arg1Type) && !types.IsInteger(arg2Type) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a set, "+
+					"and the second argument to be an integer, got %s and %s", pre.Name(), arg1Type, arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		call.SemaType = types.NilType
+		return
+	case "halt":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+		if !types.IsInteger(argType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer argument, got %s",
+					pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		call.SemaType = types.NilType
+		return
+	case "inc":
+		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects one or two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		if len(call.ActualParams) == 1 {
+			call.ActualParams[0].Accept(t)
+			T := call.ActualParams[0].Type()
+
+			if !types.IsInteger(T) && !types.IsEnum(T) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects an integer or enum type, got %s",
+						pre.Name(), T),
+					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+				return
+			}
+
+			call.SemaType = types.NilType
+			return
+		}
+
+		if len(call.ActualParams) == 2 {
+			call.ActualParams[0].Accept(t)
+			call.ActualParams[1].Accept(t)
+			x, xOk := call.ActualParams[0].(ast.Expression)
+			y, yOk := call.ActualParams[1].(ast.Expression)
+			if !xOk || !yOk {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("predeclared procedure '%s' expects two expressions", pre.Name()),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+				})
+				return
+			}
+
+			tx := x.Type()
+			ty := y.Type()
+			if !types.IsInteger(tx) && !types.IsInteger(ty) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be integers, got %s and %s",
+						pre.Name(), tx.String(), ty.String()),
+					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), y.End()),
+				})
+				return
+			}
+
+			call.SemaType = types.NilType
+			return
+		}
+	case "incl":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+		if !types.IsSet(arg1Type) && !types.IsInteger(arg2Type) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a set, "+
+					"and the second argument to be an integer, got %s and %s", pre.Name(), arg1Type, arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		call.SemaType = types.NilType
+		return
+	case "new":
+		if len(call.ActualParams) == 0 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects at least one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		if len(call.ActualParams) == 1 {
+			call.ActualParams[0].Accept(t)
+			argType := call.ActualParams[0].Type()
+			if !types.IsPointerToRecord(argType) && !types.IsFixedArray(argType) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects a pointer to a record or a fixed array, got %s",
+						pre.Name(), argType),
+					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+				return
+			}
+
+			call.SemaType = types.NilType
+			return
+		} else {
+			call.ActualParams[0].Accept(t)
+			argType := call.ActualParams[0].Type()
+			if !types.IsPointerToOpenArray(argType) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects a pointer to an open array, got %s",
+						pre.Name(), argType),
+					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+				return
+			}
+
+			for _, arg := range call.ActualParams[1:] {
+				arg.Accept(t)
+				argType = arg.Type()
+				if !types.IsInteger(argType) {
+					t.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message: fmt.Sprintf("predeclared procedure '%s' expects integer arguments after the first, got %s",
+							pre.Name(), argType),
+						Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+					})
+					return
+				}
+			}
+
+			call.SemaType = types.NilType
+			return
+		}
+	case "number":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		call.ActualParams[1].Accept(t)
+		arg1Type := call.ActualParams[0].Type()
+		arg2Type := call.ActualParams[1].Type()
+
+		if !types.IsNumeric(arg1Type) && !types.IsSet(arg1Type) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be numeric or set, got %s",
+					pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		if !types.IsArrayOf(arg2Type, types.ByteType) && !types.IsArrayOf(arg2Type, types.CharType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an array of byte or char, "+
+					"got %s", pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[1].Pos(), call.ActualParams[1].End()),
+			})
+			return
+		}
+
+		call.SemaType = types.NilType
+		return
+	case "pcall":
+		if len(call.ActualParams) < 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects at least two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		call.ActualParams[1].Accept(t)
+		arg1Type := call.ActualParams[0].Type()
+		arg2Type := call.ActualParams[1].Type()
+
+		if !types.IsPointerToAnyRec(arg1Type) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a pointer to AnyRec, "+
+					"got %s", pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		if !types.IsProperProcedure(arg2Type) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be a proper procedure, "+
+					"got %s", pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[1].Pos(), call.ActualParams[1].End()),
+			})
+			return
+		}
+
+		if len(call.ActualParams) > 2 {
+			proc := call.ActualParams[1].Type().(*types.ProcedureType)
+			if len(call.ActualParams)-2 != len(proc.Params) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects %d additional arguments, got %d",
+						pre.Name(), len(proc.Params), len(call.ActualParams)-2),
+					Range: t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+				})
+				return
+			}
+
+			for i, arg := range call.ActualParams[2:] {
+				arg.Accept(t)
+				if !types.ParameterCompatible(arg.Type(), proc.Params[i]) {
+					t.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message: fmt.Sprintf("argument %d of predeclared procedure '%s' is incompatible with parameter "+
+							"of type '%s'", i+1, pre.Name(), proc.Params[i].Type.String()),
+						Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+					})
+					return
+				}
+			}
+		}
+
+		call.SemaType = types.NilType
+		return
+	case "raise":
+		if len(call.ActualParams) != 1 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		call.ActualParams[0].Accept(t)
+		argType := call.ActualParams[0].Type()
+		if !types.IsPointerToAnyRec(argType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects a pointer to AnyRec, got %s",
+					pre.Name(), argType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
+		call.SemaType = types.NilType
+	case "copy":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+
+		if !types.IsCharArrayOrString(arg1Type) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a char array or string, "+
+					"got %s", pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
+			})
+			return
+		}
+
+		if !types.IsArrayOf(arg2Type, types.CharType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an array of char, got %s",
+					pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		call.SemaType = types.NilType
+	case "pack":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+
+		if !types.IsReal(arg1Type) && t.isAssignable(arg1) && arg2Type != types.Int32Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be real, "+
+					"and the second argument to be int32, got %s and %s", pre.Name(), arg1Type, arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		call.SemaType = types.NilType
+	case "unpk":
+		if len(call.ActualParams) != 2 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		arg1 := call.ActualParams[0]
+		arg2 := call.ActualParams[1]
+		arg1.Accept(t)
+		arg2.Accept(t)
+		arg1Type := arg1.Type()
+		arg2Type := arg2.Type()
+
+		if !types.IsReal(arg1Type) && t.isAssignable(arg1) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be real and a variable, "+
+					" got %s", pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		if arg2Type != types.Int32Type && t.isAssignable(arg2) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32 and variable, got %s",
+					pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
+			})
+			return
+		}
+
+		call.SemaType = types.NilType
+	default:
+		t.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("unknown predeclared procedure '%s'", pre.Name()),
+			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.Pos(), call.Callee.End()),
+		})
 	}
 
-	call.SemaType = procType.Result
+}
+
+func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
+	if call.Callee.Symbol == nil || call.Callee.Symbol.Kind() != ast.ProcedureSymbolKind {
+		t.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("name '%s' could not be resolved to a procedure", call.Callee),
+			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
+		})
+	}
+
+	switch call.Callee.Symbol.Props() {
+	case ast.Predeclared:
+		t.checkPredeclaredProcedure(call, call.Callee.Symbol.(*ast.ProcedureSymbol))
+	default:
+		calleeType := call.Callee.Symbol.TypeNode().Accept(t).(types.Type)
+		procType, ok := calleeType.(*types.ProcedureType)
+		if !ok {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("cannot call '%v' of non-procedure", call.Callee),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
+			})
+			return call
+		}
+
+		if len(call.ActualParams) != len(procType.Params) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("wrong number of arguments for '%v'. expected %d arguments, got %d",
+					call.Callee, len(procType.Params), len(call.ActualParams)),
+			})
+
+			return call
+		}
+
+		for i, arg := range call.ActualParams {
+			arg.Accept(t)
+
+			formal := procType.Params[i]
+			actual := arg.Type()
+
+			if !types.ParameterCompatible(actual, formal) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("argument %d: of type, '%s' incompatible with parameter of type '%s'",
+						i+1, actual.String(), formal.Type.String()),
+					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+				})
+			}
+		}
+
+		call.SemaType = procType.Result
+	}
 
 	return call
 }

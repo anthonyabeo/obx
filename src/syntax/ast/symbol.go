@@ -104,6 +104,16 @@ type ProcedureSymbol struct {
 	mangledName string
 }
 
+func NewProcedureSymbol(name string, props IdentProps, ty Type, env *Environment) *ProcedureSymbol {
+	return &ProcedureSymbol{
+		Env:      env,
+		name:     name,
+		kind:     ProcedureSymbolKind,
+		props:    props,
+		typeNode: ty,
+	}
+}
+
 func (p *ProcedureSymbol) Name() string                  { return p.name }
 func (p *ProcedureSymbol) Kind() SymbolKind              { return p.kind }
 func (p *ProcedureSymbol) Props() IdentProps             { return p.props }
@@ -114,9 +124,6 @@ func (p *ProcedureSymbol) SetMangledName(name string)    { p.mangledName = name 
 func (p *ProcedureSymbol) Type() types.Type              { return p.typ }
 func (p *ProcedureSymbol) SetType(ty types.Type)         { p.typ = ty }
 func (p *ProcedureSymbol) TypeNode() Type                { return p.typeNode }
-func NewProcedureSymbol(name string, props IdentProps, env *Environment) *ProcedureSymbol {
-	return &ProcedureSymbol{name: name, kind: ProcedureSymbolKind, props: props, Env: env}
-}
 
 type ImportSymbol struct {
 	name        string
@@ -131,6 +138,7 @@ type ImportSymbol struct {
 func NewImportSymbol(name string) *ImportSymbol {
 	return &ImportSymbol{name: name, kind: ImportSymbolKind}
 }
+
 func (m *ImportSymbol) Name() string                  { return m.name }
 func (m *ImportSymbol) Kind() SymbolKind              { return m.kind }
 func (m *ImportSymbol) Parent() *Environment          { return m.parent }

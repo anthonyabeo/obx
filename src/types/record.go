@@ -53,3 +53,9 @@ func (r *RecordType) GetField(name string) *Field {
 
 	return nil
 }
+
+var AnyRec *RecordType
+
+func init() {
+	AnyRec = &RecordType{}
+}

@@ -59,67 +59,68 @@ const (
 )
 
 var PredeclaredProcedures = [...]struct {
-	Name string
+	Name []string
 }{
 	// Predeclared proper procedures
-	Assert_: {"assert"},
-	Bytes_:  {"bytes"},
-	Dec_:    {"dec"},
-	Excl_:   {"excl"},
-	Halt_:   {"halt"},
-	Inc_:    {"inc"},
-	Incl_:   {"incl"},
-	New_:    {"new"},
-	Number_: {"number"},
-	PCall_:  {"pcall"},
-	Raise_:  {"raise"},
+	Assert_: {[]string{"assert", "ASSERT"}},
+	Bytes_:  {[]string{"bytes", "BYTES"}},
+	Dec_:    {[]string{"dec", "DEC"}},
+	Excl_:   {[]string{"excl", "EXCL"}},
+	Halt_:   {[]string{"halt", "HALT"}},
+	Inc_:    {[]string{"inc", "INC"}},
+	Incl_:   {[]string{"incl", "INCL"}},
+	New_:    {[]string{"new", "NEW"}},
+	Number_: {[]string{"number", "NUMBER"}},
+	PCall_:  {[]string{"pcall", "PCALL"}},
+	Raise_:  {[]string{"raise", "RAISE"}},
 
 	// Deprecated predeclared proper procedures for backward compatibility
-	Copy_: {"copy"},
-	Pack_: {"pack"},
-	UnPk_: {"unpk"},
+	Copy_: {[]string{"copy", "COPY"}},
+	Pack_: {[]string{"pack", "PACK"}},
+	UnPk_: {[]string{"unpk", "UNPK"}},
 
-	Abs_:     {"abs"},
-	Cap_:     {"cap"},
-	BitAnd_:  {"bitand"},
-	BitAsr_:  {"bitasr"},
-	BitNot_:  {"bitnot"},
-	BitOr_:   {"bitor"},
-	Bits_:    {"bits"},
-	BitShl_:  {"bitshl"},
-	BitShr_:  {"bitshr"},
-	BitXor_:  {"bitxor"},
-	Cast_:    {"cast"},
-	Chr_:     {"chr"},
-	Default_: {"default"},
-	Floor_:   {"floor"},
-	Flt_:     {"flt"},
-	LdCmd_:   {"ldcmd"},
-	LdMod_:   {"ldmod"},
-	Len_:     {"len"},
-	Long_:    {"long"},
-	Max_:     {"max"},
-	Min_:     {"min"},
-	Odd_:     {"odd"},
-	Ord_:     {"ord"},
-	Short_:   {"short"},
-	Size_:    {"size"},
-	StrLen_:  {"strlen"},
-	WChr_:    {"wchr"},
+	Abs_:     {[]string{"abs", "ABS"}},
+	Cap_:     {[]string{"cap", "CAP"}},
+	BitAnd_:  {[]string{"bitand", "BITAND"}},
+	BitAsr_:  {[]string{"bitasr", "BITASR"}},
+	BitNot_:  {[]string{"bitnot", "BITNOT"}},
+	BitOr_:   {[]string{"bitor", "BITOR"}},
+	Bits_:    {[]string{"bits", "BITS"}},
+	BitShl_:  {[]string{"bitshl", "BITSHL"}},
+	BitShr_:  {[]string{"bitshr", "BITSHR"}},
+	BitXor_:  {[]string{"bitxor", "BITXOR"}},
+	Cast_:    {[]string{"cast", "CAST"}},
+	Chr_:     {[]string{"chr", "CHR"}},
+	Default_: {[]string{"default", "DEFAULT"}},
+	Floor_:   {[]string{"floor", "FLOOR"}},
+	Flt_:     {[]string{"flt", "FLT"}},
+	LdCmd_:   {[]string{"ldcmd", "LDCMD"}},
+	LdMod_:   {[]string{"ldmod", "LDMOD"}},
+	Len_:     {[]string{"len", "LEN"}},
+	Long_:    {[]string{"long", "LONG"}},
+	Max_:     {[]string{"max", "MAX"}},
+	Min_:     {[]string{"min", "MIN"}},
+	Odd_:     {[]string{"odd", "ODD"}},
+	Ord_:     {[]string{"ord", "ORD"}},
+	Short_:   {[]string{"short", "SHORT"}},
+	Size_:    {[]string{"size", "SIZE"}},
+	StrLen_:  {[]string{"strlen", "STRLEN"}},
+	WChr_:    {[]string{"wchr", "WCHR"}},
 
-	// Deprecated predeclared functions for backward compatibility
-	ASh_:    {"ash"},
-	ASr_:    {"asr"},
-	Entier_: {"entier"},
-	Lsl_:    {"lsl"},
-	Ror_:    {"ror"},
+	ASh_:    {[]string{"ash", "ASH"}},
+	ASr_:    {[]string{"asr", "ASR"}},
+	Entier_: {[]string{"entier", "ENTIER"}},
+	Lsl_:    {[]string{"lsl", "LSL"}},
+	Ror_:    {[]string{"ror", "ROR"}},
 }
 
 func defPredeclaredProcedures() {
 	for i := range PredeclaredProcedures {
 		id := PreDeclFuncProc(i)
 
-		GlobalEnviron.Insert(NewProcedureSymbol(PredeclaredProcedures[id].Name, Predeclared, nil))
+		for _, name := range PredeclaredProcedures[id].Name {
+			GlobalEnviron.Insert(NewProcedureSymbol(name, Predeclared, nil, nil))
+		}
 	}
 }
 

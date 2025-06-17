@@ -168,6 +168,16 @@ func IsByte(t Type) bool {
 	return t == ByteType
 }
 
+func IsProperProcedure(t Type) bool {
+	_, ok := t.(*ProcedureType)
+	if !ok {
+		return false
+	}
+
+	proc, _ := t.(*ProcedureType)
+	return proc.Result == nil
+}
+
 func IsProcedure(t Type) bool {
 	_, ok := t.(*ProcedureType)
 	return ok
@@ -176,6 +186,11 @@ func IsProcedure(t Type) bool {
 func IsArray(t Type) bool {
 	_, ok := t.(*ArrayType)
 	return ok
+}
+
+func IsFixedArray(t Type) bool {
+	a, ok := t.(*ArrayType)
+	return ok && !a.IsOpen()
 }
 
 func IsNil(t Type) bool {
@@ -247,6 +262,24 @@ func IsPointerToRecord(t Type) bool {
 	}
 	_, ok = Underlying(ptr.Base).(*RecordType)
 	return ok
+}
+
+func IsPointerToAnyRec(t Type) bool {
+	ptr, ok := Underlying(t).(*PointerType)
+	if !ok {
+		return false
+	}
+	rec, ok := Underlying(ptr.Base).(*RecordType)
+	return ok && rec == AnyRec
+}
+
+func IsPointerToOpenArray(t Type) bool {
+	ptr, ok := Underlying(t).(*PointerType)
+	if !ok {
+		return false
+	}
+	arr, ok := Underlying(ptr.Base).(*ArrayType)
+	return ok && arr.IsOpen()
 }
 
 func BaseRecord(t Type) *RecordType {

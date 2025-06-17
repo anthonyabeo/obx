@@ -88,6 +88,7 @@ func TestTypeCheckerPrograms(t *testing.T) {
 			c: CHAR;
 			ptr: POINTER TO User;
 			t: Table;
+			r: REAL;
 
 		BEGIN
 			x := 42;                      (* int literal *)
@@ -99,15 +100,18 @@ func TestTypeCheckerPrograms(t *testing.T) {
 			a[0] := 123;                  (* array assignment *)
 			b := x = y;                   (* comparison op *)
 			b := ~(x = y);                (* unary not *)
-			(* x := ORD(TRUE);               built-in function *)
+			x := ORD(TRUE);              (* built-in function *)
 			b := x < y + 1              (* combined binary ops *)
-			(* x := ABS(-y)                 built-in call with unary *)
+			x := ABS(-y)                (* built-in call with unary *)
 			usr.username := "foobar"
 			usr.age := x
 			usr.salary := 346.32
 			c := usr.username[0] (* record field access *)
 			ptr^.username[3] := "A" (* pointer dereference and field access *)
 			t[0] := 3.14                (* array assignment *)
+			c := CHR(65)            (* built-in function for char *)
+			(*y := MIN(int32)*)
+			r := MIN(3.14, 2) (* built-in function with multiple args *)
 		END Test.
 	`,
 		},

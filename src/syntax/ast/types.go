@@ -165,7 +165,6 @@ func (p *ProcedureType) Children() []Node {
 	if p.FP != nil {
 		return []Node{p.FP}
 	}
-
 	return []Node{}
 }
 

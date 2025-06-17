@@ -1265,8 +1265,16 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 			})
 		}
 
+		procedureTy := &ast.ProcedureType{}
+		if head.FP != nil {
+			procedureTy.FP.Params = head.FP.Params
+			procedureTy.FP.RetType = head.FP.RetType
+			procedureTy.FP.StartOffset = head.FP.StartOffset
+			procedureTy.FP.EndOffset = head.FP.EndOffset
+		}
+
 		// add the procedure to the receiver's environment
-		if sym := recordType.Env.Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, p.ctx.Env)); sym != nil {
+		if sym := recordType.Env.Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procedureTy, p.ctx.Env)); sym != nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  "duplicate procedure declaration",
@@ -1274,7 +1282,15 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 			})
 		}
 	} else {
-		if sym := p.ctx.Env.Parent().Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, p.ctx.Env)); sym != nil {
+		procedureTy := &ast.ProcedureType{}
+		if head.FP != nil {
+			procedureTy.FP.Params = head.FP.Params
+			procedureTy.FP.RetType = head.FP.RetType
+			procedureTy.FP.StartOffset = head.FP.StartOffset
+			procedureTy.FP.EndOffset = head.FP.EndOffset
+		}
+
+		if sym := p.ctx.Env.Parent().Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procedureTy, p.ctx.Env)); sym != nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("duplicate procedure declaration: '%v'" + head.Name.Name),

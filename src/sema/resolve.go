@@ -240,12 +240,14 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 		case *ast.TypeGuard:
 			s.Ty.Accept(n)
 			ty, ok := s.Ty.(*ast.QualifiedIdent)
-			if !ok && ty.Symbol == nil && ty.Symbol.Kind() != ast.TypeSymbolKind {
+			if !ok || ty.Symbol == nil || ty.Symbol.Kind() != ast.TypeSymbolKind {
 				n.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  fmt.Sprintf("type-guard expression must be a (qualified) identifier: '%v'", dsg.QIdent),
 					Range:    n.ctx.Source.Span(n.ctx.FileName, s.Ty.Pos(), s.Ty.End()),
 				})
+
+				return nil
 			}
 
 			symbol = ty.Symbol
