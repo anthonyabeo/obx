@@ -1,5 +1,7 @@
 package types
 
+import "strings"
+
 type EnumType struct {
 	Variants map[string]int
 }
@@ -14,8 +16,11 @@ func NewEnumWithVariants(variants ...string) *EnumType {
 }
 
 func (e EnumType) String() string {
-	//TODO implement me
-	panic("implement me")
+	var parts []string
+	for name := range e.Variants {
+		parts = append(parts, name)
+	}
+	return "ENUM " + strings.Join(parts, ", ") + " END"
 }
 
 func (e EnumType) Width() int {

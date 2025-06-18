@@ -255,7 +255,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 	return dsg
 }
 
-func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast.ProcedureSymbol) {
+func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.ProcedureSymbol) {
 	switch strings.ToLower(pre.Name()) {
 	case "abs":
 		var argType types.Type = types.UnknownType
@@ -633,8 +633,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 		}
 
 		// Convert integer to char
-		value := t.EvalConstUint32(call.ActualParams[0])
-		if value < 0 || value > math.MaxUint8 {
+		value, err := t.EvalConstUint32(call.ActualParams[0])
+		if err != nil || value < 0 || value > math.MaxUint8 {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer "+
@@ -1156,8 +1156,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 
 		// If the value is within the valid range for a wchar which is 0 to 65535 for a short int in
 		// Oberon, set the type to WCharType
-		value := t.EvalConstUint32(call.ActualParams[0])
-		if value < 0 || value > math.MaxUint16 {
+		value, err := t.EvalConstUint32(call.ActualParams[0])
+		if err != nil || value < 0 || value > math.MaxUint16 {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer in the range [0, 65535], "+
@@ -1344,7 +1344,17 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 		}
 
 		call.SemaType = types.Int32Type
+	default:
+		t.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("unknown predeclared procedure '%s'", pre.Name()),
+			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.Pos(), call.Callee.End()),
+		})
+	}
+}
 
+func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *ast.ProcedureSymbol) {
+	switch strings.ToLower(pre.Name()) {
 	case "assert":
 		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
 			t.ctx.Reporter.Report(report.Diagnostic{
@@ -1357,7 +1367,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 
 		if len(call.ActualParams) == 1 {
 			call.ActualParams[0].Accept(t)
-			T := call.ActualParams[0].Type()
+			T := types.Underlying(call.ActualParams[0].Type())
 
 			if !types.IsBoolean(T) {
 				t.ctx.Reporter.Report(report.Diagnostic{
@@ -1368,7 +1378,6 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 				})
 			}
 
-			call.SemaType = types.NilType
 			return
 		}
 
@@ -1386,8 +1395,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 
 			x.Accept(t)
 			y.Accept(t)
-			tx := x.Type()
-			ty := y.Type()
+			tx := types.Underlying(x.Type())
+			ty := types.Underlying(y.Type())
 
 			if !types.IsBoolean(tx) {
 				t.ctx.Reporter.Report(report.Diagnostic{
@@ -1398,16 +1407,15 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 				})
 			}
 
-			if !types.IsInteger(ty) {
+			if !types.IsInteger(ty) || !ast.IsConstExpr(y) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be integer, got %s",
+					Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an integer constant, got %s",
 						pre.Name(), ty),
 					Range: t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
 				})
 			}
 
-			call.SemaType = types.NilType
 			return
 		}
 	case "bytes":
@@ -1424,8 +1432,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 		arg2 := call.ActualParams[1]
 		arg1.Accept(t)
 		arg2.Accept(t)
-		arg1Type := arg1.Type()
-		arg2Type := arg2.Type()
+		arg1Type := types.Underlying(arg1.Type())
+		arg2Type := types.Underlying(arg2.Type())
 
 		if !types.IsArrayOf(arg1Type, types.ByteType) && !types.IsArrayOf(arg1Type, types.CharType) {
 			t.ctx.Reporter.Report(report.Diagnostic{
@@ -1446,8 +1454,6 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 			})
 			return
 		}
-
-		call.SemaType = types.NilType
 	case "dec":
 		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
 			t.ctx.Reporter.Report(report.Diagnostic{
@@ -1460,19 +1466,18 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 
 		if len(call.ActualParams) == 1 {
 			call.ActualParams[0].Accept(t)
-			T := call.ActualParams[0].Type()
+			T := types.Underlying(call.ActualParams[0].Type())
 
 			if !types.IsInteger(T) && !types.IsEnum(T) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message: fmt.Sprintf("predeclared procedure '%s' expects an integer or enum type, got %s",
+					Message: fmt.Sprintf("predeclared procedure '%s' expects first argument to be an integer or enum type, got %s",
 						pre.Name(), T),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 				})
 				return
 			}
 
-			call.SemaType = types.NilType
 			return
 		}
 
@@ -1490,19 +1495,29 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 				return
 			}
 
-			tx := x.Type()
-			ty := y.Type()
-			if !types.IsInteger(tx) && !types.IsInteger(ty) {
+			tx := types.Underlying(x.Type())
+			ty := types.Underlying(y.Type())
+
+			if !types.IsInteger(tx) || !t.isAssignable(x) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be integers, got %s and %s",
-						pre.Name(), tx.String(), ty.String()),
-					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), y.End()),
+					Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an assignable integer, got %s",
+						pre.Name(), tx.String()),
+					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), x.End()),
 				})
 				return
 			}
 
-			call.SemaType = types.NilType
+			if !types.IsInteger(ty) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an integer, got %s",
+						pre.Name(), ty.String()),
+					Range: t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
+				})
+				return
+			}
+
 			return
 		}
 	case "excl":
@@ -1519,20 +1534,29 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 		arg2 := call.ActualParams[1]
 		arg1.Accept(t)
 		arg2.Accept(t)
-		arg1Type := arg1.Type()
-		arg2Type := arg2.Type()
+		arg1Type := types.Underlying(arg1.Type())
+		arg2Type := types.Underlying(arg2.Type())
 
-		if !types.IsSet(arg1Type) && !types.IsInteger(arg2Type) {
+		if !types.IsSet(arg1Type) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a set, "+
-					"and the second argument to be an integer, got %s and %s", pre.Name(), arg1Type, arg2Type),
-				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg2.End()),
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a set, got %s",
+					pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
 			})
 			return
 		}
 
-		call.SemaType = types.NilType
+		value, err := t.EvalConstUint32(arg2)
+		if !types.IsInteger(arg2Type) || err != nil || (value < 0 || value > math.MaxUint32) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an integer in the range [0, MAX(SET)], got %s",
+					pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
+			})
+		}
+
 		return
 	case "halt":
 		if len(call.ActualParams) != 1 {
@@ -1545,7 +1569,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 		}
 
 		call.ActualParams[0].Accept(t)
-		argType := call.ActualParams[0].Type()
+		argType := types.Underlying(call.ActualParams[0].Type())
 		if !types.IsInteger(argType) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
@@ -1556,7 +1580,6 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 			return
 		}
 
-		call.SemaType = types.NilType
 		return
 	case "inc":
 		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
@@ -1570,7 +1593,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 
 		if len(call.ActualParams) == 1 {
 			call.ActualParams[0].Accept(t)
-			T := call.ActualParams[0].Type()
+			T := types.Underlying(call.ActualParams[0].Type())
 
 			if !types.IsInteger(T) && !types.IsEnum(T) {
 				t.ctx.Reporter.Report(report.Diagnostic{
@@ -1582,7 +1605,6 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 				return
 			}
 
-			call.SemaType = types.NilType
 			return
 		}
 
@@ -1600,19 +1622,27 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 				return
 			}
 
-			tx := x.Type()
-			ty := y.Type()
-			if !types.IsInteger(tx) && !types.IsInteger(ty) {
+			tx := types.Underlying(x.Type())
+			ty := types.Underlying(y.Type())
+
+			if !types.IsInteger(tx) || !t.isAssignable(x) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be integers, got %s and %s",
-						pre.Name(), tx.String(), ty.String()),
-					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), y.End()),
+					Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an assignable integer, got %s",
+						pre.Name(), tx.String()),
+					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), x.End()),
 				})
-				return
 			}
 
-			call.SemaType = types.NilType
+			if !types.IsInteger(ty) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an integer, got %s",
+						pre.Name(), ty.String()),
+					Range: t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
+				})
+			}
+
 			return
 		}
 	case "incl":
@@ -1629,19 +1659,29 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 		arg2 := call.ActualParams[1]
 		arg1.Accept(t)
 		arg2.Accept(t)
-		arg1Type := arg1.Type()
-		arg2Type := arg2.Type()
-		if !types.IsSet(arg1Type) && !types.IsInteger(arg2Type) {
+		arg1Type := types.Underlying(arg1.Type())
+		arg2Type := types.Underlying(arg2.Type())
+
+		if !types.IsSet(arg1Type) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a set, "+
-					"and the second argument to be an integer, got %s and %s", pre.Name(), arg1Type, arg2Type),
-				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg2.End()),
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a set, got %s",
+					pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
 			})
 			return
 		}
 
-		call.SemaType = types.NilType
+		value, err := t.EvalConstUint32(arg2)
+		if !types.IsInteger(arg2Type) || err != nil || (value < 0 || value > math.MaxUint32) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an integer in the range [0, MAX(SET)], got %s",
+					pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
+			})
+		}
+
 		return
 	case "new":
 		if len(call.ActualParams) == 0 {
@@ -1655,7 +1695,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 
 		if len(call.ActualParams) == 1 {
 			call.ActualParams[0].Accept(t)
-			argType := call.ActualParams[0].Type()
+			argType := types.Underlying(call.ActualParams[0].Type())
 			if !types.IsPointerToRecord(argType) && !types.IsFixedArray(argType) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
@@ -1666,11 +1706,10 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 				return
 			}
 
-			call.SemaType = types.NilType
 			return
 		} else {
 			call.ActualParams[0].Accept(t)
-			argType := call.ActualParams[0].Type()
+			argType := types.Underlying(call.ActualParams[0].Type())
 			if !types.IsPointerToOpenArray(argType) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
@@ -1683,7 +1722,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 
 			for _, arg := range call.ActualParams[1:] {
 				arg.Accept(t)
-				argType = arg.Type()
+				argType = types.Underlying(arg.Type())
 				if !types.IsInteger(argType) {
 					t.ctx.Reporter.Report(report.Diagnostic{
 						Severity: report.Error,
@@ -1695,7 +1734,6 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 				}
 			}
 
-			call.SemaType = types.NilType
 			return
 		}
 	case "number":
@@ -1710,8 +1748,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 
 		call.ActualParams[0].Accept(t)
 		call.ActualParams[1].Accept(t)
-		arg1Type := call.ActualParams[0].Type()
-		arg2Type := call.ActualParams[1].Type()
+		arg1Type := types.Underlying(call.ActualParams[0].Type())
+		arg2Type := types.Underlying(call.ActualParams[1].Type())
 
 		if !types.IsNumeric(arg1Type) && !types.IsSet(arg1Type) {
 			t.ctx.Reporter.Report(report.Diagnostic{
@@ -1733,7 +1771,6 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 			return
 		}
 
-		call.SemaType = types.NilType
 		return
 	case "pcall":
 		if len(call.ActualParams) < 2 {
@@ -1747,8 +1784,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 
 		call.ActualParams[0].Accept(t)
 		call.ActualParams[1].Accept(t)
-		arg1Type := call.ActualParams[0].Type()
-		arg2Type := call.ActualParams[1].Type()
+		arg1Type := types.Underlying(call.ActualParams[0].Type())
+		arg2Type := types.Underlying(call.ActualParams[1].Type())
 
 		if !types.IsPointerToAnyRec(arg1Type) {
 			t.ctx.Reporter.Report(report.Diagnostic{
@@ -1771,7 +1808,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 		}
 
 		if len(call.ActualParams) > 2 {
-			proc := call.ActualParams[1].Type().(*types.ProcedureType)
+			proc := types.Underlying(call.ActualParams[1].Type()).(*types.ProcedureType)
 			if len(call.ActualParams)-2 != len(proc.Params) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
@@ -1784,7 +1821,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 
 			for i, arg := range call.ActualParams[2:] {
 				arg.Accept(t)
-				if !types.ParameterCompatible(arg.Type(), proc.Params[i]) {
+				if !types.ParameterCompatible(types.Underlying(arg.Type()), proc.Params[i]) {
 					t.ctx.Reporter.Report(report.Diagnostic{
 						Severity: report.Error,
 						Message: fmt.Sprintf("argument %d of predeclared procedure '%s' is incompatible with parameter "+
@@ -1796,7 +1833,6 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 			}
 		}
 
-		call.SemaType = types.NilType
 		return
 	case "raise":
 		if len(call.ActualParams) != 1 {
@@ -1809,7 +1845,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 		}
 
 		call.ActualParams[0].Accept(t)
-		argType := call.ActualParams[0].Type()
+		argType := types.Underlying(call.ActualParams[0].Type())
 		if !types.IsPointerToAnyRec(argType) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
@@ -1819,8 +1855,6 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 			})
 			return
 		}
-
-		call.SemaType = types.NilType
 	case "copy":
 		if len(call.ActualParams) != 2 {
 			t.ctx.Reporter.Report(report.Diagnostic{
@@ -1835,8 +1869,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 		arg2 := call.ActualParams[1]
 		arg1.Accept(t)
 		arg2.Accept(t)
-		arg1Type := arg1.Type()
-		arg2Type := arg2.Type()
+		arg1Type := types.Underlying(arg1.Type())
+		arg2Type := types.Underlying(arg2.Type())
 
 		if !types.IsCharArrayOrString(arg1Type) {
 			t.ctx.Reporter.Report(report.Diagnostic{
@@ -1857,8 +1891,6 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 			})
 			return
 		}
-
-		call.SemaType = types.NilType
 	case "pack":
 		if len(call.ActualParams) != 2 {
 			t.ctx.Reporter.Report(report.Diagnostic{
@@ -1873,8 +1905,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 		arg2 := call.ActualParams[1]
 		arg1.Accept(t)
 		arg2.Accept(t)
-		arg1Type := arg1.Type()
-		arg2Type := arg2.Type()
+		arg1Type := types.Underlying(arg1.Type())
+		arg2Type := types.Underlying(arg2.Type())
 
 		if !types.IsReal(arg1Type) && t.isAssignable(arg1) && arg2Type != types.Int32Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
@@ -1885,8 +1917,6 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 			})
 			return
 		}
-
-		call.SemaType = types.NilType
 	case "unpk":
 		if len(call.ActualParams) != 2 {
 			t.ctx.Reporter.Report(report.Diagnostic{
@@ -1901,8 +1931,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 		arg2 := call.ActualParams[1]
 		arg1.Accept(t)
 		arg2.Accept(t)
-		arg1Type := arg1.Type()
-		arg2Type := arg2.Type()
+		arg1Type := types.Underlying(arg1.Type())
+		arg2Type := types.Underlying(arg2.Type())
 
 		if !types.IsReal(arg1Type) && t.isAssignable(arg1) {
 			t.ctx.Reporter.Report(report.Diagnostic{
@@ -1923,8 +1953,6 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.FunctionCall, pre *ast
 			})
 			return
 		}
-
-		call.SemaType = types.NilType
 	default:
 		t.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
@@ -1946,7 +1974,7 @@ func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
 
 	switch call.Callee.Symbol.Props() {
 	case ast.Predeclared:
-		t.checkPredeclaredProcedure(call, call.Callee.Symbol.(*ast.ProcedureSymbol))
+		t.checkPredeclaredFunction(call, call.Callee.Symbol.(*ast.ProcedureSymbol))
 	default:
 		calleeType := call.Callee.Symbol.TypeNode().Accept(t).(types.Type)
 		procType, ok := calleeType.(*types.ProcedureType)
@@ -2009,8 +2037,8 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 		} else {
 			switch e := expr.Operand.(type) {
 			case *ast.BasicLit:
-				if e.Kind == token.REAL || e.Kind == token.LONGREAL {
-					value, err := strconv.ParseFloat(e.Val, 10)
+				if e.Kind == token.REAL_LIT || e.Kind == token.LONGREAL_LIT {
+					value, err := strconv.ParseFloat(e.Val, 64)
 					if err != nil {
 						t.ctx.Reporter.Report(report.Diagnostic{
 							Severity: report.Fatal,
@@ -2019,9 +2047,12 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 						})
 					}
 
-					f32 := float32(value)
-					back := float64(f32)
-					if back == value {
+					if op == token.MINUS {
+						value = -value
+					}
+
+					// Determine the type based on the value
+					if value >= -3.402823466e+38 && value <= 3.402823466e+38 {
 						expr.SemaType = types.RealType
 					} else {
 						expr.SemaType = types.LongRealType
@@ -2036,14 +2067,18 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 						})
 					}
 
+					if op == token.MINUS {
+						value = -value
+					}
+
 					switch {
-					case -value >= 0 && -value <= 255:
+					case value >= 0 && value <= 255:
 						expr.SemaType = types.ByteType
-					case -value >= -128 && -value <= 127:
+					case value >= -128 && value <= 127:
 						expr.SemaType = types.Int8Type
-					case -value >= -32768 && -value <= 32767:
+					case value >= -32768 && value <= 32767:
 						expr.SemaType = types.Int16Type
-					case -value >= -2147483648 && -value <= 2147483647:
+					case value >= -2147483648 && value <= 2147483647:
 						expr.SemaType = types.Int32Type
 					default:
 						expr.SemaType = types.Int64Type
@@ -2106,8 +2141,16 @@ func (t *TypeChecker) VisitSet(n *ast.Set) any {
 			t.assertConst(e.Low)
 			t.assertConst(e.High)
 
-			low := t.EvalConstUint32(e.Low)
-			high := t.EvalConstUint32(e.High)
+			low, errLow := t.EvalConstUint32(e.Low)
+			high, errHigh := t.EvalConstUint32(e.High)
+			if errLow != nil || errHigh != nil {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("invalid set range: %v", errLow),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, elem.Pos(), elem.End()),
+				})
+				return n
+			}
 
 			if low > high {
 				t.ctx.Reporter.Report(report.Diagnostic{
@@ -2122,7 +2165,15 @@ func (t *TypeChecker) VisitSet(n *ast.Set) any {
 			t.assertInteger(e, "set element must be integer")
 			t.assertConst(e)
 
-			val := t.EvalConstUint32(e)
+			val, err := t.EvalConstUint32(e)
+			if err != nil {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("invalid set element: %v", err),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, elem.Pos(), elem.End()),
+				})
+				return n
+			}
 			_ = val // validated by EvalConstUint32
 
 		default:
@@ -2156,6 +2207,8 @@ func (t *TypeChecker) VisitBasicLit(lit *ast.BasicLit) any {
 		lit.SemaType = types.LongRealType
 	case token.CHAR_LIT:
 		lit.SemaType = types.CharType
+	case token.WCHAR_LIT:
+		lit.SemaType = types.WCharType
 	case token.HEX_STR_LIT:
 		lit.SemaType = &types.StringType{}
 	case token.STR_LIT:
@@ -2277,8 +2330,22 @@ func (t *TypeChecker) VisitReturnStmt(stmt *ast.ReturnStmt) any {
 }
 
 func (t *TypeChecker) VisitProcedureCall(call *ast.ProcedureCall) any {
-	//TODO implement me
-	panic("implement me")
+	if call.Callee.Symbol == nil || call.Callee.Symbol.Kind() != ast.ProcedureSymbolKind {
+		t.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("name '%s' could not be resolved to a procedure", call.Callee),
+			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
+		})
+	}
+
+	switch call.Callee.Symbol.Props() {
+	case ast.Predeclared:
+		t.checkPredeclaredProcedure(call, call.Callee.Symbol.(*ast.ProcedureSymbol))
+	default:
+		// TODO: implement user-defined procedures
+	}
+
+	return call
 }
 
 func (t *TypeChecker) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
@@ -2908,45 +2975,28 @@ func (t *TypeChecker) TypeOf(n ast.Node) types.Type {
 	}
 }
 
-func (t *TypeChecker) EvalConstUint32(expr ast.Expression) uint32 {
+func (t *TypeChecker) EvalConstUint32(expr ast.Expression) (uint32, error) {
 	val := ast.EvalConstExpr(expr)
 	switch v := val.(type) {
 	case int:
 		if v < 0 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  "set value must be unsigned integer",
-				Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Pos(), expr.End()),
-			})
+			return 0, fmt.Errorf("value must be unsigned integer, got %d", v)
 		}
-		return uint32(v)
+		return uint32(v), nil
 	case uint32:
-		return v
+		return v, nil
 	case uint64:
 		if v > math.MaxUint32 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  "set value exceeds uint32 max",
-				Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Pos(), expr.End()),
-			})
+			return 0, fmt.Errorf("value exceeds uint32 max: %d", v)
 		}
-		return uint32(v)
+		return uint32(v), nil
 	case int64:
 		if v < 0 || v > math.MaxUint32 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  "set value outside of [0..uint32] range ",
-				Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Pos(), expr.End()),
-			})
+			return 0, fmt.Errorf("value outside of [0..uint32] range: %d", v)
 		}
-		return uint32(v)
+		return uint32(v), nil
 	default:
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
-			Message:  "expected constant unsigned integer",
-			Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Pos(), expr.End()),
-		})
-		return 0 // unreachable
+		return 0, fmt.Errorf("expected constant unsigned integer, got %T", val)
 	}
 }
 

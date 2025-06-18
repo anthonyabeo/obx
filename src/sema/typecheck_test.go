@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/report"
@@ -501,4 +502,785 @@ END InvalidExprCompatibilityTest.
 		t.Errorf("got %d unexpected errors:\n", ctx.Reporter.ErrorCount())
 		ctx.Reporter.Flush()
 	}
+}
+
+type procTestCase struct {
+	name        string
+	code        string
+	shouldPass  bool
+	expectError string
+}
+
+type procTestEntry struct {
+	procName string
+	cases    []procTestCase
+}
+
+var predeclaredProcTests = []procTestEntry{
+	{
+		procName: "ABS",
+		cases: []procTestCase{
+			{
+				name: "Valid ABS INT8",
+				code: `
+					MODULE Test;
+					VAR x: INT8;
+					BEGIN x := ABS(-5)
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "Valid ABS INT16",
+				code: `
+					MODULE Test;
+					VAR x: INT16;
+					BEGIN x := ABS(-12345)
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name:       "Valid ABS INT32",
+				code:       `MODULE Test; VAR x, y: INT32; BEGIN y := ABS(x) END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "ABS with REAL",
+				code: `MODULE Test;
+						VAR x: REAL;
+						BEGIN x := ABS(-3.14)
+						END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "ABS with non-numeric",
+				code: `MODULE Test;
+						VAR x: BOOL;
+						BEGIN x := ABS(TRUE)
+						END Test.`,
+				shouldPass:  false,
+				expectError: "'ABS' expects a numeric argument",
+			},
+			{
+				name: "ABS with no arguments",
+				code: `MODULE Test;
+					VAR x: INT8;
+					BEGIN x := ABS()
+					END Test.`,
+				shouldPass:  false,
+				expectError: "'ABS' expects exactly one argument",
+			},
+			{
+				name: "ABS with too many arguments",
+				code: `MODULE Test;
+					VAR x: INT8;
+					BEGIN x := ABS(1, 2)
+					END Test.`,
+				shouldPass:  false,
+				expectError: "'ABS' expects exactly one argument",
+			},
+			{
+				name:        "Invalid ABS on BOOLEAN",
+				code:        `MODULE Test; VAR x, b: BOOL; BEGIN x := ABS(b) END Test.`,
+				shouldPass:  false,
+				expectError: "'ABS' expects a numeric argument",
+			},
+			{
+				name:        "Too many arguments",
+				code:        `MODULE Test; VAR x, y: INT32; BEGIN y := ABS(x, x)  END Test.`,
+				shouldPass:  false,
+				expectError: "expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "CHR",
+		cases: []procTestCase{
+			{
+				name: "CAP with lowercase CHAR",
+				code: `MODULE Test;
+					VAR c: CHAR;
+					BEGIN c := CAP('a')
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "CAP with CHAR literal",
+				code: `MODULE Test;
+					VAR c: CHAR;
+					BEGIN c := CAP(0ffx)
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "CAP with CHAR literal",
+				code: `MODULE Test;
+					VAR c: CHAR;
+					BEGIN c := CAP(0x)
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "CAP with WCHAR literal",
+				code: `MODULE Test;
+					VAR c: WCHAR;
+					BEGIN c := CAP(4F60x)
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "CAP with WCHAR literal",
+				code: `MODULE Test;
+					VAR c: WCHAR;
+					BEGIN c := CAP(0d7ffx)
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "CAP with WCHAR literal",
+				code: `MODULE Test;
+					VAR c: WCHAR;
+					BEGIN c := CAP(0f900x)
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "CAP with WCHAR literal",
+				code: `MODULE Test;
+					VAR c: WCHAR;
+					BEGIN c := CAP(0ffffx)
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "CAP with uppercase CHAR",
+				code: `MODULE Test;
+					VAR c: CHAR;
+					BEGIN c := CAP('Z')
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "CAP with numeric argument",
+				code: `MODULE Test;
+					VAR c: CHAR;
+					BEGIN c := CAP(65)
+					END Test.`,
+				shouldPass:  false,
+				expectError: "'CAP' expects a char argument",
+			},
+			{
+				name: "CAP with boolean argument",
+				code: `MODULE Test;
+					VAR c: CHAR;
+					BEGIN c := CAP(TRUE)
+					END Test.`,
+				shouldPass:  false,
+				expectError: "'CAP' expects a char argument",
+			},
+			{
+				name: "CAP with no arguments",
+				code: `MODULE Test;
+					VAR c: CHAR;
+					BEGIN c := CAP()
+					END Test.`,
+				shouldPass:  false,
+				expectError: "'CAP' expects exactly one argument",
+			},
+			{
+				name: "CAP with too many arguments",
+				code: `
+					MODULE Test;
+					VAR c: CHAR;
+					BEGIN c := CAP('a', 'b')
+					END Test.`,
+				shouldPass:  false,
+				expectError: "'CAP' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "DEC",
+		cases: []procTestCase{
+			{
+				name: "DEC with one argument: integer variable",
+				code: `MODULE Test;
+					VAR x: INTEGER;
+					BEGIN DEC(x)
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "DEC with one argument: enum variable",
+				code: `MODULE Test;
+					TYPE Color = (Red, Green, Blue);
+					VAR c: Color;
+					BEGIN DEC(c)
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "DEC with one argument: non-integer, non-enum",
+				code: `MODULE Test;
+					VAR r: REAL;
+					BEGIN DEC(r)
+					END Test.`,
+				shouldPass:  false,
+				expectError: "'DEC' expects first argument to be an integer or enum type",
+			},
+			{
+				name: "DEC with two arguments: valid integer decrement",
+				code: `MODULE Test;
+					VAR x: INTEGER;
+					BEGIN DEC(x, 3)
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "DEC with two arguments: enum variable, valid integer",
+				code: `MODULE Test;
+					TYPE State = (Start, Middle, Last);
+					VAR s: State;
+					BEGIN DEC(s, 1)
+					END Test.`,
+				shouldPass:  false,
+				expectError: "'DEC' expects the first argument to be an assignable integer",
+			},
+			{
+				name: "DEC with two arguments: non-integer decrement",
+				code: `
+					MODULE Test;
+					VAR x: INTEGER;
+					BEGIN DEC(x, 1.5)
+					END Test.`,
+				shouldPass:  false,
+				expectError: "'DEC' expects the second argument to be an integer",
+			},
+			{
+				name: "DEC with two arguments: first argument not a variable",
+				code: `MODULE Test;
+					CONST x = 5;
+					BEGIN DEC(x, 1)
+					END Test.`,
+				shouldPass:  false,
+				expectError: "'DEC' expects the first argument to be an assignable integer",
+			},
+			{
+				name: "DEC with too many arguments",
+				code: `MODULE Test;
+					VAR x: INTEGER;
+					BEGIN DEC(x, 1, 2)
+					END Test.`,
+				shouldPass:  false,
+				expectError: "'DEC' expects one or two arguments",
+			},
+			{
+				name: "DEC with zero arguments",
+				code: `MODULE Test;
+					BEGIN DEC()
+					END Test.`,
+				shouldPass:  false,
+				expectError: "'DEC' expects one or two arguments",
+			},
+		},
+	},
+	{
+		procName: "INC",
+		cases: []procTestCase{
+			{
+				name: "INC with one argument: integer variable",
+				code: `MODULE Test;
+					VAR x: INTEGER;
+					BEGIN INC(x)
+					END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "INC with one argument: enum variable",
+				code: `
+			MODULE Test;
+			TYPE Color = (Red, Green, Blue);
+			VAR c: Color;
+			BEGIN INC(c)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "INC with one argument: real variable (invalid)",
+				code: `
+			MODULE Test;
+			VAR r: REAL;
+			BEGIN INC(r)
+			END Test.`,
+				expectError: "'INC' expects an integer or enum type",
+			},
+			{
+				name: "INC with two arguments: integer variable and constant",
+				code: `
+			MODULE Test;
+			VAR x: INTEGER;
+			BEGIN INC(x, 5)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "INC with two arguments: enum variable and constant",
+				code: `
+			MODULE Test;
+			TYPE State = (Init, Running, Done);
+			VAR s: State;
+			BEGIN INC(s, 1)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'INC' expects the first argument to be an assignable integer",
+			},
+			{
+				name: "INC with two arguments: second argument not integer",
+				code: `
+			MODULE Test;
+			VAR x: INTEGER;
+			BEGIN INC(x, 1.0)
+			END Test.`,
+				expectError: "'INC' expects the second argument to be an integer",
+			},
+			{
+				name: "INC with two arguments: first argument not a variable",
+				code: `
+			MODULE Test;
+			CONST c = 5;
+			BEGIN INC(c, 1)
+			END Test.`,
+				expectError: "'INC' expects the first argument to be an assignable integer",
+			},
+			{
+				name: "INC with too many arguments",
+				code: `
+			MODULE Test;
+			VAR x: INTEGER;
+			BEGIN INC(x, 1, 2)
+			END Test.`,
+				expectError: "'INC' expects one or two arguments",
+			},
+			{
+				name: "INC with zero arguments",
+				code: `
+			MODULE Test;
+			BEGIN INC()
+			END Test.`,
+				expectError: "'INC' expects one or two arguments",
+			},
+		},
+	},
+	{
+		procName: "INCL",
+		cases: []procTestCase{
+			{
+				name: "INCL with valid SET variable and integer",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN INCL(s, 5)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "INCL with constant expression index",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			CONST i = 10;
+			BEGIN INCL(s, i)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "INCL with large integer",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN INCL(s, 999999999)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "INCL with MAX(SET) integer",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN INCL(s, 4294967295)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "INCL with out-of-bounds integer",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN INCL(s, 4294967296)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'INCL' expects the second argument to be an integer in the range [0, MAX(SET)]",
+			},
+			{
+				name: "INCL with non-integer index",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN INCL(s, 1.5)
+			END Test.`,
+				expectError: "'INCL' expects the second argument to be an integer",
+			},
+			{
+				name: "INCL with non-SET variable",
+				code: `
+			MODULE Test;
+			VAR s: INTEGER;
+			BEGIN INCL(s, 1)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'INCL' expects the first argument to be a set",
+			},
+			{
+				name: "INCL with set union as first argument",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN INCL(s + s, 1)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "INCL with set difference as first argument",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN INCL(s / s, 4294967295)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "INCL with set difference as first argument",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN INCL(s - s, 0)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "INCL with set difference as first argument",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN INCL(s * s, 0)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "INCL with missing arguments",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN INCL(s)
+			END Test.`,
+				expectError: "'INCL' expects exactly two arguments",
+			},
+			{
+				name: "INCL with too many arguments",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN INCL(s, 1, 2)
+			END Test.`,
+				expectError: "'INCL' expects exactly two arguments",
+			},
+		},
+	},
+	{
+		procName: "EXCL",
+		cases: []procTestCase{
+			{
+				name: "EXCL with valid SET variable and integer",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s, 5)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "EXCL with constant expression index",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			CONST i = 7;
+			BEGIN EXCL(s, i)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "EXCL with non-integer index",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s, 3.14)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'EXCL' expects the second argument to be an integer",
+			},
+			{
+				name: "EXCL with valid SET variable and integer",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s, 5)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "EXCL with constant expression index",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			CONST i = 10;
+			BEGIN EXCL(s, i)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "EXCL with large integer",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s, 999999999)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "EXCL with MAX(SET) integer",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s, 4294967295)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "EXCL with out-of-bounds integer",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s, 4294967296)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'EXCL' expects the second argument to be an integer in the range [0, MAX(SET)]",
+			},
+			{
+				name: "EXCL with non-integer index",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s, 'a')
+			END Test.`,
+				expectError: "'EXCL' expects the second argument to be an integer",
+			},
+			{
+				name: "EXCL with non-SET variable",
+				code: `
+			MODULE Test;
+			VAR s: INTEGER;
+			BEGIN EXCL(s, 1)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'EXCL' expects the first argument to be a set",
+			},
+			{
+				name: "EXCL with set union as first argument",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s + s, 1)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "EXCL with set difference as first argument",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s / s, 4294967295)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "EXCL with set difference as first argument",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s - s, 0)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "EXCL with set difference as first argument",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s * s, 0)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "EXCL with missing arguments",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s)
+			END Test.`,
+				expectError: "'EXCL' expects exactly two arguments",
+			},
+			{
+				name: "EXCL with too many arguments",
+				code: `
+			MODULE Test;
+			VAR s: SET;
+			BEGIN EXCL(s, 1, 2)
+			END Test.`,
+				expectError: "'EXCL' expects exactly two arguments",
+			},
+		},
+	},
+	{
+		procName: "ASSERT",
+		cases: []procTestCase{
+			{
+				name: "ASSERT with valid BOOLEAN expression",
+				code: `
+			MODULE Test;
+			VAR x: BOOL;
+			BEGIN ASSERT(x)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "ASSERT with TRUE literal",
+				code: `
+			MODULE Test;
+			BEGIN ASSERT(TRUE)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "ASSERT with valid second INTEGER constant argument",
+				code: `
+			MODULE Test;
+			BEGIN ASSERT(TRUE, 42)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "ASSERT with second argument that is not constant",
+				code: `
+			MODULE Test;
+			VAR code: INTEGER;
+			BEGIN ASSERT(TRUE, code)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'ASSERT' expects the second argument to be an integer constant",
+			},
+			{
+				name: "ASSERT with non-BOOLEAN first argument",
+				code: `
+			MODULE Test;
+			VAR x: INTEGER;
+			BEGIN ASSERT(x)
+			END Test.`,
+				expectError: "'ASSERT' expects a boolean type",
+			},
+			{
+				name: "ASSERT with negative constant code",
+				code: `
+			MODULE Test;
+			BEGIN ASSERT(TRUE, -1)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "ASSERT with too many arguments",
+				code: `
+			MODULE Test;
+			BEGIN ASSERT(TRUE, 1, 2)
+			END Test.`,
+				expectError: "'ASSERT' expects one or two arguments",
+			},
+			{
+				name: "ASSERT with no arguments",
+				code: `
+			MODULE Test;
+			BEGIN ASSERT()
+			END Test.`,
+				expectError: "'ASSERT' expects one or two arguments",
+			},
+		},
+	},
+}
+
+func TestPredeclaredProcedureCalls(t *testing.T) {
+	for _, entry := range predeclaredProcTests {
+		for _, tc := range entry.cases {
+			t.Run(entry.procName+"_"+tc.name, func(t *testing.T) {
+				ctx := typeCheckSnippet(t, tc.code)
+				if tc.shouldPass {
+					if ctx.Reporter.ErrorCount() > 0 {
+						t.Errorf("expected success, got %d errors", ctx.Reporter.ErrorCount())
+						ctx.Reporter.Flush()
+					}
+				} else {
+					if ctx.Reporter.ErrorCount() == 0 {
+						t.Errorf("expected error but got success")
+					} else {
+						err := ctx.Reporter.Diagnostics()[0]
+						if !strings.Contains(err.Message, tc.expectError) {
+							t.Errorf("expected error to contain %q, got %q", tc.expectError, err.Message)
+						}
+					}
+				}
+			})
+		}
+	}
+}
+
+func typeCheckSnippet(t *testing.T, code string) *report.Context {
+	tmp := t.TempDir()
+	file := filepath.Join(tmp, "test.obx")
+	if err := os.WriteFile(file, []byte(code), 0644); err != nil {
+		panic(err)
+	}
+
+	obx := ast.NewOberonX()
+	srcMgr := report.NewSourceManager()
+	reporter := report.NewBufferedReporter(srcMgr, 32, report.StdoutSink{
+		Source: srcMgr,
+		Writer: os.Stdout,
+	})
+	ctx := &report.Context{
+		FileName: file,
+		FilePath: file,
+		Content:  []byte(code),
+		Source:   srcMgr,
+		Reporter: reporter,
+		TabWidth: 4,
+		Envs:     make(map[string]*ast.Environment),
+	}
+	p := parser.NewParser(ctx)
+	unit := p.Parse()
+	if ctx.Reporter.ErrorCount() > 0 {
+		return ctx
+	}
+
+	obx.AddUnit(unit)
+	ctx.Envs[unit.Name()] = unit.Environ()
+	s := NewSema(ctx, obx)
+	s.Validate()
+
+	return ctx
 }

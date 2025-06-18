@@ -130,7 +130,7 @@ func IsReal(ty Type) bool {
 
 func IsChar(ty Type) bool {
 	switch t := ty.(type) {
-	case StringType:
+	case *StringType:
 		return t.Length == 1
 	}
 
