@@ -275,14 +275,18 @@ func TestScanCharacterLiterals(t *testing.T) {
 		wantErr       bool
 	}{
 		// Valid character literals
-		{"1Fx", token.CHAR_LIT, "A", false},   // 8-bit character 'A'
-		{"0041x", token.CHAR_LIT, "A", false}, // 16-bit Unicode 'A'
-		{"03A9x", token.CHAR_LIT, "Ω", false}, // Unicode 'Ω'
-		{"7Fx", token.CHAR_LIT, "", false},   // Extended ASCII ''
-		{"4F60x", token.CHAR_LIT, "你", false}, // Unicode '你' (Chinese character)
+		{"0x", token.CHAR_LIT, "A", false},      // 8-bit character 'A'
+		{"1Fx", token.CHAR_LIT, "A", false},     // 8-bit character 'A'
+		{"0041x", token.CHAR_LIT, "A", false},   // 16-bit Unicode 'A'
+		{"03A9x", token.WCHAR_LIT, "Ω", false},  // Unicode 'Ω'
+		{"7Fx", token.CHAR_LIT, "", false},     // Extended ASCII ''
+		{"4F60x", token.WCHAR_LIT, "你", false},  // Unicode '你' (Chinese character)
+		{"0FFFFx", token.WCHAR_LIT, "你", false}, // Unicode '你' (Chinese character)
+		{"1x", token.CHAR_LIT, "", false},
+		{"01x", token.CHAR_LIT, "", false},
+		{"000000001x", token.CHAR_LIT, "", false},
 
 		// Invalid character literals
-		{"1x", token.ILLEGAL, "", true},      // Too few hex digits
 		{"G2x", token.IDENTIFIER, "", false}, // Invalid hex digit 'G'
 		{"1F", token.ILLEGAL, "", true},      // Missing 'x'
 		{"12345x", token.ILLEGAL, "", true},  // Too many hex digits

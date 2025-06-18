@@ -103,6 +103,11 @@ func EvalConstExpr(expr Expression) any {
 		return evalUnaryExpr(e)
 	case *BinaryExpr:
 		return evalBinaryExpr(e)
+	case *Designator:
+		if sym, ok := e.Symbol.(*ConstantSymbol); ok {
+			return EvalConstExpr(sym.Value) // Return the constant value
+		}
+		return nil // Not a constant expression
 	default:
 		return nil // Not a constant expression
 	}

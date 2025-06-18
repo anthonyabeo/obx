@@ -882,7 +882,7 @@ func (p *Parser) parseFactor() ast.Expression {
 		return dsg
 
 	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
-		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.NIL, token.TRUE, token.FALSE, token.LBRACE:
+		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.WCHAR_LIT, token.NIL, token.TRUE, token.FALSE, token.LBRACE:
 		return p.parseLiteral()
 
 	default:
@@ -1028,7 +1028,7 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
 func (p *Parser) parseLiteral() (lit ast.Expression) {
 	switch p.tok {
 	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
-		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.TRUE, token.FALSE:
+		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.WCHAR_LIT, token.TRUE, token.FALSE:
 
 		lit = &ast.BasicLit{Kind: p.tok, Val: p.lexeme, StartOffset: p.pos, EndOffset: p.end}
 		p.next()
@@ -1265,7 +1265,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 			})
 		}
 
-		procedureTy := &ast.ProcedureType{}
+		procedureTy := &ast.ProcedureType{FP: &ast.FormalParams{}}
 		if head.FP != nil {
 			procedureTy.FP.Params = head.FP.Params
 			procedureTy.FP.RetType = head.FP.RetType
@@ -1282,7 +1282,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 			})
 		}
 	} else {
-		procedureTy := &ast.ProcedureType{}
+		procedureTy := &ast.ProcedureType{FP: &ast.FormalParams{}}
 		if head.FP != nil {
 			procedureTy.FP.Params = head.FP.Params
 			procedureTy.FP.RetType = head.FP.RetType

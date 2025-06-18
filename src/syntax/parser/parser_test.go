@@ -542,15 +542,15 @@ end Drawing
 `)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 	figures := ast.NewEnvironment(ast.GlobalEnviron, "Figure")
-	figures.Insert(ast.NewProcedureSymbol("calc", ast.Exported, nil))
+	figures.Insert(ast.NewProcedureSymbol("calc", ast.Exported, nil, nil))
 
 	collections := ast.NewEnvironment(ast.GlobalEnviron, "Collections")
 	collections.Insert(ast.NewTypeSymbol("Iterator", ast.Exported, &ast.RecordType{}))
-	collections.Insert(ast.NewProcedureSymbol("createDeque", ast.Exported, nil))
+	collections.Insert(ast.NewProcedureSymbol("createDeque", ast.Exported, nil, nil))
 
 	env := ast.NewRecordEnv(nil, collections)
-	env.Insert(ast.NewProcedureSymbol("forEach", ast.Exported, nil))
-	env.Insert(ast.NewProcedureSymbol("append", ast.Exported, nil))
+	env.Insert(ast.NewProcedureSymbol("forEach", ast.Exported, nil, nil))
+	env.Insert(ast.NewProcedureSymbol("append", ast.Exported, nil, nil))
 	collections.Insert(ast.NewTypeSymbol("Deque", ast.Exported, &ast.RecordType{Env: env}))
 
 	envs := map[string]*ast.Environment{
@@ -1127,7 +1127,7 @@ VAR x, y: INTEGER
 
 BEGIN
   y := @;             
-  while x > 0x do     
+  while x > 0zx do     
     x := x div 2      
     inc(y);;
   end                 

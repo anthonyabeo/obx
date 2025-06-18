@@ -1,11 +1,10 @@
 package scan
 
 import (
+	"github.com/anthonyabeo/obx/src/syntax/token"
 	"strconv"
 	"strings"
 	"unicode"
-
-	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type StateFn func(*Scanner) StateFn
@@ -91,30 +90,43 @@ func scanNumber(s *Scanner) StateFn {
 			return s.errorf("malformed number: invalid character '%c' after char literal", s.peek())
 		}
 
+		// remove preceding zeroes from hexValue
+		hexValue = strings.TrimLeft(hexValue, "0")
+
+		if len(hexValue) > 4 {
+			return s.errorf("malformed number: character literal must be 1-4 hex digits")
+		}
+
+		if len(hexValue) == 0 {
+			hexValue = "0"
+		}
+
 		var value int
-		if len(hexValue) == 2 {
-			// 8-bit value (ISO/IEC 8859-1 Latin-1)
-			parsed, err := strconv.ParseInt(hexValue, 16, 8)
-			if err != nil {
-				return s.errorf("malformed number: invalid 8-bit character value: %s", hexValue)
-			}
-			value = int(parsed)
-		} else if len(hexValue) == 4 {
-			// 16-bit value (Unicode BMP)
-			parsed, err := strconv.ParseInt(hexValue, 16, 16)
-			if err != nil {
-				return s.errorf("malformed number: invalid 16-bit character value: %s", hexValue)
-			}
-			value = int(parsed)
-		} else {
-			return s.errorf("malformed number: invalid character literal, hex value must be 2 or 4 digits")
+		parsed, err := strconv.ParseInt(hexValue, 16, 64)
+		if err != nil {
+			return s.errorf("malformed number: invalid character value: %s", hexValue)
 		}
 
 		// Convert the value to a rune
-		character := rune(value)
+		character := rune(parsed)
+		var tokenKind token.Kind
+
+		if character < 0 || character > 0x10FFFF {
+			return s.errorf("malformed number: character literal out of range: %d", value)
+		}
+		if character == 0xD800 || (character >= 0xD800 && character <= 0xDFFF) {
+			return s.errorf("malformed number: character literal cannot be a surrogate pair: %d", value)
+		}
+
+		// Use WCHAR_LIT for characters outside ASCII range
+		if character > 0xFF {
+			tokenKind = token.WCHAR_LIT
+		} else {
+			tokenKind = token.CHAR_LIT
+		}
 
 		// Emit the character token with its Unicode code point
-		s.emitWithValue(token.CHAR_LIT, string(character), s.start, s.pos)
+		s.emitWithValue(tokenKind, string(character), s.start, s.pos)
 
 		return scanText
 	}

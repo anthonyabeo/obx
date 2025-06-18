@@ -42,6 +42,7 @@ const (
 	REAL_LIT
 	LONGREAL_LIT
 	CHAR_LIT
+	WCHAR_LIT
 	HEX_STR_LIT
 	STR_LIT
 	literal_end

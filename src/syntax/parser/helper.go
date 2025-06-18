@@ -108,6 +108,7 @@ func (p *Parser) exprStart() bool {
 		p.tok == token.STR_LIT ||
 		p.tok == token.HEX_STR_LIT ||
 		p.tok == token.CHAR_LIT ||
+		p.tok == token.WCHAR_LIT ||
 		p.tok == token.BYTE_LIT ||
 		p.tok == token.INT8_LIT ||
 		p.tok == token.INT16_LIT ||
