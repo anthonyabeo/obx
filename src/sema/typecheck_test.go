@@ -1222,6 +1222,332 @@ var predeclaredProcTests = []procTestEntry{
 			},
 		},
 	},
+	{
+		procName: "BYTES",
+		cases: []procTestCase{
+			{
+				name: "BYTES(array, n) with BYTE array and INT32",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 8 OF BYTE;
+			VAR x: INT32;
+			VAR n: INTEGER;
+			BEGIN BYTES(a, x)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "BYTES(array, n) with CHAR array and SET",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 16 OF CHAR;
+			VAR x: SET;
+			VAR n: INTEGER;
+			BEGIN BYTES(a, x)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "BYTES(array, n) with array of INTEGER",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 4 OF INTEGER;
+			VAR x: INT32;
+			VAR n: INTEGER;
+			BEGIN BYTES(a, x)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'BYTES' expects the first argument to be an array of byte or char",
+			},
+			{
+				name: "BYTES(array, n) with BOOLEAN",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 8 OF BYTE;
+			VAR b: BOOL;
+			BEGIN BYTES(a, b)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'BYTES' expects the second argument to be numeric or set",
+			},
+			{
+				name: "BYTES() with no arguments",
+				code: `
+			MODULE Test;
+			BEGIN BYTES()
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'BYTES' expects exactly two arguments",
+			},
+			{
+				name: "BYTES() with too many arguments",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 8 OF BYTE;
+			VAR n: INTEGER;
+			BEGIN BYTES(a, n, n)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'BYTES' expects exactly two arguments",
+			},
+			{
+				name: "BYTES() with non-array first argument",
+				code: `
+			MODULE Test;
+			VAR x: INTEGER;
+			VAR n: INTEGER;
+			BEGIN BYTES(x, n)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'BYTES' expects the first argument to be an array of byte or char",
+			},
+			{
+				name: "BYTES() with non-numeric second argument",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 8 OF BYTE;
+			VAR b: BOOL;
+			BEGIN BYTES(a, b)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'BYTES' expects the second argument to be numeric or set",
+			},
+			{
+				name: "BYTES() with array of CHAR",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 8 OF CHAR;
+			VAR n: INTEGER;
+			BEGIN BYTES(a, n)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "BYTES() with array of BYTE",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 8 OF BYTE;
+			VAR n: INTEGER;
+			BEGIN BYTES(a, n)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "BYTES() with array of WCHAR",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 8 OF WCHAR;
+			VAR n: INTEGER;
+			BEGIN BYTES(a, n)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'BYTES' expects the first argument to be an array of byte or char",
+			},
+		},
+	},
+	{
+		procName: "HALT",
+		cases: []procTestCase{
+			{
+				name: "HALT with integer constant",
+				code: `
+			MODULE Test;
+			BEGIN HALT(1)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "HALT with zero",
+				code: `
+			MODULE Test;
+			BEGIN HALT(0)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "HALT with large int constant",
+				code: `
+			MODULE Test;
+			BEGIN HALT(32767)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "HALT with variable",
+				code: `
+			MODULE Test;
+			VAR n: INTEGER;
+			BEGIN HALT(n)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'HALT' expects an integer constant",
+			},
+			{
+				name: "HALT with REAL constant",
+				code: `
+			MODULE Test;
+			BEGIN HALT(1.0)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'HALT' expects an integer constant",
+			},
+			{
+				name: "HALT with no arguments",
+				code: `
+			MODULE Test;
+			BEGIN HALT()
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'HALT' expects exactly one argument",
+			},
+			{
+				name: "HALT with two arguments",
+				code: `
+			MODULE Test;
+			BEGIN HALT(1, 2)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'HALT' expects exactly one argument",
+			},
+			{
+				name: "HALT with negative constant",
+				code: `
+			MODULE Test;
+			BEGIN HALT(-1)
+			END Test.`,
+				shouldPass: true,
+			},
+		},
+	},
+	{
+		procName: "NEW",
+		cases: []procTestCase{
+			{
+				name: "NEW fixed array",
+				code: `
+			MODULE Test;
+			TYPE A = ARRAY 10 OF INTEGER;
+			VAR arr: A;
+			BEGIN NEW(arr)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "NEW pointer to record",
+				code: `
+			MODULE Test;
+			TYPE Rec = RECORD
+				field: INTEGER
+			END;
+			VAR p: POINTER TO Rec;
+			BEGIN NEW(p)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "NEW pointer to open array 1D",
+				code: `
+			MODULE Test;
+			TYPE A = ARRAY OF INTEGER;
+			     P = ^A;
+			VAR p: P;
+			BEGIN NEW(p, 42)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "NEW pointer to open array 2D",
+				code: `
+			MODULE Test;
+			TYPE A = ARRAY OF ARRAY OF CHAR;
+			     P = ^A;
+			VAR p: P;
+			BEGIN NEW(p, 3, 10)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "NEW pointer to 2D open array - too few args",
+				code: `
+			MODULE Test;
+			TYPE A = ARRAY OF ARRAY OF INTEGER;
+			     P = ^A;
+			VAR p: P;
+			BEGIN NEW(p, 5)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NEW': expected 2 dimension lengths for open array type",
+			},
+			{
+				name: "NEW with too many args",
+				code: `
+			MODULE Test;
+			TYPE A = ARRAY OF INTEGER;
+			     P = ^A;
+			VAR p: P;
+			BEGIN NEW(p, 1, 2)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NEW': expected 1 dimension lengths for open array type",
+			},
+			{
+				name: "NEW with non-integer dimension",
+				code: `
+			MODULE Test;
+			TYPE A = ARRAY OF INTEGER;
+			     P = ^A;
+			VAR p: P;
+			BEGIN NEW(p, TRUE)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NEW': dimension length must be integer",
+			},
+			{
+				name: "NEW with missing open array dimensions",
+				code: `
+			MODULE Test;
+			TYPE A = ARRAY OF INTEGER;
+			     P = ^A;
+			VAR p: P;
+			BEGIN NEW(p)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NEW' expects a pointer to a record or a fixed array",
+			},
+			{
+				name: "NEW with arg on fixed array",
+				code: `
+			MODULE Test;
+			TYPE A = ARRAY 10 OF INTEGER;
+			     P = ^A;
+			VAR p: P;
+			BEGIN NEW(p, 1)
+			END Test.`,
+				expectError: "'NEW' expects a pointer to an open array",
+			},
+			{
+				name: "NEW with no args",
+				code: `
+			MODULE Test;
+			BEGIN NEW()
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NEW' expects at least one argument",
+			},
+			{
+				name: "NEW with too many args",
+				code: `
+			MODULE Test;
+			TYPE A = ARRAY OF INTEGER;
+			     P = ^A;
+			VAR p: P;
+			BEGIN NEW(p, 1, 2, 3)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NEW': expected 1 dimension lengths for open array type",
+			},
+		},
+	},
 }
 
 func TestPredeclaredProcedureCalls(t *testing.T) {

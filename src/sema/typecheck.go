@@ -1568,14 +1568,16 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			return
 		}
 
-		call.ActualParams[0].Accept(t)
-		argType := types.Underlying(call.ActualParams[0].Type())
-		if !types.IsInteger(argType) {
+		arg := call.ActualParams[0]
+		arg.Accept(t)
+		argType := types.Underlying(arg.Type())
+
+		if !types.IsInteger(argType) || !ast.IsConstExpr(arg) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer argument, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer constant argument, got %s",
 					pre.Name(), argType),
-				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
 			})
 			return
 		}
@@ -1720,13 +1722,24 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 				return
 			}
 
+			dim := types.Underlying(argType.(*types.PointerType).Base).(*types.ArrayType).Dimensions()
+			if dim != len(call.ActualParams[1:]) {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("'%s': expected %d dimension lengths for open array type, got %d",
+						pre.Name(), dim, len(call.ActualParams)-1),
+					Range: t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+				})
+				return
+			}
+
 			for _, arg := range call.ActualParams[1:] {
 				arg.Accept(t)
 				argType = types.Underlying(arg.Type())
 				if !types.IsInteger(argType) {
 					t.ctx.Reporter.Report(report.Diagnostic{
 						Severity: report.Error,
-						Message: fmt.Sprintf("predeclared procedure '%s' expects integer arguments after the first, got %s",
+						Message: fmt.Sprintf("'%s': dimension length must be integer, got %s",
 							pre.Name(), argType),
 						Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
 					})

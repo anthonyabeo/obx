@@ -28,6 +28,15 @@ func (a *ArrayType) Width() int {
 	return int(a.Length) * baseWidth
 }
 
+func (a *ArrayType) Dimensions() int {
+	base, ok := a.Base.(*ArrayType)
+	if ok {
+		return 1 + base.Dimensions()
+	}
+
+	return 1 // Base type is not an array, so this is the only dimension
+}
+
 func (a *ArrayType) Alignment() int {
 	panic("Not implemented")
 }

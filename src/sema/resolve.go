@@ -572,7 +572,10 @@ func (n *NamesResolver) VisitProcedureBody(body *ast.ProcedureBody) any {
 func (n *NamesResolver) VisitBasicType(ty *ast.BasicType) any { return ty }
 
 func (n *NamesResolver) VisitArrayType(ty *ast.ArrayType) any {
-	ty.LenList.Accept(n)
+	if ty.LenList != nil {
+		ty.LenList.Accept(n)
+	}
+
 	ty.ElemType.Accept(n)
 	return ty
 }

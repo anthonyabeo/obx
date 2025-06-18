@@ -169,13 +169,8 @@ func IsByte(t Type) bool {
 }
 
 func IsProperProcedure(t Type) bool {
-	_, ok := t.(*ProcedureType)
-	if !ok {
-		return false
-	}
-
-	proc, _ := t.(*ProcedureType)
-	return proc.Result == nil
+	proc, ok := t.(*ProcedureType)
+	return ok && proc.Result == nil
 }
 
 func IsProcedure(t Type) bool {
@@ -199,11 +194,7 @@ func IsNil(t Type) bool {
 
 func IsUnknownType(ty Type) bool {
 	b, ok := ty.(*BasicType)
-	if ok && b.Kind == UNKNOWN {
-		return true
-	}
-
-	return false
+	return ok && b.Kind == UNKNOWN
 }
 
 func IsExtensionOf(sub, sup Type) bool {
