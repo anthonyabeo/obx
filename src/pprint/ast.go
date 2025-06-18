@@ -101,7 +101,7 @@ func (v *AstPrinter) VisitDesignator(d *ast.Designator) any {
 	return map[string]any{
 		"type":      "Designator",
 		"base":      d.QIdent.Accept(v),
-		"selectors": visitList(d.Select, v),
+		"selectors": visitSelector(d.Select, v),
 		"range":     formatRange(v.ctx.Source.Span(v.ctx.FileName, d.StartOffset, d.EndOffset)),
 	}
 }

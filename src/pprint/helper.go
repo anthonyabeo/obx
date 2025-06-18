@@ -35,6 +35,40 @@ func visitList[T ast.Node](nodes []T, v ast.Visitor) []any {
 	return result
 }
 
+func visitSelector(selectors []ast.Selector, v ast.Visitor) []any {
+	result := make([]any, len(selectors))
+
+	vst := v.(*AstPrinter)
+	for i, sel := range selectors {
+		switch s := sel.(type) {
+		case *ast.DotOp:
+			result[i] = map[string]any{
+				"type":  "DotOp",
+				"name":  sel.(*ast.DotOp).Field,
+				"range": formatRange(vst.ctx.Source.Span(vst.ctx.FileName, s.StartOffset, s.EndOffset)),
+			}
+		case *ast.IndexOp:
+			result[i] = map[string]any{
+				"type":    "IndexOp",
+				"indices": visitList(s.List, v),
+				"range":   formatRange(vst.ctx.Source.Span(vst.ctx.FileName, s.StartOffset, s.EndOffset)),
+			}
+		case *ast.PtrDeref:
+			result[i] = map[string]any{
+				"type":  "PtrDeref",
+				"range": formatRange(vst.ctx.Source.Span(vst.ctx.FileName, s.StartOffset, s.EndOffset)),
+			}
+		case *ast.TypeGuard:
+			result[i] = map[string]any{
+				"type":  "TypeGuard",
+				"Type":  s.Ty.Accept(v),
+				"range": formatRange(vst.ctx.Source.Span(vst.ctx.FileName, s.StartOffset, s.EndOffset)),
+			}
+		}
+	}
+	return result
+}
+
 func PrettyPrintJSON(obx *ast.OberonX, ctx *report.Context) ([]byte, error) {
 	v := NewAstPrinter(obx, ctx)
 	return json.MarshalIndent(v.Print(), "", "  ")

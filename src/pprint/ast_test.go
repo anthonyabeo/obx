@@ -126,7 +126,7 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Bigger")
 	out := ast.NewEnvironment(ast.GlobalEnviron, "Out")
-	out.Insert(ast.NewProcedureSymbol("Int", ast.Exported, nil))
+	out.Insert(ast.NewProcedureSymbol("Int", ast.Exported, nil, nil))
 	envs := map[string]*ast.Environment{
 		"Bigger": table,
 		"Out":    out,
@@ -148,7 +148,7 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 	}
 
 	obx := parseSource(t, ctx)
-	
+
 	data, err := PrettyPrintJSON(obx, ctx)
 	if err != nil {
 		t.Fatalf("PrettyPrintJSON failed: %v", err)
