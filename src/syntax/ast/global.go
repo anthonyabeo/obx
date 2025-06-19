@@ -1,5 +1,7 @@
 package ast
 
+import "github.com/anthonyabeo/obx/src/types"
+
 var GlobalEnviron *Environment
 
 // A PreDeclFuncProc is the id of a predeclared function or procedure.
@@ -124,8 +126,19 @@ func defPredeclaredProcedures() {
 	}
 }
 
+func defPredeclaredTypes() {
+	anyrec := NewTypeSymbol("anyrec", Predeclared, &RecordType{})
+	ANYREC := NewTypeSymbol("ANYREC", Predeclared, &RecordType{})
+	anyrec.SetType(types.AnyRec)
+	ANYREC.SetType(types.AnyRec)
+
+	GlobalEnviron.Insert(anyrec)
+	GlobalEnviron.Insert(ANYREC)
+}
+
 func init() {
 	GlobalEnviron = NewEnvironment(nil, "global")
 
+	defPredeclaredTypes()
 	defPredeclaredProcedures()
 }
