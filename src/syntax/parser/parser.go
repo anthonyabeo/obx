@@ -20,11 +20,12 @@ type Parser struct {
 	pos    int
 	end    int
 
-	list []ast.Expression
+	name []string           // stack of procedure names
+	list [][]ast.Expression // stack of a list of procedure arguments
 }
 
 func NewParser(ctx *report.Context) *Parser {
-	p := &Parser{sc: scan.Scan(ctx), ctx: ctx}
+	p := &Parser{sc: scan.Scan(ctx), ctx: ctx, name: make([]string, 0), list: make([][]ast.Expression, 0)}
 	p.next()
 
 	return p
@@ -844,13 +845,11 @@ func (p *Parser) parseFactor() ast.Expression {
 			StartOffset: pos,
 			EndOffset:   operand.End(),
 		}
-
 	case token.LPAREN:
 		p.match(token.LPAREN)
 		expr := p.parseExpression()
 		p.match(token.RPAREN)
 		return expr
-
 	case token.IDENTIFIER:
 		dsg := p.parseDesignator()
 		env := p.ctx.Env
@@ -867,14 +866,16 @@ func (p *Parser) parseFactor() ast.Expression {
 			}
 		}
 
-		if sym := env.Lookup(dsg.QIdent.Name); sym != nil && sym.Kind() == ast.ProcedureSymbolKind && p.tok == token.RPAREN {
-			call := &ast.FunctionCall{
-				Callee:       dsg,
-				ActualParams: p.list,
-				StartOffset:  dsg.Pos(),
-				EndOffset:    p.end,
+		sym := env.Lookup(dsg.QIdent.Name)
+		if sym != nil && sym.Kind() == ast.ProcedureSymbolKind && p.tok == token.RPAREN && p.name[len(p.name)-1] == sym.Name() {
+			var args []ast.Expression
+			if len(p.list) > 0 {
+				args = p.list[len(p.list)-1]
+				p.list = p.list[:len(p.list)-1]
 			}
-			p.list = nil
+
+			call := &ast.FunctionCall{Callee: dsg, ActualParams: args, StartOffset: dsg.Pos(), EndOffset: p.end}
+			p.name = p.name[:len(p.name)-1]
 			p.next()
 			return call
 		}
@@ -978,16 +979,19 @@ func (p *Parser) parseDesignator() *ast.Designator {
 }
 
 func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
+	p.name = append(p.name, dsg.QIdent.Name)
+
 	if !p.exprStart() {
 		return false
 	}
 
-	p.list = p.parseExprList()
+	p.list = append(p.list, p.parseExprList())
 	if len(p.list) != 1 {
 		return false
 	}
 
-	d, ok := p.list[0].(*ast.Designator)
+	top := p.list[len(p.list)-1]
+	d, ok := top[0].(*ast.Designator)
 	if !ok {
 		return false
 	}
@@ -1021,6 +1025,12 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
 
 	dsg.EndOffset = end
 	p.match(token.RPAREN)
+	if len(p.name) > 0 {
+		p.name = p.name[:len(p.name)-1]
+	}
+	if len(p.list) > 0 {
+		p.list = p.list[:len(p.list)-1]
+	}
 	return true
 }
 
@@ -1490,8 +1500,17 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 			assign.EndOffset = assign.RValue.End()
 			stmt = assign
 		case token.RPAREN:
-			stmt = &ast.ProcedureCall{Callee: dsg, ActualParams: p.list, StartOffset: pos, EndOffset: p.end}
-			p.list = make([]ast.Expression, 0)
+			var args []ast.Expression
+			if len(p.list) > 0 {
+				args = p.list[len(p.list)-1]
+				p.list = p.list[:len(p.list)-1]
+			}
+
+			if len(p.name) > 0 {
+				p.name = p.name[:len(p.name)-1]
+			}
+
+			stmt = &ast.ProcedureCall{Callee: dsg, ActualParams: args, StartOffset: pos, EndOffset: p.end}
 			p.next()
 		default:
 			p.ctx.Reporter.Report(report.Diagnostic{
