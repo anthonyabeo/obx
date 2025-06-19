@@ -260,6 +260,7 @@ func IsPointerToAnyRec(t Type) bool {
 	if !ok {
 		return false
 	}
+
 	rec, ok := Underlying(ptr.Base).(*RecordType)
 	return ok && rec == AnyRec
 }

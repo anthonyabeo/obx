@@ -30,8 +30,8 @@ func TypeIncludes(b, a Type) bool {
 	case WCharType:
 		return b == CharType
 	case CharType:
-		s := b.(*StringType)
-		return s != nil && s.Length == 1
+		s, ok := b.(*StringType)
+		return ok && s.Length == 1
 	}
 
 	return false
@@ -94,7 +94,7 @@ func EqualType(Ta, Tb Type) bool {
 	return false
 }
 
-func FormalParamsListMatch(Pa, Pb []FormalParam) bool {
+func FormalParamsListMatch(Pa, Pb []*FormalParam) bool {
 	if len(Pa) != len(Pb) {
 		return false
 	}
@@ -196,7 +196,7 @@ func AssignmentCompatible(exprType, varType Type) bool {
 	return false
 }
 
-func ParameterCompatible(actual Type, formal FormalParam) bool {
+func ParameterCompatible(actual Type, formal *FormalParam) bool {
 	tf := formal.Type // formal parameter type
 	ta := actual      // actual parameter type
 
@@ -206,7 +206,7 @@ func ParameterCompatible(actual Type, formal FormalParam) bool {
 	}
 
 	switch formal.Kind {
-	case "value", "": // value is default
+	case "value", "VALUE", "": // value is default
 		// 2. Value parameters can accept assignment-compatible expressions
 		return AssignmentCompatible(ta, tf)
 
@@ -322,7 +322,7 @@ func ExpressionCompatible(op token.Kind, lhs, rhs Type) (bool, Type) {
 		}
 
 		// extra for strings, arrays
-		if IsCharArrayOrString(lhs) && IsCharArrayOrString(rhs) {
+		if IsLatin1CharArrayOrString(lhs) && IsLatin1CharArrayOrString(rhs) {
 			return true, BooleanType
 		}
 	case token.IN:

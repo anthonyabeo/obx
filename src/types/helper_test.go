@@ -63,31 +63,31 @@ func TestSameType_OpenArray(t *testing.T) {
 func TestMatchingParams(t *testing.T) {
 	tests := []struct {
 		name string
-		a, b []FormalParam
+		a, b []*FormalParam
 		want bool
 	}{
 		{
 			name: "same params, same kinds and types",
-			a:    []FormalParam{{Kind: "", Type: IntegerType}},
-			b:    []FormalParam{{Kind: "", Type: IntegerType}},
+			a:    []*FormalParam{{Kind: "", Type: IntegerType}},
+			b:    []*FormalParam{{Kind: "", Type: IntegerType}},
 			want: true,
 		},
 		{
 			name: "different kinds",
-			a:    []FormalParam{{Kind: "VAR", Type: IntegerType}},
-			b:    []FormalParam{{Kind: "", Type: IntegerType}},
+			a:    []*FormalParam{{Kind: "VAR", Type: IntegerType}},
+			b:    []*FormalParam{{Kind: "", Type: IntegerType}},
 			want: false,
 		},
 		{
 			name: "different types",
-			a:    []FormalParam{{Kind: "", Type: IntegerType}},
-			b:    []FormalParam{{Kind: "", Type: RealType}},
+			a:    []*FormalParam{{Kind: "", Type: IntegerType}},
+			b:    []*FormalParam{{Kind: "", Type: RealType}},
 			want: false,
 		},
 		{
 			name: "different lengths",
-			a:    []FormalParam{{Kind: "", Type: IntegerType}},
-			b:    []FormalParam{{Kind: "", Type: IntegerType}, {Kind: "", Type: IntegerType}},
+			a:    []*FormalParam{{Kind: "", Type: IntegerType}},
+			b:    []*FormalParam{{Kind: "", Type: IntegerType}, {Kind: "", Type: IntegerType}},
 			want: false,
 		},
 	}
@@ -104,29 +104,29 @@ func TestMatchingParams(t *testing.T) {
 
 func TestEqualType_Procedure(t *testing.T) {
 	proc1 := &ProcedureType{
-		Params: []FormalParam{{Kind: "", Type: IntegerType}},
+		Params: []*FormalParam{{Kind: "", Type: IntegerType}},
 	}
 
 	proc2 := &ProcedureType{
-		Params: []FormalParam{{Kind: "", Type: IntegerType}},
+		Params: []*FormalParam{{Kind: "", Type: IntegerType}},
 	}
 
 	proc3 := &ProcedureType{
-		Params: []FormalParam{{Kind: "VAR", Type: IntegerType}},
+		Params: []*FormalParam{{Kind: "VAR", Type: IntegerType}},
 	}
 
 	func1 := &ProcedureType{
-		Params: []FormalParam{{Kind: "", Type: IntegerType}},
+		Params: []*FormalParam{{Kind: "", Type: IntegerType}},
 		Result: RealType,
 	}
 
 	func2 := &ProcedureType{
-		Params: []FormalParam{{Kind: "", Type: IntegerType}},
+		Params: []*FormalParam{{Kind: "", Type: IntegerType}},
 		Result: RealType,
 	}
 
 	func3 := &ProcedureType{
-		Params: []FormalParam{{Kind: "", Type: IntegerType}},
+		Params: []*FormalParam{{Kind: "", Type: IntegerType}},
 		Result: IntegerType,
 	}
 
@@ -231,7 +231,7 @@ func TestAssignmentCompatible(t *testing.T) {
 
 	// Helper to build arrays
 	arr := func(elem Type, length int) Type {
-		return &ArrayType{Base: elem, Length: length}
+		return &ArrayType{Base: elem, Length: int64(length)}
 	}
 
 	// Helper to build open arrays
@@ -292,20 +292,20 @@ func TestAssignmentCompatible(t *testing.T) {
 
 		// 12. Procedure matching
 		{
-			NewProcedureType([]FormalParam{
+			NewProcedureType([]*FormalParam{
 				{Kind: "value", Type: Int32Type},
 			}, nil),
-			NewProcedureType([]FormalParam{
+			NewProcedureType([]*FormalParam{
 				{Kind: "value", Type: Int32Type},
 			}, nil),
 			true,
 			"procedure with matching signature",
 		},
 		{
-			NewProcedureType([]FormalParam{
+			NewProcedureType([]*FormalParam{
 				{Kind: "VAR", Type: Int32Type},
 			}, nil),
-			NewProcedureType([]FormalParam{
+			NewProcedureType([]*FormalParam{
 				{Kind: "value", Type: Int32Type},
 			}, nil),
 			false,
@@ -339,116 +339,116 @@ func TestParameterCompatible(t *testing.T) {
 
 		// Procedures
 		procA = &ProcedureType{
-			Params: []FormalParam{{Kind: "", Type: Int16Type}},
+			Params: []*FormalParam{{Kind: "", Type: Int16Type}},
 		}
 		procB = &ProcedureType{
-			Params: []FormalParam{{Kind: "", Type: Int16Type}},
+			Params: []*FormalParam{{Kind: "", Type: Int16Type}},
 		}
 		procC = &ProcedureType{
-			Params: []FormalParam{{Kind: "", Type: Int32Type}},
+			Params: []*FormalParam{{Kind: "", Type: Int32Type}},
 		}
 	)
 
 	tests := []struct {
 		name   string
 		actual Type
-		formal FormalParam
+		formal *FormalParam
 		want   bool
 	}{
 		{
 			name:   "Equal basic types",
 			actual: Int16Type,
-			formal: FormalParam{Kind: "", Type: Int16Type},
+			formal: &FormalParam{Kind: "", Type: Int16Type},
 			want:   true,
 		},
 		{
 			name:   "Assignment compatible (INT16 -> INT32)",
 			actual: Int16Type,
-			formal: FormalParam{Kind: "", Type: Int32Type},
+			formal: &FormalParam{Kind: "", Type: Int32Type},
 			want:   true,
 		},
 		{
 			name:   "Not assignment compatible (INT32 -> INT16)",
 			actual: Int32Type,
-			formal: FormalParam{Kind: "", Type: Int16Type},
+			formal: &FormalParam{Kind: "", Type: Int16Type},
 			want:   false,
 		},
 		{
 			name:   "Same type for VAR param",
 			actual: ByteType,
-			formal: FormalParam{Kind: "VAR", Type: ByteType},
+			formal: &FormalParam{Kind: "VAR", Type: ByteType},
 			want:   true,
 		},
 		{
 			name:   "VAR param with subtype extension (record B -> A)",
 			actual: recordB,
-			formal: FormalParam{Kind: "VAR", Type: recordA},
+			formal: &FormalParam{Kind: "VAR", Type: recordA},
 			want:   true,
 		},
 		{
 			name:   "VAR param, different basic types",
 			actual: ByteType,
-			formal: FormalParam{Kind: "VAR", Type: Int16Type},
+			formal: &FormalParam{Kind: "VAR", Type: Int16Type},
 			want:   false,
 		},
 		{
 			name:   "IN param, same type",
 			actual: CharType,
-			formal: FormalParam{Kind: "IN", Type: CharType},
+			formal: &FormalParam{Kind: "IN", Type: CharType},
 			want:   true,
 		},
 		{
 			name:   "IN param with record extension",
 			actual: recordB,
-			formal: FormalParam{Kind: "IN", Type: recordA},
+			formal: &FormalParam{Kind: "IN", Type: recordA},
 			want:   true,
 		},
 		{
 			name:   "IN param with non-matching types",
 			actual: WCharType,
-			formal: FormalParam{Kind: "IN", Type: Int16Type},
+			formal: &FormalParam{Kind: "IN", Type: Int16Type},
 			want:   false,
 		},
 		{
 			name:   "Equal pointer types",
 			actual: int32Ptr,
-			formal: FormalParam{Kind: "", Type: int32Ptr},
+			formal: &FormalParam{Kind: "", Type: int32Ptr},
 			want:   true,
 		},
 		{
 			name:   "Mismatched pointer types",
 			actual: int16Ptr,
-			formal: FormalParam{Kind: "", Type: int32Ptr},
+			formal: &FormalParam{Kind: "", Type: int32Ptr},
 			want:   false,
 		},
 		{
 			name:   "Equal fixed arrays",
 			actual: fixedCharArray,
-			formal: FormalParam{Kind: "", Type: fixedCharArray},
+			formal: &FormalParam{Kind: "", Type: fixedCharArray},
 			want:   true,
 		},
 		{
 			name:   "Open array assigned to fixed array (not same)",
 			actual: openCharArray,
-			formal: FormalParam{Kind: "", Type: fixedCharArray},
+			formal: &FormalParam{Kind: "", Type: fixedCharArray},
 			want:   true,
 		},
 		{
 			name:   "Procedure types with matching params",
 			actual: procA,
-			formal: FormalParam{Kind: "", Type: procB},
+			formal: &FormalParam{Kind: "", Type: procB},
 			want:   true,
 		},
 		{
 			name:   "Procedure types with mismatched params",
 			actual: procA,
-			formal: FormalParam{Kind: "", Type: procC},
+			formal: &FormalParam{Kind: "", Type: procC},
 			want:   false,
 		},
 		{
 			name:   "Open WCHAR to fixed WCHAR (not same)",
 			actual: openWCharArray,
-			formal: FormalParam{Kind: "", Type: fixedWCharArray},
+			formal: &FormalParam{Kind: "", Type: fixedWCharArray},
 			want:   true,
 		},
 	}
@@ -465,7 +465,7 @@ func TestParameterCompatible(t *testing.T) {
 
 func TestArrayCompatible(t *testing.T) {
 	makeArray := func(elem Type, len int) *ArrayType {
-		return &ArrayType{Length: len, Base: elem}
+		return &ArrayType{Length: int64(len), Base: elem}
 	}
 
 	tests := []struct {
@@ -559,7 +559,7 @@ func TestArrayCompatible(t *testing.T) {
 
 func TestArrayCompatible_Multidimensional(t *testing.T) {
 	makeArray := func(elem Type, len int) *ArrayType {
-		return &ArrayType{Length: len, Base: elem}
+		return &ArrayType{Length: int64(len), Base: elem}
 	}
 
 	tests := []struct {
@@ -629,7 +629,7 @@ func TestArrayCompatible_Multidimensional(t *testing.T) {
 
 func TestArrayCompatible_DeepNesting(t *testing.T) {
 	makeArray := func(elem Type, len int) *ArrayType {
-		return &ArrayType{Length: len, Base: elem}
+		return &ArrayType{Length: int64(len), Base: elem}
 	}
 
 	tests := []struct {
