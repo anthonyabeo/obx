@@ -1774,6 +1774,17 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			return
 		}
 
+		if !t.isAssignable(call.ActualParams[0]) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an "+
+					"assignable numeric or set type, got %s",
+					pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+			})
+			return
+		}
+
 		if !types.IsArrayOf(arg2Type, types.ByteType) && !types.IsArrayOf(arg2Type, types.CharType) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
@@ -1803,7 +1814,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		if !types.IsPointerToAnyRec(arg1Type) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a pointer to AnyRec, "+
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a pointer to ANYREC, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
@@ -1837,9 +1848,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 				if !types.ParameterCompatible(types.Underlying(arg.Type()), proc.Params[i]) {
 					t.ctx.Reporter.Report(report.Diagnostic{
 						Severity: report.Error,
-						Message: fmt.Sprintf("argument %d of predeclared procedure '%s' is incompatible with parameter "+
-							"of type '%s'", i+1, pre.Name(), proc.Params[i].Type.String()),
-						Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+						Message:  fmt.Sprintf("%s: argument %d is incompatible with parameter of type '%s'", pre.Name(), i+1, proc.Params[i].Type.String()),
+						Range:    t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
 					})
 					return
 				}
@@ -1862,7 +1872,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		if !types.IsPointerToAnyRec(argType) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects a pointer to AnyRec, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects a pointer to ANYREC, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
@@ -1895,11 +1905,11 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			return
 		}
 
-		if !types.IsArrayOf(arg2Type, types.CharType) {
+		if !types.IsArrayOf(arg2Type, types.CharType) || !t.isAssignable(arg2) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an array of char, got %s",
-					pre.Name(), arg2Type),
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an assignable array of char, "+
+					"got %s", pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
 			})
 			return
@@ -1921,12 +1931,22 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		arg1Type := types.Underlying(arg1.Type())
 		arg2Type := types.Underlying(arg2.Type())
 
-		if !types.IsReal(arg1Type) && t.isAssignable(arg1) && arg2Type != types.Int32Type {
+		if !types.IsReal(arg1Type) || !t.isAssignable(arg1) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be real, "+
-					"and the second argument to be int32, got %s and %s", pre.Name(), arg1Type, arg2Type),
-				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg2.End()),
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an assignable REAL/LONGREAL, "+
+					" got %s", pre.Name(), arg1Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
+			})
+			return
+		}
+
+		if arg2Type != types.Int32Type {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, got %s",
+					pre.Name(), arg2Type),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
 			})
 			return
 		}
@@ -1947,20 +1967,20 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		arg1Type := types.Underlying(arg1.Type())
 		arg2Type := types.Underlying(arg2.Type())
 
-		if !types.IsReal(arg1Type) && t.isAssignable(arg1) {
+		if !types.IsReal(arg1Type) || !t.isAssignable(arg1) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be real and a variable, "+
-					" got %s", pre.Name(), arg1Type),
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an "+
+					"assignable REAL/LONGREAL, got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg2.End()),
 			})
 			return
 		}
 
-		if arg2Type != types.Int32Type && t.isAssignable(arg2) {
+		if arg2Type != types.Int32Type || !t.isAssignable(arg2) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32 and variable, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an assignable INT32, got %s",
 					pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
 			})
@@ -2546,8 +2566,11 @@ func (t *TypeChecker) VisitImport(i *ast.Import) any {
 }
 
 func (t *TypeChecker) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
-	//TODO implement me
-	panic("implement me")
+	decl.Head.Accept(t)
+	if decl.Body != nil {
+		decl.Body.Accept(t)
+	}
+	return decl
 }
 
 func (t *TypeChecker) VisitVariableDecl(decl *ast.VariableDecl) any {
@@ -2597,8 +2620,22 @@ func (t *TypeChecker) VisitTypeDecl(decl *ast.TypeDecl) any {
 }
 
 func (t *TypeChecker) VisitProcedureHeading(heading *ast.ProcedureHeading) any {
-	//TODO implement me
-	panic("implement me")
+	if heading.Rcv != nil {
+		heading.Rcv.Accept(t)
+	}
+
+	heading.Name.Accept(t)
+
+	var procType *types.ProcedureType
+
+	if heading.FP != nil {
+		procType = heading.FP.Accept(t).(*types.ProcedureType)
+	}
+
+	heading.Name.SemaType = procType
+	heading.Name.Symbol.SetType(procType)
+
+	return heading
 }
 
 func (t *TypeChecker) VisitProcedureBody(body *ast.ProcedureBody) any {
@@ -2644,12 +2681,20 @@ func (t *TypeChecker) VisitFPSection(section *ast.FPSection) any {
 }
 
 func (t *TypeChecker) VisitFormalParams(params *ast.FormalParams) any {
+	procType := &types.ProcedureType{}
+
 	var p []*types.FormalParam
 	for _, sec := range params.Params {
 		fp := t.VisitFPSection(sec).(*types.FormalParam)
 		p = append(p, fp)
 	}
-	return params
+	procType.Params = p
+
+	if params.RetType != nil {
+		procType.Result = params.RetType.Accept(t).(types.Type)
+	}
+
+	return procType
 }
 
 func (t *TypeChecker) VisitBasicType(ty *ast.BasicType) any {
@@ -2747,10 +2792,9 @@ func (t *TypeChecker) VisitPointerType(ty *ast.PointerType) any {
 }
 
 func (t *TypeChecker) VisitProcedureType(ty *ast.ProcedureType) any {
-	proc := &types.ProcedureType{}
+	var proc *types.ProcedureType
 	if ty.FP != nil {
-		proc.Params = ty.FP.Accept(t).([]types.FormalParam)
-		proc.Result = ty.FP.RetType.Accept(t).(types.Type)
+		proc = ty.FP.Accept(t).(*types.ProcedureType)
 	}
 
 	return proc

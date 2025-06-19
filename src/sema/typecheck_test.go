@@ -1548,6 +1548,499 @@ var predeclaredProcTests = []procTestEntry{
 			},
 		},
 	},
+	{
+		procName: "NUMBER",
+		cases: []procTestCase{
+			{
+				name: "NUMBER to BYTE",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 4 OF BYTE;
+			    n: BYTE;
+			BEGIN NUMBER(n, a)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "NUMBER to CHAR",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 4 OF CHAR;
+			    n: CHAR;
+			BEGIN NUMBER(n, a)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NUMBER' expects the first argument to be numeric or set",
+			},
+			{
+				name: "NUMBER to INT32",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 4 OF BYTE;
+			    n: INT32;
+			BEGIN NUMBER(n, a)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "NUMBER to SET",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 4 OF BYTE;
+			    s: SET;
+			BEGIN NUMBER(s, a)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "NUMBER with non-numeric target",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 4 OF BYTE;
+			    s: BOOL;
+			BEGIN NUMBER(s, a)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NUMBER' expects the first argument to be numeric or set",
+			},
+			{
+				name: "NUMBER with wrong array element type",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 4 OF INTEGER;
+			    n: INT32;
+			BEGIN NUMBER(n, a)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NUMBER' expects the second argument to be an array of byte or char",
+			},
+			{
+				name: "NUMBER with second argument not array",
+				code: `
+			MODULE Test;
+			VAR x: BYTE;
+			    n: INT32;
+			BEGIN NUMBER(n, x)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NUMBER' expects the second argument to be an array of byte or char",
+			},
+			{
+				name: "NUMBER with no arguments",
+				code: `
+			MODULE Test;
+			BEGIN NUMBER()
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NUMBER' expects exactly two arguments",
+			},
+			{
+				name: "NUMBER with too many arguments",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 4 OF BYTE;
+			    n: INT32;
+			BEGIN NUMBER(n, a, 1)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NUMBER' expects exactly two arguments",
+			},
+			{
+				name: "NUMBER with non-assignable first argument",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 4 OF BYTE;
+			    n: INT32;
+			BEGIN NUMBER(1, a)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'NUMBER' expects the first argument to be an assignable numeric or set type",
+			},
+			{
+				name: "NUMBER with real first argument",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 4 OF BYTE;
+			    n: REAL;
+			BEGIN NUMBER(n, a)
+			END Test.`,
+				shouldPass: true,
+			},
+		},
+	},
+	{
+		procName: "COPY",
+		cases: []procTestCase{
+			{
+				name: "COPY with string and array",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 16 OF CHAR;
+			BEGIN COPY("Hello", a)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "COPY with array and array",
+				code: `
+			MODULE Test;
+			VAR src, dst: ARRAY 16 OF CHAR;
+			BEGIN COPY(src, dst)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "COPY with non-string first argument",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 16 OF CHAR;
+			    x: INTEGER;
+			BEGIN COPY(x, a)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'COPY' expects the first argument to be a char array or string",
+			},
+			{
+				name: "COPY with wrong destination type",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 16 OF CHAR;
+			    x: SET;
+			BEGIN COPY(a, x)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'COPY' expects the second argument to be an assignable array of char",
+			},
+			{
+				name: "COPY to non-array of char",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 16 OF CHAR;
+			BEGIN COPY(a, a[1])  (* not array of char *)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'COPY' expects the second argument to be an assignable array of char",
+			},
+			{
+				name: "COPY wrong arity",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 16 OF CHAR;
+			BEGIN COPY(a)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'COPY' expects exactly two arguments",
+			},
+			{
+				name: "COPY with too many arguments",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 16 OF CHAR;
+			BEGIN COPY(a, a, 1)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'COPY' expects exactly two arguments",
+			},
+			{
+				name: "COPY with no arguments",
+				code: `
+			MODULE Test;
+			BEGIN COPY()
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'COPY' expects exactly two arguments",
+			},
+			{
+				name: "COPY with non-assignable second argument",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 16 OF CHAR;
+			BEGIN COPY(a, "Hello")
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'COPY' expects the second argument to be an assignable array of char",
+			},
+			{
+				name: "COPY with array of CHAR",
+				code: `
+			MODULE Test;
+			VAR a: ARRAY 16 OF CHAR;
+			VAR b: ARRAY 16 OF CHAR;
+			BEGIN COPY(a, b)
+			END Test.`,
+				shouldPass: true,
+			},
+		},
+	},
+	{
+		procName: "PACK",
+		cases: []procTestCase{
+			{
+				name: "PACK with REAL and INT32",
+				code: `
+			MODULE Test;
+			VAR x: REAL;
+			BEGIN PACK(x, 5i)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "PACK with LONGREAL and INT32",
+				code: `
+			MODULE Test;
+			VAR x: LONGREAL;
+			BEGIN PACK(x, 0i)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "PACK with wrong x type",
+				code: `
+			MODULE Test;
+			VAR x: SET;
+			BEGIN PACK(x, 0)
+			END Test.`,
+				expectError: "'PACK' expects the first argument to be an assignable REAL/LONGREAL",
+			},
+			{
+				name: "PACK with wrong n type",
+				code: `
+			MODULE Test;
+			VAR x: REAL; b: BYTE;
+			BEGIN PACK(x, b)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'PACK' expects the second argument to be INT32",
+			},
+			{
+				name: "PACK first argument not l-value",
+				code: `
+			MODULE Test;
+			VAR x: REAL;
+			BEGIN PACK(x + 1.0, 0i)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'PACK' expects the first argument to be an assignable REAL/LONGREAL",
+			},
+			{
+				name: "PACK with one argument",
+				code: `
+			MODULE Test;
+			VAR x: REAL;
+			BEGIN PACK(x)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'PACK' expects exactly two arguments",
+			},
+		},
+	},
+	{
+		procName: "UNPK",
+		cases: []procTestCase{
+			{
+				name: "UNPK with REAL and INT32",
+				code: `
+			MODULE Test;
+			VAR x: REAL; n: INT32;
+			BEGIN UNPK(x, n)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "UNPK with LONGREAL and INT32",
+				code: `
+			MODULE Test;
+			VAR x: LONGREAL; n: INT32;
+			BEGIN UNPK(x, n)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "UNPK with invalid x type",
+				code: `
+			MODULE Test;
+			VAR x: SET; n: INT32;
+			BEGIN UNPK(x, n)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'UNPK' expects the first argument to be an assignable REAL/LONGREAL",
+			},
+			{
+				name: "UNPK with invalid n type",
+				code: `
+			MODULE Test;
+			VAR x: REAL; n: BYTE;
+			BEGIN UNPK(x, n)
+			END Test.`,
+				expectError: "'UNPK' expects the second argument to be an assignable INT32",
+			},
+			{
+				name: "UNPK x not l-value",
+				code: `
+			MODULE Test;
+			VAR x: REAL; n: INT32;
+			BEGIN UNPK(x + 1.0, n)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'UNPK' expects the first argument to be an assignable REAL/LONGREAL",
+			},
+			{
+				name: "UNPK n not l-value",
+				code: `
+			MODULE Test;
+			VAR x: REAL; n: INT32;
+			BEGIN UNPK(x, n + 1)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'UNPK' expects the second argument to be an assignable INT32",
+			},
+			{
+				name: "UNPK arity mismatch",
+				code: `
+			MODULE Test;
+			VAR x: REAL;
+			BEGIN UNPK(x)
+			END Test.`,
+				expectError: "'UNPK' expects exactly two arguments",
+			},
+			{
+				name: "UNPK arity mismatch",
+				code: `
+			MODULE Test;
+			VAR x: REAL;
+			BEGIN UNPK(x, 0i, 5)
+			END Test.`,
+				expectError: "'UNPK' expects exactly two arguments",
+			},
+			{
+				name: "UNPK no arguments",
+				code: `
+			MODULE Test;
+			VAR x: REAL;
+			BEGIN UNPK()
+			END Test.`,
+				expectError: "'UNPK' expects exactly two arguments",
+			},
+		},
+	},
+	{
+		procName: "RAISE",
+		cases: []procTestCase{
+			{
+				name: "RAISE pointer to record",
+				code: `
+			MODULE Test;
+			VAR e: POINTER TO ANYREC;
+			BEGIN RAISE(e)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "RAISE with non-pointer",
+				code: `
+			MODULE Test;
+			VAR x: INTEGER;
+			BEGIN RAISE(x)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'RAISE' expects a pointer to ANYREC",
+			},
+			{
+				name: "RAISE pointer to array",
+				code: `
+			MODULE Test;
+			TYPE A = ARRAY 4 OF CHAR;
+			VAR p: POINTER TO A;
+			BEGIN RAISE(p)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'RAISE' expects a pointer to ANYREC",
+			},
+			{
+				name: "RAISE too many args",
+				code: `
+			MODULE Test;
+			VAR x: INTEGER;
+			BEGIN RAISE(x, x)
+			END Test.`,
+				expectError: "'RAISE' expects exactly one argument",
+			},
+			{
+				name: "RAISE too few args",
+				code: `
+			MODULE Test;
+			VAR x: INTEGER;
+			BEGIN RAISE()
+			END Test.`,
+				expectError: "'RAISE' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "PCALL",
+		cases: []procTestCase{
+			{
+				name: "Valid PCALL",
+				code: `
+			MODULE Test;
+			//TYPE P = PROCEDURE(x: INTEGER);
+	
+			VAR e: POINTER TO anyrec;
+			PROCEDURE p(x: INTEGER);  END p;
+	
+			BEGIN PCALL(e, p, 42)
+			END Test.`,
+				shouldPass: true,
+			},
+			{
+				name: "PCALL non-pointer exception",
+				code: `
+			MODULE Test;
+			TYPE P = PROCEDURE;
+			VAR x: INTEGER;
+			PROCEDURE Act; END Act;
+			BEGIN PCALL(x, Act)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'PCALL' expects the first argument to be a pointer to ANYREC",
+			},
+			{
+				name: "PCALL pointer to non-record",
+				code: `
+			MODULE Test;
+			TYPE A = ARRAY 4 OF INTEGER;
+			     P = PROCEDURE;
+			VAR p: POINTER TO A;
+			PROCEDURE Act; END Act;
+			BEGIN PCALL(p, Act)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'PCALL' expects the first argument to be a pointer to ANYREC",
+			},
+			{
+				name: "PCALL second argument not procedure",
+				code: `
+			MODULE Test;
+			VAR e: POINTER TO ANYREC;
+			    x: INTEGER;
+			BEGIN PCALL(e, x)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "'PCALL' expects the second argument to be a proper procedure",
+			},
+			{
+				name: "PCALL argument mismatch",
+				code: `
+			MODULE Test;
+			VAR e: POINTER TO ANYREC;
+			PROCEDURE F(x: INTEGER); END F;
+			BEGIN PCALL(e, F, TRUE)
+			END Test.`,
+				shouldPass:  false,
+				expectError: "PCALL: argument 1 is incompatible with parameter of type 'integer'",
+			},
+		},
+	},
 }
 
 func TestPredeclaredProcedureCalls(t *testing.T) {

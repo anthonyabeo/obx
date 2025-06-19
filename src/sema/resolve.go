@@ -683,7 +683,9 @@ func (n *NamesResolver) VisitFormalParams(params *ast.FormalParams) any {
 		param.Accept(n)
 	}
 
-	params.RetType.Accept(n)
+	if params.RetType != nil {
+		params.RetType.Accept(n)
+	}
 
 	return params
 }
