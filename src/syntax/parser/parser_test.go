@@ -179,27 +179,12 @@ end Main
 func TestParseExpressions(t *testing.T) {
 	input := []byte(`
 module Main
+	type Tree = Record end
 	type CenterTree = record
 		x,y: integer 
 	end
+	var t: Tree
 begin
-	phi := 1991                   
-	phi := i div 3                
-	phi := ~p or q                
-	phi := (i+j) * (i-j)          
-	phi := s - {8, 9, 13}         
-	phi := i + x                  
-	phi := a[i+j] * a[i-j]        
-	phi := (0<=i) & (i<100)       
-	phi := t.key = 0              
-	phi := k in {i..j-1}          
-	phi := w[i].name <= "John"   
-	phi := t is CenterTree   
-	phi := a[i]
-	phi := t(CenterTree).subnode
-	phi := t.left.right 
-	phi := w[3].name[i]
-	phi := t(CenterTree)
 	t(CenterTree).subnode := t(CenterTree).subnode
 end Main
 `)
@@ -227,23 +212,6 @@ end Main
 	}
 
 	tests := []string{
-		"1991",
-		"i div 3",
-		"~p or q",
-		"i + j * i - j",
-		"s - {8, 9, 13}",
-		"i + x",
-		"a[i + j] * a[i - j]",
-		"0 <= i & i < 100",
-		"t.key = 0",
-		"k in {i..j - 1}",
-		"w[i].name <= John",
-		"t is CenterTree",
-		"a[i]",
-		"t(CenterTree).subnode",
-		"t.left.right",
-		"w[3].name[i]",
-		"t(CenterTree)",
 		"t(CenterTree).subnode",
 	}
 

@@ -523,19 +523,19 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "Valid ABS INT8",
 				code: `
-					MODULE Test;
-					VAR x: INT8;
-					BEGIN x := ABS(-5)
-					END Test.`,
+						MODULE Test;
+						VAR x: INT8;
+						BEGIN x := ABS(-5)
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "Valid ABS INT16",
 				code: `
-					MODULE Test;
-					VAR x: INT16;
-					BEGIN x := ABS(-12345)
-					END Test.`,
+						MODULE Test;
+						VAR x: INT16;
+						BEGIN x := ABS(-12345)
+						END Test.`,
 				shouldPass: true,
 			},
 			{
@@ -546,35 +546,35 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "ABS with REAL",
 				code: `MODULE Test;
-						VAR x: REAL;
-						BEGIN x := ABS(-3.14)
-						END Test.`,
+							VAR x: REAL;
+							BEGIN x := ABS(-3.14)
+							END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "ABS with non-numeric",
 				code: `MODULE Test;
-						VAR x: BOOL;
-						BEGIN x := ABS(TRUE)
-						END Test.`,
+							VAR x: BOOL;
+							BEGIN x := ABS(TRUE)
+							END Test.`,
 				shouldPass:  false,
 				expectError: "'ABS' expects a numeric argument",
 			},
 			{
 				name: "ABS with no arguments",
 				code: `MODULE Test;
-					VAR x: INT8;
-					BEGIN x := ABS()
-					END Test.`,
+						VAR x: INT8;
+						BEGIN x := ABS()
+						END Test.`,
 				shouldPass:  false,
 				expectError: "'ABS' expects exactly one argument",
 			},
 			{
 				name: "ABS with too many arguments",
 				code: `MODULE Test;
-					VAR x: INT8;
-					BEGIN x := ABS(1, 2)
-					END Test.`,
+						VAR x: INT8;
+						BEGIN x := ABS(1, 2)
+						END Test.`,
 				shouldPass:  false,
 				expectError: "'ABS' expects exactly one argument",
 			},
@@ -598,101 +598,101 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "CAP with lowercase CHAR",
 				code: `MODULE Test;
-					VAR c: CHAR;
-					BEGIN c := CAP('a')
-					END Test.`,
+						VAR c: CHAR;
+						BEGIN c := CAP('a')
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "CAP with CHAR literal",
 				code: `MODULE Test;
-					VAR c: CHAR;
-					BEGIN c := CAP(0ffx)
-					END Test.`,
+						VAR c: CHAR;
+						BEGIN c := CAP(0ffx)
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "CAP with CHAR literal",
 				code: `MODULE Test;
-					VAR c: CHAR;
-					BEGIN c := CAP(0x)
-					END Test.`,
+						VAR c: CHAR;
+						BEGIN c := CAP(0x)
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "CAP with WCHAR literal",
 				code: `MODULE Test;
-					VAR c: WCHAR;
-					BEGIN c := CAP(4F60x)
-					END Test.`,
+						VAR c: WCHAR;
+						BEGIN c := CAP(4F60x)
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "CAP with WCHAR literal",
 				code: `MODULE Test;
-					VAR c: WCHAR;
-					BEGIN c := CAP(0d7ffx)
-					END Test.`,
+						VAR c: WCHAR;
+						BEGIN c := CAP(0d7ffx)
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "CAP with WCHAR literal",
 				code: `MODULE Test;
-					VAR c: WCHAR;
-					BEGIN c := CAP(0f900x)
-					END Test.`,
+						VAR c: WCHAR;
+						BEGIN c := CAP(0f900x)
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "CAP with WCHAR literal",
 				code: `MODULE Test;
-					VAR c: WCHAR;
-					BEGIN c := CAP(0ffffx)
-					END Test.`,
+						VAR c: WCHAR;
+						BEGIN c := CAP(0ffffx)
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "CAP with uppercase CHAR",
 				code: `MODULE Test;
-					VAR c: CHAR;
-					BEGIN c := CAP('Z')
-					END Test.`,
+						VAR c: CHAR;
+						BEGIN c := CAP('Z')
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "CAP with numeric argument",
 				code: `MODULE Test;
-					VAR c: CHAR;
-					BEGIN c := CAP(65)
-					END Test.`,
+						VAR c: CHAR;
+						BEGIN c := CAP(65)
+						END Test.`,
 				shouldPass:  false,
 				expectError: "'CAP' expects a CHAR argument",
 			},
 			{
 				name: "CAP with boolean argument",
 				code: `MODULE Test;
-					VAR c: CHAR;
-					BEGIN c := CAP(TRUE)
-					END Test.`,
+						VAR c: CHAR;
+						BEGIN c := CAP(TRUE)
+						END Test.`,
 				shouldPass:  false,
 				expectError: "'CAP' expects a CHAR argument",
 			},
 			{
 				name: "CAP with no arguments",
 				code: `MODULE Test;
-					VAR c: CHAR;
-					BEGIN c := CAP()
-					END Test.`,
+						VAR c: CHAR;
+						BEGIN c := CAP()
+						END Test.`,
 				shouldPass:  false,
 				expectError: "'CAP' expects exactly one argument",
 			},
 			{
 				name: "CAP with too many arguments",
 				code: `
-					MODULE Test;
-					VAR c: CHAR;
-					BEGIN c := CAP('a', 'b')
-					END Test.`,
+						MODULE Test;
+						VAR c: CHAR;
+						BEGIN c := CAP('a', 'b')
+						END Test.`,
 				shouldPass:  false,
 				expectError: "'CAP' expects exactly one argument",
 			},
@@ -761,80 +761,80 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "DEC with one argument: integer variable",
 				code: `MODULE Test;
-					VAR x: INTEGER;
-					BEGIN DEC(x)
-					END Test.`,
+						VAR x: INTEGER;
+						BEGIN DEC(x)
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "DEC with one argument: enum variable",
 				code: `MODULE Test;
-					TYPE Color = (Red, Green, Blue);
-					VAR c: Color;
-					BEGIN DEC(c)
-					END Test.`,
+						TYPE Color = (Red, Green, Blue);
+						VAR c: Color;
+						BEGIN DEC(c)
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "DEC with one argument: non-integer, non-enum",
 				code: `MODULE Test;
-					VAR r: REAL;
-					BEGIN DEC(r)
-					END Test.`,
+						VAR r: REAL;
+						BEGIN DEC(r)
+						END Test.`,
 				shouldPass:  false,
 				expectError: "'DEC' expects first argument to be an integer or enum type",
 			},
 			{
 				name: "DEC with two arguments: valid integer decrement",
 				code: `MODULE Test;
-					VAR x: INTEGER;
-					BEGIN DEC(x, 3)
-					END Test.`,
+						VAR x: INTEGER;
+						BEGIN DEC(x, 3)
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "DEC with two arguments: enum variable, valid integer",
 				code: `MODULE Test;
-					TYPE State = (Start, Middle, Last);
-					VAR s: State;
-					BEGIN DEC(s, 1)
-					END Test.`,
+						TYPE State = (Start, Middle, Last);
+						VAR s: State;
+						BEGIN DEC(s, 1)
+						END Test.`,
 				shouldPass:  false,
 				expectError: "'DEC' expects the first argument to be an assignable integer",
 			},
 			{
 				name: "DEC with two arguments: non-integer decrement",
 				code: `
-					MODULE Test;
-					VAR x: INTEGER;
-					BEGIN DEC(x, 1.5)
-					END Test.`,
+						MODULE Test;
+						VAR x: INTEGER;
+						BEGIN DEC(x, 1.5)
+						END Test.`,
 				shouldPass:  false,
 				expectError: "'DEC' expects the second argument to be an integer",
 			},
 			{
 				name: "DEC with two arguments: first argument not a variable",
 				code: `MODULE Test;
-					CONST x = 5;
-					BEGIN DEC(x, 1)
-					END Test.`,
+						CONST x = 5;
+						BEGIN DEC(x, 1)
+						END Test.`,
 				shouldPass:  false,
 				expectError: "'DEC' expects the first argument to be an assignable integer",
 			},
 			{
 				name: "DEC with too many arguments",
 				code: `MODULE Test;
-					VAR x: INTEGER;
-					BEGIN DEC(x, 1, 2)
-					END Test.`,
+						VAR x: INTEGER;
+						BEGIN DEC(x, 1, 2)
+						END Test.`,
 				shouldPass:  false,
 				expectError: "'DEC' expects one or two arguments",
 			},
 			{
 				name: "DEC with zero arguments",
 				code: `MODULE Test;
-					BEGIN DEC()
-					END Test.`,
+						BEGIN DEC()
+						END Test.`,
 				shouldPass:  false,
 				expectError: "'DEC' expects one or two arguments",
 			},
@@ -846,83 +846,83 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "INC with one argument: integer variable",
 				code: `MODULE Test;
-					VAR x: INTEGER;
-					BEGIN INC(x)
-					END Test.`,
+						VAR x: INTEGER;
+						BEGIN INC(x)
+						END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "INC with one argument: enum variable",
 				code: `
-			MODULE Test;
-			TYPE Color = (Red, Green, Blue);
-			VAR c: Color;
-			BEGIN INC(c)
-			END Test.`,
+				MODULE Test;
+				TYPE Color = (Red, Green, Blue);
+				VAR c: Color;
+				BEGIN INC(c)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "INC with one argument: real variable (invalid)",
 				code: `
-			MODULE Test;
-			VAR r: REAL;
-			BEGIN INC(r)
-			END Test.`,
+				MODULE Test;
+				VAR r: REAL;
+				BEGIN INC(r)
+				END Test.`,
 				expectError: "'INC' expects an integer or enum type",
 			},
 			{
 				name: "INC with two arguments: integer variable and constant",
 				code: `
-			MODULE Test;
-			VAR x: INTEGER;
-			BEGIN INC(x, 5)
-			END Test.`,
+				MODULE Test;
+				VAR x: INTEGER;
+				BEGIN INC(x, 5)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "INC with two arguments: enum variable and constant",
 				code: `
-			MODULE Test;
-			TYPE State = (Init, Running, Done);
-			VAR s: State;
-			BEGIN INC(s, 1)
-			END Test.`,
+				MODULE Test;
+				TYPE State = (Init, Running, Done);
+				VAR s: State;
+				BEGIN INC(s, 1)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'INC' expects the first argument to be an assignable integer",
 			},
 			{
 				name: "INC with two arguments: second argument not integer",
 				code: `
-			MODULE Test;
-			VAR x: INTEGER;
-			BEGIN INC(x, 1.0)
-			END Test.`,
+				MODULE Test;
+				VAR x: INTEGER;
+				BEGIN INC(x, 1.0)
+				END Test.`,
 				expectError: "'INC' expects the second argument to be an integer",
 			},
 			{
 				name: "INC with two arguments: first argument not a variable",
 				code: `
-			MODULE Test;
-			CONST c = 5;
-			BEGIN INC(c, 1)
-			END Test.`,
+				MODULE Test;
+				CONST c = 5;
+				BEGIN INC(c, 1)
+				END Test.`,
 				expectError: "'INC' expects the first argument to be an assignable integer",
 			},
 			{
 				name: "INC with too many arguments",
 				code: `
-			MODULE Test;
-			VAR x: INTEGER;
-			BEGIN INC(x, 1, 2)
-			END Test.`,
+				MODULE Test;
+				VAR x: INTEGER;
+				BEGIN INC(x, 1, 2)
+				END Test.`,
 				expectError: "'INC' expects one or two arguments",
 			},
 			{
 				name: "INC with zero arguments",
 				code: `
-			MODULE Test;
-			BEGIN INC()
-			END Test.`,
+				MODULE Test;
+				BEGIN INC()
+				END Test.`,
 				expectError: "'INC' expects one or two arguments",
 			},
 		},
@@ -933,121 +933,121 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "INCL with valid SET variable and integer",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN INCL(s, 5)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN INCL(s, 5)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "INCL with constant expression index",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			CONST i = 10;
-			BEGIN INCL(s, i)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				CONST i = 10;
+				BEGIN INCL(s, i)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "INCL with large integer",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN INCL(s, 999999999)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN INCL(s, 999999999)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "INCL with MAX(SET) integer",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN INCL(s, 4294967295)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN INCL(s, 4294967295)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "INCL with out-of-bounds integer",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN INCL(s, 4294967296)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN INCL(s, 4294967296)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'INCL' expects the second argument to be an integer in the range [0, MAX(SET)]",
 			},
 			{
 				name: "INCL with non-integer index",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN INCL(s, 1.5)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN INCL(s, 1.5)
+				END Test.`,
 				expectError: "'INCL' expects the second argument to be an integer",
 			},
 			{
 				name: "INCL with non-SET variable",
 				code: `
-			MODULE Test;
-			VAR s: INTEGER;
-			BEGIN INCL(s, 1)
-			END Test.`,
+				MODULE Test;
+				VAR s: INTEGER;
+				BEGIN INCL(s, 1)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'INCL' expects the first argument to be a set",
 			},
 			{
 				name: "INCL with set union as first argument",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN INCL(s + s, 1)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN INCL(s + s, 1)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "INCL with set difference as first argument",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN INCL(s / s, 4294967295)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN INCL(s / s, 4294967295)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "INCL with set difference as first argument",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN INCL(s - s, 0)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN INCL(s - s, 0)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "INCL with set difference as first argument",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN INCL(s * s, 0)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN INCL(s * s, 0)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "INCL with missing arguments",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN INCL(s)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN INCL(s)
+				END Test.`,
 				expectError: "'INCL' expects exactly two arguments",
 			},
 			{
 				name: "INCL with too many arguments",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN INCL(s, 1, 2)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN INCL(s, 1, 2)
+				END Test.`,
 				expectError: "'INCL' expects exactly two arguments",
 			},
 		},
@@ -1058,150 +1058,150 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "EXCL with valid SET variable and integer",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s, 5)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s, 5)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "EXCL with constant expression index",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			CONST i = 7;
-			BEGIN EXCL(s, i)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				CONST i = 7;
+				BEGIN EXCL(s, i)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "EXCL with non-integer index",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s, 3.14)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s, 3.14)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'EXCL' expects the second argument to be an integer",
 			},
 			{
 				name: "EXCL with valid SET variable and integer",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s, 5)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s, 5)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "EXCL with constant expression index",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			CONST i = 10;
-			BEGIN EXCL(s, i)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				CONST i = 10;
+				BEGIN EXCL(s, i)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "EXCL with large integer",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s, 999999999)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s, 999999999)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "EXCL with MAX(SET) integer",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s, 4294967295)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s, 4294967295)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "EXCL with out-of-bounds integer",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s, 4294967296)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s, 4294967296)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'EXCL' expects the second argument to be an integer in the range [0, MAX(SET)]",
 			},
 			{
 				name: "EXCL with non-integer index",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s, 'a')
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s, 'a')
+				END Test.`,
 				expectError: "'EXCL' expects the second argument to be an integer",
 			},
 			{
 				name: "EXCL with non-SET variable",
 				code: `
-			MODULE Test;
-			VAR s: INTEGER;
-			BEGIN EXCL(s, 1)
-			END Test.`,
+				MODULE Test;
+				VAR s: INTEGER;
+				BEGIN EXCL(s, 1)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'EXCL' expects the first argument to be a set",
 			},
 			{
 				name: "EXCL with set union as first argument",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s + s, 1)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s + s, 1)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "EXCL with set difference as first argument",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s / s, 4294967295)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s / s, 4294967295)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "EXCL with set difference as first argument",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s - s, 0)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s - s, 0)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "EXCL with set difference as first argument",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s * s, 0)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s * s, 0)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "EXCL with missing arguments",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s)
+				END Test.`,
 				expectError: "'EXCL' expects exactly two arguments",
 			},
 			{
 				name: "EXCL with too many arguments",
 				code: `
-			MODULE Test;
-			VAR s: SET;
-			BEGIN EXCL(s, 1, 2)
-			END Test.`,
+				MODULE Test;
+				VAR s: SET;
+				BEGIN EXCL(s, 1, 2)
+				END Test.`,
 				expectError: "'EXCL' expects exactly two arguments",
 			},
 		},
@@ -1212,69 +1212,69 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "ASSERT with valid BOOLEAN expression",
 				code: `
-			MODULE Test;
-			VAR x: BOOL;
-			BEGIN ASSERT(x)
-			END Test.`,
+				MODULE Test;
+				VAR x: BOOL;
+				BEGIN ASSERT(x)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "ASSERT with TRUE literal",
 				code: `
-			MODULE Test;
-			BEGIN ASSERT(TRUE)
-			END Test.`,
+				MODULE Test;
+				BEGIN ASSERT(TRUE)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "ASSERT with valid second INTEGER constant argument",
 				code: `
-			MODULE Test;
-			BEGIN ASSERT(TRUE, 42)
-			END Test.`,
+				MODULE Test;
+				BEGIN ASSERT(TRUE, 42)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "ASSERT with second argument that is not constant",
 				code: `
-			MODULE Test;
-			VAR code: INTEGER;
-			BEGIN ASSERT(TRUE, code)
-			END Test.`,
+				MODULE Test;
+				VAR code: INTEGER;
+				BEGIN ASSERT(TRUE, code)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'ASSERT' expects the second argument to be an integer constant",
 			},
 			{
 				name: "ASSERT with non-BOOLEAN first argument",
 				code: `
-			MODULE Test;
-			VAR x: INTEGER;
-			BEGIN ASSERT(x)
-			END Test.`,
+				MODULE Test;
+				VAR x: INTEGER;
+				BEGIN ASSERT(x)
+				END Test.`,
 				expectError: "'ASSERT' expects a boolean type",
 			},
 			{
 				name: "ASSERT with negative constant code",
 				code: `
-			MODULE Test;
-			BEGIN ASSERT(TRUE, -1)
-			END Test.`,
+				MODULE Test;
+				BEGIN ASSERT(TRUE, -1)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "ASSERT with too many arguments",
 				code: `
-			MODULE Test;
-			BEGIN ASSERT(TRUE, 1, 2)
-			END Test.`,
+				MODULE Test;
+				BEGIN ASSERT(TRUE, 1, 2)
+				END Test.`,
 				expectError: "'ASSERT' expects one or two arguments",
 			},
 			{
 				name: "ASSERT with no arguments",
 				code: `
-			MODULE Test;
-			BEGIN ASSERT()
-			END Test.`,
+				MODULE Test;
+				BEGIN ASSERT()
+				END Test.`,
 				expectError: "'ASSERT' expects one or two arguments",
 			},
 		},
@@ -1285,118 +1285,118 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "BYTES(array, n) with BYTE array and INT32",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 8 OF BYTE;
-			VAR x: INT32;
-			VAR n: INTEGER;
-			BEGIN BYTES(a, x)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 8 OF BYTE;
+				VAR x: INT32;
+				VAR n: INTEGER;
+				BEGIN BYTES(a, x)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "BYTES(array, n) with CHAR array and SET",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 16 OF CHAR;
-			VAR x: SET;
-			VAR n: INTEGER;
-			BEGIN BYTES(a, x)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 16 OF CHAR;
+				VAR x: SET;
+				VAR n: INTEGER;
+				BEGIN BYTES(a, x)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "BYTES(array, n) with array of INTEGER",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 4 OF INTEGER;
-			VAR x: INT32;
-			VAR n: INTEGER;
-			BEGIN BYTES(a, x)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 4 OF INTEGER;
+				VAR x: INT32;
+				VAR n: INTEGER;
+				BEGIN BYTES(a, x)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'BYTES' expects the first argument to be an array of byte or char",
 			},
 			{
 				name: "BYTES(array, n) with BOOLEAN",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 8 OF BYTE;
-			VAR b: BOOL;
-			BEGIN BYTES(a, b)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 8 OF BYTE;
+				VAR b: BOOL;
+				BEGIN BYTES(a, b)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'BYTES' expects the second argument to be numeric or set",
 			},
 			{
 				name: "BYTES() with no arguments",
 				code: `
-			MODULE Test;
-			BEGIN BYTES()
-			END Test.`,
+				MODULE Test;
+				BEGIN BYTES()
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'BYTES' expects exactly two arguments",
 			},
 			{
 				name: "BYTES() with too many arguments",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 8 OF BYTE;
-			VAR n: INTEGER;
-			BEGIN BYTES(a, n, n)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 8 OF BYTE;
+				VAR n: INTEGER;
+				BEGIN BYTES(a, n, n)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'BYTES' expects exactly two arguments",
 			},
 			{
 				name: "BYTES() with non-array first argument",
 				code: `
-			MODULE Test;
-			VAR x: INTEGER;
-			VAR n: INTEGER;
-			BEGIN BYTES(x, n)
-			END Test.`,
+				MODULE Test;
+				VAR x: INTEGER;
+				VAR n: INTEGER;
+				BEGIN BYTES(x, n)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'BYTES' expects the first argument to be an array of byte or char",
 			},
 			{
 				name: "BYTES() with non-numeric second argument",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 8 OF BYTE;
-			VAR b: BOOL;
-			BEGIN BYTES(a, b)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 8 OF BYTE;
+				VAR b: BOOL;
+				BEGIN BYTES(a, b)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'BYTES' expects the second argument to be numeric or set",
 			},
 			{
 				name: "BYTES() with array of CHAR",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 8 OF CHAR;
-			VAR n: INTEGER;
-			BEGIN BYTES(a, n)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 8 OF CHAR;
+				VAR n: INTEGER;
+				BEGIN BYTES(a, n)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "BYTES() with array of BYTE",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 8 OF BYTE;
-			VAR n: INTEGER;
-			BEGIN BYTES(a, n)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 8 OF BYTE;
+				VAR n: INTEGER;
+				BEGIN BYTES(a, n)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "BYTES() with array of WCHAR",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 8 OF WCHAR;
-			VAR n: INTEGER;
-			BEGIN BYTES(a, n)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 8 OF WCHAR;
+				VAR n: INTEGER;
+				BEGIN BYTES(a, n)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'BYTES' expects the first argument to be an array of byte or char",
 			},
@@ -1408,70 +1408,70 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "HALT with integer constant",
 				code: `
-			MODULE Test;
-			BEGIN HALT(1)
-			END Test.`,
+				MODULE Test;
+				BEGIN HALT(1)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "HALT with zero",
 				code: `
-			MODULE Test;
-			BEGIN HALT(0)
-			END Test.`,
+				MODULE Test;
+				BEGIN HALT(0)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "HALT with large int constant",
 				code: `
-			MODULE Test;
-			BEGIN HALT(32767)
-			END Test.`,
+				MODULE Test;
+				BEGIN HALT(32767)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "HALT with variable",
 				code: `
-			MODULE Test;
-			VAR n: INTEGER;
-			BEGIN HALT(n)
-			END Test.`,
+				MODULE Test;
+				VAR n: INTEGER;
+				BEGIN HALT(n)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'HALT' expects an integer constant",
 			},
 			{
 				name: "HALT with REAL constant",
 				code: `
-			MODULE Test;
-			BEGIN HALT(1.0)
-			END Test.`,
+				MODULE Test;
+				BEGIN HALT(1.0)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'HALT' expects an integer constant",
 			},
 			{
 				name: "HALT with no arguments",
 				code: `
-			MODULE Test;
-			BEGIN HALT()
-			END Test.`,
+				MODULE Test;
+				BEGIN HALT()
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'HALT' expects exactly one argument",
 			},
 			{
 				name: "HALT with two arguments",
 				code: `
-			MODULE Test;
-			BEGIN HALT(1, 2)
-			END Test.`,
+				MODULE Test;
+				BEGIN HALT(1, 2)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'HALT' expects exactly one argument",
 			},
 			{
 				name: "HALT with negative constant",
 				code: `
-			MODULE Test;
-			BEGIN HALT(-1)
-			END Test.`,
+				MODULE Test;
+				BEGIN HALT(-1)
+				END Test.`,
 				shouldPass: true,
 			},
 		},
@@ -1482,124 +1482,124 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "NEW fixed array",
 				code: `
-			MODULE Test;
-			TYPE A = ARRAY 10 OF INTEGER;
-			VAR arr: A;
-			BEGIN NEW(arr)
-			END Test.`,
+				MODULE Test;
+				TYPE A = ARRAY 10 OF INTEGER;
+				VAR arr: A;
+				BEGIN NEW(arr)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "NEW pointer to record",
 				code: `
-			MODULE Test;
-			TYPE Rec = RECORD
-				field: INTEGER
-			END;
-			VAR p: POINTER TO Rec;
-			BEGIN NEW(p)
-			END Test.`,
+				MODULE Test;
+				TYPE Rec = RECORD
+					field: INTEGER
+				END;
+				VAR p: POINTER TO Rec;
+				BEGIN NEW(p)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "NEW pointer to open array 1D",
 				code: `
-			MODULE Test;
-			TYPE A = ARRAY OF INTEGER;
-			     P = ^A;
-			VAR p: P;
-			BEGIN NEW(p, 42)
-			END Test.`,
+				MODULE Test;
+				TYPE A = ARRAY OF INTEGER;
+				     P = ^A;
+				VAR p: P;
+				BEGIN NEW(p, 42)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "NEW pointer to open array 2D",
 				code: `
-			MODULE Test;
-			TYPE A = ARRAY OF ARRAY OF CHAR;
-			     P = ^A;
-			VAR p: P;
-			BEGIN NEW(p, 3, 10)
-			END Test.`,
+				MODULE Test;
+				TYPE A = ARRAY OF ARRAY OF CHAR;
+				     P = ^A;
+				VAR p: P;
+				BEGIN NEW(p, 3, 10)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "NEW pointer to 2D open array - too few args",
 				code: `
-			MODULE Test;
-			TYPE A = ARRAY OF ARRAY OF INTEGER;
-			     P = ^A;
-			VAR p: P;
-			BEGIN NEW(p, 5)
-			END Test.`,
+				MODULE Test;
+				TYPE A = ARRAY OF ARRAY OF INTEGER;
+				     P = ^A;
+				VAR p: P;
+				BEGIN NEW(p, 5)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NEW': expected 2 dimension lengths for open array type",
 			},
 			{
 				name: "NEW with too many args",
 				code: `
-			MODULE Test;
-			TYPE A = ARRAY OF INTEGER;
-			     P = ^A;
-			VAR p: P;
-			BEGIN NEW(p, 1, 2)
-			END Test.`,
+				MODULE Test;
+				TYPE A = ARRAY OF INTEGER;
+				     P = ^A;
+				VAR p: P;
+				BEGIN NEW(p, 1, 2)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NEW': expected 1 dimension lengths for open array type",
 			},
 			{
 				name: "NEW with non-integer dimension",
 				code: `
-			MODULE Test;
-			TYPE A = ARRAY OF INTEGER;
-			     P = ^A;
-			VAR p: P;
-			BEGIN NEW(p, TRUE)
-			END Test.`,
+				MODULE Test;
+				TYPE A = ARRAY OF INTEGER;
+				     P = ^A;
+				VAR p: P;
+				BEGIN NEW(p, TRUE)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NEW': dimension length must be integer",
 			},
 			{
 				name: "NEW with missing open array dimensions",
 				code: `
-			MODULE Test;
-			TYPE A = ARRAY OF INTEGER;
-			     P = ^A;
-			VAR p: P;
-			BEGIN NEW(p)
-			END Test.`,
+				MODULE Test;
+				TYPE A = ARRAY OF INTEGER;
+				     P = ^A;
+				VAR p: P;
+				BEGIN NEW(p)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NEW' expects a pointer to a record or a fixed array",
 			},
 			{
 				name: "NEW with arg on fixed array",
 				code: `
-			MODULE Test;
-			TYPE A = ARRAY 10 OF INTEGER;
-			     P = ^A;
-			VAR p: P;
-			BEGIN NEW(p, 1)
-			END Test.`,
+				MODULE Test;
+				TYPE A = ARRAY 10 OF INTEGER;
+				     P = ^A;
+				VAR p: P;
+				BEGIN NEW(p, 1)
+				END Test.`,
 				expectError: "'NEW' expects a pointer to an open array",
 			},
 			{
 				name: "NEW with no args",
 				code: `
-			MODULE Test;
-			BEGIN NEW()
-			END Test.`,
+				MODULE Test;
+				BEGIN NEW()
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NEW' expects at least one argument",
 			},
 			{
 				name: "NEW with too many args",
 				code: `
-			MODULE Test;
-			TYPE A = ARRAY OF INTEGER;
-			     P = ^A;
-			VAR p: P;
-			BEGIN NEW(p, 1, 2, 3)
-			END Test.`,
+				MODULE Test;
+				TYPE A = ARRAY OF INTEGER;
+				     P = ^A;
+				VAR p: P;
+				BEGIN NEW(p, 1, 2, 3)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NEW': expected 1 dimension lengths for open array type",
 			},
@@ -1611,116 +1611,116 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "NUMBER to BYTE",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 4 OF BYTE;
-			    n: BYTE;
-			BEGIN NUMBER(n, a)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 4 OF BYTE;
+				    n: BYTE;
+				BEGIN NUMBER(n, a)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "NUMBER to CHAR",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 4 OF CHAR;
-			    n: CHAR;
-			BEGIN NUMBER(n, a)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 4 OF CHAR;
+				    n: CHAR;
+				BEGIN NUMBER(n, a)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NUMBER' expects the first argument to be numeric or set",
 			},
 			{
 				name: "NUMBER to INT32",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 4 OF BYTE;
-			    n: INT32;
-			BEGIN NUMBER(n, a)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 4 OF BYTE;
+				    n: INT32;
+				BEGIN NUMBER(n, a)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "NUMBER to SET",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 4 OF BYTE;
-			    s: SET;
-			BEGIN NUMBER(s, a)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 4 OF BYTE;
+				    s: SET;
+				BEGIN NUMBER(s, a)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "NUMBER with non-numeric target",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 4 OF BYTE;
-			    s: BOOL;
-			BEGIN NUMBER(s, a)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 4 OF BYTE;
+				    s: BOOL;
+				BEGIN NUMBER(s, a)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NUMBER' expects the first argument to be numeric or set",
 			},
 			{
 				name: "NUMBER with wrong array element type",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 4 OF INTEGER;
-			    n: INT32;
-			BEGIN NUMBER(n, a)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 4 OF INTEGER;
+				    n: INT32;
+				BEGIN NUMBER(n, a)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NUMBER' expects the second argument to be an array of byte or char",
 			},
 			{
 				name: "NUMBER with second argument not array",
 				code: `
-			MODULE Test;
-			VAR x: BYTE;
-			    n: INT32;
-			BEGIN NUMBER(n, x)
-			END Test.`,
+				MODULE Test;
+				VAR x: BYTE;
+				    n: INT32;
+				BEGIN NUMBER(n, x)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NUMBER' expects the second argument to be an array of byte or char",
 			},
 			{
 				name: "NUMBER with no arguments",
 				code: `
-			MODULE Test;
-			BEGIN NUMBER()
-			END Test.`,
+				MODULE Test;
+				BEGIN NUMBER()
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NUMBER' expects exactly two arguments",
 			},
 			{
 				name: "NUMBER with too many arguments",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 4 OF BYTE;
-			    n: INT32;
-			BEGIN NUMBER(n, a, 1)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 4 OF BYTE;
+				    n: INT32;
+				BEGIN NUMBER(n, a, 1)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NUMBER' expects exactly two arguments",
 			},
 			{
 				name: "NUMBER with non-assignable first argument",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 4 OF BYTE;
-			    n: INT32;
-			BEGIN NUMBER(1, a)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 4 OF BYTE;
+				    n: INT32;
+				BEGIN NUMBER(1, a)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'NUMBER' expects the first argument to be an assignable numeric or set type",
 			},
 			{
 				name: "NUMBER with real first argument",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 4 OF BYTE;
-			    n: REAL;
-			BEGIN NUMBER(n, a)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 4 OF BYTE;
+				    n: REAL;
+				BEGIN NUMBER(n, a)
+				END Test.`,
 				shouldPass: true,
 			},
 		},
@@ -1731,100 +1731,100 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "COPY with string and array",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 16 OF CHAR;
-			BEGIN COPY("Hello", a)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 16 OF CHAR;
+				BEGIN COPY("Hello", a)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "COPY with array and array",
 				code: `
-			MODULE Test;
-			VAR src, dst: ARRAY 16 OF CHAR;
-			BEGIN COPY(src, dst)
-			END Test.`,
+				MODULE Test;
+				VAR src, dst: ARRAY 16 OF CHAR;
+				BEGIN COPY(src, dst)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "COPY with non-string first argument",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 16 OF CHAR;
-			    x: INTEGER;
-			BEGIN COPY(x, a)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 16 OF CHAR;
+				    x: INTEGER;
+				BEGIN COPY(x, a)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'COPY' expects the first argument to be a char array or string",
 			},
 			{
 				name: "COPY with wrong destination type",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 16 OF CHAR;
-			    x: SET;
-			BEGIN COPY(a, x)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 16 OF CHAR;
+				    x: SET;
+				BEGIN COPY(a, x)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'COPY' expects the second argument to be an assignable array of char",
 			},
 			{
 				name: "COPY to non-array of char",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 16 OF CHAR;
-			BEGIN COPY(a, a[1])  (* not array of char *)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 16 OF CHAR;
+				BEGIN COPY(a, a[1])  (* not array of char *)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'COPY' expects the second argument to be an assignable array of char",
 			},
 			{
 				name: "COPY wrong arity",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 16 OF CHAR;
-			BEGIN COPY(a)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 16 OF CHAR;
+				BEGIN COPY(a)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'COPY' expects exactly two arguments",
 			},
 			{
 				name: "COPY with too many arguments",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 16 OF CHAR;
-			BEGIN COPY(a, a, 1)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 16 OF CHAR;
+				BEGIN COPY(a, a, 1)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'COPY' expects exactly two arguments",
 			},
 			{
 				name: "COPY with no arguments",
 				code: `
-			MODULE Test;
-			BEGIN COPY()
-			END Test.`,
+				MODULE Test;
+				BEGIN COPY()
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'COPY' expects exactly two arguments",
 			},
 			{
 				name: "COPY with non-assignable second argument",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 16 OF CHAR;
-			BEGIN COPY(a, "Hello")
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 16 OF CHAR;
+				BEGIN COPY(a, "Hello")
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'COPY' expects the second argument to be an assignable array of char",
 			},
 			{
 				name: "COPY with array of CHAR",
 				code: `
-			MODULE Test;
-			VAR a: ARRAY 16 OF CHAR;
-			VAR b: ARRAY 16 OF CHAR;
-			BEGIN COPY(a, b)
-			END Test.`,
+				MODULE Test;
+				VAR a: ARRAY 16 OF CHAR;
+				VAR b: ARRAY 16 OF CHAR;
+				BEGIN COPY(a, b)
+				END Test.`,
 				shouldPass: true,
 			},
 		},
@@ -1835,57 +1835,57 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "PACK with REAL and INT32",
 				code: `
-			MODULE Test;
-			VAR x: REAL;
-			BEGIN PACK(x, 5i)
-			END Test.`,
+				MODULE Test;
+				VAR x: REAL;
+				BEGIN PACK(x, 5i)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "PACK with LONGREAL and INT32",
 				code: `
-			MODULE Test;
-			VAR x: LONGREAL;
-			BEGIN PACK(x, 0i)
-			END Test.`,
+				MODULE Test;
+				VAR x: LONGREAL;
+				BEGIN PACK(x, 0i)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "PACK with wrong x type",
 				code: `
-			MODULE Test;
-			VAR x: SET;
-			BEGIN PACK(x, 0)
-			END Test.`,
+				MODULE Test;
+				VAR x: SET;
+				BEGIN PACK(x, 0)
+				END Test.`,
 				expectError: "'PACK' expects the first argument to be an assignable REAL/LONGREAL",
 			},
 			{
 				name: "PACK with wrong n type",
 				code: `
-			MODULE Test;
-			VAR x: REAL; b: BYTE;
-			BEGIN PACK(x, b)
-			END Test.`,
+				MODULE Test;
+				VAR x: REAL; b: BYTE;
+				BEGIN PACK(x, b)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'PACK' expects the second argument to be INT32",
 			},
 			{
 				name: "PACK first argument not l-value",
 				code: `
-			MODULE Test;
-			VAR x: REAL;
-			BEGIN PACK(x + 1.0, 0i)
-			END Test.`,
+				MODULE Test;
+				VAR x: REAL;
+				BEGIN PACK(x + 1.0, 0i)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'PACK' expects the first argument to be an assignable REAL/LONGREAL",
 			},
 			{
 				name: "PACK with one argument",
 				code: `
-			MODULE Test;
-			VAR x: REAL;
-			BEGIN PACK(x)
-			END Test.`,
+				MODULE Test;
+				VAR x: REAL;
+				BEGIN PACK(x)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'PACK' expects exactly two arguments",
 			},
@@ -1897,85 +1897,85 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "UNPK with REAL and INT32",
 				code: `
-			MODULE Test;
-			VAR x: REAL; n: INT32;
-			BEGIN UNPK(x, n)
-			END Test.`,
+				MODULE Test;
+				VAR x: REAL; n: INT32;
+				BEGIN UNPK(x, n)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "UNPK with LONGREAL and INT32",
 				code: `
-			MODULE Test;
-			VAR x: LONGREAL; n: INT32;
-			BEGIN UNPK(x, n)
-			END Test.`,
+				MODULE Test;
+				VAR x: LONGREAL; n: INT32;
+				BEGIN UNPK(x, n)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "UNPK with invalid x type",
 				code: `
-			MODULE Test;
-			VAR x: SET; n: INT32;
-			BEGIN UNPK(x, n)
-			END Test.`,
+				MODULE Test;
+				VAR x: SET; n: INT32;
+				BEGIN UNPK(x, n)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'UNPK' expects the first argument to be an assignable REAL/LONGREAL",
 			},
 			{
 				name: "UNPK with invalid n type",
 				code: `
-			MODULE Test;
-			VAR x: REAL; n: BYTE;
-			BEGIN UNPK(x, n)
-			END Test.`,
+				MODULE Test;
+				VAR x: REAL; n: BYTE;
+				BEGIN UNPK(x, n)
+				END Test.`,
 				expectError: "'UNPK' expects the second argument to be an assignable INT32",
 			},
 			{
 				name: "UNPK x not l-value",
 				code: `
-			MODULE Test;
-			VAR x: REAL; n: INT32;
-			BEGIN UNPK(x + 1.0, n)
-			END Test.`,
+				MODULE Test;
+				VAR x: REAL; n: INT32;
+				BEGIN UNPK(x + 1.0, n)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'UNPK' expects the first argument to be an assignable REAL/LONGREAL",
 			},
 			{
 				name: "UNPK n not l-value",
 				code: `
-			MODULE Test;
-			VAR x: REAL; n: INT32;
-			BEGIN UNPK(x, n + 1)
-			END Test.`,
+				MODULE Test;
+				VAR x: REAL; n: INT32;
+				BEGIN UNPK(x, n + 1)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'UNPK' expects the second argument to be an assignable INT32",
 			},
 			{
 				name: "UNPK arity mismatch",
 				code: `
-			MODULE Test;
-			VAR x: REAL;
-			BEGIN UNPK(x)
-			END Test.`,
+				MODULE Test;
+				VAR x: REAL;
+				BEGIN UNPK(x)
+				END Test.`,
 				expectError: "'UNPK' expects exactly two arguments",
 			},
 			{
 				name: "UNPK arity mismatch",
 				code: `
-			MODULE Test;
-			VAR x: REAL;
-			BEGIN UNPK(x, 0i, 5)
-			END Test.`,
+				MODULE Test;
+				VAR x: REAL;
+				BEGIN UNPK(x, 0i, 5)
+				END Test.`,
 				expectError: "'UNPK' expects exactly two arguments",
 			},
 			{
 				name: "UNPK no arguments",
 				code: `
-			MODULE Test;
-			VAR x: REAL;
-			BEGIN UNPK()
-			END Test.`,
+				MODULE Test;
+				VAR x: REAL;
+				BEGIN UNPK()
+				END Test.`,
 				expectError: "'UNPK' expects exactly two arguments",
 			},
 		},
@@ -1986,49 +1986,49 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "RAISE pointer to record",
 				code: `
-			MODULE Test;
-			VAR e: POINTER TO ANYREC;
-			BEGIN RAISE(e)
-			END Test.`,
+				MODULE Test;
+				VAR e: POINTER TO ANYREC;
+				BEGIN RAISE(e)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "RAISE with non-pointer",
 				code: `
-			MODULE Test;
-			VAR x: INTEGER;
-			BEGIN RAISE(x)
-			END Test.`,
+				MODULE Test;
+				VAR x: INTEGER;
+				BEGIN RAISE(x)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'RAISE' expects a pointer to ANYREC",
 			},
 			{
 				name: "RAISE pointer to array",
 				code: `
-			MODULE Test;
-			TYPE A = ARRAY 4 OF CHAR;
-			VAR p: POINTER TO A;
-			BEGIN RAISE(p)
-			END Test.`,
+				MODULE Test;
+				TYPE A = ARRAY 4 OF CHAR;
+				VAR p: POINTER TO A;
+				BEGIN RAISE(p)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'RAISE' expects a pointer to ANYREC",
 			},
 			{
 				name: "RAISE too many args",
 				code: `
-			MODULE Test;
-			VAR x: INTEGER;
-			BEGIN RAISE(x, x)
-			END Test.`,
+				MODULE Test;
+				VAR x: INTEGER;
+				BEGIN RAISE(x, x)
+				END Test.`,
 				expectError: "'RAISE' expects exactly one argument",
 			},
 			{
 				name: "RAISE too few args",
 				code: `
-			MODULE Test;
-			VAR x: INTEGER;
-			BEGIN RAISE()
-			END Test.`,
+				MODULE Test;
+				VAR x: INTEGER;
+				BEGIN RAISE()
+				END Test.`,
 				expectError: "'RAISE' expects exactly one argument",
 			},
 		},
@@ -2039,60 +2039,60 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "Valid PCALL",
 				code: `
-			MODULE Test;
-			//TYPE P = PROCEDURE(x: INTEGER);
-	
-			VAR e: POINTER TO anyrec;
-			PROCEDURE p(x: INTEGER);  END p;
-	
-			BEGIN PCALL(e, p, 42)
-			END Test.`,
+				MODULE Test;
+				//TYPE P = PROCEDURE(x: INTEGER);
+
+				VAR e: POINTER TO anyrec;
+				PROCEDURE p(x: INTEGER);  END p;
+
+				BEGIN PCALL(e, p, 42)
+				END Test.`,
 				shouldPass: true,
 			},
 			{
 				name: "PCALL non-pointer exception",
 				code: `
-			MODULE Test;
-			TYPE P = PROCEDURE;
-			VAR x: INTEGER;
-			PROCEDURE Act; END Act;
-			BEGIN PCALL(x, Act)
-			END Test.`,
+				MODULE Test;
+				TYPE P = PROCEDURE;
+				VAR x: INTEGER;
+				PROCEDURE Act; END Act;
+				BEGIN PCALL(x, Act)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'PCALL' expects the first argument to be a pointer to ANYREC",
 			},
 			{
 				name: "PCALL pointer to non-record",
 				code: `
-			MODULE Test;
-			TYPE A = ARRAY 4 OF INTEGER;
-			     P = PROCEDURE;
-			VAR p: POINTER TO A;
-			PROCEDURE Act; END Act;
-			BEGIN PCALL(p, Act)
-			END Test.`,
+				MODULE Test;
+				TYPE A = ARRAY 4 OF INTEGER;
+				     P = PROCEDURE;
+				VAR p: POINTER TO A;
+				PROCEDURE Act; END Act;
+				BEGIN PCALL(p, Act)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'PCALL' expects the first argument to be a pointer to ANYREC",
 			},
 			{
 				name: "PCALL second argument not procedure",
 				code: `
-			MODULE Test;
-			VAR e: POINTER TO ANYREC;
-			    x: INTEGER;
-			BEGIN PCALL(e, x)
-			END Test.`,
+				MODULE Test;
+				VAR e: POINTER TO ANYREC;
+				    x: INTEGER;
+				BEGIN PCALL(e, x)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "'PCALL' expects the second argument to be a proper procedure",
 			},
 			{
 				name: "PCALL argument mismatch",
 				code: `
-			MODULE Test;
-			VAR e: POINTER TO ANYREC;
-			PROCEDURE F(x: INTEGER); END F;
-			BEGIN PCALL(e, F, TRUE)
-			END Test.`,
+				MODULE Test;
+				VAR e: POINTER TO ANYREC;
+				PROCEDURE F(x: INTEGER); END F;
+				BEGIN PCALL(e, F, TRUE)
+				END Test.`,
 				shouldPass:  false,
 				expectError: "PCALL: argument 1 is incompatible with parameter of type 'integer'",
 			},
@@ -3510,6 +3510,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 		},
 	},
+
 	{
 		procName: "SIZE",
 		cases: []procTestCase{

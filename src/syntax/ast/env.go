@@ -93,9 +93,7 @@ func (r *RecordEnv) Insert(obj Symbol) Symbol {
 	}
 
 	r.insert(obj.Name(), obj)
-	if obj.Parent == nil {
-		obj.SetParent(r.parent)
-	}
+	obj.SetParent(r.parent)
 
 	return nil
 }

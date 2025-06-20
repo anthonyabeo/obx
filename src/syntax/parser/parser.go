@@ -889,7 +889,7 @@ func (p *Parser) parseFactor() ast.Expression {
 	default:
 		p.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
-			Message:  "unexpected token: " + p.lexeme + "does not initiate an expression",
+			Message:  "unexpected token: " + p.lexeme + " does not initiate an expression",
 			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
 		})
 		pos := p.pos
@@ -1003,22 +1003,27 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
 	}
 
 	p.list = append(p.list, p.parseExprList())
-	if len(p.list) != 1 {
+	if len(p.list[len(p.list)-1]) != 1 {
 		return false
 	}
 
 	top := p.list[len(p.list)-1]
-	d, ok := top[0].(*ast.Designator)
+	_, ok := top[0].(*ast.Designator)
+	if ok {
+		return false
+	}
+
+	Named, ok := top[0].(*ast.NamedType)
 	if !ok {
 		return false
 	}
 
 	env := p.ctx.Env
-	if d.QIdent.Prefix != "" {
-		env = p.ctx.Envs[d.QIdent.Prefix]
+	if Named.Name.Prefix != "" {
+		env = p.ctx.Envs[Named.Name.Prefix]
 	}
 
-	sym := env.Lookup(d.QIdent.Name)
+	sym := env.Lookup(Named.Name.Name)
 	if sym == nil || sym.Kind() != ast.TypeSymbolKind {
 		return false
 	}
@@ -1033,9 +1038,14 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
 		return false
 	}
 
+	sym = p.ctx.Env.Lookup(dsg.QIdent.Name)
+	if sym == nil || sym.Kind() != ast.VariableSymbolKind && sym.Kind() != ast.ParamSymbolKind {
+		return false
+	}
+
 	end := p.end
 	dsg.Select = append(dsg.Select, &ast.TypeGuard{
-		Ty:          d.QIdent,
+		Ty:          Named.Name,
 		StartOffset: pos,
 		EndOffset:   end,
 	})
