@@ -294,7 +294,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if !types.IsChar(argType) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects a char argument, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects a CHAR argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
@@ -318,7 +318,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			if argType != types.Int32Type && argType != types.Int64Type {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be int32 or int64, "+
+					Message: fmt.Sprintf("predeclared procedure '%s' expects INT32 or INT64 arguments, "+
 						"got %s", pre.Name(), argType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
 				})
@@ -351,7 +351,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be int32 or int64, "+
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be INT32 or INT64, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
 			})
@@ -361,7 +361,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if arg2Type != types.Int32Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32, "+
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, "+
 					"got %s", pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
 			})
@@ -388,7 +388,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if argType != types.Int32Type && argType != types.Int64Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects an int32 or int64 argument, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an INT32 or INT64 argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
@@ -416,7 +416,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			if argType != types.Int32Type && argType != types.Int64Type {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be int32 or int64, "+
+					Message: fmt.Sprintf("predeclared procedure '%s' expects INT32 or INT64 arguments, "+
 						"got %s", pre.Name(), argType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
 				})
@@ -444,7 +444,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if argType != types.Int32Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects an int32 argument, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an INT32 argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
@@ -473,7 +473,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be int32 or int64, "+
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be INT32 or INT64, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
 			})
@@ -483,7 +483,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if arg2Type != types.Int32Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32, "+
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, "+
 					"got %s", pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
 			})
@@ -514,7 +514,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be int32 or int64, "+
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be INT32 or INT64, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
 			})
@@ -524,7 +524,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if arg2Type != types.Int32Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32, "+
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, "+
 					"got %s", pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
 			})
@@ -552,7 +552,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			if argType != types.Int32Type && argType != types.Int64Type {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be int32 or int64, "+
+					Message: fmt.Sprintf("predeclared procedure '%s' expects INT32 or INT64 arguments, "+
 						"got %s", pre.Name(), argType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
 				})
@@ -632,20 +632,6 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			return
 		}
 
-		// Convert integer to char
-		value, err := t.EvalConstUint32(call.ActualParams[0])
-		if err != nil || value < 0 || value > math.MaxUint8 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer "+
-					"in the range [0, 255], got %d", pre.Name(), value),
-				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
-			})
-			return
-		}
-
-		// If the value is within the valid range for a char which is 0 to 255 for a byte in
-		// Oberon, set the type to CharType
 		call.SemaType = types.CharType
 	case "default":
 		if len(call.ActualParams) != 1 {
@@ -682,7 +668,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if !types.IsReal(argType) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects a real argument, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects a REAL or LONGREAL argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
@@ -710,7 +696,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if argType != types.Int32Type && argType != types.Int64Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects an int32 or int64 argument, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an INT32 or INT64 argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
@@ -794,7 +780,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 				call.SemaType = types.UnknownType
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message: fmt.Sprintf("predeclared procedure '%s' expects an array or string type, got %s",
+					Message: fmt.Sprintf("predeclared procedure '%s' expects an array or string argument, got %s",
 						pre.Name(), T),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 				})
@@ -818,13 +804,43 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			tx := x.Type()
 			ty := y.Type()
 
-			if !types.IsArray(tx) && ty != types.Int32Type {
+			if !types.IsArray(tx) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an array "+
-						"and the second argument to be an integer, got %s and %s", pre.Name(), tx.String(), ty.String()),
-					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), y.End()),
+					Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an array got %s",
+						pre.Name(), tx.String()),
+					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), x.End()),
 				})
+				return
+			}
+
+			if ty != types.Int32Type {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, got %s",
+						pre.Name(), ty.String()),
+					Range: t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
+				})
+				return
+			}
+
+			dim := tx.(*types.ArrayType).Dimensions()
+			value, err := t.EvalConstUint32(y)
+			if err != nil {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("dimension value %s should be integer constant >= 0", y.String()),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
+				})
+			}
+
+			if int(value) >= dim {
+				t.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  fmt.Sprintf("ARRAY has fewer than %d dimensions", value+1),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
+				})
+				return
 			}
 
 			call.SemaType = types.Int32Type
@@ -842,12 +858,12 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.ActualParams[0].Accept(t)
 		argType := call.ActualParams[0].Type()
 
-		if argType != types.Int8Type || argType != types.ByteType || argType != types.Int16Type ||
-			argType != types.Int32Type || argType != types.RealType || argType != types.CharType {
+		if argType != types.Int8Type && argType != types.ByteType && argType != types.Int16Type &&
+			argType != types.Int32Type && argType != types.RealType && argType != types.CharType {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects an int8, byte, int16, int32, "+
-					"real or char argument, got %s", pre.Name(), argType),
+				Message: fmt.Sprintf("predeclared procedure '%s' expects INT8, BYTE, INT16, INT32, "+
+					"REAL, or CHAR argument, got %s", pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
 		}
@@ -879,7 +895,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			if !ok {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message:  fmt.Sprintf("predeclared procedure '%s' expects a single type argument", pre.Name()),
+					Message:  fmt.Sprintf("predeclared procedure '%s': single argument must be a type", pre.Name()),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 				})
 				return
@@ -949,7 +965,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			if !ok {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message:  fmt.Sprintf("predeclared procedure '%s' expects a single type argument", pre.Name()),
+					Message:  fmt.Sprintf("predeclared procedure '%s': single argument must be a type", pre.Name()),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 				})
 				return
@@ -1039,7 +1055,12 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			return
 		}
 		call.ActualParams[0].Accept(t)
-		argType := call.ActualParams[0].Type()
+		argType := types.Underlying(call.ActualParams[0].Type())
+
+		if types.IsEnum(argType) {
+			call.SemaType = types.Int32Type
+			return
+		}
 
 		switch argType {
 		case types.CharType, types.BooleanType:
@@ -1068,11 +1089,11 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.ActualParams[0].Accept(t)
 		argType := call.ActualParams[0].Type()
 		if argType != types.Int16Type && argType != types.Int32Type && argType != types.Int64Type &&
-			argType != types.RealType && argType != types.LongRealType && argType != types.WCharType {
+			argType != types.LongRealType && argType != types.WCharType {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects an int16, int32, int64, "+
-					"longreal or wchar argument, got %s", pre.Name(), argType),
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an INT16, INT32, INT64, "+
+					"LONGREAL, or WCHAR argument, got %s", pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
 		}
@@ -1124,7 +1145,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if !types.IsCharArrayOrString(argType) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects a string argument, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects "+
+					"an array of CHAR, array of WCHAR, or string literal as argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
@@ -1147,21 +1169,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if !types.IsInteger(argType) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer argument, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer type as argument, got %s",
 					pre.Name(), argType),
-				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
-			})
-			return
-		}
-
-		// If the value is within the valid range for a wchar which is 0 to 65535 for a short int in
-		// Oberon, set the type to WCharType
-		value, err := t.EvalConstUint32(call.ActualParams[0])
-		if err != nil || value < 0 || value > math.MaxUint16 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer in the range [0, 65535], "+
-					"got %d", pre.Name(), value),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
 			return
@@ -1188,7 +1197,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be int32 or int64, "+
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be INT32 or INT64, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
 			})
@@ -1198,7 +1207,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if arg2Type != types.Int32Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, got %s",
 					pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
 			})
@@ -1230,7 +1239,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be int32 or int64, "+
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be INT32 or INT64, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
 			})
@@ -1240,7 +1249,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if arg2Type != types.Int32Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, got %s",
 					pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
 			})
@@ -1267,7 +1276,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if !types.IsReal(argType) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects a real argument, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects a real type as argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
@@ -1294,7 +1303,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be int32 or int64, "+
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be INT32 or INT64, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
 			})
@@ -1304,7 +1313,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if arg2Type != types.Int32Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be int32, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, got %s",
 					pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
 			})
@@ -1333,10 +1342,10 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		arg1Type := arg1.Type()
 		arg2Type := arg2.Type()
 
-		if arg1Type != types.Int32Type && arg2Type != types.Int32Type {
+		if arg1Type != types.Int32Type || arg2Type != types.Int32Type {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be int32, got %s and %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be INT32, got %s and %s",
 					pre.Name(), arg1Type, arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg2.End()),
 			})
@@ -2090,7 +2099,7 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 					} else {
 						expr.SemaType = types.LongRealType
 					}
-				} else {
+				} else if e.Kind != token.CHAR && e.Kind != token.WCHAR && e.Kind != token.SET && e.Kind != token.BOOLEAN {
 					value, err := strconv.ParseInt(e.Val, 10, 64)
 					if err != nil {
 						t.ctx.Reporter.Report(report.Diagnostic{
@@ -2104,15 +2113,31 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 						value = -value
 					}
 
-					switch {
-					case value >= 0 && value <= 255:
-						expr.SemaType = types.ByteType
-					case value >= -128 && value <= 127:
-						expr.SemaType = types.Int8Type
-					case value >= -32768 && value <= 32767:
-						expr.SemaType = types.Int16Type
-					case value >= -2147483648 && value <= 2147483647:
-						expr.SemaType = types.Int32Type
+					switch e.Kind {
+					case token.BYTE_LIT:
+						if value >= 0 && value <= 255 {
+							expr.SemaType = tx
+						} else {
+							expr.SemaType = smallestTypeFor(value)
+						}
+					case token.INT8_LIT:
+						if value >= -128 && value <= 127 {
+							expr.SemaType = tx
+						} else {
+							expr.SemaType = smallestTypeFor(value)
+						}
+					case token.INT16_LIT, token.SHORTINT:
+						if value >= -32768 && value <= 32767 {
+							expr.SemaType = tx
+						} else {
+							expr.SemaType = smallestTypeFor(value)
+						}
+					case token.INT32_LIT, token.INTEGER:
+						if value >= -2147483648 && value <= 2147483647 {
+							expr.SemaType = tx
+						} else {
+							expr.SemaType = smallestTypeFor(value)
+						}
 					default:
 						expr.SemaType = types.Int64Type
 					}

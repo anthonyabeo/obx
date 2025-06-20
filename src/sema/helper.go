@@ -3,6 +3,7 @@ package sema
 import (
 	"fmt"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/types"
 )
 
 var loopIDCounter int
@@ -46,4 +47,19 @@ func findProcedureByName(name string, unit ast.CompilationUnit) *ast.ProcedureDe
 	}, unit)
 
 	return found
+}
+
+func smallestTypeFor(value int64) types.Type {
+	switch {
+	case value >= 0 && value <= 255:
+		return types.ByteType
+	case value >= -128 && value <= 127:
+		return types.Int8Type
+	case value >= -32768 && value <= 32767:
+		return types.Int16Type
+	case value >= -2147483648 && value <= 2147483647:
+		return types.Int32Type
+	default:
+		return types.Int64Type
+	}
 }

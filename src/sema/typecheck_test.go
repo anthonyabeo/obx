@@ -40,8 +40,8 @@ func TestTypeCheckerPrograms(t *testing.T) {
 
 				BEGIN
 					i8 := -128
-					i := -2147483648
-					si := -32768
+					i64 := -2147483648
+					i32 := -32768
 					i := 5;
 					li := 9223372036854775807
 					r := 3.14;
@@ -593,7 +593,7 @@ var predeclaredProcTests = []procTestEntry{
 		},
 	},
 	{
-		procName: "CHR",
+		procName: "CAP",
 		cases: []procTestCase{
 			{
 				name: "CAP with lowercase CHAR",
@@ -666,7 +666,7 @@ var predeclaredProcTests = []procTestEntry{
 					BEGIN c := CAP(65)
 					END Test.`,
 				shouldPass:  false,
-				expectError: "'CAP' expects a char argument",
+				expectError: "'CAP' expects a CHAR argument",
 			},
 			{
 				name: "CAP with boolean argument",
@@ -675,7 +675,7 @@ var predeclaredProcTests = []procTestEntry{
 					BEGIN c := CAP(TRUE)
 					END Test.`,
 				shouldPass:  false,
-				expectError: "'CAP' expects a char argument",
+				expectError: "'CAP' expects a CHAR argument",
 			},
 			{
 				name: "CAP with no arguments",
@@ -695,6 +695,63 @@ var predeclaredProcTests = []procTestEntry{
 					END Test.`,
 				shouldPass:  false,
 				expectError: "'CAP' expects exactly one argument",
+			},
+			{
+				name:       "Valid_CAP_on_char",
+				code:       "MODULE Test; VAR i, c: CHAR; ch: CHAR; BEGIN i := CAP(c) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_CAP_on_integer",
+				code:        "MODULE Test; VAR i: INTEGER; BEGIN i := CAP(i) END Test.",
+				shouldPass:  false,
+				expectError: "'CAP' expects a CHAR argument",
+			},
+			{
+				name:        "Invalid_CAP_wrong_arg_count",
+				code:        "MODULE Test; VAR c: CHAR; BEGIN c := CAP() END Test.",
+				shouldPass:  false,
+				expectError: "'CAP' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_CAP_too_many_args",
+				code:        "MODULE Test; VAR c: CHAR; BEGIN c := CAP(c, c) END Test.",
+				shouldPass:  false,
+				expectError: "'CAP' expects exactly one argument",
+			},
+			{
+				name:       "Valid_CAP_on_char_literal",
+				code:       "MODULE Test; VAR i, c: WCHAR; BEGIN i := CAP('a') END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_CAP_on_boolean",
+				code:        "MODULE Test; VAR i, b: BOOL; BEGIN i := CAP(b) END Test.",
+				shouldPass:  false,
+				expectError: "'CAP' expects a CHAR argument",
+			},
+			{
+				name:        "Invalid_CAP_on_array_of_char",
+				code:        "MODULE Test; VAR i, arr: ARRAY 3 OF CHAR; BEGIN i := CAP(arr) END Test.",
+				shouldPass:  false,
+				expectError: "'CAP' expects a CHAR argument",
+			},
+			{
+				name:        "Invalid_CAP_on_set",
+				code:        "MODULE Test; VAR i, s: SET; BEGIN i := CAP(s) END Test.",
+				shouldPass:  false,
+				expectError: "'CAP' expects a CHAR argument",
+			},
+			{
+				name:        "Invalid_CAP_on_real",
+				code:        "MODULE Test; VAR i, r: REAL; BEGIN i := CAP(r) END Test.",
+				shouldPass:  false,
+				expectError: "'CAP' expects a CHAR argument",
+			},
+			{
+				name:       "Invalid_CAP_on_string_literal",
+				code:       "MODULE Test; VAR i: WCHAR; BEGIN i := CAP('A') END Test.",
+				shouldPass: true,
 			},
 		},
 	},
@@ -2038,6 +2095,1456 @@ var predeclaredProcTests = []procTestEntry{
 			END Test.`,
 				shouldPass:  false,
 				expectError: "PCALL: argument 1 is incompatible with parameter of type 'integer'",
+			},
+		},
+	},
+	{
+		procName: "CHR",
+		cases: []procTestCase{
+			{
+				name:       "Valid_CHR_on_integer",
+				code:       "MODULE Test; VAR c: CHAR; BEGIN c := CHR(65) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_CHR_on_variable",
+				code:       "MODULE Test; VAR c: CHAR; i: INTEGER; BEGIN i := 99; c := CHR(i) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_CHR_on_real",
+				code:        "MODULE Test; VAR c: CHAR; r: REAL; BEGIN c := CHR(r) END Test.",
+				shouldPass:  false,
+				expectError: "'CHR' expects an integer argument",
+			},
+			{
+				name:        "Invalid_CHR_on_char",
+				code:        "MODULE Test; VAR c1, c2: CHAR; BEGIN c1 := CHR(c2) END Test.",
+				shouldPass:  false,
+				expectError: "'CHR' expects an integer argument",
+			},
+			{
+				name:        "Invalid_CHR_on_boolean",
+				code:        "MODULE Test; VAR c: CHAR; b: BOOL; BEGIN c := CHR(b) END Test.",
+				shouldPass:  false,
+				expectError: "'CHR' expects an integer argument",
+			},
+			{
+				name:        "Invalid_CHR_on_set",
+				code:        "MODULE Test; VAR c: CHAR; s: SET; BEGIN c := CHR(s) END Test.",
+				shouldPass:  false,
+				expectError: "'CHR' expects an integer argument",
+			},
+			{
+				name:        "Invalid_CHR_too_few_args",
+				code:        "MODULE Test; VAR c: CHAR; BEGIN c := CHR() END Test.",
+				shouldPass:  false,
+				expectError: "'CHR' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_CHR_too_many_args",
+				code:        "MODULE Test; VAR c: CHAR; BEGIN c := CHR(1, 2) END Test.",
+				shouldPass:  false,
+				expectError: "'CHR' expects exactly one argument",
+			},
+			{
+				name:       "Invalid_CHR_out_of_range",
+				code:       "MODULE Test; VAR c: CHAR; BEGIN c := CHR(300) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_CHR_on_byte",
+				code:       "MODULE Test; VAR c: CHAR; b: BYTE; BEGIN b := 255; c := CHR(b) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_CHR_on_int8",
+				code:       "MODULE Test; VAR c: CHAR; i: INT8; BEGIN c := CHR(i) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_CHR_on_int16",
+				code:       "MODULE Test; VAR c: CHAR; i: INT16; BEGIN c := CHR(i) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_CHR_on_int32",
+				code:       "MODULE Test; VAR c: CHAR; i: INT32; BEGIN i := 34; c := CHR(i) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_CHR_on_int64",
+				code:       "MODULE Test; VAR c: CHAR; i: INT64; BEGIN i := 254; c := CHR(i) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_CHR_on_string_literal",
+				code:        "MODULE Test; VAR c: CHAR; BEGIN c := CHR(\"A\") END Test.",
+				shouldPass:  false,
+				expectError: "'CHR' expects an integer argument",
+			},
+		},
+	},
+	{
+		procName: "BITAND",
+		cases: []procTestCase{
+			{
+				name:       "Valid_BITAND_INT32_INT32",
+				code:       "MODULE Test; VAR x, y: INT32; z: INT32; BEGIN z := BITAND(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITAND_INT64_INT32",
+				code:       "MODULE Test; VAR x: INT64; y: INT32; z: INT64; BEGIN z := BITAND(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITAND_INT32_INT64",
+				code:       "MODULE Test; VAR x: INT32; y: INT64; z: INT64; BEGIN z := BITAND(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITAND_INT64_INT64",
+				code:       "MODULE Test; VAR x, y: INT64; z: INT64; BEGIN z := BITAND(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_BITAND_INT32_REAL",
+				code:        "MODULE Test; VAR x: INT32; y: REAL; z: INT32; BEGIN z := BITAND(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITAND' expects INT32 or INT64 arguments",
+			},
+			{
+				name:        "Invalid_BITAND_CHAR_INT32",
+				code:        "MODULE Test; VAR x: CHAR; y: INT32; z: INT32; BEGIN z := BITAND(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITAND' expects INT32 or INT64 arguments",
+			},
+			{
+				name:        "Invalid_BITAND_too_few_args",
+				code:        "MODULE Test; VAR x: INT32; z: INT32; BEGIN z := BITAND(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITAND' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_BITAND_too_many_args",
+				code:        "MODULE Test; VAR x, y, z: INT32; BEGIN z := BITAND(x, y, z) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITAND' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_BITAND_on_boolean",
+				code:        "MODULE Test; VAR x: BOOL; y: INT32; z: INT32; BEGIN z := BITAND(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITAND' expects INT32 or INT64 arguments",
+			},
+			{
+				name:        "Invalid_BITAND_on_set",
+				code:        "MODULE Test; VAR x: SET; y: INT32; z: INT32; BEGIN z := BITAND(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITAND' expects INT32 or INT64 arguments",
+			},
+		},
+	},
+	{
+		procName: "BITASR",
+		cases: []procTestCase{
+			{
+				name:       "Valid_BITASR_INT32_INT32",
+				code:       "MODULE Test; VAR x, n: INT32; z: INT32; BEGIN z := BITASR(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITASR_INT64_INT32",
+				code:       "MODULE Test; VAR x: INT64; n: INT32; z: INT64; BEGIN z := BITASR(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_BITASR_INT32_REAL",
+				code:        "MODULE Test; VAR x: INT32; n: REAL; z: INT32; BEGIN z := BITASR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITASR' expects the second argument to be INT32",
+			},
+			{
+				name:        "Invalid_BITASR_REAL_INT32",
+				code:        "MODULE Test; VAR x: REAL; n: INT32; z: INT32; BEGIN z := BITASR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITASR' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_BITASR_INT64_INT64",
+				code:        "MODULE Test; VAR x, n: INT64; z: INT64; BEGIN z := BITASR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITASR' expects the second argument to be INT32",
+			},
+			{
+				name:        "Invalid_BITASR_too_few_args",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := BITASR(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITASR' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_BITASR_too_many_args",
+				code:        "MODULE Test; VAR x, n: INT32; BEGIN x := BITASR(x, n, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITASR' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_BITASR_on_boolean",
+				code:        "MODULE Test; VAR x: BOOL; n: INT32; BEGIN x := BITASR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITASR' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_BITASR_on_set",
+				code:        "MODULE Test; VAR x: SET; n: INT32; BEGIN x := BITASR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITASR' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_BITASR_second_arg_char",
+				code:        "MODULE Test; VAR x: INT32; n: CHAR; BEGIN x := BITASR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITASR' expects the second argument to be INT32",
+			},
+		},
+	},
+	{
+		procName: "BITNOT",
+		cases: []procTestCase{
+			{
+				name:       "Valid_BITNOT_INT32",
+				code:       "MODULE Test; VAR x, z: INT32; BEGIN z := BITNOT(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITNOT_INT64",
+				code:       "MODULE Test; VAR x, z: INT64; BEGIN z := BITNOT(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_BITNOT_REAL",
+				code:        "MODULE Test; VAR x: REAL; BEGIN x := BITNOT(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITNOT' expects an INT32 or INT64 argument",
+			},
+			{
+				name:        "Invalid_BITNOT_CHAR",
+				code:        "MODULE Test; VAR x: CHAR; BEGIN x := BITNOT(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITNOT' expects an INT32 or INT64 argument",
+			},
+			{
+				name:        "Invalid_BITNOT_BOOLEAN",
+				code:        "MODULE Test; VAR x: BOOL; BEGIN x := BITNOT(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITNOT' expects an INT32 or INT64 argument",
+			},
+			{
+				name:        "Invalid_BITNOT_SET",
+				code:        "MODULE Test; VAR x: SET; BEGIN x := BITNOT(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITNOT' expects an INT32 or INT64 argument",
+			},
+			{
+				name:        "Invalid_BITNOT_too_few_args",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := BITNOT() END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITNOT' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_BITNOT_too_many_args",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := BITNOT(x, x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITNOT' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "BITOR",
+		cases: []procTestCase{
+			{
+				name:       "Valid_BITOR_INT32_INT32",
+				code:       "MODULE Test; VAR x, y: INT32; z: INT32; BEGIN z := BITOR(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITOR_INT64_INT32",
+				code:       "MODULE Test; VAR x: INT64; y: INT32; z: INT64; BEGIN z := BITOR(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITOR_INT32_INT64",
+				code:       "MODULE Test; VAR x: INT32; y: INT64; z: INT64; BEGIN z := BITOR(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITOR_INT64_INT64",
+				code:       "MODULE Test; VAR x, y: INT64; z: INT64; BEGIN z := BITOR(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_BITOR_INT32_REAL",
+				code:        "MODULE Test; VAR x: INT32; y: REAL; z: INT32; BEGIN z := BITOR(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITOR' expects INT32 or INT64 arguments",
+			},
+			{
+				name:        "Invalid_BITOR_CHAR_INT32",
+				code:        "MODULE Test; VAR x: CHAR; y: INT32; z: INT32; BEGIN z := BITOR(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITOR' expects INT32 or INT64 arguments",
+			},
+			{
+				name:        "Invalid_BITOR_too_few_args",
+				code:        "MODULE Test; VAR x: INT32; z: INT32; BEGIN z := BITOR(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITOR' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_BITOR_too_many_args",
+				code:        "MODULE Test; VAR x, y, z: INT32; BEGIN z := BITOR(x, y, z) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITOR' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_BITOR_on_bool",
+				code:        "MODULE Test; VAR x: BOOL; y: INT32; z: INT32; BEGIN z := BITOR(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITOR' expects INT32 or INT64 arguments",
+			},
+			{
+				name:        "Invalid_BITOR_on_set",
+				code:        "MODULE Test; VAR x: SET; y: INT32; z: INT32; BEGIN z := BITOR(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITOR' expects INT32 or INT64 arguments",
+			},
+		},
+	},
+	{
+		procName: "BITS",
+		cases: []procTestCase{
+			{
+				name:       "Valid_BITS_INT32",
+				code:       "MODULE Test; VAR x: INT32; s: SET; BEGIN s := BITS(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_BITS_INT64",
+				code:        "MODULE Test; VAR x: INT64; s: SET; BEGIN s := BITS(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITS' expects an INT32 argument",
+			},
+			{
+				name:        "Invalid_BITS_REAL",
+				code:        "MODULE Test; VAR x: REAL; s: SET; BEGIN s := BITS(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITS' expects an INT32 argument",
+			},
+			{
+				name:        "Invalid_BITS_CHAR",
+				code:        "MODULE Test; VAR x: CHAR; s: SET; BEGIN s := BITS(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITS' expects an INT32 argument",
+			},
+			{
+				name:        "Invalid_BITS_BOOL",
+				code:        "MODULE Test; VAR x: BOOL; s: SET; BEGIN s := BITS(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITS' expects an INT32 argument",
+			},
+			{
+				name:        "Invalid_BITS_SET",
+				code:        "MODULE Test; VAR x: SET; s: SET; BEGIN s := BITS(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITS' expects an INT32 argument",
+			},
+			{
+				name:        "Invalid_BITS_too_few_args",
+				code:        "MODULE Test; VAR s: SET; BEGIN s := BITS() END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITS' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_BITS_too_many_args",
+				code:        "MODULE Test; VAR x: INT32; s: SET; BEGIN s := BITS(x, x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITS' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "BITSHL",
+		cases: []procTestCase{
+			{
+				name:       "Valid_BITSHL_INT32_INT32",
+				code:       "MODULE Test; VAR x, n: INT32; z: INT32; BEGIN z := BITSHL(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITSHL_INT64_INT32",
+				code:       "MODULE Test; VAR x: INT64; n: INT32; z: INT64; BEGIN z := BITSHL(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_BITSHL_INT32_REAL",
+				code:        "MODULE Test; VAR x: INT32; n: REAL; z: INT32; BEGIN z := BITSHL(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHL' expects the second argument to be INT32",
+			},
+			{
+				name:        "Invalid_BITSHL_REAL_INT32",
+				code:        "MODULE Test; VAR x: REAL; n: INT32; z: INT32; BEGIN z := BITSHL(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHL' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_BITSHL_INT64_INT64",
+				code:        "MODULE Test; VAR x, n: INT64; z: INT64; BEGIN z := BITSHL(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHL' expects the second argument to be INT32",
+			},
+			{
+				name:        "Invalid_BITSHL_too_few_args",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := BITSHL(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHL' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_BITSHL_too_many_args",
+				code:        "MODULE Test; VAR x, n: INT32; BEGIN x := BITSHL(x, n, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHL' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_BITSHL_on_bool",
+				code:        "MODULE Test; VAR x: BOOL; n: INT32; BEGIN x := BITSHL(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHL' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_BITSHL_on_set",
+				code:        "MODULE Test; VAR x: SET; n: INT32; BEGIN x := BITSHL(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHL' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_BITSHL_second_arg_char",
+				code:        "MODULE Test; VAR x: INT32; n: CHAR; BEGIN x := BITSHL(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHL' expects the second argument to be INT32",
+			},
+		},
+	},
+	{
+		procName: "BITSHR",
+		cases: []procTestCase{
+			{
+				name:       "Valid_BITSHR_INT32_INT32",
+				code:       "MODULE Test; VAR x, n: INT32; z: INT32; BEGIN z := BITSHR(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITSHR_INT64_INT32",
+				code:       "MODULE Test; VAR x: INT64; n: INT32; z: INT64; BEGIN z := BITSHR(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_BITSHR_INT32_REAL",
+				code:        "MODULE Test; VAR x: INT32; n: REAL; z: INT32; BEGIN z := BITSHR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHR' expects the second argument to be INT32",
+			},
+			{
+				name:        "Invalid_BITSHR_REAL_INT32",
+				code:        "MODULE Test; VAR x: REAL; n: INT32; z: INT32; BEGIN z := BITSHR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHR' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_BITSHR_INT64_INT64",
+				code:        "MODULE Test; VAR x, n: INT64; z: INT64; BEGIN z := BITSHR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHR' expects the second argument to be INT32",
+			},
+			{
+				name:        "Invalid_BITSHR_too_few_args",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := BITSHR(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHR' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_BITSHR_too_many_args",
+				code:        "MODULE Test; VAR x, n: INT32; BEGIN x := BITSHR(x, n, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHR' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_BITSHR_on_bool",
+				code:        "MODULE Test; VAR x: BOOL; n: INT32; BEGIN x := BITSHR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHR' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_BITSHR_on_set",
+				code:        "MODULE Test; VAR x: SET; n: INT32; BEGIN x := BITSHR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHR' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_BITSHR_second_arg_char",
+				code:        "MODULE Test; VAR x: INT32; n: CHAR; BEGIN x := BITSHR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITSHR' expects the second argument to be INT32",
+			},
+		},
+	},
+	{
+		procName: "BITXOR",
+		cases: []procTestCase{
+			{
+				name:       "Valid_BITXOR_INT32_INT32",
+				code:       "MODULE Test; VAR x, y: INT32; z: INT32; BEGIN z := BITXOR(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITXOR_INT64_INT32",
+				code:       "MODULE Test; VAR x: INT64; y: INT32; z: INT64; BEGIN z := BITXOR(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITXOR_INT32_INT64",
+				code:       "MODULE Test; VAR x: INT32; y: INT64; z: INT64; BEGIN z := BITXOR(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_BITXOR_INT64_INT64",
+				code:       "MODULE Test; VAR x, y: INT64; z: INT64; BEGIN z := BITXOR(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_BITXOR_INT32_REAL",
+				code:        "MODULE Test; VAR x: INT32; y: REAL; z: INT32; BEGIN z := BITXOR(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITXOR' expects INT32 or INT64 arguments",
+			},
+			{
+				name:        "Invalid_BITXOR_REAL_INT32",
+				code:        "MODULE Test; VAR x: REAL; y: INT32; z: INT32; BEGIN z := BITXOR(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITXOR' expects INT32 or INT64 arguments",
+			},
+			{
+				name:        "Invalid_BITXOR_on_bool",
+				code:        "MODULE Test; VAR x: BOOL; y: INT32; BEGIN x := BITXOR(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITXOR' expects INT32 or INT64 arguments",
+			},
+			{
+				name:        "Invalid_BITXOR_on_set",
+				code:        "MODULE Test; VAR x: SET; y: INT32; BEGIN x := BITXOR(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITXOR' expects INT32 or INT64 arguments",
+			},
+			{
+				name:        "Invalid_BITXOR_too_few_args",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := BITXOR(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITXOR' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_BITXOR_too_many_args",
+				code:        "MODULE Test; VAR x, y: INT32; BEGIN x := BITXOR(x, y, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITXOR' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_BITXOR_second_arg_char",
+				code:        "MODULE Test; VAR x: INT32; y: CHAR; BEGIN x := BITXOR(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'BITXOR' expects INT32 or INT64 arguments",
+			},
+		},
+	},
+	{
+		procName: "FLOOR",
+		cases: []procTestCase{
+			{
+				name:       "Valid_FLOOR_REAL",
+				code:       "MODULE Test; VAR x: REAL; z: INT32; BEGIN z := FLOOR(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_FLOOR_LONGREAL",
+				code:       "MODULE Test; VAR x: LONGREAL; z: INT64; BEGIN z := FLOOR(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_FLOOR_INT32",
+				code:        "MODULE Test; VAR x: INT32; z: INT32; BEGIN z := FLOOR(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'FLOOR' expects a REAL or LONGREAL argument",
+			},
+			{
+				name:        "Invalid_FLOOR_SET",
+				code:        "MODULE Test; VAR x: SET; z: INT32; BEGIN z := FLOOR(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'FLOOR' expects a REAL or LONGREAL argument",
+			},
+			{
+				name:        "Invalid_FLOOR_CHAR",
+				code:        "MODULE Test; VAR x: CHAR; z: INT32; BEGIN z := FLOOR(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'FLOOR' expects a REAL or LONGREAL argument",
+			},
+			{
+				name:        "Invalid_FLOOR_BOOL",
+				code:        "MODULE Test; VAR x: BOOL; z: INT32; BEGIN z := FLOOR(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'FLOOR' expects a REAL or LONGREAL argument",
+			},
+			{
+				name:        "Invalid_FLOOR_too_few_args",
+				code:        "MODULE Test; VAR z: INT32; BEGIN z := FLOOR() END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'FLOOR' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_FLOOR_too_many_args",
+				code:        "MODULE Test; VAR x: REAL; z: INT32; BEGIN z := FLOOR(x, x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'FLOOR' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "FLT",
+		cases: []procTestCase{
+			{
+				name:       "Valid_FLT_INT32",
+				code:       "MODULE Test; VAR x: INT32; r: REAL; BEGIN r := FLT(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_FLT_INT64",
+				code:       "MODULE Test; VAR x: INT64; r: LONGREAL; BEGIN r := FLT(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_FLT_REAL",
+				code:        "MODULE Test; VAR x: REAL; r: REAL; BEGIN r := FLT(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'FLT' expects an INT32 or INT64 argument",
+			},
+			{
+				name:        "Invalid_FLT_SET",
+				code:        "MODULE Test; VAR x: SET; r: REAL; BEGIN r := FLT(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'FLT' expects an INT32 or INT64 argument",
+			},
+			{
+				name:        "Invalid_FLT_CHAR",
+				code:        "MODULE Test; VAR x: CHAR; r: REAL; BEGIN r := FLT(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'FLT' expects an INT32 or INT64 argument",
+			},
+			{
+				name:        "Invalid_FLT_BOOL",
+				code:        "MODULE Test; VAR x: BOOL; r: REAL; BEGIN r := FLT(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'FLT' expects an INT32 or INT64 argument",
+			},
+			{
+				name:        "Invalid_FLT_too_few_args",
+				code:        "MODULE Test; VAR r: REAL; BEGIN r := FLT() END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'FLT' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_FLT_too_many_args",
+				code:        "MODULE Test; VAR x: INT32; r: REAL; BEGIN r := FLT(x, x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'FLT' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "LEN",
+		cases: []procTestCase{
+			{
+				name:       "Valid_LEN_array",
+				code:       "MODULE Test; VAR a: ARRAY 10 OF INTEGER; n: INT32; BEGIN n := LEN(a) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_LEN_string",
+				code:       "MODULE Test; VAR s: ARRAY 16 OF CHAR; n: INT32; BEGIN n := LEN(s) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_LEN_array_dim",
+				code:       "MODULE Test; VAR a: ARRAY 5, 7 OF INTEGER; n: INT32; BEGIN n := LEN(a, 1i) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_LEN_string_dim0",
+				code:       "MODULE Test; VAR s: ARRAY 8 OF CHAR; n: INT32; BEGIN n := LEN(s, 0i) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_LEN_on_int",
+				code:        "MODULE Test; VAR x: INT32; n: INT32; BEGIN n := LEN(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'LEN' expects an array or string argument",
+			},
+			{
+				name:        "Invalid_LEN_on_set",
+				code:        "MODULE Test; VAR s: SET; n: INT32; BEGIN n := LEN(s) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'LEN' expects an array or string argument",
+			},
+			{
+				name:        "Invalid_LEN_too_few_args",
+				code:        "MODULE Test; VAR a: ARRAY 3 OF INTEGER; n: INT32; BEGIN n := LEN() END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'LEN' expects one or two arguments",
+			},
+			{
+				name:        "Invalid_LEN_too_many_args",
+				code:        "MODULE Test; VAR a: ARRAY 3 OF INTEGER; n: INT32; BEGIN n := LEN(a, 0, 1) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'LEN' expects one or two arguments",
+			},
+			{
+				name:        "Invalid_LEN_dim_not_int",
+				code:        "MODULE Test; VAR a: ARRAY 3 OF INTEGER; n: INT32; BEGIN n := LEN(a, TRUE) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'LEN' expects the second argument to be INT32",
+			},
+			{
+				name:        "Invalid_LEN_dim_on_scalar",
+				code:        "MODULE Test; VAR x: INT32; n: INT32; BEGIN n := LEN(x, 0) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'LEN' expects the first argument to be an array",
+			},
+			{
+				name:        "Invalid_LEN_dim_too_large",
+				code:        "MODULE Test; VAR a: ARRAY 3, 4 OF INTEGER; n: INT32; BEGIN n := LEN(a, 2i) END Test.",
+				shouldPass:  false,
+				expectError: "ARRAY has fewer than 3 dimensions",
+			},
+			{
+				name:        "Invalid_LEN_dim_on_string_too_large",
+				code:        "MODULE Test; VAR s: ARRAY 8 OF CHAR; n: INT32; BEGIN n := LEN(s, 1i) END Test.",
+				shouldPass:  false,
+				expectError: "ARRAY has fewer than 2 dimensions",
+			},
+			{
+				name:        "Invalid_LEN_dim_negative",
+				code:        "MODULE Test; VAR a: ARRAY 3, 4 OF INTEGER; n: INT32; BEGIN n := LEN(a, -1i) END Test.",
+				shouldPass:  false,
+				expectError: "dimension value -1 should be integer constant >= 0",
+			},
+		},
+	},
+	{
+		procName: "LONG",
+		cases: []procTestCase{
+			{
+				name:       "Valid_LONG_INT8",
+				code:       "MODULE Test; VAR x: INT8; y: INT16; BEGIN y := LONG(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_LONG_BYTE",
+				code:       "MODULE Test; VAR x: BYTE; y: INT16; BEGIN y := LONG(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_LONG_INT16",
+				code:       "MODULE Test; VAR x: INT16; y: INT32; BEGIN y := LONG(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_LONG_INT32",
+				code:       "MODULE Test; VAR x: INT32; y: INT64; BEGIN y := LONG(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_LONG_REAL",
+				code:       "MODULE Test; VAR x: REAL; y: LONGREAL; BEGIN y := LONG(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_LONG_CHAR",
+				code:       "MODULE Test; VAR x: CHAR; y: WCHAR; BEGIN y := LONG(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_LONG_INT64",
+				code:        "MODULE Test; VAR x: INT64; y: INT64; BEGIN y := LONG(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'LONG' expects INT8, BYTE, INT16, INT32, REAL, or CHAR argument",
+			},
+			{
+				name:        "Invalid_LONG_WCHAR",
+				code:        "MODULE Test; VAR x: WCHAR; y: WCHAR; BEGIN y := LONG(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'LONG' expects INT8, BYTE, INT16, INT32, REAL, or CHAR argument",
+			},
+			{
+				name:        "Invalid_LONG_too_many_args",
+				code:        "MODULE Test; VAR x: INT8; y: INT16; BEGIN y := LONG(x, x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'LONG' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_LONG_no_args",
+				code:        "MODULE Test; VAR y: INT16; BEGIN y := LONG() END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'LONG' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "SHORT",
+		cases: []procTestCase{
+			{
+				name:       "Valid_SHORT_INT64",
+				code:       "MODULE Test; VAR x: INT64; y: INT32; BEGIN y := SHORT(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_SHORT_INT32",
+				code:       "MODULE Test; VAR x: INT32; y: INT16; BEGIN y := SHORT(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_SHORT_INT16",
+				code:       "MODULE Test; VAR x: INT16; y: INT8; BEGIN y := SHORT(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_SHORT_LONGREAL",
+				code:       "MODULE Test; VAR x: LONGREAL; y: REAL; BEGIN y := SHORT(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_SHORT_WCHAR",
+				code:       "MODULE Test; VAR x: WCHAR; y: CHAR; BEGIN y := SHORT(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_SHORT_INT8",
+				code:        "MODULE Test; VAR x: INT8; y: INT8; BEGIN y := SHORT(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'SHORT' expects an INT16, INT32, INT64, LONGREAL, or WCHAR argument",
+			},
+			{
+				name:        "Invalid_SHORT_REAL",
+				code:        "MODULE Test; VAR x: REAL; y: REAL; BEGIN y := SHORT(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'SHORT' expects an INT16, INT32, INT64, LONGREAL, or WCHAR argument",
+			},
+			{
+				name:        "Invalid_SHORT_CHAR",
+				code:        "MODULE Test; VAR x: CHAR; y: CHAR; BEGIN y := SHORT(x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'SHORT' expects an INT16, INT32, INT64, LONGREAL, or WCHAR argument",
+			},
+			{
+				name:        "Invalid_SHORT_too_many_args",
+				code:        "MODULE Test; VAR x: INT64; y: INT32; BEGIN y := SHORT(x, x) END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'SHORT' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_SHORT_no_args",
+				code:        "MODULE Test; VAR y: INT32; BEGIN y := SHORT() END Test.",
+				shouldPass:  false,
+				expectError: "predeclared procedure 'SHORT' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "ORD",
+		cases: []procTestCase{
+			{
+				name:       "Valid_ORD_CHAR",
+				code:       "MODULE Test; VAR c: CHAR; n: BYTE; BEGIN n := ORD(c) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_ORD_WCHAR",
+				code:       "MODULE Test; VAR w: WCHAR; n: SHORTINT; BEGIN n := ORD(w) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_ORD_ENUM",
+				code:       "MODULE Test; TYPE Color = (Red, Green, Blue); VAR c: Color; n: INT32; BEGIN n := ORD(c) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_ORD_BOOLEAN",
+				code:       "MODULE Test; VAR b: BOOL; n: BYTE; BEGIN n := ORD(b) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_ORD_SET",
+				code:       "MODULE Test; VAR s: SET; n: INT32; BEGIN n := ORD(s) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_ORD_INT32",
+				code:        "MODULE Test; VAR i: INT32; n: INT32; BEGIN n := ORD(i) END Test.",
+				shouldPass:  false,
+				expectError: "'ORD' cannot be applied to type",
+			},
+			{
+				name:        "Invalid_ORD_REAL",
+				code:        "MODULE Test; VAR r: REAL; n: INT32; BEGIN n := ORD(r) END Test.",
+				shouldPass:  false,
+				expectError: "'ORD' cannot be applied to type",
+			},
+			{
+				name:        "Invalid_ORD_too_many_args",
+				code:        "MODULE Test; VAR c: CHAR; n: BYTE; BEGIN n := ORD(c, c) END Test.",
+				shouldPass:  false,
+				expectError: "'ORD' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_ORD_no_args",
+				code:        "MODULE Test; VAR n: BYTE; BEGIN n := ORD() END Test.",
+				shouldPass:  false,
+				expectError: "'ORD' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "ODD",
+		cases: []procTestCase{
+			{
+				name:       "Valid_ODD_INT8",
+				code:       "MODULE Test; VAR x: INT8; b: BOOL; BEGIN b := ODD(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_ODD_INT16",
+				code:       "MODULE Test; VAR x: INT16; b: BOOL; BEGIN b := ODD(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_ODD_INT32",
+				code:       "MODULE Test; VAR x: INT32; b: BOOL; BEGIN b := ODD(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_ODD_INT64",
+				code:       "MODULE Test; VAR x: INT64; b: BOOL; BEGIN b := ODD(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_ODD_REAL",
+				code:        "MODULE Test; VAR x: REAL; b: BOOL; BEGIN b := ODD(x) END Test.",
+				shouldPass:  false,
+				expectError: "'ODD' expects an integer argument",
+			},
+			{
+				name:        "Invalid_ODD_BOOLEAN",
+				code:        "MODULE Test; VAR x: BOOL; b: BOOL; BEGIN b := ODD(x) END Test.",
+				shouldPass:  false,
+				expectError: "'ODD' expects an integer argument",
+			},
+			{
+				name:        "Invalid_ODD_CHAR",
+				code:        "MODULE Test; VAR x: CHAR; b: BOOL; BEGIN b := ODD(x) END Test.",
+				shouldPass:  false,
+				expectError: "'ODD' expects an integer argument",
+			},
+			{
+				name:        "Invalid_ODD_no_args",
+				code:        "MODULE Test; VAR b: BOOL; BEGIN b := ODD() END Test.",
+				shouldPass:  false,
+				expectError: "'ODD' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_ODD_too_many_args",
+				code:        "MODULE Test; VAR x: INT32; b: BOOL; BEGIN b := ODD(x, x) END Test.",
+				shouldPass:  false,
+				expectError: "'ODD' expects exactly one argument",
+			},
+		},
+	},
+	//{
+	//	procName: "SIZE",
+	//	cases: []procTestCase{
+	//		{
+	//			name:       "Valid_SIZE_INT32",
+	//			code:       "MODULE Test; VAR n: INT32; BEGIN n := SIZE(INT32) END Test.",
+	//			shouldPass: true,
+	//		},
+	//		{
+	//			name:       "Valid_SIZE_ARRAY",
+	//			code:       "MODULE Test; VAR n: INT32; BEGIN n := SIZE(ARRAY 10 OF CHAR) END Test.",
+	//			shouldPass: true,
+	//		},
+	//		{
+	//			name:       "Valid_SIZE_RECORD",
+	//			code:       "MODULE Test; TYPE R = RECORD x: INT8; y: INT16 END; VAR n: INT32; BEGIN n := SIZE(R) END Test.",
+	//			shouldPass: true,
+	//		},
+	//		{
+	//			name:        "Invalid_SIZE_no_args",
+	//			code:        "MODULE Test; VAR n: INT32; BEGIN n := SIZE() END Test.",
+	//			shouldPass:  false,
+	//			expectError: "'SIZE' expects exactly one argument",
+	//		},
+	//		{
+	//			name:        "Invalid_SIZE_too_many_args",
+	//			code:        "MODULE Test; VAR n: INT32; BEGIN n := SIZE(INT32, INT16) END Test.",
+	//			shouldPass:  false,
+	//			expectError: "'SIZE' expects exactly one argument",
+	//		},
+	//		{
+	//			name:        "Invalid_SIZE_non_type",
+	//			code:        "MODULE Test; VAR n: INT32; x: INT32; BEGIN n := SIZE(x) END Test.",
+	//			shouldPass:  false,
+	//			expectError: "'SIZE' expects a type as argument",
+	//		},
+	//	},
+	//},
+	{
+		procName: "ASH",
+		cases: []procTestCase{
+			{
+				name:       "Valid_ASH_INT32",
+				code:       "MODULE Test; VAR x: INT32; n: INT32; y: INT32; BEGIN y := ASH(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_ASH_INT64",
+				code:       "MODULE Test; VAR x: INT64; n: INT32; y: INT64; BEGIN y := ASH(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_ASH_x_REAL",
+				code:        "MODULE Test; VAR x: REAL; n: INT32; y: INT32; BEGIN y := ASH(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ASH' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_ASH_n_REAL",
+				code:        "MODULE Test; VAR x: INT32; n: REAL; y: INT32; BEGIN y := ASH(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ASH' expects the second argument to be INT32",
+			},
+			{
+				name:        "Invalid_ASH_no_args",
+				code:        "MODULE Test; VAR y: INT32; BEGIN y := ASH() END Test.",
+				shouldPass:  false,
+				expectError: "'ASH' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_ASH_too_many_args",
+				code:        "MODULE Test; VAR x: INT32; n: INT32; y: INT32; BEGIN y := ASH(x, n, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ASH' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_ASH_x_CHAR",
+				code:        "MODULE Test; VAR x: CHAR; n: INT32; y: INT32; BEGIN y := ASH(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ASH' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_ASH_n_CHAR",
+				code:        "MODULE Test; VAR x: INT32; n: CHAR; y: INT32; BEGIN y := ASH(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ASH' expects the second argument to be INT32",
+			},
+		},
+	},
+	{
+		procName: "ASR",
+		cases: []procTestCase{
+			{
+				name:       "Valid_ASR_INT32",
+				code:       "MODULE Test; VAR x: INT32; n: INT32; y: INT32; BEGIN y := ASR(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_ASR_INT64",
+				code:       "MODULE Test; VAR x: INT64; n: INT32; y: INT64; BEGIN y := ASR(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_ASR_x_REAL",
+				code:        "MODULE Test; VAR x: REAL; n: INT32; y: INT32; BEGIN y := ASR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ASR' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_ASR_n_REAL",
+				code:        "MODULE Test; VAR x: INT32; n: REAL; y: INT32; BEGIN y := ASR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ASR' expects the second argument to be INT32",
+			},
+			{
+				name:        "Invalid_ASR_no_args",
+				code:        "MODULE Test; VAR y: INT32; BEGIN y := ASR() END Test.",
+				shouldPass:  false,
+				expectError: "'ASR' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_ASR_too_many_args",
+				code:        "MODULE Test; VAR x: INT32; n: INT32; y: INT32; BEGIN y := ASR(x, n, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ASR' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_ASR_x_CHAR",
+				code:        "MODULE Test; VAR x: CHAR; n: INT32; y: INT32; BEGIN y := ASR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ASR' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_ASR_n_CHAR",
+				code:        "MODULE Test; VAR x: INT32; n: CHAR; y: INT32; BEGIN y := ASR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ASR' expects the second argument to be INT32",
+			},
+		},
+	},
+	{
+		procName: "ENTIER",
+		cases: []procTestCase{
+			{
+				name:       "Valid_ENTIER_REAL",
+				code:       "MODULE Test; VAR x: REAL; y: INT64; BEGIN y := ENTIER(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_ENTIER_LONGREAL",
+				code:       "MODULE Test; VAR x: LONGREAL; y: INT64; BEGIN y := ENTIER(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_ENTIER_INT32",
+				code:        "MODULE Test; VAR x: INT32; y: INT64; BEGIN y := ENTIER(x) END Test.",
+				shouldPass:  false,
+				expectError: "'ENTIER' expects a real type as argument",
+			},
+			{
+				name:        "Invalid_ENTIER_no_args",
+				code:        "MODULE Test; VAR y: INT64; BEGIN y := ENTIER() END Test.",
+				shouldPass:  false,
+				expectError: "'ENTIER' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_ENTIER_too_many_args",
+				code:        "MODULE Test; VAR x: REAL; y: INT64; BEGIN y := ENTIER(x, x) END Test.",
+				shouldPass:  false,
+				expectError: "'ENTIER' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "LSL",
+		cases: []procTestCase{
+			{
+				name:       "Valid_LSL_INT32",
+				code:       "MODULE Test; VAR x: INT32; n: INT32; y: INT32; BEGIN y := LSL(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_LSL_INT64",
+				code:       "MODULE Test; VAR x: INT64; n: INT32; y: INT64; BEGIN y := LSL(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_LSL_x_REAL",
+				code:        "MODULE Test; VAR x: REAL; n: INT32; y: INT32; BEGIN y := LSL(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'LSL' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_LSL_n_REAL",
+				code:        "MODULE Test; VAR x: INT32; n: REAL; y: INT32; BEGIN y := LSL(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'LSL' expects the second argument to be INT32",
+			},
+			{
+				name:        "Invalid_LSL_no_args",
+				code:        "MODULE Test; VAR y: INT32; BEGIN y := LSL() END Test.",
+				shouldPass:  false,
+				expectError: "'LSL' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_LSL_too_many_args",
+				code:        "MODULE Test; VAR x: INT32; n: INT32; y: INT32; BEGIN y := LSL(x, n, n) END Test.",
+				shouldPass:  false,
+				expectError: "'LSL' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_LSL_x_CHAR",
+				code:        "MODULE Test; VAR x: CHAR; n: INT32; y: INT32; BEGIN y := LSL(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'LSL' expects the first argument to be INT32 or INT64",
+			},
+			{
+				name:        "Invalid_LSL_n_CHAR",
+				code:        "MODULE Test; VAR x: INT32; n: CHAR; y: INT32; BEGIN y := LSL(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'LSL' expects the second argument to be INT32",
+			},
+		},
+	},
+	{
+		procName: "ROR",
+		cases: []procTestCase{
+			{
+				name:       "Valid_ROR_INT32",
+				code:       "MODULE Test; VAR x: INT32; n: INT32; y: INT32; BEGIN y := ROR(x, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_ROR_x_REAL",
+				code:        "MODULE Test; VAR x: REAL; n: INT32; y: INT32; BEGIN y := ROR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ROR' expects both arguments to be INT32",
+			},
+			{
+				name:        "Invalid_ROR_n_REAL",
+				code:        "MODULE Test; VAR x: INT32; n: REAL; y: INT32; BEGIN y := ROR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ROR' expects both arguments to be INT32",
+			},
+			{
+				name:        "Invalid_ROR_x_INT64",
+				code:        "MODULE Test; VAR x: INT64; n: INT32; y: INT32; BEGIN y := ROR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ROR' expects both arguments to be INT32",
+			},
+			{
+				name:        "Invalid_ROR_n_INT64",
+				code:        "MODULE Test; VAR x: INT32; n: INT64; y: INT32; BEGIN y := ROR(x, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ROR' expects both arguments to be INT32",
+			},
+			{
+				name:        "Invalid_ROR_no_args",
+				code:        "MODULE Test; VAR y: INT32; BEGIN y := ROR() END Test.",
+				shouldPass:  false,
+				expectError: "'ROR' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_ROR_too_many_args",
+				code:        "MODULE Test; VAR x: INT32; n: INT32; y: INT32; BEGIN y := ROR(x, n, n) END Test.",
+				shouldPass:  false,
+				expectError: "'ROR' expects exactly two arguments",
+			},
+		},
+	},
+	{
+		procName: "WCHR",
+		cases: []procTestCase{
+			{
+				name:       "Valid_WCHR_INT32",
+				code:       "MODULE Test; VAR x: INT32; w: WCHAR; BEGIN w := WCHR(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_WCHR_INT64",
+				code:       "MODULE Test; VAR x: INT64; w: WCHAR; BEGIN w := WCHR(x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_WCHR_REAL",
+				code:        "MODULE Test; VAR x: REAL; w: WCHAR; BEGIN w := WCHR(x) END Test.",
+				shouldPass:  false,
+				expectError: "'WCHR' expects an integer type as argument",
+			},
+			{
+				name:        "Invalid_WCHR_CHAR",
+				code:        "MODULE Test; VAR x: CHAR; w: WCHAR; BEGIN w := WCHR(x) END Test.",
+				shouldPass:  false,
+				expectError: "'WCHR' expects an integer type as argument",
+			},
+			{
+				name:        "Invalid_WCHR_no_args",
+				code:        "MODULE Test; VAR w: WCHAR; BEGIN w := WCHR() END Test.",
+				shouldPass:  false,
+				expectError: "'WCHR' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_WCHR_too_many_args",
+				code:        "MODULE Test; VAR x: INT32; w: WCHAR; BEGIN w := WCHR(x, x) END Test.",
+				shouldPass:  false,
+				expectError: "'WCHR' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "STRLEN",
+		cases: []procTestCase{
+			{
+				name:       "Valid_STRLEN_array_CHAR",
+				code:       "MODULE Test; VAR s: ARRAY 10 OF CHAR; n: INT32; BEGIN n := STRLEN(s) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_STRLEN_array_WCHAR",
+				code:       "MODULE Test; VAR s: ARRAY 10 OF WCHAR; n: INT32; BEGIN n := STRLEN(s) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_STRLEN_string_literal",
+				code:       "MODULE Test; VAR n: INT32; BEGIN n := STRLEN(\"hello\") END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_STRLEN_INT32",
+				code:        "MODULE Test; VAR s: INT32; n: INT32; BEGIN n := STRLEN(s) END Test.",
+				shouldPass:  false,
+				expectError: "'STRLEN' expects an array of CHAR, array of WCHAR, or string literal as argument",
+			},
+			{
+				name:        "Invalid_STRLEN_REAL",
+				code:        "MODULE Test; VAR s: REAL; n: INT32; BEGIN n := STRLEN(s) END Test.",
+				shouldPass:  false,
+				expectError: "'STRLEN' expects an array of CHAR, array of WCHAR, or string literal as argument",
+			},
+			{
+				name:        "Invalid_STRLEN_no_args",
+				code:        "MODULE Test; VAR n: INT32; BEGIN n := STRLEN() END Test.",
+				shouldPass:  false,
+				expectError: "'STRLEN' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_STRLEN_too_many_args",
+				code:        "MODULE Test; VAR s: ARRAY 10 OF CHAR; n: INT32; BEGIN n := STRLEN(s, s) END Test.",
+				shouldPass:  false,
+				expectError: "'STRLEN' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "MIN",
+		cases: []procTestCase{
+			{
+				name:       "Valid_MIN_INT32_INT32",
+				code:       "MODULE Test; VAR x, y, z: INT32; BEGIN z := MIN(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_MIN_INT32_INT64",
+				code:       "MODULE Test; VAR x: INT32; y: INT64; z: INT64; BEGIN z := MIN(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_MIN_REAL_LONGREAL",
+				code:       "MODULE Test; VAR x: REAL; y: LONGREAL; z: LONGREAL; BEGIN z := MIN(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_MIN_CHAR_CHAR",
+				code:       "MODULE Test; VAR x, y, z: CHAR; BEGIN z := MIN(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_MIN_CHAR_WCHAR",
+				code:       "MODULE Test; VAR x: CHAR; y: WCHAR; z: WCHAR; BEGIN z := MIN(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_MIN_INT32_REAL",
+				code:        "MODULE Test; VAR x: INT32; y: REAL; z: INT32; BEGIN z := MIN(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "cannot assign expression (MIN(x, y): real)  to variable (z: int32)",
+			},
+			{
+				name:        "Invalid_MIN_CHAR_INT32",
+				code:        "MODULE Test; VAR x: CHAR; y: INT32; z: CHAR; BEGIN z := MIN(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "'MIN' expects both arguments to be numeric or char types",
+			},
+			{
+				name:        "Invalid_MIN_no_args",
+				code:        "MODULE Test; VAR z: INT32; BEGIN z := MIN() END Test.",
+				shouldPass:  false,
+				expectError: "'MIN' expects one or two arguments",
+			},
+			{
+				name:        "Invalid_MIN_one_arg",
+				code:        "MODULE Test; VAR x: INT32; z: INT32; BEGIN z := MIN(x) END Test.",
+				shouldPass:  false,
+				expectError: "'MIN': single argument must be a type",
+			},
+			{
+				name:        "Invalid_MIN_too_many_args",
+				code:        "MODULE Test; VAR x, y, z: INT32; BEGIN z := MIN(x, y, z) END Test.",
+				shouldPass:  false,
+				expectError: "'MIN' expects one or two arguments",
+			},
+		},
+	},
+	{
+		procName: "MAX",
+		cases: []procTestCase{
+			{
+				name:       "Valid_MAX_INT32_INT32",
+				code:       "MODULE Test; VAR x, y, z: INT32; BEGIN z := MAX(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_MAX_INT32_INT64",
+				code:       "MODULE Test; VAR x: INT32; y: INT64; z: INT64; BEGIN z := MAX(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_MAX_REAL_LONGREAL",
+				code:       "MODULE Test; VAR x: REAL; y: LONGREAL; z: LONGREAL; BEGIN z := MAX(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_MAX_CHAR_CHAR",
+				code:       "MODULE Test; VAR x, y, z: CHAR; BEGIN z := MAX(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_MAX_CHAR_WCHAR",
+				code:       "MODULE Test; VAR x: CHAR; y: WCHAR; z: WCHAR; BEGIN z := MAX(x, y) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_MAX_INT32_REAL",
+				code:        "MODULE Test; VAR x: INT32; y: REAL; z: INT32; BEGIN z := MAX(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "cannot assign expression (MAX(x, y): real)  to variable (z: int32)",
+			},
+			{
+				name:        "Invalid_MAX_CHAR_INT32",
+				code:        "MODULE Test; VAR x: CHAR; y: INT32; z: CHAR; BEGIN z := MAX(x, y) END Test.",
+				shouldPass:  false,
+				expectError: "'MAX' expects both arguments to be numeric or char types",
+			},
+			{
+				name:        "Invalid_MAX_no_args",
+				code:        "MODULE Test; VAR z: INT32; BEGIN z := MAX() END Test.",
+				shouldPass:  false,
+				expectError: "'MAX' expects one or two arguments",
+			},
+			{
+				name:        "Invalid_MAX_one_arg",
+				code:        "MODULE Test; VAR x: INT32; z: INT32; BEGIN z := MAX(x) END Test.",
+				shouldPass:  false,
+				expectError: "'MAX': single argument must be a type",
+			},
+			{
+				name:        "Invalid_MAX_too_many_args",
+				code:        "MODULE Test; VAR x, y, z: INT32; BEGIN z := MAX(x, y, z) END Test.",
+				shouldPass:  false,
+				expectError: "'MAX' expects one or two arguments",
 			},
 		},
 	},
