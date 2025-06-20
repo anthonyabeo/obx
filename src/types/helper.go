@@ -289,7 +289,7 @@ func BaseRecord(t Type) *RecordType {
 func IsOrdinal(t Type) bool {
 	switch t := Underlying(t).(type) {
 	case *BasicType:
-		return t.Kind == BOOLEAN || IsInteger(t) || IsChar(t)
+		return IsInteger(t) || IsChar(t)
 	case *EnumType:
 		return true
 	case *NamedType:

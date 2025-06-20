@@ -70,6 +70,10 @@ func (n *NamesResolver) VisitDefinition(def *ast.Definition) any {
 }
 
 func (n *NamesResolver) VisitIdentifierDef(def *ast.IdentifierDef) any {
+	if def.Name == "_" {
+		return def
+	}
+
 	sym := n.ctx.Env.Lookup(def.Name)
 	if sym == nil {
 		n.ctx.Reporter.Report(report.Diagnostic{

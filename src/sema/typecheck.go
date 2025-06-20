@@ -579,7 +579,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if !ok {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message:  fmt.Sprintf("predeclared procedure '%s' expects a type as the first argument", pre.Name()),
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects a type as first argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
 			return
@@ -597,13 +597,32 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		E.Accept(t)
 		exprType := E.Type()
 
-		if types.IsEnum(T) && types.IsOrdinal(exprType) {
-			call.SemaType = T // Cast returns the type of the enum
+		T = types.Underlying(T)
+		exprType = types.Underlying(exprType)
+
+		if types.IsEnum(T) && types.IsOrdinal(exprType) || types.IsInteger(T) && types.IsInteger(exprType) {
+			call.SemaType = T
 			return
 		}
 
-		if types.IsInteger(T) && types.IsInteger(exprType) {
-			call.SemaType = T // Cast returns the type of the integer
+		if !types.IsEnum(T) && !types.IsInteger(T) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects first argument to be integer or enum",
+					pre.Name()),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		if !types.IsOrdinal(exprType) && !types.IsInteger(exprType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expected second argument to be"+
+					" ordinal number or integer", pre.Name()),
+				Range: t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+
 			return
 		}
 
@@ -643,11 +662,11 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			return
 		}
 
-		T, ok := call.ActualParams[0].(types.Type)
+		T, ok := call.ActualParams[0].Accept(t).(types.Type)
 		if !ok {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message:  fmt.Sprintf("predeclared procedure '%s' expects a type as the argument", pre.Name()),
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects a type as argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
 			return
@@ -724,7 +743,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			if !types.IsCharArrayOrString(argType) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message: fmt.Sprintf("predeclared procedure '%s' expects a string argument, got %s",
+					Message: fmt.Sprintf("predeclared procedure '%s' expects string arguments, got %s",
 						pre.Name(), argType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
 				})
@@ -901,20 +920,21 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 				return
 			}
 
-			switch ty := T.(type) {
+			switch ty := types.Underlying(T).(type) {
 			case *types.BasicType:
 				if ty == types.SetType {
 					call.SemaType = types.Int32Type
 				} else {
 					call.SemaType = ty
 				}
-			case types.EnumType:
+			case *types.EnumType:
 				call.SemaType = types.ByteType
 			default:
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message:  fmt.Sprintf("predeclared procedure 'max' expects a basic type or enum, got %s", T),
-					Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+					Message: fmt.Sprintf("predeclared procedure '%s' expects a basic type or enum, got %s",
+						pre.Name(), T),
+					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 				})
 			}
 		}
@@ -971,20 +991,21 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 				return
 			}
 
-			switch ty := T.(type) {
+			switch ty := types.Underlying(T).(type) {
 			case *types.BasicType:
 				if ty == types.SetType {
 					call.SemaType = types.Int32Type
 				} else {
 					call.SemaType = ty
 				}
-			case types.EnumType:
+			case *types.EnumType:
 				call.SemaType = types.ByteType
 			default:
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message:  fmt.Sprintf("predeclared procedure 'min' expects a basic type or enum, got %s", T),
-					Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+					Message: fmt.Sprintf("predeclared procedure '%s' expects a basic type or enum, got %s",
+						pre.Name(), T),
+					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 				})
 			}
 
@@ -1120,7 +1141,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			return
 		}
 
-		if T, ok := call.ActualParams[0].(types.Type); !ok {
+		if T, ok := call.ActualParams[0].Accept(t).(types.Type); !ok {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects a type as the argument, got '%v'", pre.Name(), T),

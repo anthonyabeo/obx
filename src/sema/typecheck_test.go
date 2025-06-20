@@ -3075,44 +3075,6 @@ var predeclaredProcTests = []procTestEntry{
 			},
 		},
 	},
-	//{
-	//	procName: "SIZE",
-	//	cases: []procTestCase{
-	//		{
-	//			name:       "Valid_SIZE_INT32",
-	//			code:       "MODULE Test; VAR n: INT32; BEGIN n := SIZE(INT32) END Test.",
-	//			shouldPass: true,
-	//		},
-	//		{
-	//			name:       "Valid_SIZE_ARRAY",
-	//			code:       "MODULE Test; VAR n: INT32; BEGIN n := SIZE(ARRAY 10 OF CHAR) END Test.",
-	//			shouldPass: true,
-	//		},
-	//		{
-	//			name:       "Valid_SIZE_RECORD",
-	//			code:       "MODULE Test; TYPE R = RECORD x: INT8; y: INT16 END; VAR n: INT32; BEGIN n := SIZE(R) END Test.",
-	//			shouldPass: true,
-	//		},
-	//		{
-	//			name:        "Invalid_SIZE_no_args",
-	//			code:        "MODULE Test; VAR n: INT32; BEGIN n := SIZE() END Test.",
-	//			shouldPass:  false,
-	//			expectError: "'SIZE' expects exactly one argument",
-	//		},
-	//		{
-	//			name:        "Invalid_SIZE_too_many_args",
-	//			code:        "MODULE Test; VAR n: INT32; BEGIN n := SIZE(INT32, INT16) END Test.",
-	//			shouldPass:  false,
-	//			expectError: "'SIZE' expects exactly one argument",
-	//		},
-	//		{
-	//			name:        "Invalid_SIZE_non_type",
-	//			code:        "MODULE Test; VAR n: INT32; x: INT32; BEGIN n := SIZE(x) END Test.",
-	//			shouldPass:  false,
-	//			expectError: "'SIZE' expects a type as argument",
-	//		},
-	//	},
-	//},
 	{
 		procName: "ASH",
 		cases: []procTestCase{
@@ -3545,6 +3507,328 @@ var predeclaredProcTests = []procTestEntry{
 				code:        "MODULE Test; VAR x, y, z: INT32; BEGIN z := MAX(x, y, z) END Test.",
 				shouldPass:  false,
 				expectError: "'MAX' expects one or two arguments",
+			},
+		},
+	},
+	{
+		procName: "SIZE",
+		cases: []procTestCase{
+			{
+				name:       "Valid_SIZE_INT32",
+				code:       "MODULE Test; VAR n: INT32; BEGIN n := SIZE(INT32) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_SIZE_ARRAY",
+				code:       "MODULE Test; VAR n: INT32; BEGIN n := SIZE(ARRAY 10 OF CHAR) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_SIZE_RECORD",
+				code:       "MODULE Test; TYPE R = RECORD x: INT8; y: INT16 END; VAR n: INT32; BEGIN n := SIZE(R) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_SIZE_no_args",
+				code:        "MODULE Test; VAR n: INT32; BEGIN n := SIZE() END Test.",
+				shouldPass:  false,
+				expectError: "'SIZE' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_SIZE_too_many_args",
+				code:        "MODULE Test; VAR n: INT32; BEGIN n := SIZE(INT32, INT16) END Test.",
+				shouldPass:  false,
+				expectError: "'SIZE' expects exactly one argument",
+			},
+		},
+	},
+	{
+		procName: "MAX",
+		cases: []procTestCase{
+			{
+				name:       "Valid_MAX_INT32_type",
+				code:       "MODULE Test; VAR m : INT32;BEGIN m := MAX(INT32) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_MAX_SET_type",
+				code:       "MODULE Test; VAR m :INT32; BEGIN m := MAX(SET) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_MAX_enum_type",
+				code:       "MODULE Test; TYPE Color = (Red, Green, Blue); VAR m: BYTE; BEGIN m := MAX(Color) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_MAX_no_args",
+				code:        "MODULE Test; VAR m :INT32; BEGIN  m := MAX() END Test.",
+				shouldPass:  false,
+				expectError: "'MAX' expects one or two arguments",
+			},
+			{
+				name:        "Invalid_MAX_too_many_args",
+				code:        "MODULE Test; VAR m :INT32; BEGIN m := MAX(INT32, INT32, INT32) END Test.",
+				shouldPass:  false,
+				expectError: "'MAX' expects one or two arguments",
+			},
+			{
+				name:        "Invalid_MAX_non_type_arg",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := MAX(x) END Test.",
+				shouldPass:  false,
+				expectError: "'MAX': single argument must be a type",
+			},
+			{
+				name:        "Invalid_MAX_unsupported_type",
+				code:        "MODULE Test; TYPE Rec = RECORD END; VAR m: BYTE; BEGIN m := MAX(Rec) END Test.",
+				shouldPass:  false,
+				expectError: "'MAX' expects a basic type or enum",
+			},
+		},
+	},
+	{
+		procName: "MIN",
+		cases: []procTestCase{
+			{
+				name:       "Valid_MIN_INT32_type",
+				code:       "MODULE Test; VAR m: INT32; BEGIN m := MIN(INT32) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_MIN_SET_type",
+				code:       "MODULE Test; VAR m: INT32; BEGIN m := MIN(SET) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_MIN_enum_type",
+				code:       "MODULE Test; TYPE Color = (Red, Green, Blue); VAR m: BYTE; BEGIN m := MIN(Color) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_MIN_no_args",
+				code:        "MODULE Test; VAR m: BYTE; BEGIN m := MIN() END Test.",
+				shouldPass:  false,
+				expectError: "'MIN' expects one or two arguments",
+			},
+			{
+				name:        "Invalid_MIN_too_many_args",
+				code:        "MODULE Test; VAR m: BYTE; BEGIN m := MIN(INT32, INT32, INT32) END Test.",
+				shouldPass:  false,
+				expectError: "'MIN' expects one or two arguments",
+			},
+			{
+				name:        "Invalid_MIN_non_type_arg",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := MIN(x) END Test.",
+				shouldPass:  false,
+				expectError: "'MIN': single argument must be a type",
+			},
+			{
+				name:        "Invalid_MIN_unsupported_type",
+				code:        "MODULE Test; TYPE Rec = RECORD END; VAR m: BYTE; BEGIN m := MIN(Rec) END Test.",
+				shouldPass:  false,
+				expectError: "'MIN' expects a basic type or enum",
+			},
+		},
+	},
+	{
+		procName: "DEFAULT",
+		cases: []procTestCase{
+			{
+				name:       "Valid_DEFAULT_INT32",
+				code:       "MODULE Test; VAR x: INT32; BEGIN x := DEFAULT(INT32) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_DEFAULT_CHAR",
+				code:       "MODULE Test; VAR c: CHAR; BEGIN c := DEFAULT(CHAR) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_DEFAULT_BOOLEAN",
+				code:       "MODULE Test; VAR b: BOOL; BEGIN b := DEFAULT(BOOL) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_DEFAULT_SET",
+				code:       "MODULE Test; VAR s: SET; BEGIN s := DEFAULT(SET) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_DEFAULT_enum",
+				code:       "MODULE Test; TYPE Color = (Red, Green, Blue); VAR c: Color; BEGIN c := DEFAULT(Color) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_DEFAULT_pointer",
+				code:       "MODULE Test; TYPE P = POINTER TO RECORD END; VAR p: P; BEGIN p := DEFAULT(P) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_DEFAULT_proc",
+				code:       "MODULE Test; VAR p: PROCEDURE; BEGIN p := DEFAULT(PROCEDURE) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_DEFAULT_record",
+				code:       "MODULE Test; TYPE R = RECORD x: INT32 END; VAR r: R; BEGIN r := DEFAULT(R) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_DEFAULT_array",
+				code:       "MODULE Test; TYPE A = ARRAY 3 OF INT32; VAR a: A; BEGIN a := DEFAULT(A) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_DEFAULT_no_args",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := DEFAULT() END Test.",
+				shouldPass:  false,
+				expectError: "'DEFAULT' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_DEFAULT_too_many_args",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := DEFAULT(INT32, INT32) END Test.",
+				shouldPass:  false,
+				expectError: "'DEFAULT' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_DEFAULT_non_type_arg",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := DEFAULT(x) END Test.",
+				shouldPass:  false,
+				expectError: "'DEFAULT' expects a type as argument",
+			},
+			{
+				name:       "Invalid_DEFAULT_unsupported_type",
+				code:       "MODULE Test; TYPE F = PROCEDURE (_: INT32): INT32; VAR f: F; BEGIN f := DEFAULT(F) END Test.",
+				shouldPass: true,
+			},
+		},
+	},
+	{
+		procName: "LDMOD",
+		cases: []procTestCase{
+			{
+				name:       "Valid_LDMOD_string",
+				code:       "MODULE Test; VAR b: BOOL; BEGIN b := LDMOD(\"MyModule\") END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_LDMOD_no_args",
+				code:        "MODULE Test; VAR b: BOOL; BEGIN b := LDMOD() END Test.",
+				shouldPass:  false,
+				expectError: "'LDMOD' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_LDMOD_too_many_args",
+				code:        "MODULE Test; VAR b: BOOL; BEGIN b := LDMOD(\"A\", \"B\") END Test.",
+				shouldPass:  false,
+				expectError: "'LDMOD' expects exactly one argument",
+			},
+			{
+				name:        "Invalid_LDMOD_non_string_arg",
+				code:        "MODULE Test; VAR b: BOOL; BEGIN b := LDMOD(123) END Test.",
+				shouldPass:  false,
+				expectError: "'LDMOD' expects a string argument",
+			},
+		},
+	},
+	{
+		procName: "LDCMD",
+		cases: []procTestCase{
+			{
+				name:       "Valid_LDCMD_two_strings",
+				code:       "MODULE Test; VAR p: PROCEDURE; BEGIN p := LDCMD(\"Mod\", \"Cmd\") END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_LDCMD_no_args",
+				code:        "MODULE Test; VAR p: PROCEDURE; BEGIN p := LDCMD() END Test.",
+				shouldPass:  false,
+				expectError: "'LDCMD' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_LDCMD_one_arg",
+				code:        "MODULE Test; VAR p: PROCEDURE; BEGIN p := LDCMD(\"Mod\") END Test.",
+				shouldPass:  false,
+				expectError: "'LDCMD' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_LDCMD_three_args",
+				code:        "MODULE Test; VAR p: PROCEDURE; BEGIN p := LDCMD(\"A\", \"B\", \"C\") END Test.",
+				shouldPass:  false,
+				expectError: "'LDCMD' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_LDCMD_non_string_first_arg",
+				code:        "MODULE Test; VAR p: PROCEDURE; BEGIN p := LDCMD(123, \"Cmd\") END Test.",
+				shouldPass:  false,
+				expectError: "'LDCMD' expects string arguments",
+			},
+			{
+				name:        "Invalid_LDCMD_non_string_second_arg",
+				code:        "MODULE Test; VAR p: PROCEDURE; BEGIN p := LDCMD(\"Mod\", 456) END Test.",
+				shouldPass:  false,
+				expectError: "'LDCMD' expects string arguments",
+			},
+		},
+	},
+	{
+		procName: "CAST",
+		cases: []procTestCase{
+			{
+				name:       "Valid_CAST_enum_from_ordinal",
+				code:       "MODULE Test; TYPE Color = (Red, Green, Blue); VAR c: Color; BEGIN c := CAST(Color, 1) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_CAST_INT32_from_INT8",
+				code:       "MODULE Test; VAR x: INT8; VAR y: INT32; BEGIN y := CAST(INT32, x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_CAST_INT8_from_INT32",
+				code:       "MODULE Test; VAR x: INT32; VAR y: INT8; BEGIN y := CAST(INT8, x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_CAST_INT64_from_INT32",
+				code:       "MODULE Test; VAR x: INT32; VAR y: INT64; BEGIN y := CAST(INT64, x) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:        "Invalid_CAST_no_args",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := CAST() END Test.",
+				shouldPass:  false,
+				expectError: "'CAST' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_CAST_one_arg",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := CAST(INT32) END Test.",
+				shouldPass:  false,
+				expectError: "'CAST' expects exactly two arguments",
+			},
+			{
+				name:        "Invalid_CAST_non_type_first_arg",
+				code:        "MODULE Test; VAR x: INT32; BEGIN x := CAST(x, 1) END Test.",
+				shouldPass:  false,
+				expectError: "'CAST' expects a type as first argument",
+			},
+			{
+				name:        "Invalid_CAST_enum_from_non_ordinal",
+				code:        "MODULE Test; TYPE Color = (Red, Green, Blue); VAR c: Color; BEGIN c := CAST(Color, TRUE) END Test.",
+				shouldPass:  false,
+				expectError: "'CAST' expected second argument to be ordinal number or integer",
+			},
+			{
+				name:        "Invalid_CAST_integer_from_non_integer",
+				code:        "MODULE Test; VAR x: REAL; VAR y: INT32; BEGIN y := CAST(INT32, x) END Test.",
+				shouldPass:  false,
+				expectError: "'CAST' expected second argument to be ordinal number or integer",
+			},
+			{
+				name:        "Invalid_CAST_unsupported_type",
+				code:        "MODULE Test; TYPE P = POINTER TO RECORD END; VAR p: P; BEGIN p := CAST(P, 1) END Test.",
+				shouldPass:  false,
+				expectError: "'CAST' expects first argument to be integer or enum",
 			},
 		},
 	},
