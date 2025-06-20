@@ -911,12 +911,29 @@ func (p *Parser) parseActualParameters() (list []ast.Expression) {
 	return
 }
 
+func (p *Parser) parseTypeOrExpression() ast.Expression {
+	if p.tok == token.IDENTIFIER {
+		sym := p.ctx.Env.Lookup(p.lexeme)
+		if sym != nil && sym.Kind() == ast.TypeSymbolKind {
+			return p.parseType()
+		} else {
+			return p.parseExpression()
+		}
+	}
+
+	if typeStart[p.tok] {
+		return p.parseType()
+	}
+
+	return p.parseExpression()
+}
+
 func (p *Parser) parseExprList() (list []ast.Expression) {
-	list = append(list, p.parseExpression())
+	list = append(list, p.parseTypeOrExpression())
 
 	for p.tok == token.COMMA {
 		p.next()
-		list = append(list, p.parseExpression())
+		list = append(list, p.parseTypeOrExpression())
 	}
 
 	return

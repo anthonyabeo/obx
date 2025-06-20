@@ -36,13 +36,15 @@ var exprStart = map[token.Kind]bool{
 	token.STR_LIT:      true,
 	token.HEX_STR_LIT:  true,
 	token.CHAR_LIT:     true,
+	token.WCHAR_LIT:    true,
+	token.BYTE_LIT:     true,
 	token.INT8_LIT:     true,
 	token.INT16_LIT:    true,
 	token.INT32_LIT:    true,
 	token.INT64_LIT:    true,
 	token.REAL_LIT:     true,
-	token.NOT:          true,
 	token.LONGREAL_LIT: true,
+	token.NOT:          true,
 }
 
 var exprEnd = map[token.Kind]bool{
@@ -69,6 +71,20 @@ var typeStart = map[token.Kind]bool{
 	token.CARET:      true,
 	token.RECORD:     true,
 	token.IDENTIFIER: true,
+	token.INT8:       true,
+	token.INT16:      true,
+	token.INT32:      true,
+	token.INT64:      true,
+	token.REAL:       true,
+	token.LONGREAL:   true,
+	token.BYTE:       true,
+	token.BOOLEAN:    true,
+	token.CHAR:       true,
+	token.WCHAR:      true,
+	token.INTEGER:    true,
+	token.SHORTINT:   true,
+	token.LONGINT:    true,
+	token.SET:        true,
 }
 
 func (p *Parser) addOp() bool {
@@ -97,26 +113,7 @@ func (p *Parser) relation() bool {
 }
 
 func (p *Parser) exprStart() bool {
-	return p.tok == token.LPAREN ||
-		p.tok == token.PLUS ||
-		p.tok == token.MINUS ||
-		p.tok == token.IDENTIFIER ||
-		p.tok == token.TRUE ||
-		p.tok == token.FALSE ||
-		p.tok == token.NIL ||
-		p.tok == token.LBRACE ||
-		p.tok == token.STR_LIT ||
-		p.tok == token.HEX_STR_LIT ||
-		p.tok == token.CHAR_LIT ||
-		p.tok == token.WCHAR_LIT ||
-		p.tok == token.BYTE_LIT ||
-		p.tok == token.INT8_LIT ||
-		p.tok == token.INT16_LIT ||
-		p.tok == token.INT32_LIT ||
-		p.tok == token.INT64_LIT ||
-		p.tok == token.REAL_LIT ||
-		p.tok == token.LONGREAL_LIT ||
-		p.tok == token.NOT
+	return exprStart[p.tok] || typeStart[p.tok]
 }
 
 func (p *Parser) stmtStart() bool {

@@ -3,6 +3,7 @@ package ast
 import (
 	"bytes"
 	"fmt"
+	"github.com/anthonyabeo/obx/src/types"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -87,6 +88,8 @@ func (n *NamedType) typ()                   {}
 func (n *NamedType) Pos() int               { return n.StartOffset }
 func (n *NamedType) End() int               { return n.EndOffset }
 func (n *NamedType) Children() []Node       { return []Node{n.Name} }
+func (n *NamedType) expr()                  {}
+func (n *NamedType) Type() types.Type       { panic("not implemented") }
 
 func NewBasicType(kind token.Kind, pos int, rng int) *BasicType {
 	return &BasicType{Kind: kind, StartOffset: pos, EndOffset: rng}
@@ -99,6 +102,8 @@ func (b *BasicType) typ()                   {}
 func (b *BasicType) Pos() int               { return b.StartOffset }
 func (b *BasicType) End() int               { return b.EndOffset }
 func (b *BasicType) Children() []Node       { return []Node{} }
+func (b *BasicType) expr()                  {}
+func (b *BasicType) Type() types.Type       { panic("not implemented") }
 
 func NewArray(lenList *LenList, elem Type, pos int, rng int) *ArrayType {
 	return &ArrayType{LenList: lenList, ElemType: elem, StartOffset: pos, EndOffset: rng}
@@ -119,6 +124,8 @@ func (a *ArrayType) typ()                   {}
 func (a *ArrayType) Pos() int               { return a.StartOffset }
 func (a *ArrayType) End() int               { return a.EndOffset }
 func (a *ArrayType) Children() []Node       { return []Node{a.LenList, a.ElemType} }
+func (a *ArrayType) expr()                  {}
+func (a *ArrayType) Type() types.Type       { panic("not implemented") }
 
 type LenList struct {
 	Modifier token.Kind
@@ -167,6 +174,8 @@ func (p *ProcedureType) Children() []Node {
 	}
 	return []Node{}
 }
+func (p *ProcedureType) expr()            {}
+func (p *ProcedureType) Type() types.Type { panic("not implemented") }
 
 func (p *PointerType) String() string         { return fmt.Sprintf("^%s", p.Base) }
 func (p *PointerType) Accept(vst Visitor) any { return vst.VisitPointerType(p) }
@@ -174,6 +183,8 @@ func (p *PointerType) typ()                   {}
 func (p *PointerType) Pos() int               { return p.StartOffset }
 func (p *PointerType) End() int               { return p.EndOffset }
 func (p *PointerType) Children() []Node       { return []Node{p.Base} }
+func (p *PointerType) expr()                  {}
+func (p *PointerType) Type() types.Type       { panic("not implemented") }
 
 func NewRecordType(base Type, fields []*FieldList, env *RecordEnv) *RecordType {
 	return &RecordType{Base: base, Fields: fields, Env: env}
@@ -213,6 +224,8 @@ func (r *RecordType) Children() []Node {
 
 	return children
 }
+func (r *RecordType) expr()            {}
+func (r *RecordType) Type() types.Type { panic("not implemented") }
 
 func (f *FieldList) Accept(vst Visitor) any { return vst.VisitFieldList(f) }
 func (f *FieldList) String() string {
@@ -240,6 +253,8 @@ func (e *EnumType) typ()                   {}
 func (e *EnumType) Pos() int               { return e.StartOffset }
 func (e *EnumType) End() int               { return e.EndOffset }
 func (e *EnumType) Children() []Node       { return []Node{} }
+func (e *EnumType) expr()                  {}
+func (e *EnumType) Type() types.Type       { panic("not implemented") }
 
 func (b *BadType) String() string         { return "<BadType>" }
 func (b *BadType) Accept(vst Visitor) any { return vst.VisitBadType(b) }
@@ -247,3 +262,5 @@ func (b *BadType) typ()                   {}
 func (b *BadType) Pos() int               { return b.StartOffset }
 func (b *BadType) End() int               { return b.EndOffset }
 func (b *BadType) Children() []Node       { return []Node{} }
+func (b *BadType) expr()                  {}
+func (b *BadType) Type() types.Type       { panic("not implemented") }

@@ -31,7 +31,7 @@ type Declaration interface {
 }
 
 type Type interface {
-	Node
+	Expression
 	typ()
 }
 

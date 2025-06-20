@@ -47,12 +47,14 @@ func scanNumber(s *Scanner) StateFn {
 	s.acceptRun("0123456789AaBbCcDdEeFf") // possible hex digits
 	if s.accept("Hh") {
 		if s.accept("Ll") {
-			s.emit(token.INT64_LIT, s.start, s.pos)
+			value := string(s.content[s.start : s.pos-1])
+			s.emitWithValue(token.INT64_LIT, value, s.start, s.pos)
 			return scanText
 		}
 
 		if s.accept("Ii") {
-			s.emit(token.INT32_LIT, s.start, s.pos)
+			value := string(s.content[s.start : s.pos-1])
+			s.emitWithValue(token.INT32_LIT, value, s.start, s.pos)
 			return scanText
 		}
 
@@ -157,12 +159,14 @@ func scanNumber(s *Scanner) StateFn {
 	// Optional suffix for integer
 	if !isReal {
 		if s.accept("Ll") {
-			s.emit(token.INT64_LIT, s.start, s.pos)
+			value := string(s.content[s.start : s.pos-1])
+			s.emitWithValue(token.INT64_LIT, value, s.start, s.pos)
 			return scanText
 		}
 
 		if s.accept("Ii") {
-			s.emit(token.INT32_LIT, s.start, s.pos)
+			value := string(s.content[s.start : s.pos-1])
+			s.emitWithValue(token.INT32_LIT, value, s.start, s.pos)
 			return scanText
 		}
 
