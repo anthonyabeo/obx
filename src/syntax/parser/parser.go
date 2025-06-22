@@ -1198,17 +1198,25 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 	if p.tok == token.SEMICOLON {
 		p.next()
 	}
+	proc.Env.SetName(proc.Head.Name.Name)
 
 	proc.Body = p.parseProcBody()
 
 	proc.EndOffset = p.end
 	p.match(token.END)
+	if proc.Body != nil && p.tok != token.IDENTIFIER && p.lexeme != proc.Head.Name.Name {
+		p.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("non-empty body of procedure declaration must end with a matching name"),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
+		})
+	}
+
 	if p.tok == token.IDENTIFIER {
 		proc.EndOffset = p.end
 		proc.EndName = p.parseIdent()
 	}
 
-	proc.Env.SetName(proc.Head.Name.Name)
 	return
 }
 
@@ -1287,7 +1295,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 		default:
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message:  fmt.Sprintf("receiver '%s' must be a record type", rcvType),
+				Message:  fmt.Sprintf("receiver '%s' must be a (pointer to) record type", rcvType),
 				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Rcv.StartOffset, head.Rcv.EndOffset),
 			})
 			p.advance(declStart)
@@ -1480,6 +1488,15 @@ func (p *Parser) parseStatementSeq() (seq []ast.Statement) {
 			p.next()
 		}
 
+		if !p.stmtStart() {
+			last := seq[len(seq)-1]
+			p.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  "the last statement must not end with a semi-colon",
+				Range:    p.ctx.Source.Span(p.ctx.FileName, last.Pos(), last.End()),
+			})
+			return
+		}
 		seq = append(seq, p.parseStatement())
 	}
 
