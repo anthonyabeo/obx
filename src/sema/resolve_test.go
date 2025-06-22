@@ -1,6 +1,7 @@
 package sema
 
 import (
+	"github.com/anthonyabeo/obx/adt"
 	"log"
 	"os"
 	"path/filepath"
@@ -44,7 +45,9 @@ func TestNameResolution_BasicProcedure(t *testing.T) {
 			Source: sm,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	// Parse the file
@@ -155,10 +158,12 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 	})
 
 	ctx := &report.Context{
-		Source:   srcMgr,
-		Reporter: reporter,
-		TabWidth: 4,
-		Envs:     make(map[string]*ast.Environment),
+		Source:    srcMgr,
+		Reporter:  reporter,
+		TabWidth:  4,
+		Envs:      make(map[string]*ast.Environment),
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	for _, header := range sorted {
@@ -228,7 +233,9 @@ func TestNameResolutionUndefined(t *testing.T) {
 			Source: sm,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	// Parse the file
@@ -279,7 +286,9 @@ func TestNameResolution_Basic(t *testing.T) {
 			Source: sm,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	// Parse the file

@@ -2,6 +2,7 @@ package pprint
 
 import (
 	"encoding/json"
+	"github.com/anthonyabeo/obx/adt"
 	"os"
 	"testing"
 
@@ -45,7 +46,9 @@ func TestPrettyPrintJSON(t *testing.T) {
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	obx := parseSource(t, ctx)
@@ -144,7 +147,9 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	obx := parseSource(t, ctx)

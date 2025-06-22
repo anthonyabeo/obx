@@ -1,6 +1,9 @@
 package report
 
-import "github.com/anthonyabeo/obx/src/syntax/ast"
+import (
+	"github.com/anthonyabeo/obx/adt"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
+)
 
 type Context struct {
 	FileName string
@@ -13,4 +16,8 @@ type Context struct {
 
 	Env  *ast.Environment            // the current environment. Defaults to that of the current scope
 	Envs map[string]*ast.Environment // environments of compilation units
+
+	// use to disambiguate between type-guards and procedure calls during parsing
+	Names     *adt.Stack[string]
+	ExprLists *adt.Stack[[]ast.Expression]
 }

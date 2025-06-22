@@ -1,6 +1,7 @@
 package sema
 
 import (
+	"github.com/anthonyabeo/obx/adt"
 	"log"
 	"os"
 	"path/filepath"
@@ -128,13 +129,15 @@ func TestTypeCheckerPrograms(t *testing.T) {
 			})
 
 			ctx := &report.Context{
-				FileName: tt.filename,
-				FilePath: tt.filename,
-				Content:  []byte(tt.source),
-				Source:   srcMgr,
-				Reporter: reporter,
-				TabWidth: 4,
-				Envs:     make(map[string]*ast.Environment),
+				FileName:  tt.filename,
+				FilePath:  tt.filename,
+				Content:   []byte(tt.source),
+				Source:    srcMgr,
+				Reporter:  reporter,
+				TabWidth:  4,
+				Envs:      make(map[string]*ast.Environment),
+				Names:     adt.NewStack[string](),
+				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
 
 			p := parser.NewParser(ctx)
@@ -244,13 +247,15 @@ func TestTypeCheckInvalidPrograms(t *testing.T) {
 			})
 
 			ctx := &report.Context{
-				FileName: tt.filename,
-				FilePath: tt.filename,
-				Content:  []byte(tt.source),
-				Source:   srcMgr,
-				Reporter: reporter,
-				TabWidth: 4,
-				Envs:     make(map[string]*ast.Environment),
+				FileName:  tt.filename,
+				FilePath:  tt.filename,
+				Content:   []byte(tt.source),
+				Source:    srcMgr,
+				Reporter:  reporter,
+				TabWidth:  4,
+				Envs:      make(map[string]*ast.Environment),
+				Names:     adt.NewStack[string](),
+				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
 
 			p := parser.NewParser(ctx)
@@ -376,13 +381,15 @@ END ExprCompatibilityTest.`)
 	})
 
 	ctx := &report.Context{
-		FileName: file,
-		FilePath: file,
-		Content:  content,
-		Source:   srcMgr,
-		Reporter: reporter,
-		TabWidth: 4,
-		Envs:     make(map[string]*ast.Environment),
+		FileName:  file,
+		FilePath:  file,
+		Content:   content,
+		Source:    srcMgr,
+		Reporter:  reporter,
+		TabWidth:  4,
+		Envs:      make(map[string]*ast.Environment),
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	p := parser.NewParser(ctx)
@@ -476,13 +483,15 @@ END InvalidExprCompatibilityTest.
 	})
 
 	ctx := &report.Context{
-		FileName: file,
-		FilePath: file,
-		Content:  content,
-		Source:   srcMgr,
-		Reporter: reporter,
-		TabWidth: 4,
-		Envs:     make(map[string]*ast.Environment),
+		FileName:  file,
+		FilePath:  file,
+		Content:   content,
+		Source:    srcMgr,
+		Reporter:  reporter,
+		TabWidth:  4,
+		Envs:      make(map[string]*ast.Environment),
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	p := parser.NewParser(ctx)
@@ -3874,13 +3883,15 @@ func typeCheckSnippet(t *testing.T, code string) *report.Context {
 		Writer: os.Stdout,
 	})
 	ctx := &report.Context{
-		FileName: file,
-		FilePath: file,
-		Content:  []byte(code),
-		Source:   srcMgr,
-		Reporter: reporter,
-		TabWidth: 4,
-		Envs:     make(map[string]*ast.Environment),
+		FileName:  file,
+		FilePath:  file,
+		Content:   []byte(code),
+		Source:    srcMgr,
+		Reporter:  reporter,
+		TabWidth:  4,
+		Envs:      make(map[string]*ast.Environment),
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := parser.NewParser(ctx)
 	unit := p.Parse()

@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/anthonyabeo/obx/adt"
 	"os"
 	"strings"
 	"testing"
@@ -44,7 +45,9 @@ end Main`)
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	p := NewParser(ctx)
@@ -98,7 +101,9 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -154,7 +159,9 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -201,7 +208,9 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -265,7 +274,9 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -342,7 +353,9 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -418,7 +431,9 @@ end Drawing
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -540,7 +555,9 @@ end Drawing
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -642,7 +659,9 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -734,7 +753,9 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	p := NewParser(ctx)
@@ -815,7 +836,9 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	p := NewParser(ctx)
@@ -924,7 +947,9 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	p := NewParser(ctx)
@@ -1038,7 +1063,9 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -1114,7 +1141,9 @@ EN BadModule.
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth: 4,
+		TabWidth:  4,
+		Names:     adt.NewStack[string](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()

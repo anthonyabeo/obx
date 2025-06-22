@@ -1,6 +1,7 @@
 package sema
 
 import (
+	"github.com/anthonyabeo/obx/adt"
 	"os"
 	"strings"
 	"testing"
@@ -277,7 +278,9 @@ END M.
 					Source: mgr,
 					Writer: os.Stdout,
 				}),
-				TabWidth: 4,
+				TabWidth:  4,
+				Names:     adt.NewStack[string](),
+				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
 
 			p := parser.NewParser(ctx)
