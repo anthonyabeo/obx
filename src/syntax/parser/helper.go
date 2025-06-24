@@ -1,6 +1,11 @@
 package parser
 
-import "github.com/anthonyabeo/obx/src/syntax/token"
+import (
+	"fmt"
+	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/syntax/token"
+)
 
 var stmtStart = map[token.Kind]bool{
 	token.EXIT:       true,
@@ -126,4 +131,138 @@ func (p *Parser) startsImportOrDecl() bool {
 
 func (p *Parser) startsDecl() bool {
 	return declStart[p.tok]
+}
+
+func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind) {
+	procType := &ast.ProcedureType{}
+
+	if head.FP != nil {
+		procType.FP = head.FP
+
+		for _, param := range head.FP.Params {
+			for _, id := range param.Names {
+				if sym := p.ctx.Env.Insert(ast.NewParamSymbol(id.Name, param.Kind, param.Type)); sym != nil {
+					p.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  "duplicate parameter declaration" + id.Name,
+						Range:    p.ctx.Source.Span(p.ctx.FileName, id.StartOffset, id.EndOffset),
+					})
+				}
+			}
+		}
+	}
+
+	switch kind {
+	case ast.ProperProcedureKind, ast.FunctionProcedureKind:
+		sym := p.ctx.Env.Parent().Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, p.ctx.Env))
+		if sym != nil {
+			p.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("duplicate procedure declaration: '%v'" + head.Name.Name),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
+			})
+		}
+	case ast.TypeBoundProcedureKind:
+		procType.IsTypeBound = true
+		rcvType := p.underlyingRcvType(head.Rcv.Type)
+
+		var (
+			ok  bool
+			rec *ast.RecordType
+		)
+
+		switch head.Rcv.Kind {
+		case token.VAR, token.IN:
+			rec, ok = rcvType.(*ast.RecordType)
+			if !ok {
+				p.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  "VAR/IN receiver type must be a record type",
+					Range:    p.ctx.Source.Span(p.ctx.FileName, rcvType.Pos(), rcvType.End()),
+				})
+			}
+		default:
+			rec, ok = p.isPointerToRecord(rcvType)
+			if !ok {
+				p.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  "value receiver type must be a pointer to record type",
+					Range:    p.ctx.Source.Span(p.ctx.FileName, rcvType.Pos(), rcvType.End()),
+				})
+			}
+		}
+
+		// add the procedure to the receiver's environment
+		if sym := rec.Env.Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, p.ctx.Env)); sym != nil {
+			p.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("duplicate procedure declaration for '%s'", head.Name.Name),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
+			})
+		}
+
+		// add the receiver to the procedure's environment
+		if sym := p.ctx.Env.Insert(ast.NewParamSymbol(head.Rcv.Name.Name, head.Rcv.Kind, head.Rcv.Type)); sym != nil {
+			p.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("duplicate parameter declaration for '%s'", head.Rcv.Name),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Rcv.StartOffset, head.Rcv.EndOffset),
+			})
+		}
+
+	}
+}
+
+func (p *Parser) underlyingRcvType(ty ast.Type) ast.Type {
+	var rcvType ast.Type
+
+	Named, ok := ty.(*ast.NamedType)
+	if !ok {
+		p.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("receiver type must be Named Type, got: '%v'", ty),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, ty.Pos(), ty.End()),
+		})
+
+		return rcvType
+	}
+
+	env := p.ctx.Env.Parent()
+	if Named.Name.Prefix != "" {
+		env = p.ctx.Envs[Named.Name.Prefix]
+	}
+
+	sym := env.Lookup(Named.Name.Name)
+	if sym == nil {
+		p.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("receiver type '%s' not declared", Named.Name),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, Named.Name.StartOffset, Named.EndOffset),
+		})
+
+		return rcvType
+	}
+
+	typeSymbol, ok := sym.(*ast.TypeSymbol)
+	if !ok || typeSymbol == nil {
+		p.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("reciever type '%s' not declared as a type", rcvType),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, Named.Name.StartOffset, Named.EndOffset),
+		})
+
+		return rcvType
+	}
+
+	return sym.TypeNode()
+}
+
+func (p *Parser) isPointerToRecord(ty ast.Type) (*ast.RecordType, bool) {
+	ptr, ok := ty.(*ast.PointerType)
+	if !ok {
+		return nil, false
+	}
+
+	rec, ok := ptr.Base.(*ast.RecordType)
+	return rec, ok
 }

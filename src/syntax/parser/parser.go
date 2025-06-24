@@ -564,19 +564,36 @@ func (p *Parser) parsePtrType() *ast.PointerType {
 }
 
 func (p *Parser) parseProcedureType() *ast.ProcedureType {
-	//pos := p.pos
 	proc := &ast.ProcedureType{StartOffset: p.pos, EndOffset: p.end}
-	p.match(token.PROCEDURE)
+	if p.tok != token.PROC && p.tok != token.PROCEDURE {
+		p.errorExpected("PROC or PROCEDURE")
+		p.advance(declStart)
+	}
+
+	p.next()
 
 	if p.tok == token.LPAREN {
-		proc.FP = p.parseFormalParameters()
-		if proc.FP != nil && len(proc.FP.Params) != 0 {
-			last := proc.FP.Params[len(proc.FP.Params)-1]
+		LParen := p.tok
+		LParenPos := p.pos
+		p.next()
 
-			if proc.FP.RetType != nil {
-				proc.EndOffset = proc.FP.RetType.End()
-			} else {
-				proc.EndOffset = last.End()
+		if p.tok == token.POINTER || p.tok == token.CARET {
+			proc.IsTypeBound = true
+			p.next()
+			p.match(token.RPAREN)
+		}
+
+		if LParen == token.LPAREN {
+			proc.FP = p.parseFormalParameters()
+			if proc.FP != nil && len(proc.FP.Params) != 0 {
+				proc.FP.StartOffset = LParenPos
+				last := proc.FP.Params[len(proc.FP.Params)-1]
+
+				if proc.FP.RetType != nil {
+					proc.EndOffset = proc.FP.RetType.End()
+				} else {
+					proc.EndOffset = last.End()
+				}
 			}
 		}
 	}
@@ -993,7 +1010,6 @@ func (p *Parser) parseDesignator() *ast.Designator {
 }
 
 func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
-	//p.name = append(p.name, dsg.QIdent.Name)
 	p.ctx.Names.Push(dsg.QIdent.Name)
 
 	if !p.exprStart() {
@@ -1198,8 +1214,18 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 	if p.tok == token.SEMICOLON {
 		p.next()
 	}
-	proc.Env.SetName(proc.Head.Name.Name)
 
+	if proc.Head.Rcv != nil {
+		proc.Kind = ast.TypeBoundProcedureKind
+	} else if proc.Head.FP != nil && proc.Head.FP.RetType != nil {
+		proc.Kind = ast.FunctionProcedureKind
+	} else {
+		proc.Kind = ast.ProperProcedureKind
+	}
+
+	p.populateEnvs(proc.Head, proc.Kind)
+
+	// ─── Parse the Procedure Body to the end of the Procedure ──────────────────────
 	proc.Body = p.parseProcBody()
 
 	proc.EndOffset = p.end
@@ -1223,8 +1249,7 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 // ProcedureHeading = ( PROCEDURE | PROC ) [Receiver] identdef [ FormalParameters ]
 // Receiver = '(' [VAR|IN] ident ':' ident ')'
 func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
-	pos := p.pos
-	head = &ast.ProcedureHeading{StartOffset: pos}
+	head = &ast.ProcedureHeading{StartOffset: p.pos}
 
 	if p.tok != token.PROC && p.tok != token.PROCEDURE {
 		p.errorExpected("proc or procedure")
@@ -1242,121 +1267,13 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 	head.EndOffset = head.Name.EndOffset
 
 	if p.tok == token.LPAREN {
+		pos := p.pos
+		p.next()
+
 		head.FP = p.parseFormalParameters()
 		if head.FP != nil {
+			head.FP.StartOffset = pos
 			head.EndOffset = head.FP.EndOffset
-		}
-	}
-
-	// check that head.Rcv.Type has been declared as a record type and retrieve its env
-	// insert the receiver into the procedure's environment and the rest of the procedure's
-	// parameters into the receiver's environment
-	if head.Rcv != nil {
-		rcvType := head.Rcv.Type.String()
-		sym := p.ctx.Env.Lookup(rcvType)
-		if sym == nil {
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  fmt.Sprintf("reciever type '%s' not declared", rcvType),
-				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Rcv.StartOffset, head.Rcv.EndOffset),
-			})
-			p.advance(declStart)
-			return head
-		}
-
-		typeSymbol, ok := sym.(*ast.TypeSymbol)
-		if !ok || typeSymbol == nil {
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  fmt.Sprintf("reciever type '%s' not declared as a type", rcvType),
-				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Rcv.StartOffset, head.Rcv.EndOffset),
-			})
-			p.advance(declStart)
-			return head
-		}
-
-		var recordType *ast.RecordType
-		switch t := typeSymbol.TypeNode().(type) {
-		case *ast.RecordType:
-			recordType = t
-		case *ast.PointerType:
-			if t.Base == nil {
-				p.errorExpected("record type")
-				p.advance(declStart)
-				return head
-			}
-
-			recordType, ok = t.Base.(*ast.RecordType)
-			if !ok {
-				p.errorExpected("record type")
-				p.advance(declStart)
-				return head
-			}
-		default:
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  fmt.Sprintf("receiver '%s' must be a (pointer to) record type", rcvType),
-				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Rcv.StartOffset, head.Rcv.EndOffset),
-			})
-			p.advance(declStart)
-			return head
-		}
-
-		// add the receiver to the procedure's parent environment
-		if sym := p.ctx.Env.Insert(ast.NewParamSymbol(head.Rcv.Var, head.Rcv.Mod, head.Rcv.Type)); sym != nil {
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  "duplicate parameter declaration",
-				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Rcv.StartOffset, head.Rcv.EndOffset),
-			})
-		}
-
-		procedureTy := &ast.ProcedureType{FP: &ast.FormalParams{}}
-		if head.FP != nil {
-			procedureTy.FP.Params = head.FP.Params
-			procedureTy.FP.RetType = head.FP.RetType
-			procedureTy.FP.StartOffset = head.FP.StartOffset
-			procedureTy.FP.EndOffset = head.FP.EndOffset
-		}
-
-		// add the procedure to the receiver's environment
-		if sym := recordType.Env.Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procedureTy, p.ctx.Env)); sym != nil {
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  "duplicate procedure declaration",
-				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
-			})
-		}
-	} else {
-		procedureTy := &ast.ProcedureType{FP: &ast.FormalParams{}}
-		if head.FP != nil {
-			procedureTy.FP.Params = head.FP.Params
-			procedureTy.FP.RetType = head.FP.RetType
-			procedureTy.FP.StartOffset = head.FP.StartOffset
-			procedureTy.FP.EndOffset = head.FP.EndOffset
-		}
-
-		if sym := p.ctx.Env.Parent().Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procedureTy, p.ctx.Env)); sym != nil {
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  fmt.Sprintf("duplicate procedure declaration: '%v'" + head.Name.Name),
-				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
-			})
-		}
-	}
-
-	// add the formal parameters into the receiver's environment
-	if head.FP != nil {
-		for _, param := range head.FP.Params {
-			for _, id := range param.Names {
-				if sym := p.ctx.Env.Insert(ast.NewParamSymbol(id.Name, param.Mod, param.Type)); sym != nil {
-					p.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
-						Message:  "duplicate parameter declaration" + id.Name,
-						Range:    p.ctx.Source.Span(p.ctx.FileName, id.StartOffset, id.EndOffset),
-					})
-				}
-			}
 		}
 	}
 
@@ -1365,10 +1282,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 
 // FormalParameters = '(' [ FPSection { [';'] FPSection } ] ')' [ ':' ReturnType ]
 func (p *Parser) parseFormalParameters() (fp *ast.FormalParams) {
-	pos := p.pos
-	fp = &ast.FormalParams{StartOffset: pos}
-
-	p.match(token.LPAREN)
+	fp = &ast.FormalParams{}
 
 	if p.tok == token.VAR || p.tok == token.IN || p.tok == token.IDENTIFIER {
 		fp.Params = append(fp.Params, p.parseFPSection())
@@ -1393,11 +1307,10 @@ func (p *Parser) parseFormalParameters() (fp *ast.FormalParams) {
 
 // FPSection = [ VAR | IN ] ident { [','] ident } ':' FormalType
 func (p *Parser) parseFPSection() (param *ast.FPSection) {
-	pos := p.pos
-	param = &ast.FPSection{StartOffset: pos}
+	param = &ast.FPSection{StartOffset: p.pos}
 
 	if p.tok == token.VAR || p.tok == token.IN {
-		param.Mod = p.tok
+		param.Kind = p.tok
 		p.next()
 	}
 
@@ -1416,16 +1329,15 @@ func (p *Parser) parseFPSection() (param *ast.FPSection) {
 }
 
 func (p *Parser) parseReceiver() (rcv *ast.Receiver) {
-	pos := p.pos
-	rcv = &ast.Receiver{StartOffset: pos}
+	rcv = &ast.Receiver{StartOffset: p.pos}
 
 	p.match(token.LPAREN)
 	if p.tok == token.VAR || p.tok == token.IN {
-		rcv.Mod = p.tok
+		rcv.Kind = p.tok
 		p.next()
 	}
 
-	rcv.Var = p.parseIdent()
+	rcv.Name = p.parseIdentifierDef()
 	p.match(token.COLON)
 	q := p.parseQualifiedIdent()
 	rcv.Type = ast.NewNamedType(q, q.StartOffset, q.EndOffset)
@@ -1486,17 +1398,18 @@ func (p *Parser) parseStatementSeq() (seq []ast.Statement) {
 	for p.tok == token.SEMICOLON || p.stmtStart() {
 		if p.tok == token.SEMICOLON {
 			p.next()
+
+			if !p.stmtStart() {
+				last := seq[len(seq)-1]
+				p.ctx.Reporter.Report(report.Diagnostic{
+					Severity: report.Error,
+					Message:  "the last statement must not end with a semi-colon",
+					Range:    p.ctx.Source.Span(p.ctx.FileName, last.Pos(), last.End()),
+				})
+				p.advance(stmtStart)
+			}
 		}
 
-		if !p.stmtStart() {
-			last := seq[len(seq)-1]
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  "the last statement must not end with a semi-colon",
-				Range:    p.ctx.Source.Span(p.ctx.FileName, last.Pos(), last.End()),
-			})
-			return
-		}
 		seq = append(seq, p.parseStatement())
 	}
 
