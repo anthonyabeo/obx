@@ -8,6 +8,14 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
+type ProcedureKind int
+
+const (
+	ProperProcedureKind ProcedureKind = iota
+	FunctionProcedureKind
+	TypeBoundProcedureKind
+)
+
 type (
 	VariableDecl struct {
 		IdentList []*IdentifierDef
@@ -36,6 +44,7 @@ type (
 	// ProcedureDecl
 	// -----------------------------------------------------
 	ProcedureDecl struct {
+		Kind    ProcedureKind
 		Head    *ProcedureHeading
 		Body    *ProcedureBody
 		EndName string
@@ -65,7 +74,7 @@ type (
 	// FPSection
 	// ----------------------------------------------
 	FPSection struct {
-		Mod   token.Kind
+		Kind  token.Kind
 		Names []*IdentifierDef
 		Type  Type
 
@@ -82,8 +91,8 @@ type (
 	}
 
 	Receiver struct {
-		Mod  token.Kind
-		Var  string
+		Kind token.Kind
+		Name *IdentifierDef
 		Type Type
 
 		StartOffset int
@@ -193,8 +202,8 @@ func (p *ProcedureBody) Children() []Node {
 
 func (sec *FPSection) String() string {
 	buf := new(bytes.Buffer)
-	if sec.Mod != token.ILLEGAL {
-		buf.WriteString(sec.Mod.String() + " ")
+	if sec.Kind != token.ILLEGAL {
+		buf.WriteString(sec.Kind.String() + " ")
 	}
 
 	var names []string
@@ -248,10 +257,10 @@ func (r *Receiver) String() string {
 	buf := new(bytes.Buffer)
 
 	buf.WriteString("(")
-	if r.Mod != token.ILLEGAL {
-		buf.WriteString(fmt.Sprintf("%s ", r.Mod.String()))
+	if r.Kind != token.ILLEGAL {
+		buf.WriteString(fmt.Sprintf("%s ", r.Kind.String()))
 	}
-	buf.WriteString(fmt.Sprintf("%s: %s", r.Var, r.Type))
+	buf.WriteString(fmt.Sprintf("%s: %s", r.Name, r.Type))
 	buf.WriteString(")")
 
 	return buf.String()
@@ -260,7 +269,7 @@ func (r *Receiver) Accept(vst Visitor) any { return vst.VisitReceiver(r) }
 func (r *Receiver) Pos() int               { return r.StartOffset }
 func (r *Receiver) End() int               { return r.EndOffset }
 func (r *Receiver) Children() []Node {
-	return []Node{r.Type}
+	return []Node{r.Name, r.Type}
 }
 
 func (b *BadDecl) Accept(vst Visitor) any { return vst.VisitBadDecl(b) }

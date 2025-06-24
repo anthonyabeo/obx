@@ -1,12 +1,13 @@
 package types
 
 type ProcedureType struct {
-	Params []*FormalParam // parameter types only; use signature binding for names/kinds
-	Result Type           // nil if PROCEDURE is a command (no result)
+	Params          []*FormalParam // parameter types only; use signature binding for names/kinds
+	Result          Type           // nil if PROCEDURE is a command (no result)
+	IsTypeBoundType bool
 }
 
 func NewProcedureType(param []*FormalParam, res Type) *ProcedureType {
-	return &ProcedureType{param, res}
+	return &ProcedureType{Params: param, Result: res}
 }
 
 func (p *ProcedureType) String() string {

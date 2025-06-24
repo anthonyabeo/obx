@@ -34,7 +34,8 @@ type (
 	}
 
 	ProcedureType struct {
-		FP *FormalParams
+		FP          *FormalParams
+		IsTypeBound bool
 
 		StartOffset int
 		EndOffset   int
