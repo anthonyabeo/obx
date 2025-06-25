@@ -34,7 +34,10 @@ func (s *Environment) Insert(obj Symbol) Symbol {
 	if obj == nil || obj.Name() == "" {
 		return nil
 	}
-	if alt := s.Lookup(obj.Name()); alt != nil {
+	//if alt := s.Lookup(obj.Name()); alt != nil {
+	//	return alt
+	//}
+	if alt := s.elems[obj.Name()]; alt != nil {
 		return alt
 	}
 

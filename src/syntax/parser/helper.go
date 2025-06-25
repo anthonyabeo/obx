@@ -134,7 +134,7 @@ func (p *Parser) startsDecl() bool {
 }
 
 func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind) {
-	procType := &ast.ProcedureType{}
+	procType := &ast.ProcedureType{FP: &ast.FormalParams{}}
 
 	if head.FP != nil {
 		procType.FP = head.FP
@@ -144,7 +144,7 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 				if sym := p.ctx.Env.Insert(ast.NewParamSymbol(id.Name, param.Kind, param.Type)); sym != nil {
 					p.ctx.Reporter.Report(report.Diagnostic{
 						Severity: report.Error,
-						Message:  "duplicate parameter declaration" + id.Name,
+						Message:  fmt.Sprintf("duplicate parameter declaration: '%s'", id.Name),
 						Range:    p.ctx.Source.Span(p.ctx.FileName, id.StartOffset, id.EndOffset),
 					})
 				}
@@ -154,7 +154,7 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 
 	switch kind {
 	case ast.ProperProcedureKind, ast.FunctionProcedureKind:
-		sym := p.ctx.Env.Parent().Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, p.ctx.Env))
+		sym := p.ctx.Env.Parent().Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, p.ctx.Env, kind))
 		if sym != nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
@@ -180,6 +180,8 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 					Message:  "VAR/IN receiver type must be a record type",
 					Range:    p.ctx.Source.Span(p.ctx.FileName, rcvType.Pos(), rcvType.End()),
 				})
+
+				return
 			}
 		default:
 			rec, ok = p.isPointerToRecord(rcvType)
@@ -189,11 +191,14 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 					Message:  "value receiver type must be a pointer to record type",
 					Range:    p.ctx.Source.Span(p.ctx.FileName, rcvType.Pos(), rcvType.End()),
 				})
+
+				return
 			}
 		}
 
 		// add the procedure to the receiver's environment
-		if sym := rec.Env.Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, p.ctx.Env)); sym != nil {
+		proc := ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, p.ctx.Env, kind)
+		if sym := rec.Env.Insert(proc); sym != nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("duplicate procedure declaration for '%s'", head.Name.Name),
@@ -210,6 +215,15 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 			})
 		}
 
+		name := head.Rcv.Type.String() + "." + head.Name.Name
+		sym := p.ctx.Env.Parent().Insert(ast.NewProcedureSymbol(name, head.Name.Props, procType, p.ctx.Env, kind))
+		if sym != nil {
+			p.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("duplicate type-bound procedure declaration for '%s'", head.Name.Name),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
+			})
+		}
 	}
 }
 

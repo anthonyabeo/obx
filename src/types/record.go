@@ -6,12 +6,13 @@ import (
 )
 
 type Field struct {
-	Name string
-	Type Type
+	Name       string
+	Type       Type
+	IsExported bool
 }
 
 type RecordType struct {
-	Fields []Field
+	Fields map[string]*Field
 	Base   *RecordType
 }
 
@@ -45,10 +46,8 @@ func (r *RecordType) Equals(other Type) bool {
 }
 
 func (r *RecordType) GetField(name string) *Field {
-	for _, f := range r.Fields {
-		if f.Name == name {
-			return &f
-		}
+	if f, ok := r.Fields[name]; ok {
+		return f
 	}
 
 	return nil

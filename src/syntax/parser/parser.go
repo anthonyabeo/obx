@@ -1223,6 +1223,9 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 		proc.Kind = ast.ProperProcedureKind
 	}
 
+	// name the symbol table to the name of the procedure
+	proc.Env.SetName(proc.Head.Name.Name)
+	
 	p.populateEnvs(proc.Head, proc.Kind)
 
 	// ─── Parse the Procedure Body to the end of the Procedure ──────────────────────

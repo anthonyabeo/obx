@@ -3906,3 +3906,147 @@ func typeCheckSnippet(t *testing.T, code string) *report.Context {
 
 	return ctx
 }
+
+type typeCheckTestCase struct {
+	Name     string
+	Source   string
+	WantErrs []string
+}
+
+func TestTypeCheckPrograms(t *testing.T) {
+	tests := []typeCheckTestCase{
+		{
+			Name: "Valid function call with integer",
+			Source: `
+				MODULE M;
+				PROCEDURE Act(x: INTEGER); END
+				BEGIN Act(5) END M.
+			`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Call with incorrect type",
+			Source: `
+				MODULE M;
+				PROCEDURE Act(x: INTEGER); END Act;
+				BEGIN Act(TRUE) END M.
+			`,
+			WantErrs: []string{"argument 1: of type, 'bool' is incompatible with parameter of type 'integer'"},
+		},
+		{
+			Name: "Procedure with return type mismatch",
+			Source: `
+				MODULE M;
+				PROCEDURE Add(): INTEGER;
+				BEGIN 
+					RETURN TRUE 
+				END Add
+
+				END M.
+			`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Call procedure with wrong number of args",
+			Source: `
+				MODULE Test;
+				  PROCEDURE Foo(x: INTEGER);
+				  END Foo;
+				
+				BEGIN
+				  Foo()
+				END Test.
+				`,
+			WantErrs: []string{"expected 1 arguments, got 0"},
+		},
+		{
+			Name: "Invalid type-bound procedure receiver",
+			Source: `
+				MODULE Test;
+				  TYPE
+					P = POINTER TO ARRAY OF INTEGER;
+				
+				  PROCEDURE (p: P) DoSomething;
+				  END DoSomething;
+				
+				END Test.
+				`,
+			WantErrs: []string{"value receiver type must be a pointer to record type"},
+		},
+		{
+			Name: "Valid type-bound procedure",
+			Source: `
+				MODULE Test;
+				  TYPE
+					T = POINTER TO RECORD END;
+
+				  PROCEDURE (t: T) Print;
+				  END Print
+				END Test.
+				`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Valid Proper and Function Procedures",
+			Source: `
+				MODULE M;
+				  VAR x: INTEGER;
+				
+				  PROCEDURE Incr(VAR a: INTEGER);
+				  BEGIN a := a + 1
+				  END Incr;
+				
+				  PROCEDURE Square(x: INTEGER): INTEGER;
+				  BEGIN RETURN x * x
+				  END Square;
+				
+				  PROCEDURE Main;
+					VAR y: INTEGER;
+				  BEGIN
+					Incr(y);
+					y := Square(y)
+				  END Main;
+				END M.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Valid Type-bound Procedure and Redefinition ",
+			Source: `
+				MODULE M;
+				  TYPE R = RECORD END;
+					   S = RECORD (R) END;
+				  VAR x: S;
+				
+				  PROCEDURE (VAR r: R) P;
+				  END P;
+				
+				  PROCEDURE (VAR s: S) P;
+				  BEGIN
+					(* P^(s)   call super P *)
+					s.P^()
+				  END P;
+				END M.`,
+			WantErrs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			ctx := typeCheckSnippet(t, tt.Source)
+
+			diags := ctx.Reporter.Diagnostics()
+			if len(diags) != len(tt.WantErrs) {
+				t.Errorf("got %d diagnostics, want %d", len(diags), len(tt.WantErrs))
+				for _, d := range diags {
+					t.Logf("diag: %s", d.Message)
+				}
+				return
+			}
+			for i, want := range tt.WantErrs {
+				if !strings.Contains(diags[i].Message, want) {
+					t.Errorf("diagnostic %d = %q, want substring %q", i, diags[i].Message, want)
+				}
+			}
+		})
+	}
+}

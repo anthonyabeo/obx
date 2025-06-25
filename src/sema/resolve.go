@@ -182,6 +182,7 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 
 			sym.SetMangledName(ast.Mangle(sym))
 			s.Symbol = sym
+			dsg.Symbol = sym
 
 			symbol = sym
 			typeNode = sym.TypeNode()
@@ -229,18 +230,20 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 
 			typeNode = arr.ElemType
 		case *ast.PtrDeref:
-			ptr, ok := symbol.TypeNode().(*ast.PointerType)
-			if !ok {
+			switch p := typeNode.(type) {
+			case *ast.PointerType:
+				typeNode = p.Base
+			case *ast.ProcedureType:
+				typeNode = symbol.TypeNode()
+			default:
 				n.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message:  fmt.Sprintf("cannot dereference a non-pointer '%s'", dsg.QIdent),
+					Message:  fmt.Sprintf("dereference/super operator not applicable to '%s'", dsg.QIdent),
 					Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 				})
 
 				continue
 			}
-
-			typeNode = ptr.Base
 		case *ast.TypeGuard:
 			s.Ty.Accept(n)
 			ty, ok := s.Ty.(*ast.QualifiedIdent)
@@ -385,7 +388,7 @@ func (n *NamesResolver) VisitReturnStmt(stmt *ast.ReturnStmt) any {
 func (n *NamesResolver) VisitProcedureCall(call *ast.ProcedureCall) any {
 	call.Callee.Accept(n)
 
-	sym := call.Callee.QIdent.Symbol
+	sym := call.Callee.Symbol
 	_, ok := sym.(*ast.ProcedureSymbol)
 	if !ok {
 		n.ctx.Reporter.Report(report.Diagnostic{
@@ -510,6 +513,47 @@ func (n *NamesResolver) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	return decl
 }
 
+func (n *NamesResolver) VisitProcedureHeading(heading *ast.ProcedureHeading) any {
+	var rcvName string
+	if heading.Rcv != nil {
+		heading.Rcv.Accept(n)
+		rcvName = heading.Rcv.Type.String() + "."
+	}
+
+	//heading.Name.Accept(n)
+	sym := n.ctx.Env.Lookup(rcvName + heading.Name.Name)
+	if sym == nil {
+		n.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("identifier '%s' not found", heading.Name.Name),
+			Range:    n.ctx.Source.Span(n.ctx.FileName, heading.Name.StartOffset, heading.Name.EndOffset),
+		})
+
+		return nil
+	}
+
+	sym.SetMangledName(ast.Mangle(sym))
+	heading.Name.Symbol = sym
+
+	if heading.FP != nil {
+		heading.FP.Accept(n)
+	}
+
+	return heading
+}
+
+func (n *NamesResolver) VisitProcedureBody(body *ast.ProcedureBody) any {
+	for _, decl := range body.DeclSeq {
+		decl.Accept(n)
+	}
+
+	for _, stmt := range body.StmtSeq {
+		stmt.Accept(n)
+	}
+
+	return body
+}
+
 func (n *NamesResolver) VisitVariableDecl(decl *ast.VariableDecl) any {
 	for _, id := range decl.IdentList {
 		def := id.Accept(n)
@@ -525,6 +569,36 @@ func (n *NamesResolver) VisitVariableDecl(decl *ast.VariableDecl) any {
 	decl.Type.Accept(n)
 
 	return decl
+}
+
+func (n *NamesResolver) VisitReceiver(rcv *ast.Receiver) any {
+	rcv.Type.Accept(n)
+	rcv.Name.Accept(n)
+
+	rcv.Name.Symbol.SetMangledName(ast.Mangle(rcv.Name.Symbol))
+
+	return rcv
+}
+
+func (n *NamesResolver) VisitFPSection(sec *ast.FPSection) any {
+	for _, name := range sec.Names {
+		name.Accept(n)
+	}
+
+	sec.Type.Accept(n)
+	return sec
+}
+
+func (n *NamesResolver) VisitFormalParams(params *ast.FormalParams) any {
+	for _, param := range params.Params {
+		param.Accept(n)
+	}
+
+	if params.RetType != nil {
+		params.RetType.Accept(n)
+	}
+
+	return params
 }
 
 func (n *NamesResolver) VisitConstantDecl(decl *ast.ConstantDecl) any {
@@ -545,32 +619,6 @@ func (n *NamesResolver) VisitTypeDecl(decl *ast.TypeDecl) any {
 	decl.Name.Accept(n)
 	decl.DenotedType.Accept(n)
 	return decl
-}
-
-func (n *NamesResolver) VisitProcedureHeading(heading *ast.ProcedureHeading) any {
-	if heading.Rcv != nil {
-		heading.Rcv.Accept(n)
-	}
-
-	heading.Name.Accept(n)
-
-	if heading.FP != nil {
-		heading.FP.Accept(n)
-	}
-
-	return heading
-}
-
-func (n *NamesResolver) VisitProcedureBody(body *ast.ProcedureBody) any {
-	for _, decl := range body.DeclSeq {
-		decl.Accept(n)
-	}
-
-	for _, stmt := range body.StmtSeq {
-		stmt.Accept(n)
-	}
-
-	return body
 }
 
 func (n *NamesResolver) VisitBasicType(ty *ast.BasicType) any { return ty }
@@ -653,45 +701,6 @@ func (n *NamesResolver) VisitElseIfBranch(br *ast.ElseIfBranch) any {
 	}
 
 	return br
-}
-
-func (n *NamesResolver) VisitReceiver(rcv *ast.Receiver) any {
-	rcv.Type.Accept(n)
-	sym := n.ctx.Env.Lookup(rcv.Var)
-	if sym == nil {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
-			Message:  fmt.Sprintf("unknown name %s in receiver", rcv.Var),
-			Range:    n.ctx.Source.Span(n.ctx.FileName, rcv.StartOffset, rcv.EndOffset),
-		})
-
-		return nil
-	}
-
-	sym.SetMangledName(ast.Mangle(sym))
-
-	return rcv
-}
-
-func (n *NamesResolver) VisitFPSection(sec *ast.FPSection) any {
-	for _, name := range sec.Names {
-		name.Accept(n)
-	}
-
-	sec.Type.Accept(n)
-	return sec
-}
-
-func (n *NamesResolver) VisitFormalParams(params *ast.FormalParams) any {
-	for _, param := range params.Params {
-		param.Accept(n)
-	}
-
-	if params.RetType != nil {
-		params.RetType.Accept(n)
-	}
-
-	return params
 }
 
 func (n *NamesResolver) VisitCase(c *ast.Case) any {

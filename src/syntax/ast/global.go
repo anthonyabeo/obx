@@ -5,10 +5,13 @@ import "github.com/anthonyabeo/obx/src/types"
 var GlobalEnviron *Environment
 
 // A PreDeclFuncProc is the id of a predeclared function or procedure.
-type PreDeclFuncProc int
+type (
+	PreDeclFuncProc   int
+	PreDeclProperProc int
+)
 
 const (
-	Assert_ PreDeclFuncProc = iota
+	Assert_ PreDeclProperProc = iota
 	Bytes_
 	Dec_
 	Excl_
@@ -22,9 +25,11 @@ const (
 	Copy_
 	Pack_
 	UnPk_
+)
 
+const (
 	// Predeclared function procedures
-	Abs_
+	Abs_ PreDeclFuncProc = iota
 	Cap_
 	BitAnd_
 	BitAsr_
@@ -60,7 +65,7 @@ const (
 	Ror_
 )
 
-var PredeclaredProcedures = [...]struct {
+var PredeclaredProperProcedures = [...]struct {
 	Name []string
 }{
 	// Predeclared proper procedures
@@ -80,7 +85,11 @@ var PredeclaredProcedures = [...]struct {
 	Copy_: {[]string{"copy", "COPY"}},
 	Pack_: {[]string{"pack", "PACK"}},
 	UnPk_: {[]string{"unpk", "UNPK"}},
+}
 
+var PredeclaredFunctionProcedures = [...]struct {
+	Name []string
+}{
 	Abs_:     {[]string{"abs", "ABS"}},
 	Cap_:     {[]string{"cap", "CAP"}},
 	BitAnd_:  {[]string{"bitand", "BITAND"}},
@@ -117,11 +126,15 @@ var PredeclaredProcedures = [...]struct {
 }
 
 func defPredeclaredProcedures() {
-	for i := range PredeclaredProcedures {
+	for i := range PredeclaredProperProcedures {
 		id := PreDeclFuncProc(i)
 
-		for _, name := range PredeclaredProcedures[id].Name {
-			GlobalEnviron.Insert(NewProcedureSymbol(name, Predeclared, nil, nil))
+		for _, name := range PredeclaredProperProcedures[id].Name {
+			GlobalEnviron.Insert(NewProcedureSymbol(name, Predeclared, nil, nil, ProperProcedureKind))
+		}
+
+		for _, name := range PredeclaredProperProcedures[id].Name {
+			GlobalEnviron.Insert(NewProcedureSymbol(name, Predeclared, nil, nil, FunctionProcedureKind))
 		}
 	}
 }

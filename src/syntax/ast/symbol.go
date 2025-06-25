@@ -102,15 +102,17 @@ type ProcedureSymbol struct {
 	typeNode    Type
 	typ         types.Type
 	mangledName string
+	ProcKind    ProcedureKind
 }
 
-func NewProcedureSymbol(name string, props IdentProps, ty Type, env *Environment) *ProcedureSymbol {
+func NewProcedureSymbol(name string, props IdentProps, ty Type, env *Environment, procKind ProcedureKind) *ProcedureSymbol {
 	return &ProcedureSymbol{
 		Env:      env,
 		name:     name,
 		kind:     ProcedureSymbolKind,
 		props:    props,
 		typeNode: ty,
+		ProcKind: procKind,
 	}
 }
 

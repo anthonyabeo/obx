@@ -277,11 +277,14 @@ func IsPointerToOpenArray(t Type) bool {
 func BaseRecord(t Type) *RecordType {
 	switch t := t.(type) {
 	case *PointerType:
-		if rec, ok := t.Base.(*RecordType); ok {
-			return rec
+		rec, ok := t.Base.(*RecordType)
+		if ok {
+			return nil
 		}
+
+		return rec.Base
 	case *RecordType:
-		return t
+		return t.Base
 	}
 	return nil
 }
