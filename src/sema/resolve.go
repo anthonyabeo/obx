@@ -103,13 +103,7 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 	}
 
 	if dsg.QIdent.Symbol == nil {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
-			Message:  fmt.Sprintf("designator '%s' not found", dsg.QIdent),
-			Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.StartOffset, dsg.EndOffset),
-		})
-
-		return nil
+		return dsg
 	}
 
 	symbol := dsg.QIdent.Symbol
@@ -138,23 +132,11 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 			case *ast.PointerType:
 				ptr, ok := n.underlying(tn.Base).(*ast.RecordType)
 				if !ok {
-					n.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
-						Message:  fmt.Sprintf("cannot select field of non-record '%s'", dsg.QIdent),
-						Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
-					})
-
 					continue
 				}
 
 				rec = ptr
 			default:
-				n.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
-					Message:  fmt.Sprintf("cannot select field of non-record '%s'", dsg.QIdent),
-					Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
-				})
-
 				continue
 			}
 
@@ -326,7 +308,7 @@ func (n *NamesResolver) VisitExprRange(rng *ast.ExprRange) any {
 	return rng
 }
 
-func (n *NamesResolver) VisitNil(n2 *ast.Nil) any { return n2 }
+func (n *NamesResolver) VisitNil(kneel *ast.Nil) any { return kneel }
 
 func (n *NamesResolver) VisitIfStmt(stmt *ast.IfStmt) any {
 	stmt.BoolExpr.Accept(n)
@@ -362,16 +344,6 @@ func (n *NamesResolver) VisitReturnStmt(stmt *ast.ReturnStmt) any {
 
 func (n *NamesResolver) VisitProcedureCall(call *ast.ProcedureCall) any {
 	call.Callee.Accept(n)
-
-	if call.Callee.Symbol == nil {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
-			Message:  fmt.Sprintf("procedure object '%s' could not be resolved", call.Callee),
-			Range:    n.ctx.Source.Span(n.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
-		})
-
-		return nil
-	}
 
 	for _, arg := range call.ActualParams {
 		arg.Accept(n)

@@ -501,14 +501,14 @@ func (v *AstPrinter) VisitFormalParams(fp *ast.FormalParams) any {
 
 func (v *AstPrinter) VisitReceiver(r *ast.Receiver) any {
 	var mode string
-	if r.Mod != token.ILLEGAL {
-		mode = r.Mod.String()
+	if r.Kind != token.ILLEGAL {
+		mode = r.Kind.String()
 	}
 
 	return map[string]any{
 		"type":     "Receiver",
 		"modifier": mode,
-		"name":     r.Var,
+		"name":     r.Name.Accept(v),
 		"typeExpr": r.Type.Accept(v),
 		"range":    formatRange(v.ctx.Source.Span(v.ctx.FileName, r.StartOffset, r.EndOffset)),
 	}
@@ -516,8 +516,8 @@ func (v *AstPrinter) VisitReceiver(r *ast.Receiver) any {
 
 func (v *AstPrinter) VisitFPSection(sec *ast.FPSection) any {
 	var mode string
-	if sec.Mod != token.ILLEGAL {
-		mode = sec.Mod.String()
+	if sec.Kind != token.ILLEGAL {
+		mode = sec.Kind.String()
 	}
 
 	return map[string]any{

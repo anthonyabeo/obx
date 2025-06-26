@@ -4202,16 +4202,14 @@ func TestTypeCheckPrograms(t *testing.T) {
 					T1 = RECORD (T0) END;
 				
 				  PROCEDURE (VAR t: T0) P(a: INTEGER);
-				  BEGIN
 				  END P;
 				
 				  PROCEDURE (VAR t: T1) P(a, b: INTEGER);
-				  BEGIN
 				  END P;
 				
 				END Test.
 				`,
-			WantErrs: []string{"redefinition of method 'P' on 'T1' does not match overridden method"},
+			WantErrs: []string{"parameter mismatch between of super and redefinition of 'P'"},
 		},
 		{
 			Name: "Type-bound method called with invalid receiver",
@@ -4221,33 +4219,39 @@ func TestTypeCheckPrograms(t *testing.T) {
 					T = RECORD END;
 				
 				  PROCEDURE (VAR t: T) M();
-				  BEGIN
 				  END M;
 				
 				  VAR x: INTEGER;
 				
 				BEGIN
-				  x.M(); (* invalid call, x is not of type T *)
+				  x.M() (* invalid call, x is not of type T *)
 				END Test.
 				`,
-			WantErrs: []string{"x.M", "not a valid receiver"},
+			WantErrs: []string{
+				"cannot select field 'M' of non-record 'x",
+				"name 'x.M' could not be resolved to a procedure",
+			},
 		},
 		{
 			Name: "Call to undefined procedure",
 			Source: `
 				MODULE Test;
 				BEGIN
-				  Foo(); (* undefined procedure *)
+				  Foo() (* undefined procedure *)
 				END Test.
 				`,
-			WantErrs: []string{"Foo", "undefined"},
+			WantErrs: []string{
+				"undeclared identifier: 'Foo'",
+				"unresolved identifier: 'Foo'",
+				"name 'Foo' could not be resolved to a procedure",
+			},
 		},
 		{
 			Name: "Valid procedure type declaration and variable",
 			Source: `
 				MODULE Test;
 				  TYPE
-					Handler = PROCEDURE (INTEGER): INTEGER;
+					Handler = PROCEDURE (_: INTEGER): INTEGER;
 				
 				  VAR
 					f: Handler;

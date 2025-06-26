@@ -55,7 +55,7 @@ func (p *ProcedureType) Equals(other Type) bool {
 }
 
 type FormalParam struct {
-	Kind  string // VAR, IN, value
-	Names []string
-	Type  Type
+	Kind string // VAR, IN, value
+	Name string
+	Type Type
 }

@@ -559,15 +559,15 @@ end Drawing
 `)
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 	figures := ast.NewEnvironment(ast.GlobalEnviron, "Figure")
-	figures.Insert(ast.NewProcedureSymbol("calc", ast.Exported, nil, nil))
+	figures.Insert(ast.NewProcedureSymbol("calc", ast.Exported, nil, nil, ast.FunctionProcedureKind))
 
 	collections := ast.NewEnvironment(ast.GlobalEnviron, "Collections")
 	collections.Insert(ast.NewTypeSymbol("Iterator", ast.Exported, &ast.RecordType{}))
-	collections.Insert(ast.NewProcedureSymbol("createDeque", ast.Exported, nil, nil))
+	collections.Insert(ast.NewProcedureSymbol("createDeque", ast.Exported, nil, nil, ast.FunctionProcedureKind))
 
 	env := ast.NewRecordEnv(nil, collections)
-	env.Insert(ast.NewProcedureSymbol("forEach", ast.Exported, nil, nil))
-	env.Insert(ast.NewProcedureSymbol("append", ast.Exported, nil, nil))
+	env.Insert(ast.NewProcedureSymbol("forEach", ast.Exported, nil, nil, ast.ProperProcedureKind))
+	env.Insert(ast.NewProcedureSymbol("append", ast.Exported, nil, nil, ast.ProperProcedureKind))
 	collections.Insert(ast.NewTypeSymbol("Deque", ast.Exported, &ast.RecordType{Env: env}))
 
 	envs := map[string]*ast.Environment{
@@ -656,10 +656,10 @@ end Drawing
 			if Decls[i] != d.String() {
 				t.Errorf("expected type declaration '%s', got '%s'", Decls[i], d.String())
 			}
-			//case *ast.ProcedureDecl:
-			//	if Decls[i] != d.Head.String() {
-			//		t.Errorf("expected procedure declaration '%s', got '%s'", Decls[i], d.Head.String())
-			//	}
+		case *ast.ProcedureDecl:
+			if Decls[i] != d.Head.String() {
+				t.Errorf("expected procedure declaration '%s', got '%s'", Decls[i], d.Head.String())
+			}
 		}
 	}
 }
@@ -823,7 +823,7 @@ end Main
 		{5, "record{integer; Tree; Tree}", "Node"},
 		{6, "^CenterNode", "CenterTree"},
 		{7, "record(Node){integer; Tree}", "CenterNode"},
-		{8, "procedure(x: integer): integer", "Function"},
+		{8, "procedure(_: integer): integer", "Function"},
 	}
 
 	for _, tt := range tests {

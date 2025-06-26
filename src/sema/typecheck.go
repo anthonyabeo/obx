@@ -178,7 +178,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				if !ok {
 					t.ctx.Reporter.Report(report.Diagnostic{
 						Severity: report.Error,
-						Message:  fmt.Sprintf("cannot select field '%v' of pointer to non-record type: '%v'", s.Field, dsg.QIdent),
+						Message:  fmt.Sprintf("cannot select field '%v' of pointer to non-record type '%v'", s.Field, dsg.QIdent),
 						Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 					})
 
@@ -189,7 +189,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 			default:
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message:  fmt.Sprintf("cannot select field '%v' of non-record: '%v'", s.Field, dsg.QIdent),
+					Message:  fmt.Sprintf("cannot select field '%v' of non-record '%v'", s.Field, dsg.QIdent),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 				})
 
@@ -2226,7 +2226,7 @@ func (t *TypeChecker) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 	if ident.Symbol == nil {
 		t.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
-			Message:  "unresolved identifier: " + ident.Name,
+			Message:  fmt.Sprintf("unresolved identifier: '%s'", ident.Name),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, ident.StartOffset, ident.EndOffset),
 		})
 
@@ -2852,10 +2852,14 @@ func (t *TypeChecker) VisitFPSection(section *ast.FPSection) any {
 		kind = "VALUE"
 	}
 
-	var names []string
+	var params []*types.FormalParam
 	for _, id := range section.Names {
 		if id.Name == "_" {
-			names = append(names, "_")
+			params = append(params, &types.FormalParam{
+				Kind: kind,
+				Name: "_",
+				Type: typ,
+			})
 			continue
 		}
 
@@ -2874,14 +2878,14 @@ func (t *TypeChecker) VisitFPSection(section *ast.FPSection) any {
 		id.Symbol = sym
 		id.SemaType = typ
 
-		names = append(names, id.Name)
+		params = append(params, &types.FormalParam{
+			Kind: kind,
+			Name: id.Name,
+			Type: typ,
+		})
 	}
 
-	return &types.FormalParam{
-		Kind:  kind,
-		Names: names,
-		Type:  typ,
-	}
+	return params
 }
 
 func (t *TypeChecker) VisitFormalParams(params *ast.FormalParams) any {
@@ -2889,8 +2893,8 @@ func (t *TypeChecker) VisitFormalParams(params *ast.FormalParams) any {
 
 	var p []*types.FormalParam
 	for _, sec := range params.Params {
-		fp := t.VisitFPSection(sec).(*types.FormalParam)
-		p = append(p, fp)
+		p = t.VisitFPSection(sec).([]*types.FormalParam)
+		//p = append(p, fp)
 	}
 	procType.Params = p
 
@@ -3312,7 +3316,7 @@ func (t *TypeChecker) checkTypeBoundRedefinition(proc *ast.ProcedureDecl) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  fmt.Sprintf("parameter mismatch between of super and redefinition of '%s'", name),
-					Range:    t.ctx.Source.Span(t.ctx.FileName, proc.Head.Pos(), proc.Head.Pos()),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, proc.Head.Pos(), proc.Head.End()),
 				})
 			}
 

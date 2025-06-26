@@ -129,7 +129,7 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 
 	table := ast.NewEnvironment(ast.GlobalEnviron, "Bigger")
 	out := ast.NewEnvironment(ast.GlobalEnviron, "Out")
-	out.Insert(ast.NewProcedureSymbol("Int", ast.Exported, nil, nil))
+	out.Insert(ast.NewProcedureSymbol("Int", ast.Exported, nil, nil, ast.ProperProcedureKind))
 	envs := map[string]*ast.Environment{
 		"Bigger": table,
 		"Out":    out,

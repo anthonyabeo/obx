@@ -324,8 +324,8 @@ func TestAssignmentCompatible(t *testing.T) {
 
 func TestParameterCompatible(t *testing.T) {
 	var (
-		recordA = &RecordType{Fields: []Field{{"A", IntegerType}}}
-		recordB = &RecordType{Fields: []Field{{"B", IntegerType}}, Base: recordA} // B extends A
+		recordA = &RecordType{Fields: map[string]*Field{"A": {"A", IntegerType, false}}}
+		recordB = &RecordType{Base: recordA, Fields: map[string]*Field{"B": {"B", IntegerType, false}}}
 
 		// Base types
 		int32Ptr = &PointerType{Base: Int32Type}
@@ -755,8 +755,8 @@ func TestSmallestRealType(t *testing.T) {
 func TestExpressionCompatible(t *testing.T) {
 	strChar := &ArrayType{10, CharType}
 	strWchar := &ArrayType{10, WCharType}
-	ptrFoo := &PointerType{&NamedType{"Foo", &RecordType{[]Field{}, nil}}}
-	procType := &ProcedureType{nil, nil}
+	ptrFoo := &PointerType{&NamedType{"Foo", &RecordType{map[string]*Field{}, nil}}}
+	procType := &ProcedureType{nil, nil, false}
 
 	tests := []struct {
 		op       token.Kind
