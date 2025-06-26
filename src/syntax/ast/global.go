@@ -6,12 +6,12 @@ var GlobalEnviron *Environment
 
 // A PreDeclFuncProc is the id of a predeclared function or procedure.
 type (
-	PreDeclFuncProc   int
-	PreDeclProperProc int
+	PreDeclFunc int
+	PreDeclProc int
 )
 
 const (
-	Assert_ PreDeclProperProc = iota
+	Assert_ PreDeclProc = iota
 	Bytes_
 	Dec_
 	Excl_
@@ -29,7 +29,7 @@ const (
 
 const (
 	// Predeclared function procedures
-	Abs_ PreDeclFuncProc = iota
+	Abs_ PreDeclFunc = iota
 	Cap_
 	BitAnd_
 	BitAsr_
@@ -65,7 +65,7 @@ const (
 	Ror_
 )
 
-var PredeclaredProperProcedures = [...]struct {
+var PredeclaredProcedures = [...]struct {
 	Name []string
 }{
 	// Predeclared proper procedures
@@ -87,7 +87,7 @@ var PredeclaredProperProcedures = [...]struct {
 	UnPk_: {[]string{"unpk", "UNPK"}},
 }
 
-var PredeclaredFunctionProcedures = [...]struct {
+var PredeclaredFunctions = [...]struct {
 	Name []string
 }{
 	Abs_:     {[]string{"abs", "ABS"}},
@@ -125,16 +125,22 @@ var PredeclaredFunctionProcedures = [...]struct {
 	Ror_:    {[]string{"ror", "ROR"}},
 }
 
-func defPredeclaredProcedures() {
-	for i := range PredeclaredProperProcedures {
-		id := PreDeclFuncProc(i)
+func defPredeclaredFunctions() {
+	for i := range PredeclaredFunctions {
+		id := PreDeclFunc(i)
 
-		for _, name := range PredeclaredProperProcedures[id].Name {
-			GlobalEnviron.Insert(NewProcedureSymbol(name, Predeclared, nil, nil, ProperProcedureKind))
+		for _, name := range PredeclaredFunctions[id].Name {
+			GlobalEnviron.Insert(NewProcedureSymbol(name, Predeclared, nil, GlobalEnviron, FunctionProcedureKind))
 		}
+	}
+}
 
-		for _, name := range PredeclaredFunctionProcedures[id].Name {
-			GlobalEnviron.Insert(NewProcedureSymbol(name, Predeclared, nil, nil, FunctionProcedureKind))
+func defPredeclaredProcedures() {
+	for i := range PredeclaredProcedures {
+		id := PreDeclProc(i)
+
+		for _, name := range PredeclaredProcedures[id].Name {
+			GlobalEnviron.Insert(NewProcedureSymbol(name, Predeclared, nil, GlobalEnviron, ProperProcedureKind))
 		}
 	}
 }
@@ -153,5 +159,6 @@ func init() {
 	GlobalEnviron = NewEnvironment(nil, "global")
 
 	defPredeclaredTypes()
+	defPredeclaredFunctions()
 	defPredeclaredProcedures()
 }

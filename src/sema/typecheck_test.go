@@ -112,7 +112,7 @@ func TestTypeCheckerPrograms(t *testing.T) {
 			ptr^.username[3] := "A" (* pointer dereference and field access *)
 			t[0] := 3.14                (* array assignment *)
 			c := CHR(65)            (* built-in function for char *)
-			(*y := MIN(int32)*)
+			y := MIN(int32)
 			r := MIN(3.14, 2) (* built-in function with multiple args *)
 		END Test.
 	`,
@@ -4162,6 +4162,105 @@ func TestTypeCheckPrograms(t *testing.T) {
 			  END Main;
 			END M.
 			`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Valid proper and function procedures, with type-bound methods and calls",
+			Source: `
+				MODULE Test;
+				  TYPE
+					T = RECORD x: INTEGER END;
+				  VAR
+					t: T;
+				
+				  PROCEDURE Inc(VAR x: INTEGER);
+				  BEGIN x := x + 1
+				  END Inc;
+				
+				  PROCEDURE Add(a, b: INTEGER): INTEGER;
+				  BEGIN RETURN a + b
+				  END Add;
+				
+				  PROCEDURE (VAR t: T) Update(y: INTEGER);
+				  BEGIN t.x := y
+				  END Update;
+				
+				BEGIN
+				  Inc(t.x);
+				  Add(1, 2);
+				  t.Update(42)
+				END Test.
+				`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Type-bound method override with mismatched parameters",
+			Source: `
+				MODULE Test;
+				  TYPE
+					T0 = RECORD END;
+					T1 = RECORD (T0) END;
+				
+				  PROCEDURE (VAR t: T0) P(a: INTEGER);
+				  BEGIN
+				  END P;
+				
+				  PROCEDURE (VAR t: T1) P(a, b: INTEGER);
+				  BEGIN
+				  END P;
+				
+				END Test.
+				`,
+			WantErrs: []string{"redefinition of method 'P' on 'T1' does not match overridden method"},
+		},
+		{
+			Name: "Type-bound method called with invalid receiver",
+			Source: `
+				MODULE Test;
+				  TYPE
+					T = RECORD END;
+				
+				  PROCEDURE (VAR t: T) M();
+				  BEGIN
+				  END M;
+				
+				  VAR x: INTEGER;
+				
+				BEGIN
+				  x.M(); (* invalid call, x is not of type T *)
+				END Test.
+				`,
+			WantErrs: []string{"x.M", "not a valid receiver"},
+		},
+		{
+			Name: "Call to undefined procedure",
+			Source: `
+				MODULE Test;
+				BEGIN
+				  Foo(); (* undefined procedure *)
+				END Test.
+				`,
+			WantErrs: []string{"Foo", "undefined"},
+		},
+		{
+			Name: "Valid procedure type declaration and variable",
+			Source: `
+				MODULE Test;
+				  TYPE
+					Handler = PROCEDURE (INTEGER): INTEGER;
+				
+				  VAR
+					f: Handler;
+				
+				  PROCEDURE Square(x: INTEGER): INTEGER;
+				  BEGIN RETURN x * x
+				  END Square;
+				
+				BEGIN
+				  f := Square;
+				  f(5)
+				END Test.
+				`,
 			WantErrs: nil,
 		},
 	}

@@ -113,7 +113,7 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 	}
 
 	symbol := dsg.QIdent.Symbol
-	typeNode := n.underlying(symbol.TypeNode())
+	typeNode := symbol.TypeNode()
 
 	for _, selector := range dsg.Select {
 		if typeNode == nil {
@@ -125,6 +125,8 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 
 			continue
 		}
+
+		typeNode = n.underlying(typeNode)
 
 		switch s := selector.(type) {
 		case *ast.DotOp:
@@ -191,18 +193,6 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 					continue
 				}
 				arr = ptr
-			case *ast.NamedType:
-				t, ok := tn.Symbol.TypeNode().(*ast.ArrayType)
-				if !ok {
-					n.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
-						Message:  fmt.Sprintf("%s\\'s type, '%s', is not an alias for an array", dsg.QIdent, tn.Name),
-						Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
-					})
-
-					continue
-				}
-				arr = t
 			default:
 				n.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
@@ -382,7 +372,7 @@ func (n *NamesResolver) VisitProcedureCall(call *ast.ProcedureCall) any {
 
 		return nil
 	}
-	
+
 	for _, arg := range call.ActualParams {
 		arg.Accept(n)
 	}
