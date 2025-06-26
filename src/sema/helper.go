@@ -63,3 +63,45 @@ func smallestTypeFor(value int64) types.Type {
 		return types.Int64Type
 	}
 }
+
+func IsCallable(dsg *ast.Designator) bool {
+	if dsg.QIdent == nil || dsg.QIdent.Symbol == nil {
+		return false
+	}
+
+	switch dsg.Symbol.Kind() {
+	case ast.ProcedureSymbolKind:
+		return true
+	case ast.VariableSymbolKind, ast.ConstantSymbolKind, ast.FieldSymbolKind, ast.ParamSymbolKind:
+		switch ty := dsg.Symbol.TypeNode().(type) {
+		case *ast.ProcedureType:
+			return true
+		case *ast.NamedType:
+			_, ok := ty.Symbol.TypeNode().(*ast.ProcedureType)
+			return ok
+		case *ast.PointerType:
+			_, ok := ty.Base.(*ast.ProcedureType)
+			return ok
+		default:
+			return false
+		}
+	default:
+		return false
+	}
+}
+
+func (n *NamesResolver) underlying(ty ast.Type) ast.Type {
+	for {
+		switch t := ty.(type) {
+		case *ast.NamedType:
+			sym := n.ctx.Env.Lookup(t.Name.Name)
+			if sym == nil {
+				return nil
+			}
+
+			ty = sym.TypeNode()
+		default:
+			return t
+		}
+	}
+}

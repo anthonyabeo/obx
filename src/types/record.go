@@ -46,11 +46,12 @@ func (r *RecordType) Equals(other Type) bool {
 }
 
 func (r *RecordType) GetField(name string) *Field {
-	if f, ok := r.Fields[name]; ok {
-		return f
+	f, ok := r.Fields[name]
+	if !ok && r.Base != nil {
+		return r.Base.GetField(name)
 	}
 
-	return nil
+	return f
 }
 
 var AnyRec *RecordType

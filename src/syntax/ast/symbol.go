@@ -18,8 +18,6 @@ const (
 	DefinitionSymbolKind
 	FieldSymbolKind
 	ParamSymbolKind
-	TypeBoundProcedureSymbolKind
-	PredeclaredProcedureSymbolKind
 )
 
 func (s SymbolKind) String() string {
@@ -38,8 +36,6 @@ func (s SymbolKind) String() string {
 		return "Definition"
 	case FieldSymbolKind:
 		return "FieldSymbolKind"
-	case TypeBoundProcedureSymbolKind:
-		return "TypeBoundProcedureSymbolKind"
 	default:
 		return "Unknown"
 	}
@@ -47,7 +43,7 @@ func (s SymbolKind) String() string {
 
 func (s SymbolKind) IsProcedure() bool {
 	switch s {
-	case ProcedureSymbolKind, TypeBoundProcedureSymbolKind:
+	case ProcedureSymbolKind:
 		return true
 	default:
 		return false

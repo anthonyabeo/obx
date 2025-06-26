@@ -598,6 +598,10 @@ func (p *Parser) parseProcedureType() *ast.ProcedureType {
 		}
 	}
 
+	if proc.FP != nil {
+		proc.FP = p.copyParamsForProcedureType(proc.FP)
+	}
+
 	return proc
 }
 
@@ -881,7 +885,7 @@ func (p *Parser) parseFactor() ast.Expression {
 		}
 
 		sym := env.Lookup(dsg.QIdent.Name)
-		if sym != nil && sym.Kind() == ast.ProcedureSymbolKind && p.tok == token.RPAREN && p.ctx.Names.Top() == sym.Name() {
+		if sym != nil && p.IsCallable(sym) && p.tok == token.RPAREN && p.ctx.Names.Top() == sym.Name() {
 			var args []ast.Expression
 			if !p.ctx.ExprLists.Empty() {
 				args = p.ctx.ExprLists.Pop()
@@ -1225,7 +1229,7 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 
 	// name the symbol table to the name of the procedure
 	proc.Env.SetName(proc.Head.Name.Name)
-	
+
 	p.populateEnvs(proc.Head, proc.Kind)
 
 	// ─── Parse the Procedure Body to the end of the Procedure ──────────────────────

@@ -4022,10 +4022,146 @@ func TestTypeCheckPrograms(t *testing.T) {
 				
 				  PROCEDURE (VAR s: S) P;
 				  BEGIN
-					(* P^(s)   call super P *)
-					s.P^()
+					s.P^() (* call super P *)
 				  END P;
 				END M.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Type-bound Redefinition (Invalid: parameter mismatch)",
+			Source: `
+				MODULE M;
+				  TYPE T = RECORD END;
+					   U = RECORD (T) END;
+				
+				  PROCEDURE (VAR t: T) Foo(x: INTEGER);
+				  END Foo;
+				
+				  PROCEDURE (IN u: U) Foo(x: CHAR);  (* ERROR *)
+				  END Foo;
+				END M.`,
+			WantErrs: []string{"parameter mismatch between of super and redefinition of 'Foo'"},
+		},
+		{
+			Name: "Type-bound Procedure Call and Dispatch",
+			Source: `MODULE M;
+				  TYPE T = RECORD END;
+					   U = RECORD (T) END;
+				
+				  PROCEDURE (VAR t: T) Print;
+				  END Print;
+				
+				  VAR u: U;
+				
+				  PROCEDURE Main;
+				  BEGIN
+					u.Print()  (* dispatch to U.Print or fallback to T.Print *)
+				  END Main;
+				END M.
+				`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Procedure Types and Assignment Compatibility",
+			Source: `MODULE M;
+				  TYPE P = PROCEDURE(_: INTEGER);
+				  VAR f: P;
+				
+				  PROCEDURE Impl(x: INTEGER);
+				  END Impl;
+				
+				  PROCEDURE Main;
+				  BEGIN
+					f := Impl;  (* compatible procedure type *)
+					f(42)
+				  END Main;
+				END M.
+				`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Predeclared Procedure Call (ABS)",
+			Source: `
+				MODULE M;
+				  VAR x, y: INTEGER;
+				
+				  PROCEDURE Main;
+				  BEGIN
+					y := ABS(x)
+				  END Main;
+				END M.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Call Procedure via Procedure Variable",
+			Source: `MODULE M;
+				  TYPE Handler = PROCEDURE(VAR x: INTEGER);
+				  VAR doSomething: Handler;
+				
+				  PROCEDURE Impl(VAR x: INTEGER);
+				  BEGIN x := x + 1
+				  END Impl;
+				
+				  PROCEDURE Main;
+					VAR n: INTEGER;
+				  BEGIN
+					doSomething := Impl;
+					doSomething(n)
+				  END Main;
+				END M.
+				`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Calling a non-procedure type ",
+			Source: `MODULE M;
+				  VAR x: INTEGER;
+				
+				  PROCEDURE Main;
+				  BEGIN
+					x()  (* ERROR: x is not a procedure *)
+				  END Main;
+				END M.
+				`,
+			WantErrs: []string{"name 'x' could not be resolved to a procedure"},
+		},
+		{
+			Name: "Using Procedure as Expression",
+			Source: `MODULE M;
+				  PROCEDURE F(x: INTEGER): INTEGER;
+				  BEGIN RETURN x * 2
+				  END F;
+				
+				  VAR g: PROCEDURE(x: INTEGER): INTEGER;
+				
+				  PROCEDURE Main;
+					VAR y: INTEGER;
+				  BEGIN
+					g := F;
+					y := g(5)
+				  END Main;
+				END M.
+				`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Type-bound Procedure with POINTER Receiver",
+			Source: `MODULE M;
+			  TYPE R = RECORD END;
+				   P = POINTER TO R;
+			
+			  PROCEDURE (r: P) DoSomething;
+			  END DoSomething;
+			
+			  VAR x: P;
+			
+			  PROCEDURE Main;
+			  BEGIN
+				NEW(x);
+				x.DoSomething()
+			  END Main;
+			END M.
+			`,
 			WantErrs: nil,
 		},
 	}

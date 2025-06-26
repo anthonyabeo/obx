@@ -133,11 +133,30 @@ func (p *Parser) startsDecl() bool {
 	return declStart[p.tok]
 }
 
+func (p *Parser) copyParamsForProcedureType(FP *ast.FormalParams) *ast.FormalParams {
+	FormalParams := &ast.FormalParams{Params: make([]*ast.FPSection, 0)}
+
+	for _, param := range FP.Params {
+		section := &ast.FPSection{Kind: param.Kind, Type: param.Type}
+		for _, id := range param.Names {
+			section.Names = append(section.Names, &ast.IdentifierDef{
+				Name:  "_",
+				Props: id.Props,
+			})
+		}
+
+		FormalParams.Params = append(FormalParams.Params, section)
+	}
+	FormalParams.RetType = FP.RetType
+
+	return FormalParams
+}
+
 func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind) {
 	procType := &ast.ProcedureType{FP: &ast.FormalParams{}}
 
 	if head.FP != nil {
-		procType.FP = head.FP
+		procType.FP = p.copyParamsForProcedureType(head.FP)
 
 		for _, param := range head.FP.Params {
 			for _, id := range param.Names {
@@ -277,6 +296,53 @@ func (p *Parser) isPointerToRecord(ty ast.Type) (*ast.RecordType, bool) {
 		return nil, false
 	}
 
-	rec, ok := ptr.Base.(*ast.RecordType)
-	return rec, ok
+	base := ptr.Base
+	for {
+		switch t := base.(type) {
+		case *ast.RecordType:
+			return t, true
+		case *ast.NamedType:
+			sym := p.ctx.Env.Lookup(t.Name.Name)
+			if sym == nil {
+				return nil, false
+			}
+
+			base = sym.TypeNode()
+		case *ast.PointerType:
+			base = t.Base
+		default:
+			return nil, false
+		}
+	}
+}
+
+func (p *Parser) IsCallable(sym ast.Symbol) bool {
+	if sym == nil {
+		return false
+	}
+
+	switch sym.Kind() {
+	case ast.ProcedureSymbolKind:
+		return true
+	case ast.VariableSymbolKind, ast.ConstantSymbolKind, ast.FieldSymbolKind, ast.ParamSymbolKind:
+		typeNode := sym.TypeNode()
+		for {
+			switch ty := typeNode.(type) {
+			case *ast.ProcedureType:
+				return true
+			case *ast.PointerType:
+				typeNode = ty.Base
+			case *ast.NamedType:
+				sym = p.ctx.Env.Lookup(ty.Name.Name)
+				if sym == nil {
+					return false
+				}
+				typeNode = sym.TypeNode()
+			default:
+				return false
+			}
+		}
+	default:
+		return false
+	}
 }

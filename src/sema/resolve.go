@@ -2,7 +2,6 @@ package sema
 
 import (
 	"fmt"
-
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
@@ -114,7 +113,7 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 	}
 
 	symbol := dsg.QIdent.Symbol
-	typeNode := symbol.TypeNode()
+	typeNode := n.underlying(symbol.TypeNode())
 
 	for _, selector := range dsg.Select {
 		if typeNode == nil {
@@ -135,7 +134,7 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 			case *ast.RecordType:
 				rec = tn
 			case *ast.PointerType:
-				ptr, ok := tn.Base.(*ast.RecordType)
+				ptr, ok := n.underlying(tn.Base).(*ast.RecordType)
 				if !ok {
 					n.ctx.Reporter.Report(report.Diagnostic{
 						Severity: report.Error,
@@ -147,18 +146,6 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 				}
 
 				rec = ptr
-			case *ast.NamedType:
-				t, ok := tn.Symbol.TypeNode().(*ast.RecordType)
-				if !ok {
-					n.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
-						Message:  fmt.Sprintf("%s\\'s type, '%s' is not an alias for a record", dsg.QIdent, tn.Name),
-						Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
-					})
-
-					continue
-				}
-				rec = t
 			default:
 				n.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
@@ -268,12 +255,10 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 func (n *NamesResolver) VisitFunctionCall(call *ast.FunctionCall) any {
 	call.Callee.Accept(n)
 
-	sym := call.Callee.QIdent.Symbol
-	_, ok := sym.(*ast.ProcedureSymbol)
-	if !ok {
+	if call.Callee.Symbol == nil {
 		n.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
-			Message:  fmt.Sprintf("called object, '%s' is not a procedure or function", call.Callee),
+			Message:  fmt.Sprintf("cannot resolve name '%v'", call.Callee),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
 		})
 	}
@@ -388,16 +373,16 @@ func (n *NamesResolver) VisitReturnStmt(stmt *ast.ReturnStmt) any {
 func (n *NamesResolver) VisitProcedureCall(call *ast.ProcedureCall) any {
 	call.Callee.Accept(n)
 
-	sym := call.Callee.Symbol
-	_, ok := sym.(*ast.ProcedureSymbol)
-	if !ok {
+	if call.Callee.Symbol == nil {
 		n.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
-			Message:  fmt.Sprintf("called object, '%s' is not a procedure", call.Callee),
+			Message:  fmt.Sprintf("procedure object '%s' could not be resolved", call.Callee),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
 		})
-	}
 
+		return nil
+	}
+	
 	for _, arg := range call.ActualParams {
 		arg.Accept(n)
 	}

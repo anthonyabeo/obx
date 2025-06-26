@@ -167,8 +167,26 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				})
 			}
 		case *ast.DotOp:
-			rec, ok := types.Underlying(typ).(*types.RecordType)
-			if !ok {
+			var rec *types.RecordType
+
+			under := types.Underlying(typ)
+			switch u := under.(type) {
+			case *types.RecordType:
+				rec = u
+			case *types.PointerType:
+				base, ok := types.Underlying(u.Base).(*types.RecordType)
+				if !ok {
+					t.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  fmt.Sprintf("cannot select field '%v' of pointer to non-record type: '%v'", s.Field, dsg.QIdent),
+						Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
+					})
+
+					return dsg
+				}
+
+				rec = base
+			default:
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  fmt.Sprintf("cannot select field '%v' of non-record: '%v'", s.Field, dsg.QIdent),
@@ -191,18 +209,19 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 
 			typ = field.Type
 		case *ast.PtrDeref:
-			ptr, ok := typ.(*types.PointerType)
-			if !ok {
+			switch ty := typ.(type) {
+			case *types.PointerType:
+				typ = ty.Base
+			case *types.ProcedureType:
+			default:
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message:  fmt.Sprintf("cannot dereference non-pointer variable: '%v'", dsg.QIdent),
+					Message:  fmt.Sprintf("dereference/super operator not applicable to '%s'", dsg.QIdent),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 				})
 
 				return dsg
 			}
-
-			typ = ptr.Base
 		case *ast.TypeGuard:
 			// Get base type of the designator before the type guard
 			base := dsg.SemaType
@@ -2032,58 +2051,61 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 }
 
 func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
-	if call.Callee.Symbol == nil || call.Callee.Symbol.Kind() != ast.ProcedureSymbolKind {
+	call.Callee.Accept(t)
+
+	if !IsCallable(call.Callee) {
 		t.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  fmt.Sprintf("name '%s' could not be resolved to a procedure", call.Callee),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
 		})
+
+		return call
 	}
 
-	call.Callee.Accept(t)
-
-	switch call.Callee.Symbol.Props() {
-	case ast.Predeclared:
+	// Handle predeclared function procedure calls
+	if call.Callee.Symbol.Props() == ast.Predeclared {
 		t.checkPredeclaredFunction(call, call.Callee.Symbol.(*ast.ProcedureSymbol))
-	default:
-		procType, ok := call.Callee.Type().(*types.ProcedureType)
-		if !ok {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  fmt.Sprintf("cannot call '%v' of non-procedure", call.Callee),
-				Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
-			})
-			return call
-		}
-
-		if len(call.ActualParams) != len(procType.Params) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message: fmt.Sprintf("wrong number of arguments for '%v'. expected %d arguments, got %d",
-					call.Callee, len(procType.Params), len(call.ActualParams)),
-			})
-
-			return call
-		}
-
-		for i, arg := range call.ActualParams {
-			arg.Accept(t)
-
-			formal := procType.Params[i]
-			actual := arg.Type()
-
-			if !types.ParameterCompatible(actual, formal) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
-					Message: fmt.Sprintf("argument %d: of type, '%s' incompatible with parameter of type '%s'",
-						i+1, actual.String(), formal.Type.String()),
-					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
-				})
-			}
-		}
-
-		call.SemaType = procType.Result
+		return call
 	}
+
+	procType, ok := types.Underlying(call.Callee.SemaType).(*types.ProcedureType)
+	if !ok {
+		t.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("cannot call '%v' of non-procedure", call.Callee),
+			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
+		})
+		return call
+	}
+
+	if len(call.ActualParams) != len(procType.Params) {
+		t.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message: fmt.Sprintf("wrong number of arguments for '%v'. expected %d arguments, got %d",
+				call.Callee, len(procType.Params), len(call.ActualParams)),
+		})
+
+		return call
+	}
+
+	for i, arg := range call.ActualParams {
+		arg.Accept(t)
+
+		formal := procType.Params[i]
+		actual := arg.Type()
+
+		if !types.ParameterCompatible(actual, formal) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("argument %d: of type, '%s' incompatible with parameter of type '%s'",
+					i+1, actual.String(), formal.Type.String()),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+			})
+		}
+	}
+
+	call.SemaType = procType.Result
 
 	return call
 }
@@ -2209,13 +2231,10 @@ func (t *TypeChecker) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 		})
 
 		ident.SemaType = types.UnknownType
-		return nil
+		return ident
 	}
 
-	ty := ident.Symbol.TypeNode().Accept(t).(types.Type)
-
-	ident.SemaType = ty
-	ident.Symbol.SetType(ty)
+	ident.SemaType = ident.Symbol.Type()
 
 	return ident
 }
@@ -2388,8 +2407,8 @@ func (t *TypeChecker) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any {
 	stmt.LValue.Accept(t)
 	stmt.RValue.Accept(t)
 
-	tv := stmt.LValue.Type() // variable type
-	te := stmt.RValue.Type() // expression type
+	tv := types.Underlying(stmt.LValue.Type()) // variable type
+	te := types.Underlying(stmt.RValue.Type()) // expression type
 
 	// Ensure the LHS is a valid variable designator
 	if !t.isAssignable(stmt.LValue) {
@@ -2422,56 +2441,57 @@ func (t *TypeChecker) VisitReturnStmt(stmt *ast.ReturnStmt) any {
 }
 
 func (t *TypeChecker) VisitProcedureCall(call *ast.ProcedureCall) any {
-	if call.Callee.Symbol == nil || call.Callee.Symbol.Kind() != ast.ProcedureSymbolKind {
+	call.Callee.Accept(t)
+
+	if !IsCallable(call.Callee) {
 		t.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  fmt.Sprintf("name '%s' could not be resolved to a procedure", call.Callee),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
 		})
+
+		return call
 	}
 
-	switch call.Callee.Symbol.Props() {
-	case ast.Predeclared:
+	// Handle predeclared procedure calls
+	if call.Callee.Symbol.Props() == ast.Predeclared {
 		t.checkPredeclaredProcedure(call, call.Callee.Symbol.(*ast.ProcedureSymbol))
-	default:
-		calleeType := call.Callee.Symbol.TypeNode().Accept(t).(types.Type)
-		call.Callee.Symbol.SetType(calleeType)
-		call.Callee.SemaType = calleeType
+		return call
+	}
 
-		procType, ok := calleeType.(*types.ProcedureType)
-		if !ok {
+	procType, ok := types.Underlying(call.Callee.SemaType).(*types.ProcedureType)
+	if !ok {
+		t.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("cannot call '%v', a non-procedure object", call.Callee),
+			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
+		})
+		return call
+	}
+
+	if len(call.ActualParams) != len(procType.Params) {
+		t.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message: fmt.Sprintf("wrong number of arguments for '%v'. expected %d arguments, got %d",
+				call.Callee, len(procType.Params), len(call.ActualParams)),
+		})
+
+		return call
+	}
+
+	for i, arg := range call.ActualParams {
+		arg.Accept(t)
+
+		formal := procType.Params[i]
+		actual := arg.Type()
+
+		if !types.ParameterCompatible(actual, formal) {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
-				Message:  fmt.Sprintf("cannot call '%v' of non-procedure", call.Callee),
-				Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
+				Message: fmt.Sprintf("argument %d: of type, '%s' is incompatible with parameter of type '%s'",
+					i+1, actual.String(), formal.Type.String()),
+				Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
 			})
-			return call
-		}
-
-		if len(call.ActualParams) != len(procType.Params) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message: fmt.Sprintf("wrong number of arguments for '%v'. expected %d arguments, got %d",
-					call.Callee, len(procType.Params), len(call.ActualParams)),
-			})
-
-			return call
-		}
-
-		for i, arg := range call.ActualParams {
-			arg.Accept(t)
-
-			formal := procType.Params[i]
-			actual := arg.Type()
-
-			if !types.ParameterCompatible(actual, formal) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
-					Message: fmt.Sprintf("argument %d: of type, '%s' is incompatible with parameter of type '%s'",
-						i+1, actual.String(), formal.Type.String()),
-					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
-				})
-			}
 		}
 	}
 
@@ -2673,9 +2693,7 @@ func (t *TypeChecker) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	}
 
 	// Type-bound procedure redefinition validation
-	if decl.Kind == ast.TypeBoundProcedureKind {
-		t.checkTypeBoundRedefinition(decl)
-	}
+	t.checkTypeBoundRedefinition(decl)
 
 	return decl
 }
@@ -2741,12 +2759,11 @@ func (t *TypeChecker) VisitProcedureHeading(heading *ast.ProcedureHeading) any {
 		return nil
 	}
 
-	ty := heading.Name.Symbol.TypeNode().Accept(t).(types.Type)
-
-	heading.Name.SemaType = ty
-	heading.Name.Symbol.SetType(ty)
-
-	if heading.FP != nil {
+	if heading.FP == nil {
+		ty := heading.Name.Symbol.TypeNode().Accept(t).(types.Type)
+		heading.Name.SemaType = ty
+		heading.Name.Symbol.SetType(ty)
+	} else {
 		procType := heading.FP.Accept(t).(*types.ProcedureType)
 		heading.Name.SemaType = procType
 		heading.Name.Symbol.SetType(procType)
@@ -2807,7 +2824,7 @@ func (t *TypeChecker) VisitReceiver(rcv *ast.Receiver) any {
 	default:
 		// value parameter of type POINTER TO T (where T is a record type
 		ptr, ok := types.Underlying(ty.Def).(*types.PointerType)
-		if !ok || ptr.Base.(*types.RecordType) == nil {
+		if !ok || types.Underlying(ptr.Base).(*types.RecordType) == nil {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("value receiver must have a pointer to record type, got '%v'", ptr.String()),
@@ -2837,6 +2854,26 @@ func (t *TypeChecker) VisitFPSection(section *ast.FPSection) any {
 
 	var names []string
 	for _, id := range section.Names {
+		if id.Name == "_" {
+			names = append(names, "_")
+			continue
+		}
+
+		sym := t.ctx.Env.Lookup(id.Name)
+		if sym == nil {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("undeclared parameter name '%s'", id.Name),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, id.Pos(), id.End()),
+			})
+
+			continue
+		}
+
+		sym.SetType(typ)
+		id.Symbol = sym
+		id.SemaType = typ
+
 		names = append(names, id.Name)
 	}
 
@@ -3012,19 +3049,21 @@ func (t *TypeChecker) VisitFieldList(list *ast.FieldList) any {
 
 	fields := make([]types.Field, 0)
 	for _, def := range list.List {
-		if sym := list.Env.Lookup(def.Name); sym == nil || sym.Kind() != ast.FieldSymbolKind {
+		sym := list.Env.Lookup(def.Name)
+		if sym == nil || sym.Kind() != ast.FieldSymbolKind {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("could not resolve field '%s'.", def.Name),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, def.StartOffset, def.EndOffset),
 			})
+			continue
 		}
 
 		fields = append(fields, types.Field{
-			Name: def.Name,
-			Type: typ,
+			Name:       def.Name,
+			Type:       typ,
+			IsExported: sym.Props() == ast.Exported,
 		})
-
 	}
 
 	return fields
@@ -3076,7 +3115,7 @@ func (t *TypeChecker) isAssignable(e ast.Expression) bool {
 	case *ast.VariableSymbol:
 		return true
 	case *ast.ParamSymbol:
-		return sym.Mod == token.VAR
+		return sym.Mod == token.VAR || sym.Mod == token.ILLEGAL
 	default:
 		return false
 	}
@@ -3272,7 +3311,7 @@ func (t *TypeChecker) checkTypeBoundRedefinition(proc *ast.ProcedureDecl) {
 			if !types.FormalParamsListMatch(pOrig.Params, pRedef.Params) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
-					Message:  fmt.Sprintf("paramter mismatch between of super and redefinition of '%s'", name),
+					Message:  fmt.Sprintf("parameter mismatch between of super and redefinition of '%s'", name),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, proc.Head.Pos(), proc.Head.Pos()),
 				})
 			}

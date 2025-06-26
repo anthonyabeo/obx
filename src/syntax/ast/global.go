@@ -133,7 +133,7 @@ func defPredeclaredProcedures() {
 			GlobalEnviron.Insert(NewProcedureSymbol(name, Predeclared, nil, nil, ProperProcedureKind))
 		}
 
-		for _, name := range PredeclaredProperProcedures[id].Name {
+		for _, name := range PredeclaredFunctionProcedures[id].Name {
 			GlobalEnviron.Insert(NewProcedureSymbol(name, Predeclared, nil, nil, FunctionProcedureKind))
 		}
 	}
