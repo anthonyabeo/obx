@@ -105,3 +105,26 @@ func (n *NamesResolver) underlying(ty ast.Type) ast.Type {
 		}
 	}
 }
+
+func isValidCaseDiscriminant(expr ast.Expression) bool {
+	dsg, exprIsDesignator := expr.(*ast.Designator)
+	if !exprIsDesignator {
+		return false
+	}
+
+	semaType := types.Underlying(dsg.SemaType)
+	if types.IsInteger(semaType) || types.IsEnum(semaType) || semaType == types.CharType {
+		return true
+	}
+
+	// VAR param of record type
+	if ast.IsVarParam(dsg) {
+		if types.IsPointerToRecord(semaType) {
+			return true
+		}
+
+		vt := types.Underlying(semaType)
+		return types.IsRecord(vt)
+	}
+	return false
+}

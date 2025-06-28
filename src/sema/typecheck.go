@@ -2224,11 +2224,11 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 
 func (t *TypeChecker) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 	if ident.Symbol == nil {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
-			Message:  fmt.Sprintf("unresolved identifier: '%s'", ident.Name),
-			Range:    t.ctx.Source.Span(t.ctx.FileName, ident.StartOffset, ident.EndOffset),
-		})
+		//t.ctx.Reporter.Report(report.Diagnostic{
+		//	Severity: report.Error,
+		//	Message:  fmt.Sprintf("unresolved identifier: '%s'", ident.Name),
+		//	Range:    t.ctx.Source.Span(t.ctx.FileName, ident.StartOffset, ident.EndOffset),
+		//})
 
 		ident.SemaType = types.UnknownType
 		return ident
@@ -2550,26 +2550,361 @@ func (t *TypeChecker) VisitCaseStmt(stmt *ast.CaseStmt) any {
 	stmt.Expr.Accept(t)
 	caseType := stmt.Expr.Type()
 
-	switch ty := caseType.(type) {
-	case *types.BasicType:
-		t.checkConstantCase(stmt, ty)
-	case *types.EnumType:
-		t.checkConstantCase(stmt, ty)
-	case *types.PointerType:
-		if _, ok := ty.Base.(*types.RecordType); ok {
-			t.checkTypeCase(stmt, ty)
-			return stmt
-		}
-	case *types.RecordType:
-		t.checkTypeCase(stmt, ty)
-		return stmt
-	default:
+	if !isValidCaseDiscriminant(stmt.Expr) {
 		t.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
-			Message:  fmt.Sprintf("invalid CASE expression type '%s'", caseType),
+			Message:  fmt.Sprintf("invalid type '%s' for CASE selector", caseType),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, stmt.Expr.Pos(), stmt.Expr.End()),
 		})
+
+		return stmt
 	}
+
+	if types.IsInteger(types.Underlying(caseType)) {
+		seen := map[interface{}]ast.Node{}
+
+		for _, c := range stmt.Cases {
+			for _, labelRange := range c.CaseLabelList {
+				labelRange.Accept(t)
+
+				if !types.TypeIncludes(caseType, labelRange.Low.Type()) /*&& !types.EqualType(caseType, labelRange.Low.Type()) */ {
+					t.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message: fmt.Sprintf("CASE label '%s' is invalid for the range of CASE expression ('%s': '%s') ",
+							labelRange, stmt.Expr, caseType),
+						Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
+					})
+
+					continue
+				}
+
+				// Case labels are constants, and no value must occur more than once
+				if !ast.IsConstExpr(labelRange.Low) {
+					t.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  "CASE label must be a constant",
+						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
+					})
+					continue
+				}
+
+				lowValue, isInt64 := ast.EvalConstExpr(labelRange.Low).(int64)
+				if !isInt64 {
+					t.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  fmt.Sprintf("'%v' is not a valid INTEGER", labelRange.Low),
+						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
+					})
+
+					continue
+				}
+				highValue := lowValue
+
+				if labelRange.High != nil {
+					if !types.TypeIncludes(caseType, labelRange.High.Type()) /*&& !types.EqualType(caseType, labelRange.Low.Type())*/ {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message: fmt.Sprintf("CASE label '%s' is invalid for the range of CASE expression ('%s': '%s') ",
+								labelRange, stmt.Expr, caseType),
+							Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
+						})
+					}
+
+					if !ast.IsConstExpr(labelRange.High) {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message:  "high end of CASE label must be a constant",
+							Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
+						})
+					}
+
+					hv, isInt64 := ast.EvalConstExpr(labelRange.High).(int64)
+					if !isInt64 {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message:  fmt.Sprintf("'%v' is not a valid INTEGER", labelRange.High),
+							Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
+						})
+
+						continue
+					}
+
+					if hv < lowValue {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message:  fmt.Sprintf("invalid case label range: %d .. %d", lowValue, hv),
+							Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
+						})
+
+						continue
+					}
+
+					highValue = hv
+				}
+
+				// Check each value in range
+				for val := lowValue; val <= highValue; val++ {
+					if prev, exists := seen[val]; exists {
+						pos := t.ctx.Source.Span(t.ctx.FileName, prev.Pos(), prev.End()).Start
+						location := fmt.Sprintf("%s:%d:%d", pos.File, pos.Line, pos.Column)
+
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message: fmt.Sprintf("duplicate case label %d (already defined at %v)",
+								val, location),
+							Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
+						})
+					} else {
+						seen[val] = labelRange.Low
+					}
+				}
+			}
+
+			for _, statement := range c.StmtSeq {
+				statement.Accept(t)
+			}
+		}
+	}
+
+	if types.IsChar(types.Underlying(caseType)) {
+		seen := map[interface{}]ast.Node{}
+		for _, c := range stmt.Cases {
+			for _, labelRange := range c.CaseLabelList {
+				labelRange.Accept(t)
+
+				// Case labels are constants, and no value must occur more than once
+				if !ast.IsConstExpr(labelRange.Low) {
+					t.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  "CASE label must be a constant",
+						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
+					})
+				}
+
+				if !types.IsChar(labelRange.Low.Type()) {
+					t.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  fmt.Sprintf("CASE label must be CHAR type, got '%v'", labelRange.Low.Type()),
+						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
+					})
+
+					continue
+				}
+
+				lowRune, ok := ast.EvalConstExpr(labelRange.Low).(rune)
+				if !ok {
+					t.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  fmt.Sprintf("'%v' is not a valid LATIN-1 CHAR", labelRange.Low),
+						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
+					})
+
+					continue
+				}
+				highRune := lowRune
+
+				if labelRange.High != nil {
+					if !types.IsChar(labelRange.High.Type()) {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message:  fmt.Sprintf("CASE label must be CHAR type, got '%v'", labelRange.High.Type()),
+							Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
+						})
+					}
+
+					// Case labels are constants, and no value must occur more than once
+					if !ast.IsConstExpr(labelRange.High) {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message:  "CASE label must be a constant",
+							Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
+						})
+
+						continue
+					}
+
+					hr, ok := ast.EvalConstExpr(labelRange.High).(rune)
+					if !ok {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message:  fmt.Sprintf("'%v' is not a valid LATIN-1 CHAR", labelRange.High),
+							Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
+						})
+
+						continue
+					}
+
+					if hr < lowRune {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message: fmt.Sprintf("'%s' cannot be greater then '%s'. Invalid case label range: "+
+								"%s .. %s.", string(lowRune), string(hr), string(lowRune), string(hr)),
+							Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
+						})
+
+						continue
+					}
+					highRune = hr
+				}
+
+				// Check each value in range
+				for val := lowRune; val <= highRune; val++ {
+					if prev, exists := seen[val]; exists {
+						pos := t.ctx.Source.Span(t.ctx.FileName, prev.Pos(), prev.End()).Start
+						location := fmt.Sprintf("%s:%d:%d", pos.File, pos.Line, pos.Column)
+
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message: fmt.Sprintf("duplicate case label '%s' (already defined at %s)",
+								string(val), location),
+							Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
+						})
+					} else {
+						seen[val] = labelRange.Low
+					}
+				}
+
+			}
+
+			for _, statement := range c.StmtSeq {
+				statement.Accept(t)
+			}
+		}
+	}
+
+	if types.IsEnum(types.Underlying(caseType)) {
+		seen := map[interface{}]ast.Node{}
+		for _, c := range stmt.Cases {
+			for _, labelRange := range c.CaseLabelList {
+				labelRange.Accept(t)
+
+				// Case labels are constants, and no value must occur more than once
+				if !ast.IsConstExpr(labelRange.Low) {
+					t.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  "CASE label must be a constant",
+						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
+					})
+				}
+
+				if !types.IsEnum(labelRange.Low.Type()) {
+					t.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message: fmt.Sprintf("CASE label must be of ENUM type, '%v' got '%v'",
+							caseType, labelRange.Low.Type()),
+						Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
+					})
+				}
+
+				enum := types.Underlying(caseType).(*types.EnumType)
+				lowEnum, isEnumMember := enum.Variants[labelRange.Low.String()]
+				if !isEnumMember {
+					t.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message: fmt.Sprintf("CASE label, '%s' is not a member of ENUM '%s'",
+							labelRange.Low.String(), caseType),
+						Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
+					})
+
+					continue
+				}
+				highEnum := lowEnum
+
+				if labelRange.High != nil {
+					// Case labels are constants, and no value must occur more than once
+					if !ast.IsConstExpr(labelRange.Low) {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message:  "CASE label must be a constant",
+							Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
+						})
+					}
+
+					if !types.IsEnum(labelRange.Low.Type()) {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message:  fmt.Sprintf("CASE label must be ENUM type, got '%v'", labelRange.High.Type()),
+							Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
+						})
+
+						continue
+					}
+
+					enum = types.Underlying(caseType).(*types.EnumType)
+					he, isEnumMember := enum.Variants[labelRange.High.String()]
+					if !isEnumMember {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message: fmt.Sprintf("CASE label, '%s' is not a member of '%s'",
+								labelRange.High.String(), caseType),
+							Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
+						})
+
+						continue
+					}
+
+					if he < lowEnum {
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message: fmt.Sprintf("Invalid case label range: %s .. %s.",
+								labelRange.Low.String(), labelRange.High.String()),
+							Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
+						})
+
+						continue
+					}
+					highEnum = he
+				}
+
+				// Check each value in range
+				for val := lowEnum; val <= highEnum; val++ {
+					if prev, exists := seen[val]; exists {
+						pos := t.ctx.Source.Span(t.ctx.FileName, prev.Pos(), prev.End()).Start
+						location := fmt.Sprintf("%s:%d:%d", pos.File, pos.Line, pos.Column)
+
+						t.ctx.Reporter.Report(report.Diagnostic{
+							Severity: report.Error,
+							Message: fmt.Sprintf("duplicate case label '%s' (already defined at %s)",
+								enum.GetVariant(val), location),
+							Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
+						})
+					} else {
+						seen[val] = labelRange.Low
+					}
+				}
+
+			}
+
+			for _, statement := range c.StmtSeq {
+				statement.Accept(t)
+			}
+		}
+	}
+
+	for _, statement := range stmt.Else {
+		statement.Accept(t)
+	}
+
+	//switch ty := caseType.(type) {
+	//case *types.BasicType:
+	//	t.checkConstantCase(stmt, ty)
+	//case *types.EnumType:
+	//	t.checkConstantCase(stmt, ty)
+	//case *types.PointerType:
+	//	if _, ok := ty.Base.(*types.RecordType); ok {
+	//		t.checkTypeCase(stmt, ty)
+	//		return stmt
+	//	}
+	//case *types.RecordType:
+	//	t.checkTypeCase(stmt, ty)
+	//	return stmt
+	//default:
+	//	t.ctx.Reporter.Report(report.Diagnostic{
+	//		Severity: report.Error,
+	//		Message:  fmt.Sprintf("invalid CASE expression type '%s'", caseType),
+	//		Range:    t.ctx.Source.Span(t.ctx.FileName, stmt.Expr.Pos(), stmt.Expr.End()),
+	//	})
+	//}
 
 	return stmt
 }
@@ -2580,8 +2915,12 @@ func (t *TypeChecker) VisitCase(c *ast.Case) any {
 }
 
 func (t *TypeChecker) VisitLabelRange(labelRange *ast.LabelRange) any {
-	//TODO implement me
-	panic("implement me")
+	labelRange.Low.Accept(t)
+	if labelRange.High != nil {
+		labelRange.High.Accept(t)
+	}
+
+	return labelRange
 }
 
 func (t *TypeChecker) VisitForStmt(stmt *ast.ForStmt) any {
@@ -3077,18 +3416,30 @@ func (t *TypeChecker) VisitEnumType(ty *ast.EnumType) any {
 	names := map[string]int{}
 
 	for i, variant := range ty.Variants {
-		if _, exists := names[variant]; exists {
+		if _, exists := names[variant.Name]; exists {
 			t.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("enum variant '%s' is defined more than once", variant),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, ty.StartOffset, ty.EndOffset),
 			})
 		} else {
-			names[variant] = i
+			names[variant.Name] = i
 		}
 	}
 
-	return &types.EnumType{Variants: names}
+	enum := &types.EnumType{Variants: names}
+
+	for _, variant := range ty.Variants {
+		if variant.Symbol == nil {
+			variant.SemaType = types.UnknownType
+			variant.Symbol.SetType(types.UnknownType)
+		} else {
+			variant.SemaType = enum
+			variant.Symbol.SetType(enum)
+		}
+	}
+
+	return enum
 }
 
 func (t *TypeChecker) VisitNamedType(ty *ast.NamedType) any {
