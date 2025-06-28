@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/report"
@@ -532,16 +533,23 @@ func (p *Parser) parseEnumType() *ast.EnumType {
 	enum := &ast.EnumType{StartOffset: pos}
 	p.next()
 
-	enum.Variants = append(enum.Variants, p.parseIdent())
+	enum.Variants = append(enum.Variants, p.parseIdentifierDef())
 	for p.tok == token.COMMA || p.tok == token.IDENTIFIER {
 		if p.tok == token.COMMA {
 			p.next()
 		}
-		enum.Variants = append(enum.Variants, p.parseIdent())
+		enum.Variants = append(enum.Variants, p.parseIdentifierDef())
 	}
 
 	enum.EndOffset = p.pos
 	p.match(token.RPAREN)
+
+	for ord, variant := range enum.Variants {
+		p.ctx.Env.Insert(ast.NewConstantSymbol(variant.Name, variant.Props, &ast.BasicLit{
+			Kind: token.INT32,
+			Val:  strconv.Itoa(ord),
+		}))
+	}
 
 	return enum
 }
