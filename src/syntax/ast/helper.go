@@ -124,6 +124,9 @@ func evalBasicLiteral(lit *BasicLit) any {
 	case token.CHAR_LIT:
 		return []rune(lit.Val)[0]
 	case token.STR_LIT:
+		if len(lit.Val) == 1 {
+			return rune(lit.Val[0])
+		}
 		return lit.Val
 	case token.TRUE:
 		return lit.Val == "true"

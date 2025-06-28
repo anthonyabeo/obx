@@ -375,10 +375,16 @@ func (c *Case) Children() []Node {
 }
 
 func (l *LabelRange) Accept(vst Visitor) any { return vst.VisitLabelRange(l) }
-func (l *LabelRange) String() string         { return fmt.Sprintf("%s..%s", l.High, l.Low) }
-func (l *LabelRange) Pos() int               { return l.StartOffset }
-func (l *LabelRange) End() int               { return l.EndOffset }
-func (l *LabelRange) Children() []Node       { return []Node{l.Low, l.High} }
+func (l *LabelRange) String() string {
+	if l.High == nil {
+		return l.Low.String()
+	}
+	
+	return fmt.Sprintf("%s..%s", l.High, l.Low)
+}
+func (l *LabelRange) Pos() int         { return l.StartOffset }
+func (l *LabelRange) End() int         { return l.EndOffset }
+func (l *LabelRange) Children() []Node { return []Node{l.Low, l.High} }
 
 func (b *BadStmt) stmt()                  {}
 func (b *BadStmt) Accept(vst Visitor) any { return vst.VisitBadStmt(b) }

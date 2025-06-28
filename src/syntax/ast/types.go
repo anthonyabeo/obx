@@ -67,7 +67,7 @@ type (
 	}
 
 	EnumType struct {
-		Variants []string
+		Variants []*IdentifierDef
 
 		StartOffset int
 		EndOffset   int
@@ -248,7 +248,13 @@ func (f *FieldList) Children() []Node {
 	return children
 }
 
-func (e *EnumType) String() string         { return fmt.Sprintf("enum(%s)", strings.Join(e.Variants, ", ")) }
+func (e *EnumType) String() string {
+	var parts []string
+	for _, name := range e.Variants {
+		parts = append(parts, name.Name)
+	}
+	return "ENUM " + strings.Join(parts, ", ") + " END"
+}
 func (e *EnumType) Accept(vst Visitor) any { return vst.VisitEnumType(e) }
 func (e *EnumType) typ()                   {}
 func (e *EnumType) Pos() int               { return e.StartOffset }
