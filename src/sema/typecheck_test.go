@@ -4242,7 +4242,6 @@ func TestTypeCheckPrograms(t *testing.T) {
 				`,
 			WantErrs: []string{
 				"undeclared identifier: 'Foo'",
-				"unresolved identifier: 'Foo'",
 				"name 'Foo' could not be resolved to a procedure",
 			},
 		},
@@ -4266,6 +4265,266 @@ func TestTypeCheckPrograms(t *testing.T) {
 				END Test.
 				`,
 			WantErrs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			ctx := typeCheckSnippet(t, tt.Source)
+
+			diags := ctx.Reporter.Diagnostics()
+			if len(diags) != len(tt.WantErrs) {
+				t.Errorf("got %d diagnostics, want %d", len(diags), len(tt.WantErrs))
+				for _, d := range diags {
+					t.Logf("diag: %s", d.Message)
+				}
+				return
+			}
+			for i, want := range tt.WantErrs {
+				if !strings.Contains(diags[i].Message, want) {
+					t.Errorf("diagnostic %d = %q, want substring %q", i, diags[i].Message, want)
+				}
+			}
+		})
+	}
+}
+
+func TestTypeCheckCaseStatementsPrograms(t *testing.T) {
+	tests := []typeCheckTestCase{
+		{
+			Name: "Valid Integer Case Ranges",
+			Source: `
+				MODULE valid_case_includes;
+				VAR x: INT16;
+				BEGIN
+					CASE x OF
+                      | 1: ASSERT(TRUE)
+					  | 5 .. 10: ASSERT(TRUE)
+					END
+				END valid_case_includes.
+			`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Case Expression Type Does Not Include Label Type",
+			Source: `
+				MODULE incompatible_case_type;
+				VAR x: INT8;
+				BEGIN
+					CASE x OF
+						300: ASSERT(TRUE)     (* too large for INT8 *)
+					END
+				END incompatible_case_type.
+			`,
+			WantErrs: []string{
+				"CASE label '300' is invalid for the range of CASE expression ('x': 'int8')",
+			},
+		},
+		{
+			Name: "Duplicate Labels in Range",
+			Source: `
+				MODULE duplicate_case_label;
+				VAR x: INT32;
+				BEGIN
+					CASE x OF
+						| 1 .. 3: ASSERT(TRUE)
+						| 3 .. 5: ASSERT(TRUE)
+					END
+				END duplicate_case_label.
+			`,
+			WantErrs: []string{
+				"duplicate case label 3",
+			},
+		},
+		{
+			Name: "Label Not Constant",
+			Source: `
+				MODULE non_constant_label;
+				CONST A = 5;
+				VAR x, y: INT32;
+				BEGIN
+					CASE x OF
+						| y: ASSERT(TRUE)
+						| A: ASSERT(TRUE)
+					END
+				END non_constant_label.
+			`,
+			WantErrs: []string{
+				"CASE label must be a constant",
+			},
+		},
+		{
+			Name: "CHAR Label on INT32 Case Expression",
+			Source: `
+				MODULE char_label_on_int;
+				VAR x: INT32;
+				BEGIN
+					CASE x OF
+						"A": ASSERT(TRUE)
+					END
+				END char_label_on_int.
+			`,
+			WantErrs: []string{
+				"CASE label 'A' is invalid for the range of CASE expression ('x': 'int32')",
+			},
+		},
+		{
+			Name: "Valid CHAR Case Labels",
+			Source: `
+		MODULE char_valid;
+		VAR ch: CHAR;
+		BEGIN
+			CASE ch OF
+				| "A": ASSERT(TRUE)
+				| "Z": ASSERT(TRUE)
+				| "0" .. "9": ASSERT(TRUE)
+			END
+		END char_valid.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Mixed Label Type (INT and CHAR)",
+			Source: `
+		MODULE char_mixed_label_type;
+		VAR ch: CHAR;
+		BEGIN
+			CASE ch OF
+				| "A": ASSERT(TRUE)
+				| 65: ASSERT(TRUE) (* Invalid: 65 is INT, not CHAR *)
+			END
+		END char_mixed_label_type.
+	`,
+			WantErrs: []string{
+				"CASE label must be CHAR type",
+			},
+		},
+		{
+			Name: "Duplicate CHAR Label",
+			Source: `
+		MODULE char_duplicate_label;
+		VAR ch: CHAR;
+		BEGIN
+			CASE ch OF
+				| "A" .. "C": ASSERT(TRUE)
+				| "C" .. "F": ASSERT(TRUE) (* Overlap at "C" *)
+			END
+		END char_duplicate_label.
+	`,
+			WantErrs: []string{
+				"duplicate case label 'C'",
+			},
+		},
+		{
+			Name: "CHAR Label Out of Range",
+			Source: `
+		MODULE char_label_out_of_range;
+		VAR ch: CHAR;
+		BEGIN
+			CASE ch OF
+				"Ā": ASSERT(TRUE)  (* Invalid: outside Latin-1 CHAR range *)
+			END
+		END char_label_out_of_range.
+	`,
+			WantErrs: []string{
+				"CASE label must be CHAR type",
+			},
+		},
+		{
+			Name: "Invalid Range (Low > High)",
+			Source: `
+		MODULE char_invalid_range;
+		VAR ch: CHAR;
+		BEGIN
+			CASE ch OF
+				"Z" .. "A": ASSERT(TRUE)
+			END
+		END char_invalid_range.
+	`,
+			WantErrs: []string{
+				"Invalid case label range",
+			},
+		},
+		{
+			Name: "Valid Enumeration Case Labels",
+			Source: `
+		MODULE enum_valid;
+			TYPE Color = (Red, Green, Blue);
+			VAR c: Color;
+		BEGIN
+			CASE c OF
+				| Red: ASSERT(TRUE)
+				| Green: ASSERT(TRUE)
+				| Blue: ASSERT(TRUE)
+			END
+		END enum_valid.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Invalid Case Label (Not in Enum)",
+			Source: `
+				MODULE enum_invalid_label;
+					TYPE Color = (Red, Green);
+					VAR c: Color;
+				BEGIN
+					CASE c OF
+						| Red: ASSERT(TRUE)
+						| Blue: ASSERT(TRUE)  (* Error: Blue is not in Color *)
+					END
+				END enum_invalid_label.`,
+			WantErrs: []string{
+				"undeclared identifier: 'Blue'",
+				"CASE label must be a constant",
+				"CASE label must be of ENUM type, 'Color' got 'unknown'",
+				"CASE label, 'Blue' is not a member of ENUM 'Color'",
+			},
+		},
+		{
+			Name: "Duplicate Enum Case Label",
+			Source: `
+				MODULE enum_duplicate_label;
+					TYPE Direction = (North, East, South, West);
+					VAR d: Direction;
+				BEGIN
+					CASE d OF
+						| North .. East: ASSERT(TRUE)
+						| East .. South: ASSERT(FALSE)  (* Error: duplicate 'East' *)
+					END
+				END enum_duplicate_label.`,
+			WantErrs: []string{
+				"duplicate case label 'East'",
+			},
+		},
+		{
+			Name: "Mixed Type Label",
+			Source: `
+				MODULE enum_mixed_label;
+					TYPE Mode = (Auto, Manual);
+					VAR m: Mode;
+				BEGIN
+					CASE m OF
+						| Auto: ASSERT(FALSE)
+						| 1: ASSERT(TRUE)  (* Error: INT used as label on ENUM case *)
+					END
+				END enum_mixed_label.`,
+			WantErrs: []string{
+				"CASE label must be of ENUM type",
+				"CASE label, '1' is not a member of ENUM 'Mode'",
+			},
+		},
+		{
+			Name: "Invalid Range (Low > High)",
+			Source: `
+				MODULE enum_invalid_range;
+					TYPE Day = (Mon, Tue, Wed, Thu);
+					VAR d: Day;
+				BEGIN
+					CASE d OF
+						Thu .. Tue: ASSERT(FALSE)
+					END
+				END enum_invalid_range.`,
+			WantErrs: []string{
+				"Invalid case label range",
+			},
 		},
 	}
 
