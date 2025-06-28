@@ -15,6 +15,17 @@ func NewEnumWithVariants(variants ...string) *EnumType {
 	return &EnumType{Variants: elems}
 }
 
+func (e EnumType) GetVariant(pos int) string {
+	var variant string
+	for name, ord := range e.Variants {
+		if ord == pos {
+			variant = name
+		}
+	}
+
+	return variant
+}
+
 func (e EnumType) String() string {
 	var parts []string
 	for name := range e.Variants {

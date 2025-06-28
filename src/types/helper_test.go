@@ -216,7 +216,7 @@ func TestTypeIncludes(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		got := TypeIncludes(test.b, test.a)
+		got := TypeIncludes(test.a, test.b)
 		if got != test.expect {
 			t.Errorf("TypeIncludes(%v, %v) = %v; want %v", test.a, test.b, got, test.expect)
 		}

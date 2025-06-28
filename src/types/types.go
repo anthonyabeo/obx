@@ -9,7 +9,7 @@ type Type interface {
 	Equals(Type) bool
 }
 
-func TypeIncludes(b, a Type) bool {
+func TypeIncludes(a, b Type) bool {
 	if a == b {
 		return true
 	}
@@ -122,15 +122,15 @@ func AssignmentCompatible(exprType, varType Type) bool {
 	}
 
 	// 2. Te and Tv are numeric or character types and Tv includes Te
-	if IsNumeric(exprType) && IsNumeric(varType) && TypeIncludes(exprType, varType) {
+	if IsNumeric(exprType) && IsNumeric(varType) && TypeIncludes(varType, exprType) {
 		return true
 	}
-	if IsChar(exprType) && IsChar(varType) && TypeIncludes(exprType, varType) {
+	if IsChar(exprType) && IsChar(varType) && TypeIncludes(varType, exprType) {
 		return true
 	}
 
 	// 3. Tv is a SET and Te is INT32 or smaller
-	if IsSet(varType) && IsInteger(exprType) && TypeIncludes(exprType, Int32Type) {
+	if IsSet(varType) && IsInteger(exprType) && TypeIncludes(Int32Type, exprType) {
 		return true
 	}
 
