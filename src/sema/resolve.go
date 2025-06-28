@@ -605,7 +605,24 @@ func (n *NamesResolver) VisitRecordType(ty *ast.RecordType) any {
 	return ty
 }
 
-func (n *NamesResolver) VisitEnumType(ty *ast.EnumType) any { return ty }
+func (n *NamesResolver) VisitEnumType(ty *ast.EnumType) any {
+	for _, variant := range ty.Variants {
+		sym := n.ctx.Env.Lookup(variant.Name)
+		if sym == nil {
+			n.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("undeclared enum variant '%s'", variant.Name),
+				Range:    n.ctx.Source.Span(n.ctx.FileName, variant.StartOffset, variant.EndOffset),
+			})
+
+			continue
+		}
+
+		variant.Symbol = sym
+	}
+
+	return ty
+}
 
 func (n *NamesResolver) VisitNamedType(ty *ast.NamedType) any {
 	ty.Name.Accept(n)
@@ -664,7 +681,9 @@ func (n *NamesResolver) VisitCase(c *ast.Case) any {
 
 func (n *NamesResolver) VisitLabelRange(rng *ast.LabelRange) any {
 	rng.Low.Accept(n)
-	rng.High.Accept(n)
+	if rng.High != nil {
+		rng.High.Accept(n)
+	}
 
 	return rng
 }
