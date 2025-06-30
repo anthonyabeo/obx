@@ -2,6 +2,7 @@ package ast
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/types"
 	"strings"
 )
 
@@ -121,8 +122,10 @@ type (
 	}
 
 	LabelRange struct {
-		High        Expression
-		Low         Expression
+		High     Expression
+		Low      Expression
+		SemaType types.Type
+
 		StartOffset int
 		EndOffset   int
 	}
@@ -379,7 +382,7 @@ func (l *LabelRange) String() string {
 	if l.High == nil {
 		return l.Low.String()
 	}
-	
+
 	return fmt.Sprintf("%s..%s", l.High, l.Low)
 }
 func (l *LabelRange) Pos() int         { return l.StartOffset }

@@ -198,17 +198,35 @@ func IsUnknownType(ty Type) bool {
 }
 
 func IsExtensionOf(sub, sup Type) bool {
-	subRec, ok1 := sub.(*RecordType)
-	supRec, ok2 := sup.(*RecordType)
+	subRec, ok1 := Underlying(sub).(*RecordType)
+	supRec, ok2 := Underlying(sup).(*RecordType)
 	if !ok1 || !ok2 {
 		return false
 	}
+
 	for r := subRec; r != nil; r = r.Base {
 		if SameType(r, supRec) {
 			return true
 		}
 	}
+
+	if supRec == AnyRec {
+		return true
+	}
+
 	return false
+}
+
+func IsPointerExtensionOf(sub, sup Type) bool {
+	if !IsPointerToRecord(sub) || !IsPointerToRecord(sup) {
+		return false
+	}
+
+	subRec := Underlying(sub.(*PointerType).Base)
+	supRec := Underlying(sup.(*PointerType).Base)
+
+	return IsExtensionOf(subRec, supRec)
+
 }
 
 func IsArrayOf(t Type, elem Type) bool {

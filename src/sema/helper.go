@@ -106,7 +106,7 @@ func (n *NamesResolver) underlying(ty ast.Type) ast.Type {
 	}
 }
 
-func isValidCaseDiscriminant(expr ast.Expression) bool {
+func IsValidCaseDiscriminant(expr ast.Expression) bool {
 	dsg, exprIsDesignator := expr.(*ast.Designator)
 	if !exprIsDesignator {
 		return false

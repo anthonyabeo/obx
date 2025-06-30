@@ -3,6 +3,7 @@ package report
 import (
 	"github.com/anthonyabeo/obx/adt"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/types"
 )
 
 type Context struct {
@@ -20,4 +21,7 @@ type Context struct {
 	// use to disambiguate between type-guards and procedure calls during parsing
 	Names     *adt.Stack[string]
 	ExprLists *adt.Stack[[]ast.Expression]
+
+	SymbolOverrides map[string]ast.Symbol // temporary binding of name to new type
+	TypeOverrides   map[string]types.Type // temporary types
 }

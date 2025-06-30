@@ -248,6 +248,11 @@ func (n *NamesResolver) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 }
 
 func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
+	if sym, ok := n.ctx.SymbolOverrides[ident.Name]; ok {
+		ident.Symbol = sym
+		return ident
+	}
+
 	if ident.Prefix == "" {
 		sym := n.ctx.Env.Lookup(ident.Name)
 		if sym == nil {
@@ -385,8 +390,57 @@ func (n *NamesResolver) VisitLoopStmt(stmt *ast.LoopStmt) any {
 
 func (n *NamesResolver) VisitCaseStmt(stmt *ast.CaseStmt) any {
 	stmt.Expr.Accept(n)
+
+	dsg, isDsg := stmt.Expr.(*ast.Designator)
+	if !isDsg {
+		n.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("'%s' is not a valid CASE selector type", stmt.Expr),
+			Range:    n.ctx.Source.Span(n.ctx.FileName, stmt.Expr.Pos(), stmt.Expr.End()),
+		})
+
+		return stmt
+	}
+
+	caseExprName := dsg.QIdent.Name
+	caseExprType := n.underlying(dsg.Symbol.TypeNode())
 	for _, c := range stmt.Cases {
-		c.Accept(n)
+		for _, labelRange := range c.CaseLabelList {
+			labelRange.Accept(n)
+
+			switch caseExprType.(type) {
+			case *ast.RecordType, *ast.PointerType:
+				if _, ok := labelRange.Low.(*ast.Nil); ok {
+					continue
+				}
+
+				label, ok := labelRange.Low.(*ast.Designator)
+				if !ok {
+					n.ctx.Reporter.Report(report.Diagnostic{
+						Severity: report.Error,
+						Message:  fmt.Sprintf("'%s' is not a valid CASE label", labelRange.Low),
+						Range:    n.ctx.Source.Span(n.ctx.FileName, stmt.Expr.Pos(), stmt.Expr.End()),
+					})
+
+					return stmt
+				}
+
+				switch n.underlying(label.Symbol.TypeNode()).(type) {
+				case *ast.RecordType, *ast.PointerType:
+					n.ctx.SymbolOverrides[caseExprName] = ast.NewVariableSymbol(caseExprName, label.Symbol.Props(), label.Symbol.TypeNode())
+				default:
+					continue
+				}
+			default:
+				continue
+			}
+		}
+
+		for _, statement := range c.StmtSeq {
+			statement.Accept(n)
+		}
+
+		delete(n.ctx.SymbolOverrides, caseExprName)
 	}
 
 	for _, statement := range stmt.Else {
@@ -394,6 +448,18 @@ func (n *NamesResolver) VisitCaseStmt(stmt *ast.CaseStmt) any {
 	}
 
 	return stmt
+}
+
+func (n *NamesResolver) VisitCase(c *ast.Case) any {
+	for _, labelRange := range c.CaseLabelList {
+		labelRange.Accept(n)
+	}
+
+	for _, stmt := range c.StmtSeq {
+		stmt.Accept(n)
+	}
+
+	return c
 }
 
 func (n *NamesResolver) VisitForStmt(stmt *ast.ForStmt) any {
@@ -665,18 +731,6 @@ func (n *NamesResolver) VisitElseIfBranch(br *ast.ElseIfBranch) any {
 	}
 
 	return br
-}
-
-func (n *NamesResolver) VisitCase(c *ast.Case) any {
-	for _, labelRange := range c.CaseLabelList {
-		labelRange.Accept(n)
-	}
-
-	for _, stmt := range c.StmtSeq {
-		stmt.Accept(n)
-	}
-
-	return c
 }
 
 func (n *NamesResolver) VisitLabelRange(rng *ast.LabelRange) any {

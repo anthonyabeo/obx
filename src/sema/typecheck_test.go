@@ -2,6 +2,7 @@ package sema
 
 import (
 	"github.com/anthonyabeo/obx/adt"
+	"github.com/anthonyabeo/obx/src/types"
 	"log"
 	"os"
 	"path/filepath"
@@ -3883,15 +3884,17 @@ func typeCheckSnippet(t *testing.T, code string) *report.Context {
 		Writer: os.Stdout,
 	})
 	ctx := &report.Context{
-		FileName:  file,
-		FilePath:  file,
-		Content:   []byte(code),
-		Source:    srcMgr,
-		Reporter:  reporter,
-		TabWidth:  4,
-		Envs:      make(map[string]*ast.Environment),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
+		FileName:        file,
+		FilePath:        file,
+		Content:         []byte(code),
+		Source:          srcMgr,
+		Reporter:        reporter,
+		TabWidth:        4,
+		Envs:            make(map[string]*ast.Environment),
+		Names:           adt.NewStack[string](),
+		ExprLists:       adt.NewStack[[]ast.Expression](),
+		SymbolOverrides: map[string]ast.Symbol{},
+		TypeOverrides:   map[string]types.Type{},
 	}
 	p := parser.NewParser(ctx)
 	unit := p.Parse()
@@ -4351,6 +4354,7 @@ func TestTypeCheckCaseStatementsPrograms(t *testing.T) {
 			`,
 			WantErrs: []string{
 				"CASE label must be a constant",
+				"'y' is not a valid INTEGER",
 			},
 		},
 		{
@@ -4366,6 +4370,7 @@ func TestTypeCheckCaseStatementsPrograms(t *testing.T) {
 			`,
 			WantErrs: []string{
 				"CASE label 'A' is invalid for the range of CASE expression ('x': 'int32')",
+				"'A' is not a valid INTEGER",
 			},
 		},
 		{
@@ -4396,6 +4401,7 @@ func TestTypeCheckCaseStatementsPrograms(t *testing.T) {
 	`,
 			WantErrs: []string{
 				"CASE label must be CHAR type",
+				"'65' is not a valid LATIN-1 CHAR",
 			},
 		},
 		{
@@ -4427,6 +4433,7 @@ func TestTypeCheckCaseStatementsPrograms(t *testing.T) {
 	`,
 			WantErrs: []string{
 				"CASE label must be CHAR type",
+				"'Ā' is not a valid LATIN-1 CHAR",
 			},
 		},
 		{
@@ -4525,6 +4532,113 @@ func TestTypeCheckCaseStatementsPrograms(t *testing.T) {
 			WantErrs: []string{
 				"Invalid case label range",
 			},
+		},
+		{
+			Name: "Valid Pointer Record Type Case",
+			Source: `
+				MODULE pointer_record_valid;
+					TYPE 
+						Base = RECORD a: INTEGER END;
+						Derived1 = RECORD (Base) b: INTEGER END;
+						Derived2 = RECORD (Base) c: REAL END;
+						PBase = POINTER TO Base;
+						PDerived1 = POINTER TO Derived1;
+						PDerived2 = POINTER TO Derived2;
+					VAR p: PBase;
+				BEGIN
+					CASE p OF
+						| PDerived1: p.b := 10
+						| PDerived2: p.c := 3.14
+						| NIL: ASSERT(TRUE)
+					END
+				END pointer_record_valid.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Label Not Extension of Static Type",
+			Source: `
+				MODULE pointer_record_not_extension;
+					TYPE 
+						Base = RECORD END;
+						Unrelated = RECORD END;
+						PBase = POINTER TO Base;
+						PUnrelated = POINTER TO Unrelated;
+					VAR p: PBase;
+				BEGIN
+					CASE p OF
+						PUnrelated:  p := NIL
+					END
+				END pointer_record_not_extension.`,
+			WantErrs: []string{
+				"CASE label 'PUnrelated' is not an extension of 'PBase'",
+			},
+		},
+		{
+			Name: "Duplicate Record Label",
+			Source: `
+				MODULE pointer_record_duplicate;
+					TYPE 
+						Base = RECORD END;
+						Ext1 = RECORD (Base) END;
+						PBase = POINTER TO Base;
+						PExt1 = POINTER TO Ext1;
+					VAR p: PBase;
+				BEGIN
+					CASE p OF
+						| PExt1: ASSERT(TRUE)
+						| PExt1: ASSERT(FALSE)  (* Error: duplicate label *)
+					END
+				END pointer_record_duplicate.`,
+			WantErrs: []string{
+				"duplicate CASE label 'PExt1'",
+			},
+		},
+		{
+			Name: "Case Label Not a Pointer to Record",
+			Source: `
+				MODULE pointer_not_pointer_to_record;
+					TYPE 
+						Base = RECORD END;
+						PBase = POINTER TO Base;
+					VAR p: PBase;
+				BEGIN
+					CASE p OF
+						Base: ASSERT(TRUE)  (* Error: must be POINTER TO RECORD *)
+					END
+				END pointer_not_pointer_to_record.`,
+			WantErrs: []string{
+				"CASE label 'Base' is not an extension of 'PBase'",
+			},
+		},
+		{
+			Name: "Static Type Not Pointer or VAR Record",
+			Source: `
+				MODULE pointer_static_not_allowed;
+					TYPE Base = RECORD END;
+					VAR r: Base;
+				BEGIN
+					CASE r OF  (* Error: not a VAR or POINTER TO RECORD *)
+						Base: ASSERT(TRUE)
+					END
+				END pointer_static_not_allowed.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Reuse Dynamic Type in Statements",
+			Source: `
+				MODULE pointer_dynamic_binding;
+					TYPE
+						Base = RECORD END;
+						Ext = RECORD (Base) f: INTEGER END;
+						PBase = POINTER TO Base;
+						PExt = POINTER TO Ext;
+					VAR p: PBase;
+				BEGIN
+					CASE p OF
+						PExt: p.f := 42  (* allowed: p is considered as Ext inside *)
+					END
+				END pointer_dynamic_binding.`,
+			WantErrs: nil,
 		},
 	}
 

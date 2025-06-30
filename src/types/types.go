@@ -368,6 +368,11 @@ func Identical(a, b Type) bool {
 		pb, ok := b.(*PointerType)
 		return ok && Identical(a.Base, pb.Base)
 	case *StringType:
+		str, ok := b.(*StringType)
+		if ok && str.Length == 1 {
+			return true
+		}
+
 		return a.Length == 1 && (b == CharType || b == WCharType)
 	// Add more composite types as needed
 	default:
