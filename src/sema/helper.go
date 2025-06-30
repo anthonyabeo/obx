@@ -128,3 +128,21 @@ func IsValidCaseDiscriminant(expr ast.Expression) bool {
 	}
 	return false
 }
+
+func IsValidGuardExpr(expr ast.Expression) bool {
+	dsg, exprIsDesignator := expr.(*ast.Designator)
+	if !exprIsDesignator {
+		return false
+	}
+
+	// VAR param of record type
+	if ast.IsVarParam(dsg) {
+		if types.IsPointerToRecord(dsg.SemaType) {
+			return true
+		}
+
+		vt := types.Underlying(dsg.SemaType)
+		return types.IsRecord(vt)
+	}
+	return false
+}

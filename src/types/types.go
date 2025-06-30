@@ -116,6 +116,10 @@ func ResultTypeMatch(Ta, Tb Type) bool {
 }
 
 func AssignmentCompatible(exprType, varType Type) bool {
+	if exprType == nil || varType == nil {
+		return false
+	}
+
 	// 1. Same type
 	if SameType(exprType, varType) {
 		return true

@@ -450,16 +450,15 @@ func (n *NamesResolver) VisitCaseStmt(stmt *ast.CaseStmt) any {
 	return stmt
 }
 
-func (n *NamesResolver) VisitCase(c *ast.Case) any {
-	for _, labelRange := range c.CaseLabelList {
-		labelRange.Accept(n)
+func (n *NamesResolver) VisitCase(c *ast.Case) any { return c }
+
+func (n *NamesResolver) VisitLabelRange(rng *ast.LabelRange) any {
+	rng.Low.Accept(n)
+	if rng.High != nil {
+		rng.High.Accept(n)
 	}
 
-	for _, stmt := range c.StmtSeq {
-		stmt.Accept(n)
-	}
-
-	return c
+	return rng
 }
 
 func (n *NamesResolver) VisitForStmt(stmt *ast.ForStmt) any {
@@ -489,6 +488,29 @@ func (n *NamesResolver) VisitWithStmt(stmt *ast.WithStmt) any {
 	}
 
 	return stmt
+}
+
+func (n *NamesResolver) VisitGuard(guard *ast.Guard) any {
+	guard.Expr.Accept(n)
+	guard.Type.Accept(n)
+
+	if !IsValidGuardExpr(guard.Expr) {
+
+	}
+
+	expr := guard.Expr.(*ast.Designator)
+	ty := guard.Type.(*ast.Designator)
+
+	n.ctx.SymbolOverrides[guard.Expr.String()] = ast.NewVariableSymbol(
+		expr.Symbol.Name(), expr.Symbol.Props(), ty.Symbol.TypeNode())
+
+	for _, stmt := range guard.StmtSeq {
+		stmt.Accept(n)
+	}
+
+	delete(n.ctx.SymbolOverrides, guard.Expr.String())
+
+	return guard
 }
 
 func (n *NamesResolver) VisitImport(i *ast.Import) any {
@@ -731,25 +753,6 @@ func (n *NamesResolver) VisitElseIfBranch(br *ast.ElseIfBranch) any {
 	}
 
 	return br
-}
-
-func (n *NamesResolver) VisitLabelRange(rng *ast.LabelRange) any {
-	rng.Low.Accept(n)
-	if rng.High != nil {
-		rng.High.Accept(n)
-	}
-
-	return rng
-}
-
-func (n *NamesResolver) VisitGuard(guard *ast.Guard) any {
-	guard.Expr.Accept(n)
-	guard.Type.Accept(n)
-	for _, stmt := range guard.StmtSeq {
-		stmt.Accept(n)
-	}
-
-	return guard
 }
 
 func (n *NamesResolver) VisitBadExpr(expr *ast.BadExpr) any { return expr }

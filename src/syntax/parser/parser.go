@@ -1711,6 +1711,7 @@ func (p *Parser) parseWithStmt() *ast.WithStmt {
 	}
 
 	if p.tok == token.ELSE {
+		p.next()
 		stmt.Else = p.parseStatementSeq()
 	}
 
@@ -1721,10 +1722,9 @@ func (p *Parser) parseWithStmt() *ast.WithStmt {
 }
 
 func (p *Parser) parseGuard() *ast.Guard {
-	pos := p.pos
-	grd := &ast.Guard{Expr: p.parseQualifiedIdent(), StartOffset: pos}
+	grd := &ast.Guard{Expr: p.parseDesignator(), StartOffset: p.pos}
 	p.match(token.COLON)
-	grd.Type = p.parseQualifiedIdent()
+	grd.Type = p.parseDesignator()
 
 	p.match(token.DO)
 	grd.StmtSeq = p.parseStatementSeq()

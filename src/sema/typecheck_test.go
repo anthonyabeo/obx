@@ -3432,7 +3432,7 @@ var predeclaredProcTests = []procTestEntry{
 				name:        "Invalid_MIN_INT32_REAL",
 				code:        "MODULE Test; VAR x: INT32; y: REAL; z: INT32; BEGIN z := MIN(x, y) END Test.",
 				shouldPass:  false,
-				expectError: "cannot assign expression (MIN(x, y): real)  to variable (z: int32)",
+				expectError: "expression 'MIN(x, y)' is not assignment compatible with variable 'z'",
 			},
 			{
 				name:        "Invalid_MIN_CHAR_INT32",
@@ -3492,7 +3492,7 @@ var predeclaredProcTests = []procTestEntry{
 				name:        "Invalid_MAX_INT32_REAL",
 				code:        "MODULE Test; VAR x: INT32; y: REAL; z: INT32; BEGIN z := MAX(x, y) END Test.",
 				shouldPass:  false,
-				expectError: "cannot assign expression (MAX(x, y): real)  to variable (z: int32)",
+				expectError: "expression 'MAX(x, y)' is not assignment compatible with variable 'z'",
 			},
 			{
 				name:        "Invalid_MAX_CHAR_INT32",
@@ -4638,6 +4638,154 @@ func TestTypeCheckCaseStatementsPrograms(t *testing.T) {
 						PExt: p.f := 42  (* allowed: p is considered as Ext inside *)
 					END
 				END pointer_dynamic_binding.`,
+			WantErrs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			ctx := typeCheckSnippet(t, tt.Source)
+
+			diags := ctx.Reporter.Diagnostics()
+			if len(diags) != len(tt.WantErrs) {
+				t.Errorf("got %d diagnostics, want %d", len(diags), len(tt.WantErrs))
+				for _, d := range diags {
+					t.Logf("diag: %s", d.Message)
+				}
+				return
+			}
+			for i, want := range tt.WantErrs {
+				if !strings.Contains(diags[i].Message, want) {
+					t.Errorf("diagnostic %d = %q, want substring %q", i, diags[i].Message, want)
+				}
+			}
+		})
+	}
+}
+
+func TestTypeCheckWithStatementsPrograms(t *testing.T) {
+	tests := []typeCheckTestCase{
+		{
+			Name: "Simple WITH with record guards",
+			Source: `
+				MODULE ok_pointer_record;
+				  TYPE
+					P = RECORD END;
+					T = RECORD (P) x: INTEGER END;
+				  VAR p: P;
+				BEGIN
+				  WITH p: T DO
+					p.x := 42
+				  END
+				END ok_pointer_record.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "WITH with extended record",
+			Source: `
+				MODULE ok_extended_record;
+				  TYPE 
+					Base = RECORD a: INTEGER END;
+					Sub = RECORD (Base) b: INTEGER END;
+					P = POINTER TO Base;
+					T = POINTER TO Sub
+				  VAR p: P;
+				BEGIN
+					WITH p: T DO
+						p.b := 99
+				  	END
+				END ok_extended_record.
+			  `,
+			WantErrs: nil,
+		},
+		{
+			Name: "WITH with ELSE block",
+			Source: `
+				MODULE ok_else_block;
+				  TYPE 
+					P = RECORD END;
+					T = RECORD (P) x: INTEGER END;
+				  		
+				  VAR p: P;
+				BEGIN
+				  WITH p: T DO
+					p.x := 1
+				  ELSE
+					HALT(1)
+				  END
+				END ok_else_block.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Same static and dynamic guard type",
+			Source: `
+				MODULE err_non_pointer;
+				  TYPE T = RECORD x: INTEGER END;
+				  VAR r: T;
+				BEGIN
+				  WITH r: T DO
+					r.x := 1
+				  END
+				END err_non_pointer.
+			  `,
+			WantErrs: nil,
+		},
+		{
+			Name: "invalid/with_non_extension_guard",
+			Source: `
+				MODULE err_non_extension_guard;
+				  TYPE
+					A = RECORD a: INTEGER END;
+					B = RECORD b: INTEGER END;
+					P = POINTER TO A;
+				  VAR p: P;
+				BEGIN
+				  WITH p: B DO
+					p.b := 1
+				  END
+				END err_non_extension_guard.
+			  `,
+			WantErrs: []string{"'B' does not extend 'P'"},
+		},
+		{
+			Name: "invalid/with_field_missing",
+			Source: `
+				MODULE err_missing_field;
+				  TYPE 
+					P = RECORD END;
+					T = RECORD (P) x: INTEGER END;
+				  VAR p: P;
+				BEGIN
+				  WITH p: T DO
+					p.y := 10  (* y does not exist *)
+				  END
+				END err_missing_field.`,
+			WantErrs: []string{
+				"'p' has no field named 'y'",
+				"expression '10' is not assignment compatible with variable 'p.y'",
+			},
+		},
+		{
+			Name: "WITH with multiple guards and ELSE",
+			Source: `
+				MODULE ok_multiple_guards;
+				  TYPE 
+					Q = RECORD END;
+					T1 = RECORD (Q) a: INTEGER END;
+					T2 = RECORD (Q) b: INTEGER END;
+					T3 = RECORD (Q) c: INTEGER END;
+					P = POINTER TO T1
+				  VAR p: Q;
+				BEGIN
+				  WITH 
+					| p: T1 DO p.a := 1
+				  	| p: T2 DO p.b := 2
+				  	| p: T3 DO p.c := 4
+				  ELSE
+					//p.a := 3
+					ASSERT(TRUE)
+				  END
+				END ok_multiple_guards.`,
 			WantErrs: nil,
 		},
 	}

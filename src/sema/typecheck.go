@@ -198,11 +198,11 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 
 			field := rec.GetField(s.Field)
 			if field == nil {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
-					Message:  fmt.Sprintf("record field '%v' not found", s.Field),
-					Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
-				})
+				//t.ctx.Reporter.Report(report.Diagnostic{
+				//	Severity: report.Error,
+				//	Message:  fmt.Sprintf("record '%v' has no field named '%v'", dsg.QIdent, s.Field),
+				//	Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
+				//})
 
 				return dsg
 			}
@@ -2423,8 +2423,8 @@ func (t *TypeChecker) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any {
 	if !types.AssignmentCompatible(te, tv) {
 		t.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
-			Message: fmt.Sprintf("cannot assign expression (%s: %s)  to variable (%s: %s)",
-				stmt.RValue, te, stmt.LValue, tv.String()),
+			Message: fmt.Sprintf("expression '%s' is not assignment compatible with variable '%s'",
+				stmt.RValue, stmt.LValue),
 			Range: t.ctx.Source.Span(t.ctx.FileName, stmt.StartOffset, stmt.EndOffset),
 		})
 	}
@@ -2577,10 +2577,7 @@ func (t *TypeChecker) VisitCaseStmt(stmt *ast.CaseStmt) any {
 	return stmt
 }
 
-func (t *TypeChecker) VisitCase(c *ast.Case) any {
-	//TODO implement me
-	panic("implement me")
-}
+func (t *TypeChecker) VisitCase(c *ast.Case) any { return c }
 
 func (t *TypeChecker) VisitLabelRange(labelRange *ast.LabelRange) any {
 	labelRange.Low.Accept(t)
@@ -2689,13 +2686,48 @@ func (t *TypeChecker) VisitForStmt(stmt *ast.ForStmt) any {
 func (t *TypeChecker) VisitExitStmt(stmt *ast.ExitStmt) any { return stmt }
 
 func (t *TypeChecker) VisitWithStmt(stmt *ast.WithStmt) any {
-	//TODO implement me
-	panic("implement me")
+	for _, arm := range stmt.Arms {
+		arm.Accept(t)
+	}
+
+	for _, statement := range stmt.Else {
+		statement.Accept(t)
+	}
+
+	return stmt
 }
 
 func (t *TypeChecker) VisitGuard(guard *ast.Guard) any {
-	//TODO implement me
-	panic("implement me")
+	guard.Expr.Accept(t)
+	guard.Type.Accept(t)
+
+	if !IsValidGuardExpr(guard.Expr) {
+		t.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("'%s' is not a valid guard expression", guard.Expr),
+			Range:    t.ctx.Source.Span(t.ctx.FileName, guard.Expr.Pos(), guard.Expr.End()),
+		})
+	}
+
+	extOf := types.IsExtensionOf(types.Underlying(guard.Type.Type()), types.Underlying(guard.Expr.Type()))
+	ptrExtOf := types.IsPointerExtensionOf(types.Underlying(guard.Type.Type()), types.Underlying(guard.Expr.Type()))
+	if !extOf && !ptrExtOf {
+		t.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("'%v' does not extend '%v'", guard.Type, guard.Expr.Type()),
+			Range:    t.ctx.Source.Span(t.ctx.FileName, guard.Type.Pos(), guard.Type.End()),
+		})
+	}
+
+	t.ctx.TypeOverrides[guard.Expr.String()] = guard.Type.Type()
+
+	for _, statement := range guard.StmtSeq {
+		statement.Accept(t)
+	}
+
+	delete(t.ctx.TypeOverrides, guard.Expr.String())
+
+	return guard
 }
 
 func (t *TypeChecker) VisitImport(i *ast.Import) any {
