@@ -287,7 +287,7 @@ func (p *Parser) underlyingRcvType(ty ast.Type) ast.Type {
 		return rcvType
 	}
 
-	return sym.TypeNode()
+	return sym.AstType()
 }
 
 func (p *Parser) isPointerToRecord(ty ast.Type) (*ast.RecordType, bool) {
@@ -307,7 +307,7 @@ func (p *Parser) isPointerToRecord(ty ast.Type) (*ast.RecordType, bool) {
 				return nil, false
 			}
 
-			base = sym.TypeNode()
+			base = sym.AstType()
 		case *ast.PointerType:
 			base = t.Base
 		default:
@@ -325,7 +325,7 @@ func (p *Parser) IsCallable(sym ast.Symbol) bool {
 	case ast.ProcedureSymbolKind:
 		return true
 	case ast.VariableSymbolKind, ast.ConstantSymbolKind, ast.FieldSymbolKind, ast.ParamSymbolKind:
-		typeNode := sym.TypeNode()
+		typeNode := sym.AstType()
 		for {
 			switch ty := typeNode.(type) {
 			case *ast.ProcedureType:
@@ -337,7 +337,7 @@ func (p *Parser) IsCallable(sym ast.Symbol) bool {
 				if sym == nil {
 					return false
 				}
-				typeNode = sym.TypeNode()
+				typeNode = sym.AstType()
 			default:
 				return false
 			}

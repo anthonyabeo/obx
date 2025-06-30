@@ -107,10 +107,10 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 	}
 
 	symbol := dsg.QIdent.Symbol
-	typeNode := symbol.TypeNode()
+	astType := symbol.AstType()
 
 	for _, selector := range dsg.Select {
-		if typeNode == nil {
+		if astType == nil {
 			n.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("'%s' must have a denoted type", dsg.QIdent),
@@ -120,13 +120,13 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 			continue
 		}
 
-		typeNode = n.underlying(typeNode)
+		astType = n.underlying(astType)
 
 		switch s := selector.(type) {
 		case *ast.DotOp:
 			var rec *ast.RecordType
 
-			switch tn := typeNode.(type) {
+			switch tn := astType.(type) {
 			case *ast.RecordType:
 				rec = tn
 			case *ast.PointerType:
@@ -156,11 +156,11 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 			dsg.Symbol = sym
 
 			symbol = sym
-			typeNode = sym.TypeNode()
+			astType = sym.AstType()
 		case *ast.IndexOp:
 			var arr *ast.ArrayType
 
-			switch tn := typeNode.(type) {
+			switch tn := astType.(type) {
 			case *ast.ArrayType:
 				arr = tn
 			case *ast.PointerType:
@@ -187,13 +187,13 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 				expr.Accept(n)
 			}
 
-			typeNode = arr.ElemType
+			astType = arr.ElemType
 		case *ast.PtrDeref:
-			switch p := typeNode.(type) {
+			switch p := astType.(type) {
 			case *ast.PointerType:
-				typeNode = p.Base
+				astType = p.Base
 			case *ast.ProcedureType:
-				typeNode = symbol.TypeNode()
+				astType = symbol.AstType()
 			default:
 				n.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
@@ -217,7 +217,7 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 			}
 
 			symbol = ty.Symbol
-			typeNode = ty.Symbol.TypeNode()
+			astType = ty.Symbol.AstType()
 		}
 	}
 
@@ -270,7 +270,7 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 	}
 
 	sym := n.ctx.Env.Lookup(ident.Prefix)
-	if sym == nil || sym.Kind() != ast.ImportSymbolKind {
+	if sym == nil || sym.Kind() != ast.ModuleSymbolKind {
 		n.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  fmt.Sprintf("'%s' is not defined as a module", ident.Prefix),
@@ -280,7 +280,7 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 		return ident
 	}
 
-	sym = sym.(*ast.ImportSymbol).Env.Lookup(ident.Name)
+	sym = sym.(*ast.ModuleSymbol).Env.Lookup(ident.Name)
 	if sym == nil || sym.Props() != ast.Exported {
 		n.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
@@ -403,7 +403,7 @@ func (n *NamesResolver) VisitCaseStmt(stmt *ast.CaseStmt) any {
 	}
 
 	caseExprName := dsg.QIdent.Name
-	caseExprType := n.underlying(dsg.Symbol.TypeNode())
+	caseExprType := n.underlying(dsg.Symbol.AstType())
 	for _, c := range stmt.Cases {
 		for _, labelRange := range c.CaseLabelList {
 			labelRange.Accept(n)
@@ -425,9 +425,9 @@ func (n *NamesResolver) VisitCaseStmt(stmt *ast.CaseStmt) any {
 					return stmt
 				}
 
-				switch n.underlying(label.Symbol.TypeNode()).(type) {
+				switch n.underlying(label.Symbol.AstType()).(type) {
 				case *ast.RecordType, *ast.PointerType:
-					n.ctx.SymbolOverrides[caseExprName] = ast.NewVariableSymbol(caseExprName, label.Symbol.Props(), label.Symbol.TypeNode())
+					n.ctx.SymbolOverrides[caseExprName] = ast.NewVariableSymbol(caseExprName, label.Symbol.Props(), label.Symbol.AstType())
 				default:
 					continue
 				}
@@ -502,7 +502,7 @@ func (n *NamesResolver) VisitGuard(guard *ast.Guard) any {
 	ty := guard.Type.(*ast.Designator)
 
 	n.ctx.SymbolOverrides[guard.Expr.String()] = ast.NewVariableSymbol(
-		expr.Symbol.Name(), expr.Symbol.Props(), ty.Symbol.TypeNode())
+		expr.Symbol.Name(), expr.Symbol.Props(), ty.Symbol.AstType())
 
 	for _, stmt := range guard.StmtSeq {
 		stmt.Accept(n)
@@ -520,7 +520,7 @@ func (n *NamesResolver) VisitImport(i *ast.Import) any {
 	}
 
 	sym := n.ctx.Env.Lookup(name)
-	if sym == nil || sym.Kind() != ast.ImportSymbolKind {
+	if sym == nil || sym.Kind() != ast.ModuleSymbolKind {
 		n.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  fmt.Sprintf("'%s' is not a known module", name),
@@ -530,7 +530,7 @@ func (n *NamesResolver) VisitImport(i *ast.Import) any {
 		return i
 	}
 
-	sym.(*ast.ImportSymbol).Env = n.ctx.Envs[name]
+	sym.(*ast.ModuleSymbol).Env = n.ctx.Envs[name]
 
 	return i
 }

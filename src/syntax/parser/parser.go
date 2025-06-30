@@ -734,7 +734,7 @@ func (p *Parser) getRecordType(base ast.Symbol) *ast.RecordType {
 		return nil
 	}
 
-	switch ty := typeSymbol.TypeNode().(type) {
+	switch ty := typeSymbol.AstType().(type) {
 	case *ast.RecordType:
 		return ty
 	case *ast.PointerType:
@@ -1054,7 +1054,7 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
 		return false
 	}
 
-	switch t := sym.(*ast.TypeSymbol).TypeNode().(type) {
+	switch t := sym.(*ast.TypeSymbol).AstType().(type) {
 	case *ast.RecordType:
 	case *ast.PointerType:
 		if _, ok := t.Base.(*ast.RecordType); !ok {
@@ -1158,7 +1158,7 @@ func (p *Parser) parseQualifiedIdent() *ast.QualifiedIdent {
 	// Parse the first identifier
 	id.Prefix = p.parseIdent()
 
-	if sym := p.ctx.Env.Lookup(id.Prefix); sym != nil && sym.Kind() == ast.ImportSymbolKind && p.tok == token.PERIOD {
+	if sym := p.ctx.Env.Lookup(id.Prefix); sym != nil && sym.Kind() == ast.ModuleSymbolKind && p.tok == token.PERIOD {
 		p.next()
 		id.EndOffset = p.end // Update the end position
 		id.Name = p.parseIdent()

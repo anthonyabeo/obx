@@ -80,7 +80,7 @@ func (t *TypeChecker) VisitIdentifierDef(def *ast.IdentifierDef) any {
 		return nil
 	}
 
-	ty := def.Symbol.TypeNode().Accept(t).(types.Type)
+	ty := def.Symbol.AstType().Accept(t).(types.Type)
 
 	def.SemaType = ty
 	def.Symbol.SetType(ty)
@@ -235,7 +235,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				})
 			}
 
-			ty := NamedTy.Symbol.TypeNode().Accept(t).(types.Type)
+			ty := NamedTy.Symbol.AstType().Accept(t).(types.Type)
 			target := ty // s.Type is an ast.Type node
 
 			// 1. Check if base is allowed (must be VAR param of record, or pointer to record)
@@ -2229,12 +2229,24 @@ func (t *TypeChecker) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 		return ident
 	}
 
-	if ident.Symbol == nil {
-		ident.SemaType = types.UnknownType
+	if ident.Prefix == "" {
+		if ident.Symbol == nil {
+			ident.SemaType = types.UnknownType
+			return ident
+		}
+
+		ident.SemaType = ident.Symbol.Type()
+
 		return ident
 	}
 
-	ident.SemaType = ident.Symbol.Type()
+	env := t.ctx.Envs[ident.Prefix]
+	sym := env.Lookup(ident.Name)
+	if sym == nil {
+		ident.SemaType = types.UnknownType
+	} else {
+		ident.SemaType = ident.Symbol.Type()
+	}
 
 	return ident
 }
@@ -2813,7 +2825,7 @@ func (t *TypeChecker) VisitProcedureHeading(heading *ast.ProcedureHeading) any {
 	}
 
 	if heading.FP == nil {
-		ty := heading.Name.Symbol.TypeNode().Accept(t).(types.Type)
+		ty := heading.Name.Symbol.AstType().Accept(t).(types.Type)
 		heading.Name.SemaType = ty
 		heading.Name.Symbol.SetType(ty)
 	} else {
@@ -3093,7 +3105,7 @@ func (t *TypeChecker) VisitRecordType(ty *ast.RecordType) any {
 
 		recTy.Fields[name] = &types.Field{
 			Name:       name,
-			Type:       sym.TypeNode().Accept(t).(types.Type),
+			Type:       sym.AstType().Accept(t).(types.Type),
 			IsExported: sym.Props() == ast.Exported,
 		}
 	}

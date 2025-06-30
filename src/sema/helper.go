@@ -73,11 +73,11 @@ func IsCallable(dsg *ast.Designator) bool {
 	case ast.ProcedureSymbolKind:
 		return true
 	case ast.VariableSymbolKind, ast.ConstantSymbolKind, ast.FieldSymbolKind, ast.ParamSymbolKind:
-		switch ty := dsg.Symbol.TypeNode().(type) {
+		switch ty := dsg.Symbol.AstType().(type) {
 		case *ast.ProcedureType:
 			return true
 		case *ast.NamedType:
-			_, ok := ty.Symbol.TypeNode().(*ast.ProcedureType)
+			_, ok := ty.Symbol.AstType().(*ast.ProcedureType)
 			return ok
 		case *ast.PointerType:
 			_, ok := ty.Base.(*ast.ProcedureType)
@@ -99,7 +99,7 @@ func (n *NamesResolver) underlying(ty ast.Type) ast.Type {
 				return nil
 			}
 
-			ty = sym.TypeNode()
+			ty = sym.AstType()
 		default:
 			return t
 		}
