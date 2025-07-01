@@ -1,6 +1,8 @@
 package types
 
-import "github.com/anthonyabeo/obx/src/syntax/token"
+import (
+	"github.com/anthonyabeo/obx/src/syntax/token"
+)
 
 type Type interface {
 	String() string
@@ -120,6 +122,9 @@ func AssignmentCompatible(exprType, varType Type) bool {
 		return false
 	}
 
+	exprType = Underlying(exprType)
+	varType = Underlying(varType)
+
 	// 1. Same type
 	if SameType(exprType, varType) {
 		return true
@@ -180,14 +185,34 @@ func AssignmentCompatible(exprType, varType Type) bool {
 
 	// 10. Tv is array of WCHAR, Te is suitable string or array, and STRLEN(Te) < LEN(Tv)
 	if IsArrayOf(varType, WCharType) && IsCharArrayOrString(exprType) {
-		// TODO For now we can't statically check STRLEN < LEN so assume true for typing
-		// TODO you will have to check for STRLEN(Te) < LEN(Tv) before/after this function
-		return true
+		TvLen := varType.(*ArrayType).Length
+
+		var TeLen int64
+		if str, isStr := exprType.(*StringType); isStr {
+			TeLen = int64(str.Length)
+		}
+
+		if arr, isArr := exprType.(*ArrayType); isArr {
+			TeLen = arr.Length
+		}
+		
+		return TeLen < TvLen
 	}
 
 	// 11. Tv is array of CHAR, Te is Latin-1 string or array, and STRLEN(Te) < LEN(Tv)
 	if IsArrayOf(varType, CharType) && IsLatin1CharArrayOrString(exprType) {
-		return true
+		TvLen := varType.(*ArrayType).Length
+
+		var TeLen int64
+		if str, isStr := exprType.(*StringType); isStr {
+			TeLen = int64(str.Length)
+		}
+
+		if arr, isArr := exprType.(*ArrayType); isArr {
+			TeLen = arr.Length
+		}
+
+		return TeLen < TvLen
 	}
 
 	// 12. Tv is procedure type and e is a procedure name with matching signature
