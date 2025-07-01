@@ -281,14 +281,22 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 	}
 
 	sym = sym.(*ast.ModuleSymbol).Env.Lookup(ident.Name)
-	if sym == nil || sym.Props() != ast.Exported {
+	if sym == nil {
 		n.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
-			Message:  fmt.Sprintf("identifier '%s' not found or is not exported", ident.Name),
+			Message:  fmt.Sprintf("identifier '%s' is not defined in module '%s'", ident.Name, ident.Prefix),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
 		})
 
 		return ident
+	}
+
+	if sym.Props() != ast.Exported {
+		n.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("identifier '%s', defined in module '%s' is not exported", ident.Name, ident.Prefix),
+			Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
+		})
 	}
 
 	sym.SetMangledName(ast.Mangle(sym))
@@ -494,12 +502,17 @@ func (n *NamesResolver) VisitGuard(guard *ast.Guard) any {
 	guard.Expr.Accept(n)
 	guard.Type.Accept(n)
 
-	if !IsValidGuardExpr(guard.Expr) {
+	expr, isExprDsg := guard.Expr.(*ast.Designator)
+	ty, isTypeDsg := guard.Type.(*ast.Designator)
+	if !isExprDsg && !isTypeDsg {
+		n.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("'%s' is not a valid guard expression", guard.Expr),
+			Range:    n.ctx.Source.Span(n.ctx.FileName, guard.Expr.Pos(), guard.Expr.End()),
+		})
 
+		return guard
 	}
-
-	expr := guard.Expr.(*ast.Designator)
-	ty := guard.Type.(*ast.Designator)
 
 	n.ctx.SymbolOverrides[guard.Expr.String()] = ast.NewVariableSymbol(
 		expr.Symbol.Name(), expr.Symbol.Props(), ty.Symbol.AstType())

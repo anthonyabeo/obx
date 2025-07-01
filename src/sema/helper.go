@@ -137,7 +137,7 @@ func IsValidGuardExpr(expr ast.Expression) bool {
 
 	// VAR param of record type
 	if ast.IsVarParam(dsg) {
-		if types.IsPointerToRecord(dsg.SemaType) {
+		if types.IsRecord(dsg.SemaType) || types.IsPointerToRecord(dsg.SemaType) {
 			return true
 		}
 

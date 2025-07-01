@@ -2,6 +2,7 @@ package sema
 
 import (
 	"github.com/anthonyabeo/obx/adt"
+	"github.com/anthonyabeo/obx/modgraph"
 	"github.com/anthonyabeo/obx/src/types"
 	"log"
 	"os"
@@ -4809,4 +4810,279 @@ func TestTypeCheckWithStatementsPrograms(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTypeCheckMultiModulePrograms(t *testing.T) {
+	tests := []typeCheckTestCase{
+		{
+			Name: "",
+			Source: `
+				MODULE Main;
+				IMPORT Math, Strings;
+				
+				VAR r: REAL;
+					msg: Strings.String;
+				
+				BEGIN
+				  r := Math.Sqrt(4.0);
+				  msg := Strings.Concat("Hello", " World")
+				END Main.
+
+				MODULE Math;
+				
+				PROCEDURE Sqrt*(x: REAL): REAL;
+				BEGIN
+				  RETURN x  (* placeholder *)
+				END Sqrt;
+				
+				END Math.
+				
+				MODULE Strings;
+				
+				TYPE String* = ARRAY 32 OF CHAR;
+				
+				PROCEDURE Concat*(a, b: String): String;
+				VAR res: String;
+				BEGIN
+				  RETURN res
+				END Concat;
+				
+				END Strings.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Non-Exported Identifier",
+			Source: `MODULE Main;
+				IMPORT Hidden;
+				
+				BEGIN
+				  Hidden.Secret()
+				END Main.
+				
+				MODULE Hidden;
+				
+				PROCEDURE Secret();
+				END Secret;
+				
+				END Hidden.
+				
+				`,
+			WantErrs: []string{
+				"identifier 'Secret', defined in module 'Hidden' is not exported",
+			},
+		},
+		{
+			Name: "Unknown Module",
+			Source: `MODULE Main;
+				IMPORT Strings;
+				
+				BEGIN
+				  Math.Sqrt(9.0)  (* Math is not imported *)
+				END Main.
+				
+				MODULE Strings;
+				
+				PROCEDURE UpperCase*(c: CHAR): CHAR;
+				BEGIN
+				  RETURN c
+				END UpperCase;
+				
+				END Strings.`,
+			WantErrs: []string{
+				"undeclared identifier: 'Math'",
+				"cannot select field 'Sqrt' of non-record 'Math'",
+				"name 'Math.Sqrt' could not be resolved to a procedure",
+			},
+		},
+		{
+			Name: "Calling Undefined identifier in module",
+			Source: `MODULE Main;
+				IMPORT Strings;
+				IMPORT Math
+
+				BEGIN
+				  Math.Sqrt(9.0)  (* Math is not imported *)
+				END Main.
+				
+				MODULE Strings;
+				
+				PROCEDURE UpperCase*(c: CHAR): CHAR;
+				BEGIN
+				  RETURN c
+				END UpperCase;
+				
+				END Strings.
+				
+				MODULE Math
+				END Math.`,
+			WantErrs: []string{
+				"identifier 'Sqrt' is not defined in module 'Math'",
+				"name 'Math.Sqrt' could not be resolved to a procedure",
+			},
+		},
+		{
+			Name: "Valid Type Import",
+			Source: `MODULE Main;
+				IMPORT Types;
+				
+				VAR p: Types.Point;
+				
+				BEGIN
+				  p.x := 10; 
+				  p.y := 20
+				END Main.
+				
+				MODULE Types;
+				
+				TYPE Point* = RECORD x, y: INTEGER END;
+				
+				END Types.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "Error Self Import",
+			Source: `MODULE Self;
+				IMPORT Self;
+				
+				BEGIN
+				END Self.
+				`,
+			WantErrs: []string{
+				"module 'Self' cannot import itself",
+			},
+		},
+		{
+			Name: "Valid Procedure Call Chain",
+			Source: `MODULE Main;
+				IMPORT A;
+				
+				BEGIN
+				  A.Ping()
+				END Main.
+				
+				MODULE A;
+				IMPORT B;
+				
+				PROCEDURE Ping*();
+				BEGIN
+				  B.Pong()
+				END Ping;
+				
+				END A.
+				
+				MODULE B;
+				
+				PROCEDURE Pong*();
+				END Pong;
+				
+				END B.`,
+			WantErrs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			ctx := typeCheckMultiModuleSnippet(t, tt.Source)
+
+			diags := ctx.Reporter.Diagnostics()
+			if len(diags) != len(tt.WantErrs) {
+				t.Errorf("got %d diagnostics, want %d", len(diags), len(tt.WantErrs))
+				for _, d := range diags {
+					t.Logf("diag: %s", d.Message)
+				}
+				return
+			}
+			for i, want := range tt.WantErrs {
+				if !strings.Contains(diags[i].Message, want) {
+					t.Errorf("diagnostic %d = %q, want substring %q", i, diags[i].Message, want)
+				}
+			}
+		})
+	}
+}
+
+func typeCheckMultiModuleSnippet(t *testing.T, code string) *report.Context {
+	tmp := t.TempDir()
+	file := filepath.Join(tmp, "test.obx")
+	if err := os.WriteFile(file, []byte(code), 0644); err != nil {
+		panic(err)
+	}
+
+	obx := ast.NewOberonX()
+	srcMgr := report.NewSourceManager()
+	reporter := report.NewBufferedReporter(srcMgr, 32, report.StdoutSink{
+		Source: srcMgr,
+		Writer: os.Stdout,
+	})
+
+	ctx := &report.Context{
+		Source:          srcMgr,
+		Reporter:        reporter,
+		TabWidth:        4,
+		Envs:            make(map[string]*ast.Environment),
+		Names:           adt.NewStack[string](),
+		ExprLists:       adt.NewStack[[]ast.Expression](),
+		SymbolOverrides: map[string]ast.Symbol{},
+		TypeOverrides:   map[string]types.Type{},
+	}
+
+	headers, err := modgraph.ScanModuleHeaders(file)
+	if err != nil {
+		ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  err.Error(),
+		})
+
+		//t.Fatalf("ScanModuleHeaders failed: %v", err)
+	}
+
+	// 3. Build graph
+	graph, err := modgraph.BuildImportGraph(tmp, headers)
+	if err != nil {
+		ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  err.Error(),
+		})
+		//log.Fatal(err)
+		return ctx
+	}
+
+	// 4. Topologically sort
+	sorted, err := modgraph.TopoSort(graph)
+	if err != nil {
+		ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  err.Error(),
+		})
+		//log.Fatal(err)
+
+		return ctx
+
+	}
+
+	for _, header := range sorted {
+		data, err := os.ReadFile(header.File)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		ctx.FileName = filepath.Base(header.File)
+		ctx.FilePath = header.File
+		ctx.Content = data[header.StartPos:header.EndPos]
+
+		p := parser.NewParser(ctx)
+		unit := p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			log.Fatalf("%d errors found", ctx.Reporter.ErrorCount())
+		}
+
+		obx.AddUnit(unit)
+		ctx.Envs[unit.Name()] = unit.Environ()
+	}
+
+	s := NewSema(ctx, obx)
+	s.Validate()
+
+	return ctx
 }

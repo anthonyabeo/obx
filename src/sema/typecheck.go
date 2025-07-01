@@ -2232,10 +2232,9 @@ func (t *TypeChecker) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 	if ident.Prefix == "" {
 		if ident.Symbol == nil {
 			ident.SemaType = types.UnknownType
-			return ident
+		} else {
+			ident.SemaType = ident.Symbol.Type()
 		}
-
-		ident.SemaType = ident.Symbol.Type()
 
 		return ident
 	}
@@ -2742,10 +2741,7 @@ func (t *TypeChecker) VisitGuard(guard *ast.Guard) any {
 	return guard
 }
 
-func (t *TypeChecker) VisitImport(i *ast.Import) any {
-	//TODO implement me
-	panic("implement me")
-}
+func (t *TypeChecker) VisitImport(i *ast.Import) any { return i }
 
 func (t *TypeChecker) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	tmp := t.ctx.Env
