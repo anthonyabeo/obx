@@ -51,7 +51,8 @@ type (
 	RecordType struct {
 		Base   Type
 		Fields []*FieldList
-		Env    *RecordEnv
+		//Environment    *RecordEnv
+		Env *RecordScope
 
 		StartOffset int
 		EndOffset   int
@@ -60,7 +61,7 @@ type (
 	FieldList struct {
 		List []*IdentifierDef
 		Type Type
-		Env  *RecordEnv
+		Env  *RecordScope
 
 		StartOffset int
 		EndOffset   int
@@ -187,7 +188,7 @@ func (p *PointerType) Children() []Node       { return []Node{p.Base} }
 func (p *PointerType) expr()                  {}
 func (p *PointerType) Type() types.Type       { panic("not implemented") }
 
-func NewRecordType(base Type, fields []*FieldList, env *RecordEnv) *RecordType {
+func NewRecordType(base Type, fields []*FieldList, env *RecordScope) *RecordType {
 	return &RecordType{Base: base, Fields: fields, Env: env}
 }
 func (r *RecordType) String() string {

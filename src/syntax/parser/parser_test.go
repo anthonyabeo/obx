@@ -32,15 +32,13 @@ begin
    end
 end Main`)
 
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -88,15 +86,13 @@ begin
 end Main
 `)
 
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
 	ctx := &report.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -146,7 +142,6 @@ begin
 	end
 end Main
 `)
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -154,7 +149,7 @@ end Main
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -212,7 +207,6 @@ begin
 	t(CenterTree).subnode := t(CenterTree).subnode
 end Main
 `)
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -220,7 +214,7 @@ end Main
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -295,7 +289,6 @@ begin
 	t.Insert("John")
 end Main
 `)
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -303,7 +296,7 @@ end Main
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -374,7 +367,6 @@ begin
 	t := c
 end Main
 `)
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -382,7 +374,7 @@ end Main
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -452,7 +444,6 @@ func TestParseImportDecl(t *testing.T) {
 		Out
 end Drawing
 `)
-	table := ast.NewEnvironment(nil, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -460,7 +451,7 @@ end Drawing
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -557,25 +548,23 @@ begin
  drawAll()
 end Drawing
 `)
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-	figures := ast.NewEnvironment(ast.GlobalEnviron, "Figure")
+	figures := ast.NewLexicalScope(ast.Global, "Figure")
 	figures.Insert(ast.NewProcedureSymbol("calc", ast.Exported, nil, nil, ast.FunctionProcedureKind))
 
-	collections := ast.NewEnvironment(ast.GlobalEnviron, "Collections")
+	collections := ast.NewLexicalScope(ast.Global, "Collections")
 	collections.Insert(ast.NewTypeSymbol("Iterator", ast.Exported, &ast.RecordType{}))
 	collections.Insert(ast.NewProcedureSymbol("createDeque", ast.Exported, nil, nil, ast.FunctionProcedureKind))
 
-	env := ast.NewRecordEnv(nil, collections)
+	env := ast.NewRecordScope(nil)
 	env.Insert(ast.NewProcedureSymbol("forEach", ast.Exported, nil, nil, ast.ProperProcedureKind))
 	env.Insert(ast.NewProcedureSymbol("append", ast.Exported, nil, nil, ast.ProperProcedureKind))
 	collections.Insert(ast.NewTypeSymbol("Deque", ast.Exported, &ast.RecordType{Env: env}))
 
-	envs := map[string]*ast.Environment{
-		"Fibonacci":   figures,
-		"F":           figures,
-		"Collections": collections,
-		"C":           collections,
-	}
+	envs := ast.NewEnv()
+	envs.AddModuleScope("Fibonacci", figures)
+	envs.AddModuleScope("F", figures)
+	envs.AddModuleScope("Collections", collections)
+	envs.AddModuleScope("C", collections)
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -583,8 +572,7 @@ end Drawing
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
-		Envs:     envs,
+		Env:      envs,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -680,7 +668,6 @@ module Main
 		t, c: Tree
 end Main
 `)
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -688,7 +675,7 @@ end Main
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -774,7 +761,6 @@ type a = array 10, N of integer
 	Function = procedure(x: integer): integer
 end Main
 `)
-	table := ast.NewEnvironment(nil, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -782,7 +768,7 @@ end Main
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -857,7 +843,6 @@ const
 	oneMillion = 1000000
 end Main
 `)
-	table := ast.NewEnvironment(nil, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -865,7 +850,7 @@ end Main
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -968,7 +953,6 @@ module Main
 
 end Main
 `)
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -976,7 +960,7 @@ end Main
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -1016,29 +1000,29 @@ end Main
 			len(tests), main.BName, len(main.DeclSeq))
 	}
 
-	//for _, tt := range tests {
-	//	switch decl := main.DeclSeq[tt.declIndex].(type) {
-	//	case *ast.ProcedureDecl:
-	//		if decl.Head.String() != tt.declType {
-	//			t.Errorf("expected type '%s', got '%s'", tt.declType, decl.Head.String())
-	//		}
-	//
-	//		if decl.Head.Name.Name != tt.declName {
-	//			t.Errorf("expected type name '%s', got '%s'", tt.declName, decl.Head.Name.Name)
-	//		}
-	//	case *ast.TypeDecl:
-	//		if decl.DenotedType.String() != tt.declType {
-	//			t.Errorf("expected type '%s', got '%s'", tt.declType, decl.DenotedType.String())
-	//		}
-	//
-	//		if decl.Name.Name != tt.declName {
-	//			t.Errorf("expected type name '%s', got '%s'", tt.declName, decl.Name.Name)
-	//		}
-	//
-	//	default:
-	//		t.Errorf("expected type or procedure declaration, got '%s'", main.DeclSeq[tt.declIndex])
-	//	}
-	//}
+	for _, tt := range tests {
+		switch decl := main.DeclSeq[tt.declIndex].(type) {
+		case *ast.ProcedureDecl:
+			if decl.Head.String() != tt.declType {
+				t.Errorf("expected type '%s', got '%s'", tt.declType, decl.Head.String())
+			}
+
+			if decl.Head.Name.Name != tt.declName {
+				t.Errorf("expected type name '%s', got '%s'", tt.declName, decl.Head.Name.Name)
+			}
+		case *ast.TypeDecl:
+			if decl.DenotedType.String() != tt.declType {
+				t.Errorf("expected type '%s', got '%s'", tt.declType, decl.DenotedType.String())
+			}
+
+			if decl.Name.Name != tt.declName {
+				t.Errorf("expected type name '%s', got '%s'", tt.declName, decl.Name.Name)
+			}
+
+		default:
+			t.Errorf("expected type or procedure declaration, got '%s'", main.DeclSeq[tt.declIndex])
+		}
+	}
 }
 
 func TestParseProcedure(t *testing.T) {
@@ -1084,7 +1068,6 @@ module Main
 
 end Main
 `)
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -1092,7 +1075,7 @@ end Main
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
@@ -1132,20 +1115,20 @@ end Main
 			len(tests), main.BName, len(main.DeclSeq))
 	}
 
-	//for _, tt := range tests {
-	//	decl, ok := main.DeclSeq[tt.declIndex].(*ast.ProcedureDecl)
-	//	if !ok {
-	//		t.Errorf("expected procedure declaration, got '%s'", main.DeclSeq[tt.declIndex])
-	//	}
-	//
-	//	if decl.Head.String() != tt.declType {
-	//		t.Errorf("expected type '%s', got '%s'", tt.declType, decl.Head.String())
-	//	}
-	//
-	//	if decl.Head.Name.Name != tt.declName {
-	//		t.Errorf("expected type name '%s', got '%s'", tt.declName, decl.Head.Name.Name)
-	//	}
-	//}
+	for _, tt := range tests {
+		decl, ok := main.DeclSeq[tt.declIndex].(*ast.ProcedureDecl)
+		if !ok {
+			t.Errorf("expected procedure declaration, got '%s'", main.DeclSeq[tt.declIndex])
+		}
+
+		if decl.Head.String() != tt.declType {
+			t.Errorf("expected type '%s', got '%s'", tt.declType, decl.Head.String())
+		}
+
+		if decl.Head.Name.Name != tt.declName {
+			t.Errorf("expected type name '%s', got '%s'", tt.declName, decl.Head.Name.Name)
+		}
+	}
 }
 
 func TestParserWithSyntaxErrors(t *testing.T) {
@@ -1162,7 +1145,6 @@ BEGIN
   end                 
 EN BadModule.         
 `)
-	table := ast.NewEnvironment(ast.GlobalEnviron, "BadModule")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
@@ -1170,7 +1152,7 @@ EN BadModule.
 		FileName: filename,
 		Content:  input,
 		Source:   mgr,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,

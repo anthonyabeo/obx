@@ -1,18 +1,18 @@
 package sema
 
 import (
-	"github.com/anthonyabeo/obx/adt"
-	"github.com/anthonyabeo/obx/modgraph"
-	"github.com/anthonyabeo/obx/src/types"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/anthonyabeo/obx/adt"
+	"github.com/anthonyabeo/obx/modgraph"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
+	"github.com/anthonyabeo/obx/src/types"
 )
 
 func TestTypeCheckerPrograms(t *testing.T) {
@@ -137,7 +137,7 @@ func TestTypeCheckerPrograms(t *testing.T) {
 				Source:    srcMgr,
 				Reporter:  reporter,
 				TabWidth:  4,
-				Envs:      make(map[string]*ast.Environment),
+				Env:       ast.NewEnv(),
 				Names:     adt.NewStack[string](),
 				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
@@ -150,7 +150,6 @@ func TestTypeCheckerPrograms(t *testing.T) {
 			}
 
 			obx.AddUnit(unit)
-			ctx.Envs[unit.Name()] = unit.Environ()
 
 			s := NewSema(ctx, obx)
 			s.Validate()
@@ -255,7 +254,7 @@ func TestTypeCheckInvalidPrograms(t *testing.T) {
 				Source:    srcMgr,
 				Reporter:  reporter,
 				TabWidth:  4,
-				Envs:      make(map[string]*ast.Environment),
+				Env:       ast.NewEnv(),
 				Names:     adt.NewStack[string](),
 				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
@@ -268,7 +267,6 @@ func TestTypeCheckInvalidPrograms(t *testing.T) {
 			}
 
 			obx.AddUnit(unit)
-			ctx.Envs[unit.Name()] = unit.Environ()
 
 			s := NewSema(ctx, obx)
 			s.Validate()
@@ -389,7 +387,7 @@ END ExprCompatibilityTest.`)
 		Source:    srcMgr,
 		Reporter:  reporter,
 		TabWidth:  4,
-		Envs:      make(map[string]*ast.Environment),
+		Env:       ast.NewEnv(),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -402,7 +400,6 @@ END ExprCompatibilityTest.`)
 	}
 
 	obx.AddUnit(unit)
-	ctx.Envs[unit.Name()] = unit.Environ()
 
 	s := NewSema(ctx, obx)
 	s.Validate()
@@ -491,7 +488,7 @@ END InvalidExprCompatibilityTest.
 		Source:    srcMgr,
 		Reporter:  reporter,
 		TabWidth:  4,
-		Envs:      make(map[string]*ast.Environment),
+		Env:       ast.NewEnv(),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -504,7 +501,6 @@ END InvalidExprCompatibilityTest.
 	}
 
 	obx.AddUnit(unit)
-	ctx.Envs[unit.Name()] = unit.Environ()
 
 	s := NewSema(ctx, obx)
 	s.Validate()
@@ -3891,7 +3887,7 @@ func typeCheckSnippet(t *testing.T, code string) *report.Context {
 		Source:          srcMgr,
 		Reporter:        reporter,
 		TabWidth:        4,
-		Envs:            make(map[string]*ast.Environment),
+		Env:             ast.NewEnv(),
 		Names:           adt.NewStack[string](),
 		ExprLists:       adt.NewStack[[]ast.Expression](),
 		SymbolOverrides: map[string]ast.Symbol{},
@@ -3904,7 +3900,6 @@ func typeCheckSnippet(t *testing.T, code string) *report.Context {
 	}
 
 	obx.AddUnit(unit)
-	ctx.Envs[unit.Name()] = unit.Environ()
 	s := NewSema(ctx, obx)
 	s.Validate()
 
@@ -5019,7 +5014,7 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *report.Context {
 		Source:          srcMgr,
 		Reporter:        reporter,
 		TabWidth:        4,
-		Envs:            make(map[string]*ast.Environment),
+		Env:             ast.NewEnv(),
 		Names:           adt.NewStack[string](),
 		ExprLists:       adt.NewStack[[]ast.Expression](),
 		SymbolOverrides: map[string]ast.Symbol{},
@@ -5033,7 +5028,7 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *report.Context {
 			Message:  err.Error(),
 		})
 
-		//t.Fatalf("ScanModuleHeaders failed: %v", err)
+		return ctx
 	}
 
 	// 3. Build graph
@@ -5043,7 +5038,6 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *report.Context {
 			Severity: report.Error,
 			Message:  err.Error(),
 		})
-		//log.Fatal(err)
 		return ctx
 	}
 
@@ -5054,7 +5048,6 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *report.Context {
 			Severity: report.Error,
 			Message:  err.Error(),
 		})
-		//log.Fatal(err)
 
 		return ctx
 
@@ -5078,7 +5071,6 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *report.Context {
 		}
 
 		obx.AddUnit(unit)
-		ctx.Envs[unit.Name()] = unit.Environ()
 	}
 
 	s := NewSema(ctx, obx)

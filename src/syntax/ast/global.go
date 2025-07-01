@@ -2,7 +2,7 @@ package ast
 
 import "github.com/anthonyabeo/obx/src/types"
 
-var GlobalEnviron *Environment
+var Global *LexicalScope
 
 // A PreDeclFuncProc is the id of a predeclared function or procedure.
 type (
@@ -130,7 +130,7 @@ func defPredeclaredFunctions() {
 		id := PreDeclFunc(i)
 
 		for _, name := range PredeclaredFunctions[id].Name {
-			GlobalEnviron.Insert(NewProcedureSymbol(name, Predeclared, nil, GlobalEnviron, FunctionProcedureKind))
+			Global.Insert(NewProcedureSymbol(name, Predeclared, nil, Global, FunctionProcedureKind))
 		}
 	}
 }
@@ -140,7 +140,7 @@ func defPredeclaredProcedures() {
 		id := PreDeclProc(i)
 
 		for _, name := range PredeclaredProcedures[id].Name {
-			GlobalEnviron.Insert(NewProcedureSymbol(name, Predeclared, nil, GlobalEnviron, ProperProcedureKind))
+			Global.Insert(NewProcedureSymbol(name, Predeclared, nil, Global, ProperProcedureKind))
 		}
 	}
 }
@@ -151,12 +151,12 @@ func defPredeclaredTypes() {
 	anyrec.SetType(types.AnyRec)
 	ANYREC.SetType(types.AnyRec)
 
-	GlobalEnviron.Insert(anyrec)
-	GlobalEnviron.Insert(ANYREC)
+	Global.Insert(anyrec)
+	Global.Insert(ANYREC)
 }
 
 func init() {
-	GlobalEnviron = NewEnvironment(nil, "global")
+	Global = NewLexicalScope(nil, "global")
 
 	defPredeclaredTypes()
 	defPredeclaredFunctions()

@@ -39,7 +39,6 @@ type CompilationUnit interface {
 	Node
 	Name() string
 	Imports() []*Import
-	Environ() *Environment
 }
 
 func Walk(fn func(Node) bool, node Node) {

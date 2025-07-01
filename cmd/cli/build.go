@@ -2,14 +2,16 @@ package cli
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+
+	"github.com/spf13/cobra"
+
 	"github.com/anthonyabeo/obx/modgraph"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
-	"github.com/spf13/cobra"
-	"log"
-	"os"
-	"path/filepath"
 )
 
 var buildArgs struct {
@@ -69,7 +71,7 @@ var buildCmd = &cobra.Command{
 			Source:   srcMgr,
 			Reporter: reporter,
 			TabWidth: tabWidth,
-			Envs:     make(map[string]*ast.Environment),
+			Env:      ast.NewEnv(),
 		}
 
 		for _, header := range sorted {
@@ -90,8 +92,6 @@ var buildCmd = &cobra.Command{
 			}
 
 			obx.AddUnit(unit)
-			ctx.Envs[unit.Name()] = unit.Environ()
 		}
-
 	},
 }

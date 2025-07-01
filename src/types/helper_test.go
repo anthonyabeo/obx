@@ -1,8 +1,9 @@
 package types
 
 import (
-	"github.com/anthonyabeo/obx/src/syntax/token"
 	"testing"
+
+	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 func TestSameType_Basic(t *testing.T) {

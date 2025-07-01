@@ -13,14 +13,8 @@ type Module struct {
 	DeclSeq    []Declaration
 	StmtSeq    []Statement
 
-	Env *Environment
-
 	StartOffset int
 	EndOffset   int
-}
-
-func NewModule(pos int, env *Environment) *Module {
-	return &Module{StartOffset: pos, Env: env}
 }
 
 func (m *Module) Name() string           { return m.BName }
@@ -49,7 +43,6 @@ func (m *Module) Children() []Node {
 
 	return children
 }
-func (m *Module) Environ() *Environment { return m.Env }
 
 type MetaSection struct {
 	Mode    token.Kind
@@ -76,20 +69,13 @@ func (ms *MetaSection) Children() []Node {
 // Definition
 // -------------------
 type Definition struct {
-	BName string
-	EName string
-
+	BName      string
+	EName      string
 	ImportList []*Import
 	DeclSeq    []Declaration
 
-	Env *Environment
-
 	StartOffset int
 	EndOffset   int
-}
-
-func NewDefinition(pos int) *Definition {
-	return &Definition{StartOffset: pos}
 }
 
 func (def *Definition) Accept(vst Visitor) any { return vst.VisitDefinition(def) }
@@ -111,4 +97,3 @@ func (def *Definition) Children() []Node {
 
 	return children
 }
-func (def *Definition) Environ() *Environment { return def.Env }

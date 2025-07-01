@@ -1,13 +1,13 @@
 package sema
 
 import (
-	"github.com/anthonyabeo/obx/adt"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/anthonyabeo/obx/adt"
 	"github.com/anthonyabeo/obx/modgraph"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -31,16 +31,13 @@ END Test.
 `
 
 func TestNameResolution_BasicProcedure(t *testing.T) {
-	env := ast.NewEnvironment(ast.GlobalEnviron, "Test")
-	envs := map[string]*ast.Environment{"Test": env}
 	sm := report.NewSourceManager()
 	ctx := &report.Context{
 		FileName: "Test.obx",
 		FilePath: "Test.obx",
 		Content:  []byte(testSource),
 		Source:   sm,
-		Env:      env,
-		Envs:     envs,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(sm, 25, report.StdoutSink{
 			Source: sm,
 			Writer: os.Stdout,
@@ -54,6 +51,7 @@ func TestNameResolution_BasicProcedure(t *testing.T) {
 	p := parser.NewParser(ctx)
 	unit := p.Parse()
 
+	ctx.Env.SetCurrentScope(ctx.Env.ModuleScope(unit.Name()))
 	resolve := NewNameResolver(ctx)
 	resolve.Resolve(unit)
 
@@ -65,9 +63,9 @@ func TestNameResolution_BasicProcedure(t *testing.T) {
 
 	// Collect symbols
 	module := unit.(*ast.Module)
-	env = module.Env
+	env := ctx.Env.ModuleScope(module.BName)
 	if env == nil {
-		t.Fatal("modgraph environment is nil")
+		t.Fatal("module environment is nil")
 	}
 
 	checkSymbol := func(name, expectedMangled string) {
@@ -161,7 +159,7 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 		Source:    srcMgr,
 		Reporter:  reporter,
 		TabWidth:  4,
-		Envs:      make(map[string]*ast.Environment),
+		Env:       ast.NewEnv(),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -184,11 +182,11 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 		}
 
 		obx.AddUnit(unit)
-		ctx.Envs[unit.Name()] = unit.Environ()
 	}
 
+	resolve := NewNameResolver(ctx)
 	for _, unit := range obx.Units {
-		resolve := NewNameResolver(ctx)
+		ctx.Env.SetCurrentScope(ctx.Env.ModuleScope(unit.Name()))
 		resolve.Resolve(unit)
 	}
 
@@ -219,16 +217,13 @@ func TestNameResolutionUndefined(t *testing.T) {
 		END Main.
 	`
 
-	env := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-	envs := map[string]*ast.Environment{"Main": env}
 	sm := report.NewSourceManager()
 	ctx := &report.Context{
 		FileName: "Test.obx",
 		FilePath: "Test.obx",
 		Content:  []byte(src),
 		Source:   sm,
-		Env:      env,
-		Envs:     envs,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(sm, 25, report.StdoutSink{
 			Source: sm,
 			Writer: os.Stdout,
@@ -272,16 +267,13 @@ func TestNameResolution_Basic(t *testing.T) {
 		END Main.
 	`
 
-	env := ast.NewEnvironment(ast.GlobalEnviron, "Main")
-	envs := map[string]*ast.Environment{"Main": env}
 	sm := report.NewSourceManager()
 	ctx := &report.Context{
 		FileName: "Test.obx",
 		FilePath: "Test.obx",
 		Content:  []byte(src),
 		Source:   sm,
-		Env:      env,
-		Envs:     envs,
+		Env:      ast.NewEnv(),
 		Reporter: report.NewBufferedReporter(sm, 25, report.StdoutSink{
 			Source: sm,
 			Writer: os.Stdout,

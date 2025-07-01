@@ -2239,7 +2239,7 @@ func (t *TypeChecker) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 		return ident
 	}
 
-	env := t.ctx.Envs[ident.Prefix]
+	env := t.ctx.Env.ModuleScope(ident.Prefix)
 	sym := env.Lookup(ident.Name)
 	if sym == nil {
 		ident.SemaType = types.UnknownType
@@ -2744,9 +2744,9 @@ func (t *TypeChecker) VisitGuard(guard *ast.Guard) any {
 func (t *TypeChecker) VisitImport(i *ast.Import) any { return i }
 
 func (t *TypeChecker) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
-	tmp := t.ctx.Env
-	t.ctx.Env = decl.Env
-	defer func() { t.ctx.Env = tmp }()
+	tmp := t.ctx.Env.CurrentScope()
+	t.ctx.Env.SetCurrentScope(decl.Env)
+	defer func() { t.ctx.Env.SetCurrentScope(tmp) }()
 
 	decl.Head.Accept(t)
 	if decl.Body != nil {

@@ -48,7 +48,8 @@ type (
 		Head    *ProcedureHeading
 		Body    *ProcedureBody
 		EndName string
-		Env     *Environment
+
+		Env *LexicalScope
 
 		StartOffset int
 		EndOffset   int

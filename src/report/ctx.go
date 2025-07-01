@@ -15,8 +15,7 @@ type Context struct {
 	Reporter Reporter
 	TabWidth int
 
-	Env  *ast.Environment            // the current environment. Defaults to that of the current scope
-	Envs map[string]*ast.Environment // environments of compilation units
+	Env *ast.Environment // manages scopes (lexical, record)
 
 	// use to disambiguate between type-guards and procedure calls during parsing
 	Names     *adt.Stack[string]

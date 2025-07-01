@@ -160,7 +160,7 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 
 		for _, param := range head.FP.Params {
 			for _, id := range param.Names {
-				if sym := p.ctx.Env.Insert(ast.NewParamSymbol(id.Name, param.Kind, param.Type)); sym != nil {
+				if sym := p.ctx.Env.Define(ast.NewParamSymbol(id.Name, param.Kind, param.Type)); sym != nil {
 					p.ctx.Reporter.Report(report.Diagnostic{
 						Severity: report.Error,
 						Message:  fmt.Sprintf("duplicate parameter declaration: '%s'", id.Name),
@@ -173,7 +173,8 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 
 	switch kind {
 	case ast.ProperProcedureKind, ast.FunctionProcedureKind:
-		sym := p.ctx.Env.Parent().Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, p.ctx.Env, kind))
+		curscope := p.ctx.Env.CurrentScope()
+		sym := curscope.Parent().Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, curscope, kind))
 		if sym != nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
@@ -216,7 +217,7 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 		}
 
 		// add the procedure to the receiver's environment
-		proc := ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, p.ctx.Env, kind)
+		proc := ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, p.ctx.Env.CurrentScope(), kind)
 		if sym := rec.Env.Insert(proc); sym != nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
@@ -226,7 +227,7 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 		}
 
 		// add the receiver to the procedure's environment
-		if sym := p.ctx.Env.Insert(ast.NewParamSymbol(head.Rcv.Name.Name, head.Rcv.Kind, head.Rcv.Type)); sym != nil {
+		if sym := p.ctx.Env.Define(ast.NewParamSymbol(head.Rcv.Name.Name, head.Rcv.Kind, head.Rcv.Type)); sym != nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
 				Message:  fmt.Sprintf("duplicate parameter declaration for '%s'", head.Rcv.Name),
@@ -235,7 +236,8 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 		}
 
 		name := head.Rcv.Type.String() + "." + head.Name.Name
-		sym := p.ctx.Env.Parent().Insert(ast.NewProcedureSymbol(name, head.Name.Props, procType, p.ctx.Env, kind))
+		curscope := p.ctx.Env.CurrentScope()
+		sym := curscope.Parent().Insert(ast.NewProcedureSymbol(name, head.Name.Props, procType, curscope, kind))
 		if sym != nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
@@ -260,9 +262,9 @@ func (p *Parser) underlyingRcvType(ty ast.Type) ast.Type {
 		return rcvType
 	}
 
-	env := p.ctx.Env.Parent()
+	env := p.ctx.Env.CurrentScope().Parent()
 	if Named.Name.Prefix != "" {
-		env = p.ctx.Envs[Named.Name.Prefix]
+		env = p.ctx.Env.ModuleScope(Named.Name.Prefix)
 	}
 
 	sym := env.Lookup(Named.Name.Name)

@@ -2,10 +2,10 @@ package pprint
 
 import (
 	"encoding/json"
-	"github.com/anthonyabeo/obx/adt"
 	"os"
 	"testing"
 
+	"github.com/anthonyabeo/obx/adt"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
@@ -33,14 +33,13 @@ func TestPrettyPrintJSON(t *testing.T) {
 		BEGIN x := 42
 		END Test.
 	`)
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Main")
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
 	ctx := &report.Context{
 		FileName: filename,
 		Content:  input,
-		Env:      table,
+		Env:      ast.NewEnv(),
 		Source:   mgr,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
@@ -127,21 +126,20 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 		END Bigger.
 	`)
 
-	table := ast.NewEnvironment(ast.GlobalEnviron, "Bigger")
-	out := ast.NewEnvironment(ast.GlobalEnviron, "Out")
+	table := ast.NewLexicalScope(ast.Global, "Bigger")
+	out := ast.NewLexicalScope(ast.Global, "Out")
 	out.Insert(ast.NewProcedureSymbol("Int", ast.Exported, nil, nil, ast.ProperProcedureKind))
-	envs := map[string]*ast.Environment{
-		"Bigger": table,
-		"Out":    out,
-	}
+
+	envs := ast.NewEnv()
+	envs.AddModuleScope("Bigger", table)
+	envs.AddModuleScope("Out", out)
 
 	filename := "test.obx"
 	mgr := report.NewSourceManager()
 	ctx := &report.Context{
 		FileName: filename,
 		Content:  input,
-		Env:      table,
-		Envs:     envs,
+		Env:      envs,
 		Source:   mgr,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,

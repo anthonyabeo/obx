@@ -147,19 +147,27 @@ func (p *Parser) parseMetaSection() *ast.MetaSection {
 }
 
 func (p *Parser) parseModule() *ast.Module {
-	pos := p.pos
-	mod := ast.NewModule(pos, p.ctx.Env)
+	p.ctx.Env.PushScope()
+	defer p.ctx.Env.PopScope()
+
+	var (
+		beginName   string
+		endName     string
+		meta        []*ast.MetaSection
+		importList  []*ast.Import
+		declSeq     []ast.Declaration
+		stmtSeq     []ast.Statement
+		startOffset int
+		endOffset   int
+	)
+
+	startOffset = p.pos
 
 	p.match(token.MODULE)
-	mod.BName = p.parseIdent()
-
-	if p.ctx.Env == nil || p.ctx.Env.Name() != mod.BName {
-		p.ctx.Env = ast.NewEnvironment(ast.GlobalEnviron, mod.BName)
-	}
-	mod.Env = p.ctx.Env
+	beginName = p.parseIdent()
 
 	if p.tok == token.LPAREN {
-		mod.MetaParams = p.metaParams()
+		meta = p.metaParams()
 	}
 
 	if p.tok == token.SEMICOLON {
@@ -169,64 +177,103 @@ func (p *Parser) parseModule() *ast.Module {
 	for p.startsImportOrDecl() {
 		switch p.tok {
 		case token.IMPORT:
-			mod.ImportList = p.parseImportList()
+			importList = p.parseImportList()
 		case token.VAR, token.TYPE, token.CONST, token.PROC, token.PROCEDURE:
-			mod.DeclSeq = p.parseDeclarationSeq()
+			declSeq = p.parseDeclarationSeq()
 		default:
 			pos := p.pos
 			p.errorExpected("import or declaration")
 			p.advance(declStart)
-			mod.DeclSeq = append(mod.DeclSeq, &ast.BadDecl{StartOffset: pos, EndOffset: p.pos})
+			declSeq = append(declSeq, &ast.BadDecl{StartOffset: pos, EndOffset: p.pos})
 		}
 	}
 
 	if p.tok == token.BEGIN {
 		p.next()
-		mod.StmtSeq = p.parseStatementSeq()
+		stmtSeq = p.parseStatementSeq()
 	}
 
 	p.match(token.END)
-	mod.EndOffset = p.end
-	mod.EName = p.parseIdent()
+	endNameStartOffset := p.pos
+	endOffset = p.end
+	endName = p.parseIdent()
+
+	if beginName != endName {
+		p.ctx.Reporter.Report(report.Diagnostic{
+			Severity: report.Error,
+			Message:  fmt.Sprintf("opening module name (%s) does not match ending name (%s)", beginName, endName),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, endNameStartOffset, endOffset),
+		})
+	}
+
 	if p.tok == token.PERIOD {
-		mod.EndOffset = p.end
+		endOffset = p.end
 		p.next()
 	}
 
-	return mod
+	p.ctx.Env.CurrentScope().Name = endName
+	p.ctx.Env.AddModuleScope(beginName, p.ctx.Env.CurrentScope())
+
+	return &ast.Module{
+		StartOffset: startOffset,
+		EndOffset:   endOffset,
+		BName:       beginName,
+		EName:       endName,
+		MetaParams:  meta,
+		ImportList:  importList,
+		DeclSeq:     declSeq,
+		StmtSeq:     stmtSeq,
+	}
 }
 
 // definition   = DEFINITION ident [';']  [ ImportList ] DeclarationSequence2 END ident ['.']
 func (p *Parser) parseDefinition() *ast.Definition {
-	pos := p.pos
-	def := ast.NewDefinition(pos)
+	p.ctx.Env.PushScope()
+	defer p.ctx.Env.PopScope()
+
+	var (
+		beginName   string
+		endName     string
+		importList  []*ast.Import
+		declSeq     []ast.Declaration
+		startOffset int
+		endOffset   int
+	)
+
+	startOffset = p.pos
 
 	p.match(token.DEFINITION)
-	def.BName = p.parseIdent()
+	beginName = p.parseIdent()
 	if p.tok == token.SEMICOLON {
 		p.next()
 	}
 
-	def.Env = ast.NewEnvironment(ast.GlobalEnviron, def.BName)
-	p.ctx.Env = def.Env
-
 	if p.tok == token.IMPORT {
-		def.ImportList = p.parseImportList()
+		importList = p.parseImportList()
 	}
 
 	for p.startsDecl() {
-		def.DeclSeq = p.parseDeclarationSeq2()
+		declSeq = p.parseDeclarationSeq2()
 	}
 
 	p.match(token.END)
-	def.EndOffset = p.end
-	def.EName = p.parseIdent()
+	endOffset = p.end
+	endName = p.parseIdent()
 	if p.tok == token.PERIOD {
-		def.EndOffset = p.end
+		endOffset = p.end
 		p.next()
 	}
 
-	return def
+	p.ctx.Env.AddModuleScope(beginName, p.ctx.Env.CurrentScope())
+
+	return &ast.Definition{
+		BName:       beginName,
+		EName:       endName,
+		ImportList:  importList,
+		DeclSeq:     declSeq,
+		StartOffset: startOffset,
+		EndOffset:   endOffset,
+	}
 }
 
 // ImportList = IMPORT import { [','] import } [';']
@@ -250,7 +297,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 	// add module imports to the environment
 	for _, imp := range list {
 		if imp.Alias != "" {
-			if sym := p.ctx.Env.Insert(ast.NewImportSymbol(imp.Alias)); sym != nil {
+			if sym := p.ctx.Env.Define(ast.NewImportSymbol(imp.Alias)); sym != nil {
 				p.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  "duplicate module import",
@@ -258,7 +305,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 				})
 			}
 		} else {
-			if sym := p.ctx.Env.Insert(ast.NewImportSymbol(imp.Name)); sym != nil {
+			if sym := p.ctx.Env.Define(ast.NewImportSymbol(imp.Name)); sym != nil {
 				p.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  "duplicate module import",
@@ -440,7 +487,7 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 	p.match(token.EQUAL)
 	Typ := p.parseType()
 
-	if sym := p.ctx.Env.Insert(ast.NewTypeSymbol(name.Name, name.Props, Typ)); sym != nil {
+	if sym := p.ctx.Env.Define(ast.NewTypeSymbol(name.Name, name.Props, Typ)); sym != nil {
 		p.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  "duplicate type declaration " + name.Name,
@@ -461,7 +508,7 @@ func (p *Parser) parseConstantDecl() *ast.ConstantDecl {
 	p.match(token.EQUAL)
 	value := p.parseExpression()
 
-	if sym := p.ctx.Env.Insert(ast.NewConstantSymbol(name.Name, name.Props, value)); sym != nil {
+	if sym := p.ctx.Env.Define(ast.NewConstantSymbol(name.Name, name.Props, value)); sym != nil {
 		p.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  "duplicate constant declaration " + name.Name,
@@ -486,7 +533,7 @@ func (p *Parser) parseVariableDecl() *ast.VariableDecl {
 
 	// add the variables to the environment
 	for _, id := range decl.IdentList {
-		sym := p.ctx.Env.Insert(ast.NewVariableSymbol(id.Name, id.Props, decl.Type))
+		sym := p.ctx.Env.Define(ast.NewVariableSymbol(id.Name, id.Props, decl.Type))
 		if sym != nil {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
@@ -545,7 +592,7 @@ func (p *Parser) parseEnumType() *ast.EnumType {
 	p.match(token.RPAREN)
 
 	for ord, variant := range enum.Variants {
-		p.ctx.Env.Insert(ast.NewConstantSymbol(variant.Name, variant.Props, &ast.BasicLit{
+		p.ctx.Env.Define(ast.NewConstantSymbol(variant.Name, variant.Props, &ast.BasicLit{
 			Kind: token.INT32,
 			Val:  strconv.Itoa(ord),
 		}))
@@ -666,7 +713,7 @@ func (p *Parser) parseRecordType() *ast.RecordType {
 	p.match(token.RECORD)
 
 	baseEnv := p.parseRecordBase(rec)
-	rec.Env = ast.NewRecordEnv(baseEnv, p.ctx.Env)
+	rec.Env = ast.NewRecordScope(baseEnv)
 
 	if p.tok == token.IDENTIFIER {
 		rec.Fields = p.parseRecordFields()
@@ -679,7 +726,7 @@ func (p *Parser) parseRecordType() *ast.RecordType {
 	return rec
 }
 
-func (p *Parser) parseRecordBase(rec *ast.RecordType) *ast.RecordEnv {
+func (p *Parser) parseRecordBase(rec *ast.RecordType) *ast.RecordScope {
 	if p.tok != token.LPAREN {
 		return nil
 	}
@@ -709,8 +756,8 @@ func (p *Parser) parseRecordBase(rec *ast.RecordType) *ast.RecordEnv {
 }
 
 func (p *Parser) lookupBaseType(baseType *ast.NamedType) ast.Symbol {
-	if env, ok := p.ctx.Envs[baseType.Name.Prefix]; ok {
-		base := env.Lookup(baseType.Name.Name)
+	if baseType.Name.Prefix != "" {
+		base := p.ctx.Env.LookupQualified(baseType.Name.Prefix, baseType.Name.Name)
 		if base == nil || base.Props() != ast.Exported {
 			p.ctx.Reporter.Report(report.Diagnostic{
 				Severity: report.Error,
@@ -878,9 +925,9 @@ func (p *Parser) parseFactor() ast.Expression {
 		return expr
 	case token.IDENTIFIER:
 		dsg := p.parseDesignator()
-		env := p.ctx.Env
+		env := p.ctx.Env.CurrentScope()
 		if dsg.QIdent.Prefix != "" {
-			if env = p.ctx.Envs[dsg.QIdent.Prefix]; env == nil {
+			if env = p.ctx.Env.ModuleScope(dsg.QIdent.Prefix); env == nil {
 				p.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Fatal,
 					Message:  fmt.Sprintf("cannot find definition or module for %s", dsg.QIdent.Prefix),
@@ -1044,9 +1091,9 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
 		return false
 	}
 
-	env := p.ctx.Env
+	env := p.ctx.Env.CurrentScope()
 	if Named.Name.Prefix != "" {
-		env = p.ctx.Envs[Named.Name.Prefix]
+		env = p.ctx.Env.ModuleScope(Named.Name.Prefix)
 	}
 
 	sym := env.Lookup(Named.Name.Name)
@@ -1213,14 +1260,10 @@ func (p *Parser) parseIdentifierDef() *ast.IdentifierDef {
 
 // ProcedureDeclaration = ProcedureHeading [ ';' ] ProcedureBody END [ ident ]
 func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
-	proc = &ast.ProcedureDecl{StartOffset: p.pos}
+	p.ctx.Env.PushScope()
+	defer p.ctx.Env.PopScope()
 
-	parent := p.ctx.Env
-	p.ctx.Env = ast.NewEnvironment(parent, "")
-	proc.Env = p.ctx.Env
-	defer func() {
-		p.ctx.Env = parent
-	}()
+	proc = &ast.ProcedureDecl{StartOffset: p.pos}
 
 	proc.Head = p.parseProcHeading()
 	if p.tok == token.SEMICOLON {
@@ -1236,8 +1279,10 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 	}
 
 	// name the symbol table to the name of the procedure
-	proc.Env.SetName(proc.Head.Name.Name)
-
+	thisScope := p.ctx.Env.CurrentScope()
+	thisScope.Name = proc.Head.Name.Name
+	proc.Env = thisScope
+	
 	p.populateEnvs(proc.Head, proc.Kind)
 
 	// ─── Parse the Procedure Body to the end of the Procedure ──────────────────────

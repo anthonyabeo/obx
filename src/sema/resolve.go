@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
@@ -543,15 +544,15 @@ func (n *NamesResolver) VisitImport(i *ast.Import) any {
 		return i
 	}
 
-	sym.(*ast.ModuleSymbol).Env = n.ctx.Envs[name]
+	sym.(*ast.ModuleSymbol).Env = n.ctx.Env.ModuleScope(name)
 
 	return i
 }
 
 func (n *NamesResolver) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
-	tmp := n.ctx.Env
-	n.ctx.Env = decl.Env
-	defer func() { n.ctx.Env = tmp }()
+	tmp := n.ctx.Env.CurrentScope()
+	n.ctx.Env.SetCurrentScope(decl.Env)
+	defer func() { n.ctx.Env.SetCurrentScope(tmp) }()
 
 	decl.Head.Accept(n)
 	if decl.Body != nil {
