@@ -1,10 +1,11 @@
 package scan
 
 import (
-	"github.com/anthonyabeo/obx/src/syntax/token"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type StateFn func(*Scanner) StateFn

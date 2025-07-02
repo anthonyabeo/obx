@@ -15,17 +15,15 @@ func NewSema(ctx *report.Context, obx *ast.OberonX) *Sema {
 }
 
 func (s *Sema) Validate() {
+	resolve := NewNameResolver(s.ctx)
+	checker := NewTypeChecker(s.ctx)
+	flow := NewFlowChecker(s.ctx)
+
 	for _, unit := range s.obx.Units {
 		s.ctx.Env.SetCurrentScope(s.ctx.Env.ModuleScope(unit.Name()))
 
-		// validate and annotate loops for EXIT support:
-		loop := NewFlowControlAnalyzer(s.ctx)
-		loop.Analyse(unit)
-
-		resolve := NewNameResolver(s.ctx)
 		resolve.Resolve(unit)
-
-		checker := NewTypeChecker(s.ctx)
 		checker.TypeCheck(unit)
+		flow.Analyse(unit)
 	}
 }

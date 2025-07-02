@@ -515,14 +515,12 @@ func (n *NamesResolver) VisitGuard(guard *ast.Guard) any {
 		return guard
 	}
 
-	n.ctx.SymbolOverrides[guard.Expr.String()] = ast.NewVariableSymbol(
-		expr.Symbol.Name(), expr.Symbol.Props(), ty.Symbol.AstType())
-
+	n.ctx.SymbolOverrides[guard.Expr.String()] = ast.NewVariableSymbol(expr.Symbol.Name(), expr.Symbol.Props(), ty.Symbol.AstType())
+	defer delete(n.ctx.SymbolOverrides, guard.Expr.String())
+	
 	for _, stmt := range guard.StmtSeq {
 		stmt.Accept(n)
 	}
-
-	delete(n.ctx.SymbolOverrides, guard.Expr.String())
 
 	return guard
 }
@@ -569,7 +567,6 @@ func (n *NamesResolver) VisitProcedureHeading(heading *ast.ProcedureHeading) any
 		rcvName = heading.Rcv.Type.String() + "."
 	}
 
-	//heading.Name.Accept(n)
 	sym := n.ctx.Env.Lookup(rcvName + heading.Name.Name)
 	if sym == nil {
 		n.ctx.Reporter.Report(report.Diagnostic{

@@ -5,293 +5,271 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
-type FlowControlAnalyzer struct {
+type FlowChecker struct {
 	ctx *report.Context
 
 	label string
 }
 
-func NewFlowControlAnalyzer(ctx *report.Context) *FlowControlAnalyzer {
-	return &FlowControlAnalyzer{ctx: ctx}
+func NewFlowChecker(ctx *report.Context) *FlowChecker {
+	return &FlowChecker{ctx: ctx}
 }
 
-func (l *FlowControlAnalyzer) Analyse(unit ast.CompilationUnit) {
-	unit.Accept(l)
+func (f *FlowChecker) Analyse(unit ast.CompilationUnit) {
+	unit.Accept(f)
 }
 
-func (l *FlowControlAnalyzer) VisitOberon(oberon *ast.OberonX) any {
+func (f *FlowChecker) VisitOberon(oberon *ast.OberonX) any {
 	for _, unit := range oberon.Units {
-		unit.Accept(l)
+		unit.Accept(f)
 	}
 
 	return oberon
 }
 
-func (l *FlowControlAnalyzer) VisitModule(module *ast.Module) any {
+func (f *FlowChecker) VisitModule(module *ast.Module) any {
 	for _, decl := range module.DeclSeq {
-		decl.Accept(l)
+		decl.Accept(f)
 	}
 
 	for _, stmt := range module.StmtSeq {
-		stmt.Accept(l)
+		stmt.Accept(f)
 	}
 
 	return module
 }
 
-func (l *FlowControlAnalyzer) VisitDefinition(def *ast.Definition) any { return def }
+func (f *FlowChecker) VisitDefinition(def *ast.Definition) any { return def }
 
-func (l *FlowControlAnalyzer) VisitBinaryExpr(expr *ast.BinaryExpr) any { return expr }
+func (f *FlowChecker) VisitBinaryExpr(expr *ast.BinaryExpr) any { return expr }
 
-func (l *FlowControlAnalyzer) VisitDesignator(dsg *ast.Designator) any { return dsg }
+func (f *FlowChecker) VisitDesignator(dsg *ast.Designator) any { return dsg }
 
-func (l *FlowControlAnalyzer) VisitFunctionCall(call *ast.FunctionCall) any { return call }
+func (f *FlowChecker) VisitFunctionCall(call *ast.FunctionCall) any { return call }
 
-func (l *FlowControlAnalyzer) VisitUnaryExpr(expr *ast.UnaryExpr) any { return expr }
+func (f *FlowChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any { return expr }
 
-func (l *FlowControlAnalyzer) VisitQualifiedIdent(ident *ast.QualifiedIdent) any { return ident }
+func (f *FlowChecker) VisitQualifiedIdent(ident *ast.QualifiedIdent) any { return ident }
 
-func (l *FlowControlAnalyzer) VisitSet(set *ast.Set) any { return set }
+func (f *FlowChecker) VisitSet(set *ast.Set) any { return set }
 
-func (l *FlowControlAnalyzer) VisitBasicLit(lit *ast.BasicLit) any { return lit }
+func (f *FlowChecker) VisitBasicLit(lit *ast.BasicLit) any { return lit }
 
-func (l *FlowControlAnalyzer) VisitExprRange(rng *ast.ExprRange) any { return rng }
+func (f *FlowChecker) VisitExprRange(rng *ast.ExprRange) any { return rng }
 
-func (l *FlowControlAnalyzer) VisitNil(n *ast.Nil) any { return n }
+func (f *FlowChecker) VisitNil(n *ast.Nil) any { return n }
 
-func (l *FlowControlAnalyzer) VisitIfStmt(stmt *ast.IfStmt) any {
+func (f *FlowChecker) VisitIfStmt(stmt *ast.IfStmt) any {
 	for _, s := range stmt.ThenPath {
-		s.Accept(l)
+		s.Accept(f)
 	}
 
 	for _, elif := range stmt.ElseIfBranches {
 		for _, s := range elif.ThenPath {
-			s.Accept(l)
+			s.Accept(f)
 		}
 	}
 
 	for _, s := range stmt.ElsePath {
-		s.Accept(l)
+		s.Accept(f)
 	}
 
 	return stmt
 }
 
-func (l *FlowControlAnalyzer) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any { return stmt }
+func (f *FlowChecker) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any { return stmt }
 
-func (l *FlowControlAnalyzer) VisitReturnStmt(stmt *ast.ReturnStmt) any { return stmt }
+func (f *FlowChecker) VisitReturnStmt(stmt *ast.ReturnStmt) any { return stmt }
 
-func (l *FlowControlAnalyzer) VisitProcedureCall(call *ast.ProcedureCall) any { return call }
+func (f *FlowChecker) VisitProcedureCall(call *ast.ProcedureCall) any { return call }
 
-func (l *FlowControlAnalyzer) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
-	tmp := l.label
-	defer func() { l.label = tmp }()
+func (f *FlowChecker) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
+	tmp := f.label
+	defer func() { f.label = tmp }()
 
-	l.label = newLoopLabel("repeat")
+	f.label = newLoopLabel("repeat")
 	for _, s := range stmt.StmtSeq {
-		s.Accept(l)
+		s.Accept(f)
 	}
 
-	stmt.Label = l.label
+	stmt.Label = f.label
 
 	return stmt
 }
 
-func (l *FlowControlAnalyzer) VisitWhileStmt(stmt *ast.WhileStmt) any {
-	tmp := l.label
-	defer func() { l.label = tmp }()
+func (f *FlowChecker) VisitWhileStmt(stmt *ast.WhileStmt) any {
+	tmp := f.label
+	defer func() { f.label = tmp }()
 
-	l.label = newLoopLabel("while")
+	f.label = newLoopLabel("while")
 
-	for _, s := range stmt.StmtSeq {
-		s.Accept(l)
-	}
-
+	f.visitStmtSeq(stmt.StmtSeq)
 	for _, elif := range stmt.ElsIfs {
-		for _, s := range elif.ThenPath {
-			s.Accept(l)
-		}
+		f.visitStmtSeq(elif.ThenPath)
 	}
 
-	stmt.Label = l.label
+	stmt.Label = f.label
 
 	return stmt
 }
 
-func (l *FlowControlAnalyzer) VisitLoopStmt(stmt *ast.LoopStmt) any {
-	tmp := l.label
-	defer func() { l.label = tmp }()
+func (f *FlowChecker) VisitLoopStmt(stmt *ast.LoopStmt) any {
+	tmp := f.label
+	defer func() { f.label = tmp }()
 
-	l.label = newLoopLabel("loop")
+	f.label = newLoopLabel("loop")
+	f.visitStmtSeq(stmt.StmtSeq)
 
-	for _, s := range stmt.StmtSeq {
-		s.Accept(l)
-	}
-
-	stmt.Label = l.label
+	stmt.Label = f.label
 
 	return stmt
 }
 
-func (l *FlowControlAnalyzer) VisitCaseStmt(stmt *ast.CaseStmt) any {
+func (f *FlowChecker) VisitCaseStmt(stmt *ast.CaseStmt) any {
 	for _, caseClause := range stmt.Cases {
 		for _, s := range caseClause.StmtSeq {
-			s.Accept(l)
+			s.Accept(f)
 		}
 	}
 
-	for _, s := range stmt.Else {
-		s.Accept(l)
-	}
+	f.visitStmtSeq(stmt.Else)
 
 	return stmt
 }
 
-func (l *FlowControlAnalyzer) VisitForStmt(stmt *ast.ForStmt) any {
-	tmp := l.label
-	defer func() { l.label = tmp }()
+func (f *FlowChecker) VisitForStmt(stmt *ast.ForStmt) any {
+	tmp := f.label
+	defer func() { f.label = tmp }()
 
-	l.label = newLoopLabel("for")
+	f.label = newLoopLabel("for")
 
-	for _, s := range stmt.StmtSeq {
-		s.Accept(l)
-	}
-
-	stmt.Label = l.label
+	f.visitStmtSeq(stmt.StmtSeq)
+	stmt.Label = f.label
 
 	return stmt
 }
 
-func (l *FlowControlAnalyzer) VisitExitStmt(stmt *ast.ExitStmt) any {
-	if l.label == "" {
-		l.ctx.Reporter.Report(report.Diagnostic{
+func (f *FlowChecker) VisitExitStmt(stmt *ast.ExitStmt) any {
+	if f.label == "" {
+		f.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
 			Message:  "Exit statement outside of loop",
-			Range:    l.ctx.Source.Span(l.ctx.FileName, stmt.StartOffset, stmt.EndOffset),
+			Range:    f.ctx.Source.Span(f.ctx.FileName, stmt.StartOffset, stmt.EndOffset),
 		})
 	}
 
-	stmt.Label = l.label
+	stmt.Label = f.label
 
 	return stmt
 }
 
-func (l *FlowControlAnalyzer) VisitWithStmt(stmt *ast.WithStmt) any {
+func (f *FlowChecker) VisitWithStmt(stmt *ast.WithStmt) any {
 	for _, arm := range stmt.Arms {
-		for _, arm := range arm.StmtSeq {
-			arm.Accept(l)
-		}
+		f.visitStmtSeq(arm.StmtSeq)
 	}
 
-	for _, s := range stmt.Else {
-		s.Accept(l)
-	}
+	f.visitStmtSeq(stmt.Else)
 
 	return stmt
 }
 
-func (l *FlowControlAnalyzer) VisitImport(i *ast.Import) any { return i }
+func (f *FlowChecker) VisitImport(i *ast.Import) any { return i }
 
-func (l *FlowControlAnalyzer) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
+func (f *FlowChecker) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	if decl.Body != nil {
-		for _, s := range decl.Body.StmtSeq {
-			s.Accept(l)
-		}
+		f.visitStmtSeq(decl.Body.StmtSeq)
 	}
 
 	return decl
 }
 
-func (l *FlowControlAnalyzer) VisitVariableDecl(decl *ast.VariableDecl) any { return decl }
+func (f *FlowChecker) VisitVariableDecl(decl *ast.VariableDecl) any { return decl }
 
-func (l *FlowControlAnalyzer) VisitConstantDecl(decl *ast.ConstantDecl) any { return decl }
+func (f *FlowChecker) VisitConstantDecl(decl *ast.ConstantDecl) any { return decl }
 
-func (l *FlowControlAnalyzer) VisitTypeDecl(decl *ast.TypeDecl) any { return decl }
+func (f *FlowChecker) VisitTypeDecl(decl *ast.TypeDecl) any { return decl }
 
-func (l *FlowControlAnalyzer) VisitProcedureHeading(heading *ast.ProcedureHeading) any {
+func (f *FlowChecker) VisitProcedureHeading(heading *ast.ProcedureHeading) any {
 	return heading
 }
 
-func (l *FlowControlAnalyzer) VisitBasicType(basic *ast.BasicType) any { return basic }
+func (f *FlowChecker) VisitBasicType(basic *ast.BasicType) any { return basic }
 
-func (l *FlowControlAnalyzer) VisitArrayType(array *ast.ArrayType) any { return array }
+func (f *FlowChecker) VisitArrayType(array *ast.ArrayType) any { return array }
 
-func (l *FlowControlAnalyzer) VisitPointerType(pointer *ast.PointerType) any { return pointer }
+func (f *FlowChecker) VisitPointerType(pointer *ast.PointerType) any { return pointer }
 
-func (l *FlowControlAnalyzer) VisitProcedureType(procedure *ast.ProcedureType) any { return procedure }
+func (f *FlowChecker) VisitProcedureType(procedure *ast.ProcedureType) any { return procedure }
 
-func (l *FlowControlAnalyzer) VisitRecordType(record *ast.RecordType) any { return record }
+func (f *FlowChecker) VisitRecordType(record *ast.RecordType) any { return record }
 
-func (l *FlowControlAnalyzer) VisitEnumType(enum *ast.EnumType) any { return enum }
+func (f *FlowChecker) VisitEnumType(enum *ast.EnumType) any { return enum }
 
-func (l *FlowControlAnalyzer) VisitNamedType(named *ast.NamedType) any { return named }
+func (f *FlowChecker) VisitNamedType(named *ast.NamedType) any { return named }
 
-func (l *FlowControlAnalyzer) VisitMetaSection(section *ast.MetaSection) any {
+func (f *FlowChecker) VisitMetaSection(section *ast.MetaSection) any {
 	return section
 }
 
-func (l *FlowControlAnalyzer) VisitIdentifierDef(def *ast.IdentifierDef) any { return def }
+func (f *FlowChecker) VisitIdentifierDef(def *ast.IdentifierDef) any { return def }
 
-func (l *FlowControlAnalyzer) VisitIndexOp(op *ast.IndexOp) any { return op }
+func (f *FlowChecker) VisitIndexOp(op *ast.IndexOp) any { return op }
 
-func (l *FlowControlAnalyzer) VisitPtrDeref(deref *ast.PtrDeref) any { return deref }
+func (f *FlowChecker) VisitPtrDeref(deref *ast.PtrDeref) any { return deref }
 
-func (l *FlowControlAnalyzer) VisitDotOp(op *ast.DotOp) any { return op }
+func (f *FlowChecker) VisitDotOp(op *ast.DotOp) any { return op }
 
-func (l *FlowControlAnalyzer) VisitTypeGuard(guard *ast.TypeGuard) any { return guard }
+func (f *FlowChecker) VisitTypeGuard(guard *ast.TypeGuard) any { return guard }
 
-func (l *FlowControlAnalyzer) VisitProcedureBody(body *ast.ProcedureBody) any {
-	for _, decl := range body.DeclSeq {
-		decl.Accept(l)
-	}
-
-	for _, s := range body.StmtSeq {
-		s.Accept(l)
-	}
-
+func (f *FlowChecker) VisitProcedureBody(body *ast.ProcedureBody) any {
+	f.visitStmtSeq(body.StmtSeq)
+	f.visitStmtSeq(body.StmtSeq)
 	return body
 }
 
-func (l *FlowControlAnalyzer) VisitFieldList(list *ast.FieldList) any { return list }
+func (f *FlowChecker) VisitFieldList(list *ast.FieldList) any { return list }
 
-func (l *FlowControlAnalyzer) VisitLenList(list *ast.LenList) any { return list }
+func (f *FlowChecker) VisitLenList(list *ast.LenList) any { return list }
 
-func (l *FlowControlAnalyzer) VisitElseIfBranch(branch *ast.ElseIfBranch) any {
-	for _, s := range branch.ThenPath {
-		s.Accept(l)
-	}
-
+func (f *FlowChecker) VisitElseIfBranch(branch *ast.ElseIfBranch) any {
+	f.visitStmtSeq(branch.ThenPath)
 	return branch
 }
 
-func (l *FlowControlAnalyzer) VisitReceiver(receiver *ast.Receiver) any { return receiver }
+func (f *FlowChecker) VisitReceiver(receiver *ast.Receiver) any { return receiver }
 
-func (l *FlowControlAnalyzer) VisitFPSection(section *ast.FPSection) any { return section }
+func (f *FlowChecker) VisitFPSection(section *ast.FPSection) any { return section }
 
-func (l *FlowControlAnalyzer) VisitFormalParams(params *ast.FormalParams) any { return params }
+func (f *FlowChecker) VisitFormalParams(params *ast.FormalParams) any { return params }
 
-func (l *FlowControlAnalyzer) VisitCase(c *ast.Case) any {
-	for _, s := range c.StmtSeq {
-		s.Accept(l)
-	}
-
+func (f *FlowChecker) VisitCase(c *ast.Case) any {
+	f.visitStmtSeq(c.StmtSeq)
 	return c
 }
 
-func (l *FlowControlAnalyzer) VisitLabelRange(labelRange *ast.LabelRange) any { return labelRange }
+func (f *FlowChecker) VisitLabelRange(labelRange *ast.LabelRange) any { return labelRange }
 
-func (l *FlowControlAnalyzer) VisitGuard(guard *ast.Guard) any {
-	for _, s := range guard.StmtSeq {
-		s.Accept(l)
-	}
-
+func (f *FlowChecker) VisitGuard(guard *ast.Guard) any {
+	f.visitStmtSeq(guard.StmtSeq)
 	return guard
 }
 
-func (l *FlowControlAnalyzer) VisitBadExpr(expr *ast.BadExpr) any { return expr }
+func (f *FlowChecker) VisitBadExpr(expr *ast.BadExpr) any { return expr }
 
-func (l *FlowControlAnalyzer) VisitBadDecl(decl *ast.BadDecl) any { return decl }
+func (f *FlowChecker) VisitBadDecl(decl *ast.BadDecl) any { return decl }
 
-func (l *FlowControlAnalyzer) VisitBadStmt(stmt *ast.BadStmt) any { return stmt }
+func (f *FlowChecker) VisitBadStmt(stmt *ast.BadStmt) any { return stmt }
 
-func (l *FlowControlAnalyzer) VisitBadType(badType *ast.BadType) any { return badType }
+func (f *FlowChecker) VisitBadType(badType *ast.BadType) any { return badType }
+
+func (f *FlowChecker) visitStmtSeq(stmts []ast.Statement) {
+	for _, stmt := range stmts {
+		stmt.Accept(f)
+	}
+}
+
+func (f *FlowChecker) visitDeclSeq(decls []ast.Declaration) {
+	for _, decl := range decls {
+		decl.Accept(f)
+	}
+}
