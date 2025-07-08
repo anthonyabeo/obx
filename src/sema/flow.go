@@ -8,7 +8,8 @@ import (
 type FlowChecker struct {
 	ctx *report.Context
 
-	label string
+	label         string
+	loopIDCounter int
 }
 
 func NewFlowChecker(ctx *report.Context) *FlowChecker {
@@ -87,7 +88,7 @@ func (f *FlowChecker) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
 	tmp := f.label
 	defer func() { f.label = tmp }()
 
-	f.label = newLoopLabel("repeat")
+	f.label = f.newLoopLabel("repeat")
 	for _, s := range stmt.StmtSeq {
 		s.Accept(f)
 	}
@@ -101,7 +102,7 @@ func (f *FlowChecker) VisitWhileStmt(stmt *ast.WhileStmt) any {
 	tmp := f.label
 	defer func() { f.label = tmp }()
 
-	f.label = newLoopLabel("while")
+	f.label = f.newLoopLabel("while")
 
 	f.visitStmtSeq(stmt.StmtSeq)
 	for _, elif := range stmt.ElsIfs {
@@ -117,7 +118,7 @@ func (f *FlowChecker) VisitLoopStmt(stmt *ast.LoopStmt) any {
 	tmp := f.label
 	defer func() { f.label = tmp }()
 
-	f.label = newLoopLabel("loop")
+	f.label = f.newLoopLabel("loop")
 	f.visitStmtSeq(stmt.StmtSeq)
 
 	stmt.Label = f.label
@@ -141,7 +142,7 @@ func (f *FlowChecker) VisitForStmt(stmt *ast.ForStmt) any {
 	tmp := f.label
 	defer func() { f.label = tmp }()
 
-	f.label = newLoopLabel("for")
+	f.label = f.newLoopLabel("for")
 
 	f.visitStmtSeq(stmt.StmtSeq)
 	stmt.Label = f.label

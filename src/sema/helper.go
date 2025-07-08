@@ -6,11 +6,9 @@ import (
 	"github.com/anthonyabeo/obx/src/types"
 )
 
-var loopIDCounter int
-
-func newLoopLabel(loopKind string) string {
-	l := fmt.Sprintf("%s.loop.%d", loopKind, loopIDCounter)
-	loopIDCounter++
+func (f *FlowChecker) newLoopLabel(loopKind string) string {
+	l := fmt.Sprintf("%s.loop.%d", loopKind, f.loopIDCounter)
+	f.loopIDCounter++
 
 	return l
 }
