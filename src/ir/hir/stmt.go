@@ -33,12 +33,6 @@ type (
 		Body *CompoundStmt
 	}
 
-	WhileStmt struct {
-		Cond    Expr
-		Body    *CompoundStmt
-		ElseIfs []*ElseIfBranch
-	}
-
 	LoopStmt struct {
 		Body  *CompoundStmt
 		label string
@@ -84,7 +78,6 @@ func (*AssignStmt) isStmt()   {}
 func (*CallStmt) isStmt()     {}
 func (*ReturnStmt) isStmt()   {}
 func (*IfStmt) isStmt()       {}
-func (*WhileStmt) isStmt()    {}
 func (*LoopStmt) isStmt()     {}
 func (*CaseStmt) isStmt()     {}
 func (*WithStmt) isStmt()     {}
@@ -107,10 +100,7 @@ func (stmt *ReturnStmt) String() string {
 
 	return "RETURN"
 }
-func (stmt *IfStmt) String() string { panic("not implemented") }
-func (stmt *WhileStmt) String() string {
-	return fmt.Sprintf("WHILE %s DO\n %s\n  END", stmt.Cond, stmt.Body)
-}
+func (stmt *IfStmt) String() string   { panic("not implemented") }
 func (stmt *LoopStmt) String() string { return fmt.Sprintf("LOOP %s END", stmt.Body) }
 func (stmt *CaseStmt) String() string {
 	out := fmt.Sprintf("Case %s of\n", stmt.Expr.String())

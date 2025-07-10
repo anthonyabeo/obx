@@ -76,7 +76,6 @@ func (*NilConst) String() string    { panic("not implemented") }
 type Op string
 
 const (
-	// Binary operators
 	Add Op = "+"
 	Sub Op = "-"
 	Mul Op = "*"
