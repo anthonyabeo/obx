@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/sema"
 	"log"
 	"os"
 	"path/filepath"
@@ -93,5 +94,9 @@ var buildCmd = &cobra.Command{
 
 			obx.AddUnit(unit)
 		}
+
+		// semantics analysis
+		s := sema.NewSema(ctx, obx)
+		s.Validate()
 	},
 }
