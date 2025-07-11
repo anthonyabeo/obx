@@ -2,11 +2,6 @@ package lir
 
 import "fmt"
 
-type Type interface {
-	isLIRType()
-	fmt.Stringer
-}
-
 type (
 	VoidType struct{}
 

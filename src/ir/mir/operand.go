@@ -1,11 +1,8 @@
 package mir
 
-import (
-	"fmt"
-	"strings"
-)
+import "fmt"
 
-type Value interface {
+type Operand interface {
 	isValue()
 	String() string
 }
@@ -16,37 +13,21 @@ type (
 	}
 
 	FieldAccess struct {
-		Record Value
+		Record Operand
 		Field  string
 	}
 
 	IndexExpr struct {
-		Array Value
-		Index []Value
+		Array Operand
+		Index []Operand
 	}
 
 	DerefExpr struct {
-		Pointer Value
+		Pointer Operand
 	}
 
 	TypeGuardExpr struct {
 		Expr VarDecl
-	}
-
-	Binary struct {
-		Op    string // "+", "-", "*", "/", etc.
-		Left  Value
-		Right Value
-	}
-
-	Unary struct {
-		Op   string
-		Expr Value
-	}
-
-	FuncCall struct {
-		Func Value
-		Args []Value
 	}
 
 	IntConst struct {
@@ -66,10 +47,6 @@ type (
 	}
 
 	Nil struct{}
-
-	CmpInst struct {
-		X, Y Value
-	}
 )
 
 func (*Variable) isValue()    {}
@@ -80,9 +57,6 @@ func (*IntConst) isValue()    {}
 func (*BoolConst) isValue()   {}
 func (*StringConst) isValue() {}
 func (*SetConst) isValue()    {}
-func (*Binary) isValue()      {}
-func (*Unary) isValue()       {}
-func (*FuncCall) isValue()    {}
 func (*Nil) isValue()         {}
 func (*CmpInst) isValue()     {}
 
@@ -94,15 +68,4 @@ func (v *IntConst) String() string    { return fmt.Sprintf("%d", v.Value) }
 func (v *BoolConst) String() string   { return fmt.Sprintf("%t", v.Value) }
 func (v *StringConst) String() string { return v.Value }
 func (v *SetConst) String() string    { panic("not implemented") }
-func (v *Binary) String() string      { return fmt.Sprintf("%s %s %s", v.Left, v.Op, v.Right) }
-func (v *Unary) String() string       { return fmt.Sprintf("%s %s", v.Op, v.Expr) }
-func (v *FuncCall) String() string {
-	var args []string
-	for _, op := range v.Args {
-		args = append(args, op.String())
-	}
-
-	return fmt.Sprintf("call %s(%s)", v.Func, strings.Join(args, ", "))
-}
-func (v *Nil) String() string     { return "nil" }
-func (v *CmpInst) String() string { return fmt.Sprintf("cmp %s %s", v.X, v.Y) }
+func (v *Nil) String() string         { return "nil" }

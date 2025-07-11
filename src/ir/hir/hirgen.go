@@ -13,6 +13,24 @@ import (
 
 type Generator struct {
 	ctx *report.Context
+	obx *ast.OberonX
+}
+
+func NewGenerator(ctx *report.Context) *Generator {
+	return &Generator{ctx: ctx}
+}
+
+func (g Generator) LowerToHIR() *Module {
+	for _, unit := range g.obx.Units {
+		mod, ok := unit.Accept(g).(*Module)
+		if !ok {
+
+		}
+
+		return mod
+	}
+
+	return nil
 }
 
 func (g Generator) VisitOberon(obx *ast.OberonX) any {

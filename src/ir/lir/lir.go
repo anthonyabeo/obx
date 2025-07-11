@@ -13,31 +13,32 @@ type Constant interface {
 	isConst()
 }
 
-type Instr interface {
+type Inst interface {
 	isInstr()
+	fmt.Stringer
+}
+
+type Type interface {
+	isLIRType()
 	fmt.Stringer
 }
 
 // Program : An entire LIR program — may have multiple modules or procedures
 type Program struct {
-	Procs   []*Proc      // All procedures defined
-	Globals []GlobalDecl // Global variables (optional)
+	Modules []*Module
 }
 
-// Proc : A procedure/function in LIR.
-type Proc struct {
-	Name       string     // e.g. "main", "Insert"
-	Params     []Register // input registers (may include return reg)
-	Locals     []Register // all locals (excluding params); for allocation info
-	Blocks     []*Block   // list of blocks; usually starts with "entry"
-	IsExported bool       // for modules with export rules
+type Module struct {
+	Name    string
+	Procs   []*Procedure  // All procedures defined
+	Globals []*GlobalDecl // Global variables (optional)
 }
 
 // GlobalDecl : Global variable/constant declaration
 type GlobalDecl struct {
-	Name string // Global name
-	Type string // Type (e.g. "i32")
-	Init string // Optional init value or empty
+	Name string  // Global name
+	Type Type    // Type (e.g. "i32")
+	Init Operand // Optional init value or empty
 }
 
 type Op string

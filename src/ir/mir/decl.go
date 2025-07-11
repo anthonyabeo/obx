@@ -13,7 +13,8 @@ type Decl interface {
 type (
 	ConstDecl struct {
 		Name  string
-		Value Value
+		Value Operand
+		Type  Type
 	}
 
 	VarDecl struct {

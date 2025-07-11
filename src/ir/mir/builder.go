@@ -12,6 +12,6 @@ func (g *Generator) newTemp() string {
 	return "_t" + strconv.Itoa(g.tempCount)
 }
 
-func (g *Generator) emit(instr Instr) {
+func (g *Generator) emit(instr Inst) {
 	g.currentBlk.Instrs = append(g.currentBlk.Instrs, instr)
 }

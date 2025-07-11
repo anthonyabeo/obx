@@ -5,67 +5,96 @@ import (
 	"strings"
 )
 
-type Instr interface {
+type Inst interface {
 	isInstr()
 	String() string
 }
 
 type (
-	AssignInstr struct {
-		Target Value
-		Value  Value
+	AssignInst struct {
+		Target Operand
+		Value  Operand
 	}
 
-	JumpInstr struct {
+	JumpInst struct {
 		Target string
 	}
 
-	CondBrInstr struct {
-		Cond       Value
+	CondBrInst struct {
+		Cond       Operand
 		TrueLabel  string
 		FalseLabel string
 	}
 
-	LabelInstr struct {
+	LabelInst struct {
 		Label string
 	}
 
-	ReturnInstr struct {
-		Result Value // nil if procedure returns nothing
+	ReturnInst struct {
+		Result Operand // nil if procedure returns nothing
 	}
 
-	ExitInstr struct {
-		LoopLabel LabelInstr
+	ExitInst struct {
+		LoopLabel LabelInst
 	}
 
-	ProcCallInstr struct {
-		Callee Value
-		Args   []Value
+	ProcCallInst struct {
+		Callee Operand
+		Args   []Operand
+	}
+
+	BinaryInst struct {
+		Dst   Operand
+		Op    string // "+", "-", "*", "/", etc.
+		Left  Operand
+		Right Operand
+	}
+
+	UnaryInst struct {
+		Dst  Operand
+		Op   string
+		Expr Operand
+	}
+
+	FuncCallInst struct {
+		Dst  Operand
+		Func Operand
+		Args []Operand
+	}
+
+	CmpInst struct {
+		Dst  Operand
+		Op   string
+		X, Y Operand
 	}
 )
 
-func (*AssignInstr) isInstr()   {}
-func (*ProcCallInstr) isInstr() {}
-func (*JumpInstr) isInstr()     {}
-func (*CondBrInstr) isInstr()   {}
-func (*LabelInstr) isInstr()    {}
-func (*ReturnInstr) isInstr()   {}
-func (*ExitInstr) isInstr()     {}
+func (*AssignInst) isInstr()   {}
+func (*ProcCallInst) isInstr() {}
+func (*JumpInst) isInstr()     {}
+func (*CondBrInst) isInstr()   {}
+func (*LabelInst) isInstr()    {}
+func (*ReturnInst) isInstr()   {}
+func (*ExitInst) isInstr()     {}
+func (*BinaryInst) isInstr()   {}
+func (*UnaryInst) isInstr()    {}
+func (*FuncCallInst) isInstr() {}
+func (*CmpInst) isInstr()      {}
 
-func (i *AssignInstr) String() string { return fmt.Sprintf("%v = %v", i.Target, i.Value) }
-func (i *ProcCallInstr) String() string {
+func (i *AssignInst) String() string { return fmt.Sprintf("%v = %v", i.Target, i.Value) }
+func (i *ProcCallInst) String() string {
 	var args []string
 	for _, arg := range i.Args {
 		args = append(args, arg.String())
 	}
 	return fmt.Sprintf("call %v(%s)", i.Callee, strings.Join(args, ","))
 }
-func (i *JumpInstr) String() string { return fmt.Sprintf("jmp %s", i.Target) }
-func (i *CondBrInstr) String() string {
+func (i *JumpInst) String() string { return fmt.Sprintf("jmp %s", i.Target) }
+func (i *CondBrInst) String() string {
 	return fmt.Sprintf("br %s, label %s, label %s", i.Cond, i.TrueLabel, i.FalseLabel)
 }
-func (i *LabelInstr) String() string { return i.Label }
-func (i *ReturnInstr) String() string {
+func (i *LabelInst) String() string { return i.Label }
+func (i *ReturnInst) String() string {
 	ret := "ret"
 	if i.Result != nil {
 		ret = fmt.Sprintf("ret %v", i.Result)
@@ -73,4 +102,17 @@ func (i *ReturnInstr) String() string {
 
 	return ret
 }
-func (i *ExitInstr) String() string { return "exit" }
+func (i *ExitInst) String() string { return "exit" }
+func (v *BinaryInst) String() string {
+	return fmt.Sprintf("%s = %s %s %s", v.Dst, v.Left, v.Op, v.Right)
+}
+func (v *UnaryInst) String() string { return fmt.Sprintf("%s = %s %s", v.Dst, v.Op, v.Expr) }
+func (v *FuncCallInst) String() string {
+	var args []string
+	for _, op := range v.Args {
+		args = append(args, op.String())
+	}
+
+	return fmt.Sprintf("%s = call %s(%s)", v.Dst, v.Func, strings.Join(args, ", "))
+}
+func (i *CmpInst) String() string { return fmt.Sprintf("cmp %s %s, %s", i.Op, i.X, i.Y) }

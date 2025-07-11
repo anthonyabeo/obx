@@ -15,6 +15,10 @@ type Generator struct {
 	currentExit string
 }
 
+func NewGenerator() *Generator {
+	return &Generator{}
+}
+
 func (g *Generator) Generate(prog *hir.Module) *Program {
 	g.program = &Program{}
 
@@ -33,7 +37,7 @@ func (g *Generator) Generate(prog *hir.Module) *Program {
 		case *hir.TypeDecl:
 			decl = &TypeDecl{Name: d.Name, Type: toMIRType(d.Type)}
 		case *hir.ConstDecl:
-			//decl = &ConstDecl{Name: d.Name, Value: d.Value}
+			//decl = &ConstDecl{Name: d.Name, Operand: d.Operand}
 		}
 
 		m.Globals = append(m.Globals, decl)
@@ -84,14 +88,14 @@ func (g *Generator) lowerProc(h *hir.Procedure) *Procedure {
 func (g *Generator) lowerStmt(s hir.Stmt) {
 	switch s := s.(type) {
 	case *hir.AssignStmt:
-		g.emit(&AssignInstr{Target: g.lowerExpr(s.Lhs), Value: g.lowerExpr(s.Rhs)})
+		g.emit(&AssignInst{Target: g.lowerExpr(s.Lhs), Value: g.lowerExpr(s.Rhs)})
 
 	case *hir.ReturnStmt:
-		var result Value
+		var result Operand
 		if s.Result != nil {
 			result = g.lowerExpr(s.Result)
 		}
-		g.emit(&ReturnInstr{Result: result})
+		g.emit(&ReturnInst{Result: result})
 
 	case *hir.CompoundStmt:
 		for _, st := range s.Stmts {
@@ -111,13 +115,13 @@ func (g *Generator) lowerStmt(s hir.Stmt) {
 			cond := g.lowerExpr(branch.Cond)
 			nextLabel = g.newLabel(fmt.Sprintf("ifnext_%d", i))
 
-			g.emit(&CondBrInstr{
+			g.emit(&CondBrInst{
 				Cond:       cond,
 				FalseLabel: nextLabel,
 			})
 
 			g.lowerStmt(branch.Body)
-			g.emit(&JumpInstr{Target: endLabel})
+			g.emit(&JumpInst{Target: endLabel})
 
 			// Emit the next conditional label block
 			nextBlk := &Block{Label: nextLabel}
@@ -152,7 +156,7 @@ func (g *Generator) lowerStmt(s hir.Stmt) {
 		g.lowerStmt(s.Body)
 
 		// Jump back to loop
-		g.emit(&JumpInstr{Target: loopLabel})
+		g.emit(&JumpInst{Target: loopLabel})
 
 		// Emit loop exit label
 		exitBlk := &Block{Label: exitLabel}
@@ -162,7 +166,7 @@ func (g *Generator) lowerStmt(s hir.Stmt) {
 		if g.currentExit == "" {
 			panic("EXIT used outside loop")
 		}
-		g.emit(&JumpInstr{Target: g.currentExit})
+		g.emit(&JumpInst{Target: g.currentExit})
 
 	// Add more stmt types here...
 
@@ -171,19 +175,13 @@ func (g *Generator) lowerStmt(s hir.Stmt) {
 	}
 }
 
-func (g *Generator) lowerExpr(e hir.Expr) Value {
+func (g *Generator) lowerExpr(e hir.Expr) Operand {
 	switch e := e.(type) {
 	case *hir.IntConst:
 		return &IntConst{Value: e.Value}
 
 	case *hir.VarExpr:
 		return &Variable{Name: e.Name}
-
-	case *hir.BinaryExpr:
-		left := g.lowerExpr(e.Left)
-		right := g.lowerExpr(e.Right)
-
-		return &Binary{Op: string(e.Op), Left: left, Right: right}
 
 	// Handle call, unary, set const, etc.
 
