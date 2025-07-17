@@ -4,13 +4,11 @@ type Module struct {
 	Name       string
 	Imports    []Import
 	Globals    []Decl
-	Procedures []*Procedure
-	Init       *Procedure
+	Procedures []*ProcedureDecl
+	Init       *ProcedureDecl
 }
 
 type Import struct {
-	Path        string
-	Alias       string
-	StartOffset int
-	EndOffset   int
+	Path  string
+	Alias string
 }

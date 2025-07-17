@@ -1,17 +1,19 @@
 package hir
 
 import (
-	"github.com/google/go-cmp/cmp"
 	"os"
 	"path/filepath"
-	//"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/anthonyabeo/obx/adt"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
+	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/types"
 )
 
@@ -73,8 +75,8 @@ func TestHIRGen(t *testing.T) {
         END Test.`,
 			expected: &Module{
 				Name:    "Test",
-				Globals: []Decl{&VarDecl{Name: "x", Type: &IntType{Bits: 32, Signed: true}}},
-				Init: &Procedure{
+				Globals: []Decl{&VarDecl{Name: "x", Type: types.Int32Type}},
+				Init: &ProcedureDecl{
 					Name: "__init_Test",
 					Body: &CompoundStmt{
 						Stmts: []Stmt{
@@ -83,26 +85,27 @@ func TestHIRGen(t *testing.T) {
 								Body: &CompoundStmt{
 									Stmts: []Stmt{
 										&AssignStmt{
-											Lhs: &VarExpr{Name: "x", Ty: &IntType{Bits: 32, Signed: true}},
-											Rhs: &BinaryExpr{
+											Left: &Variable{Name: "x", Ty: types.Int32Type},
+											Right: &BinaryExpr{
 												Op: "+",
-												Left: &VarExpr{
+												Left: &Variable{
 													Name: "x",
-													Ty:   &IntType{Bits: 32, Signed: true},
+													Ty:   types.Int32Type,
 												},
-												Right: &IntConst{
-													Value: 1,
-													Ty:    &IntType{Bits: 8, Signed: false},
+												Right: &Literal{
+													Value: "1",
+													Kind:  token.BYTE_LIT,
+													Ty:    types.ByteType,
 												},
-												Ty: &IntType{Bits: 32, Signed: true},
+												Ty: types.Int32Type,
 											},
 										},
 										&IfStmt{
 											Cond: &BinaryExpr{
 												Op:    ">",
-												Left:  &VarExpr{Name: "x", Ty: &IntType{Bits: 32, Signed: true}},
-												Right: &IntConst{Value: 10, Ty: &IntType{Bits: 8, Signed: false}},
-												Ty:    &BoolType{},
+												Left:  &Variable{Name: "x", Ty: types.Int32Type},
+												Right: &Literal{Kind: token.BYTE_LIT, Value: "10", Ty: types.ByteType},
+												Ty:    types.BooleanType,
 											},
 											Then: &CompoundStmt{
 												Stmts: []Stmt{
@@ -132,9 +135,9 @@ func TestHIRGen(t *testing.T) {
 			expected: &Module{
 				Name: "M",
 				Globals: []Decl{
-					&VarDecl{Name: "i", Type: &IntType{Bits: 32, Signed: true}},
+					&VarDecl{Name: "i", Type: types.Int32Type},
 				},
-				Init: &Procedure{
+				Init: &ProcedureDecl{
 					Name: "__init_M",
 					Body: &CompoundStmt{
 						Stmts: []Stmt{
@@ -145,22 +148,22 @@ func TestHIRGen(t *testing.T) {
 										&IfStmt{
 											Cond: &UnaryExpr{
 												Op: Not,
-												E: &BinaryExpr{
+												Operand: &BinaryExpr{
 													Op:    "<",
-													Left:  &VarExpr{Name: "i", Ty: &IntType{Bits: 32, Signed: true}},
-													Right: &IntConst{Value: 5, Ty: &IntType{Bits: 8, Signed: false}},
-													Ty:    &BoolType{},
+													Left:  &Variable{Name: "i", Ty: types.Int32Type},
+													Right: &Literal{Kind: token.BYTE_LIT, Value: "5", Ty: types.ByteType},
+													Ty:    types.BooleanType,
 												},
 											},
 											Then: &CompoundStmt{Stmts: []Stmt{&ExitStmt{loopLabel: "while.loop.0"}}},
 										},
 										&AssignStmt{
-											Lhs: &VarExpr{Name: "i", Ty: &IntType{Bits: 32, Signed: true}},
-											Rhs: &BinaryExpr{
+											Left: &Variable{Name: "i", Ty: types.Int32Type},
+											Right: &BinaryExpr{
 												Op:    "+",
-												Left:  &VarExpr{Name: "i", Ty: &IntType{Bits: 32, Signed: true}},
-												Right: &IntConst{Value: 1, Ty: &IntType{Bits: 8, Signed: false}},
-												Ty:    &IntType{Bits: 32, Signed: true},
+												Left:  &Variable{Name: "i", Ty: types.Int32Type},
+												Right: &Literal{Kind: token.BYTE_LIT, Value: "1", Ty: types.ByteType},
+												Ty:    types.Int32Type,
 											},
 										},
 									},
@@ -183,32 +186,32 @@ func TestHIRGen(t *testing.T) {
 			expected: &Module{
 				Name: "M",
 				Globals: []Decl{
-					&VarDecl{Name: "a", Type: &IntType{Bits: 32, Signed: true}},
+					&VarDecl{Name: "a", Type: types.Int32Type},
 				},
-				Init: &Procedure{
+				Init: &ProcedureDecl{
 					Name: "__init_M",
 					Body: &CompoundStmt{
 						Stmts: []Stmt{
 							&IfStmt{
 								Cond: &BinaryExpr{
 									Op:    "=",
-									Left:  &VarExpr{Name: "a", Ty: &IntType{Bits: 32, Signed: true}},
-									Right: &IntConst{Value: 0, Ty: &IntType{Bits: 8, Signed: false}},
-									Ty:    &BoolType{},
+									Left:  &Variable{Name: "a", Ty: types.Int32Type},
+									Right: &Literal{Kind: token.BYTE_LIT, Value: "0", Ty: types.ByteType},
+									Ty:    types.BooleanType,
 								},
 								Then: &CompoundStmt{
 									Stmts: []Stmt{
 										&AssignStmt{
-											Lhs: &VarExpr{Name: "a", Ty: &IntType{Bits: 32, Signed: true}},
-											Rhs: &IntConst{Value: 1, Ty: &IntType{Bits: 8, Signed: false}},
+											Left:  &Variable{Name: "a", Ty: types.Int32Type},
+											Right: &Literal{Kind: token.BYTE_LIT, Value: "1", Ty: types.ByteType},
 										},
 									},
 								},
 								Else: &CompoundStmt{
 									Stmts: []Stmt{
 										&AssignStmt{
-											Lhs: &VarExpr{Name: "a", Ty: &IntType{Bits: 32, Signed: true}},
-											Rhs: &IntConst{Value: 2, Ty: &IntType{Bits: 8, Signed: false}},
+											Left:  &Variable{Name: "a", Ty: types.Int32Type},
+											Right: &Literal{Kind: token.BYTE_LIT, Value: "2", Ty: types.ByteType},
 										},
 									},
 								},
@@ -227,26 +230,91 @@ func TestHIRGen(t *testing.T) {
   `,
 			expected: &Module{
 				Name: "M",
-				Procedures: []*Procedure{
+				Procedures: []*ProcedureDecl{
 					{
 						Name:   "Write",
-						Params: []*Param{{Name: "x", Type: &IntType{Bits: 32, Signed: true}}},
+						Params: []*Param{{Name: "x", Type: types.Int32Type}},
 					},
 				},
-				Init: &Procedure{
+				Init: &ProcedureDecl{
 					Name: "__init_M",
 					Body: &CompoundStmt{
 						Stmts: []Stmt{
 							&CallStmt{
-								Proc: &VarExpr{Name: "Write"},
-								Args: []Expr{&IntConst{Value: 42, Ty: &IntType{Bits: 8, Signed: false}}},
+								Proc: &Procedure{Name: "Write", Ty: &types.ProcedureType{
+									Params:          []*types.FormalParam{{Name: "x", Type: types.Int32Type, Kind: "VALUE"}},
+									Result:          nil,
+									IsTypeBoundType: false,
+								}},
+								Args: []Expr{&Literal{Kind: token.BYTE_LIT, Value: "42", Ty: types.ByteType}},
 							},
 						},
 					},
 				},
 			},
 		},
-		// add more test cases
+		{
+			name: "",
+			source: `
+MODULE M;
+
+TYPE
+  T = POINTER TO RECORD END;
+
+PROCEDURE (t: T) Act*;
+END Act;
+
+END M.
+`,
+			expected: &Module{
+				Name: "M",
+				Globals: []Decl{
+					&TypeDecl{
+						Name: "T",
+						Type: &types.PointerType{
+							Base: &types.RecordType{
+								Base: nil,
+								Fields: map[string]*types.Field{
+									"Act": {
+										Name:       "Act",
+										IsExported: true,
+									},
+								},
+							},
+						},
+					},
+				},
+				Procedures: []*ProcedureDecl{
+					{
+						Name: "Act",
+						Params: []*Param{
+							{
+								Name: "t",
+								Type: &types.NamedType{
+									Name: "T",
+									Def: &types.PointerType{
+										Base: &types.RecordType{
+											Base: nil,
+											Fields: map[string]*types.Field{
+												"Act": {
+													Name:       "Act",
+													IsExported: true,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						IsExported: true,
+					},
+				},
+				Init: &ProcedureDecl{
+					Name: "__init_M",
+					Body: &CompoundStmt{},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -258,11 +326,15 @@ func TestHIRGen(t *testing.T) {
 
 			if diff := cmp.Diff(tt.expected, hirModule,
 				cmp.AllowUnexported(
-					Module{}, Procedure{}, VarDecl{},
+					Module{}, ProcedureDecl{}, VarDecl{},
 					LoopStmt{}, CompoundStmt{}, AssignStmt{},
-					VarExpr{}, IntConst{}, BinaryExpr{},
-					IfStmt{}, ExitStmt{},
+					Variable{}, Literal{}, BinaryExpr{},
+					IfStmt{}, ExitStmt{}, Procedure{},
 				),
+				cmpopts.IgnoreFields(Variable{}, "MangledName", "Props"),
+				cmpopts.IgnoreFields(Procedure{}, "MangledName", "Props"),
+				cmpopts.IgnoreFields(Param{}, "Type"),
+				cmpopts.IgnoreFields(types.Field{}, "Type"),
 			); diff != "" {
 				t.Errorf("HIR mismatch (-want +got):\n%s", diff)
 			}

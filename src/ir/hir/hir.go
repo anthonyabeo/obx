@@ -1,6 +1,10 @@
 package hir
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/anthonyabeo/obx/src/types"
+)
 
 type Node interface {
 	fmt.Stringer
@@ -19,10 +23,25 @@ type Decl interface {
 type Expr interface {
 	Node
 	isExpr()
-	Type() Type
+	Type() types.Type
 }
 
-type Type interface {
-	Node
-	isType()
-}
+type Op string
+
+const (
+	Add  Op = "+"
+	Sub  Op = "-"
+	Mul  Op = "*"
+	Quot Op = "/"
+	Div  Op = "div"
+	Mod  Op = "mod"
+	And  Op = "and"
+	Or   Op = "or"
+	Eq   Op = "="
+	Neq  Op = "#"
+	Lt   Op = "<"
+	Gt   Op = ">"
+	Le   Op = "<="
+	Ge   Op = ">="
+	Not  Op = "~"
+)

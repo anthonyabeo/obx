@@ -2,13 +2,12 @@ package hir
 
 import (
 	"fmt"
-	"strconv"
+	"github.com/anthonyabeo/obx/src/types"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
-	"github.com/anthonyabeo/obx/src/types"
 )
 
 type Generator struct {
@@ -20,7 +19,7 @@ func NewGenerator(ctx *report.Context) *Generator {
 	return &Generator{ctx: ctx}
 }
 
-func (g Generator) LowerToHIR() *Module {
+func (g Generator) Generate() *Module {
 	for _, unit := range g.obx.Units {
 		mod, ok := unit.Accept(g).(*Module)
 		if !ok {
@@ -33,26 +32,18 @@ func (g Generator) LowerToHIR() *Module {
 	return nil
 }
 
-func (g Generator) VisitOberon(obx *ast.OberonX) any {
-	for _, unit := range obx.Units {
-		unit.Accept(g)
-	}
-
-	return nil
-}
-
 func (g Generator) VisitModule(module *ast.Module) any {
 	name := module.BName
 	var (
 		globals    []Decl
-		procedures []*Procedure
+		procedures []*ProcedureDecl
 		stmts      *CompoundStmt
 	)
 
 	for _, declaration := range module.DeclSeq {
 		switch decl := declaration.(type) {
 		case *ast.ProcedureDecl:
-			procedures = append(procedures, g.VisitProcedureDecl(decl).(*Procedure))
+			procedures = append(procedures, g.VisitProcedureDecl(decl).(*ProcedureDecl))
 		case *ast.VariableDecl:
 			globals = append(globals, decl.Accept(g).([]Decl)...)
 		default:
@@ -67,34 +58,49 @@ func (g Generator) VisitModule(module *ast.Module) any {
 		Imports:    nil,
 		Globals:    globals,
 		Procedures: procedures,
-		Init: &Procedure{
+		Init: &ProcedureDecl{
 			Name: fmt.Sprintf("__init_%s", name),
 			Body: stmts,
 		},
 	}
 }
 
-func (g Generator) VisitMetaSection(section *ast.MetaSection) any {
-	//TODO implement me
-	panic("implement me")
-}
+func (g Generator) VisitMetaSection(section *ast.MetaSection) any { return section }
 
 func (g Generator) VisitDefinition(definition *ast.Definition) any {
-	//TODO implement me
-	panic("implement me")
+	name := definition.BName
+	var (
+		globals    []Decl
+		procedures []*ProcedureDecl
+	)
+
+	for _, declaration := range definition.DeclSeq {
+		switch decl := declaration.(type) {
+		case *ast.ProcedureDecl:
+			procedures = append(procedures, g.VisitProcedureDecl(decl).(*ProcedureDecl))
+		case *ast.VariableDecl:
+			globals = append(globals, decl.Accept(g).([]Decl)...)
+		default:
+			globals = append(globals, decl.Accept(g).(Decl))
+		}
+	}
+
+	return &Module{
+		Name:       name,
+		Imports:    nil,
+		Globals:    globals,
+		Procedures: procedures,
+	}
 }
 
-func (g Generator) VisitIdentifierDef(def *ast.IdentifierDef) any {
-	//TODO implement me
-	panic("implement me")
-}
+func (g Generator) VisitIdentifierDef(def *ast.IdentifierDef) any { return def }
 
 func (g Generator) VisitBinaryExpr(expr *ast.BinaryExpr) any {
 	return &BinaryExpr{
 		Left:  expr.Left.Accept(g).(Expr),
 		Right: expr.Right.Accept(g).(Expr),
 		Op:    g.emitOp(expr.Op),
-		Ty:    g.emitType(expr.SemaType),
+		Ty:    expr.SemaType,
 	}
 }
 
@@ -116,7 +122,7 @@ func (g Generator) VisitDesignator(dsg *ast.Designator) any {
 			Dsg = &FieldAccess{
 				Record: Dsg,
 				Field:  sel.Field,
-				Ty:     g.emitType(sel.Symbol.Type()),
+				Ty:     sel.Symbol.Type(),
 			}
 		case *ast.IndexOp:
 			Dsg = &IndexExpr{
@@ -137,32 +143,49 @@ func (g Generator) VisitDesignator(dsg *ast.Designator) any {
 }
 
 func (g Generator) VisitFunctionCall(call *ast.FunctionCall) any {
-	callee := call.Callee.Accept(g).(Expr)
+	callee := call.Callee.Accept(g).(*Procedure)
 
 	return &FuncCallExpr{
 		Proc: callee,
 		Args: g.visitExprList(call.ActualParams),
-		Ty:   g.emitType(call.SemaType),
+		Ty:   call.SemaType,
 	}
 }
 
 func (g Generator) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 	return &UnaryExpr{
-		Op: g.emitOp(expr.Op),
-		E:  expr.Operand.Accept(g).(Expr),
-		Ty: g.emitType(expr.SemaType),
+		Op:      g.emitOp(expr.Op),
+		Operand: expr.Operand.Accept(g).(Expr),
+		Ty:      expr.SemaType,
 	}
 }
 
 func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
-	if len(ident.Prefix) != 0 {
-
+	switch ident.Symbol.Kind() {
+	case ast.VariableSymbolKind:
+		return &Variable{
+			Name:        ident.Name,
+			Ty:          ident.SemaType,
+			Props:       ident.Symbol.Props(),
+			MangledName: ident.Symbol.MangledName(),
+		}
+	case ast.ConstantSymbolKind:
+		return &Constant{
+			Name:        ident.Name,
+			Ty:          ident.SemaType,
+			Props:       ident.Symbol.Props(),
+			MangledName: ident.Symbol.MangledName(),
+		}
+	case ast.ProcedureSymbolKind:
+		return &Procedure{
+			Name:        ident.Name,
+			Ty:          ident.SemaType,
+			Props:       ident.Symbol.Props(),
+			MangledName: ident.Symbol.MangledName(),
+		}
 	}
 
-	return &VarExpr{
-		Name: ident.Name,
-		Ty:   g.emitType(ident.SemaType),
-	}
+	return nil
 }
 
 func (g Generator) VisitSet(set *ast.Set) any {
@@ -171,64 +194,14 @@ func (g Generator) VisitSet(set *ast.Set) any {
 		elems = append(elems, expression.Accept(g).(Expr))
 	}
 
-	return &SetExpr{Elems: elems, Ty: g.emitType(set.SemaType)}
+	return &SetExpr{Elems: elems, Ty: set.SemaType}
 }
 
 func (g Generator) VisitBasicLit(lit *ast.BasicLit) any {
-	switch lit.Kind {
-	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
-		val, err := strconv.ParseInt(lit.Val, 10, 64)
-		if err != nil {
-			g.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  err.Error(),
-				Range:    g.ctx.Source.Span(g.ctx.FileName, lit.StartOffset, lit.EndOffset),
-			})
-		}
-
-		return &IntConst{
-			Value: val,
-			Ty:    g.emitType(lit.SemaType),
-		}
-	case token.REAL_LIT, token.LONGREAL_LIT:
-		val, err := strconv.ParseFloat(lit.Val, 64)
-		if err != nil {
-			g.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
-				Message:  err.Error(),
-				Range:    g.ctx.Source.Span(g.ctx.FileName, lit.StartOffset, lit.EndOffset),
-			})
-		}
-
-		return &RealConst{
-			Value: val,
-			Ty:    g.emitType(lit.SemaType),
-		}
-
-	case token.CHAR_LIT, token.WCHAR_LIT:
-		return &CharConst{
-			Value: rune(lit.Val[0]),
-			Ty:    g.emitType(lit.SemaType),
-		}
-	case token.TRUE, token.FALSE:
-		val := true
-		if strings.ToLower(lit.Val) == "false" {
-			val = false
-		}
-
-		return &BoolConst{
-			Value: val,
-			Ty:    g.emitType(lit.SemaType),
-		}
-
-	case token.STR_LIT, token.HEX_STR_LIT:
-		return &StringConst{
-			Value: lit.Val,
-			Ty:    g.emitType(lit.SemaType),
-		}
-
-	default:
-		return nil
+	return &Literal{
+		Kind:  lit.Kind,
+		Value: lit.Val,
+		Ty:    lit.SemaType,
 	}
 }
 
@@ -238,7 +211,13 @@ func (g Generator) VisitExprRange(r *ast.ExprRange) any {
 	return &RangeExpr{Low: low, High: high}
 }
 
-func (g Generator) VisitNil(n *ast.Nil) any { return &NilConst{} }
+func (g Generator) VisitNil(n *ast.Nil) any {
+	return &Literal{
+		Kind:  token.NIL,
+		Value: "nil",
+		Ty:    n.SemaType,
+	}
+}
 
 func (g Generator) VisitIfStmt(stmt *ast.IfStmt) any {
 	// Convert the main IF condition and THEN block
@@ -271,8 +250,8 @@ func (g Generator) VisitElseIfBranch(branch *ast.ElseIfBranch) any { return bran
 
 func (g Generator) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any {
 	return &AssignStmt{
-		Lhs: stmt.LValue.Accept(g).(Expr),
-		Rhs: stmt.RValue.Accept(g).(Expr),
+		Left:  stmt.LValue.Accept(g).(Expr),
+		Right: stmt.RValue.Accept(g).(Expr),
 	}
 }
 
@@ -285,7 +264,7 @@ func (g Generator) VisitReturnStmt(stmt *ast.ReturnStmt) any {
 }
 
 func (g Generator) VisitProcedureCall(call *ast.ProcedureCall) any {
-	callee := call.Callee.Accept(g).(Expr)
+	callee := call.Callee.Accept(g).(*Procedure)
 
 	return &CallStmt{
 		Proc: callee,
@@ -321,7 +300,7 @@ func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
 
 	// WHILE <cond>
 	cond := stmt.BoolExpr.Accept(g).(Expr)
-	negated := &UnaryExpr{Op: Not, E: cond}
+	negated := &UnaryExpr{Op: Not, Operand: cond}
 	body.Stmts = append(body.Stmts, &IfStmt{
 		Cond: negated,
 		Then: &CompoundStmt{[]Stmt{&ExitStmt{loopLabel: stmt.Label}}},
@@ -335,7 +314,7 @@ func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
 	// ELSIF branches
 	for _, branch := range stmt.ElsIfs {
 		bCond := branch.BoolExpr.Accept(g).(Expr)
-		negB := &UnaryExpr{Op: Not, E: bCond}
+		negB := &UnaryExpr{Op: Not, Operand: bCond}
 
 		body.Stmts = append(body.Stmts, &IfStmt{
 			Cond: negB,
@@ -409,30 +388,35 @@ func (g Generator) VisitLabelRange(r *ast.LabelRange) any {
 }
 
 func (g Generator) VisitForStmt(stmt *ast.ForStmt) any {
-	cvar := &VarExpr{Name: stmt.CtlVar.Name, Ty: g.emitType(stmt.CtlVar.SemaType)}
+	cvar := &Variable{
+		Name:        stmt.CtlVar.Name,
+		Ty:          stmt.CtlVar.SemaType,
+		Props:       stmt.CtlVar.Props,
+		MangledName: stmt.CtlVar.Symbol.MangledName(),
+	}
 	init := stmt.InitVal.Accept(g).(Expr)
 	final := stmt.FinalVal.Accept(g).(Expr)
 
 	// Default step is 1
-	var step Expr = &IntConst{Value: 1}
+	var step Expr = &Literal{Value: "1", Ty: stmt.CtlVar.SemaType}
 	if stmt.By != nil {
 		step = stmt.By.Accept(g).(Expr)
 	}
 
 	// Initialize control variable: cvar = init
 	initAssign := &AssignStmt{
-		Lhs: cvar,
-		Rhs: init,
+		Left:  cvar,
+		Right: init,
 	}
 
 	// Condition: cvar > final => break
 	breakIf := &IfStmt{
 		Cond: &BinaryExpr{
-			Op:    GT,
+			Op:    Gt,
 			Left:  cvar,
 			Right: final,
 		},
-		Then: &CompoundStmt{[]Stmt{&ExitStmt{}}},
+		Then: &CompoundStmt{[]Stmt{&ExitStmt{loopLabel: stmt.Label}}},
 	}
 
 	// Generate loop body
@@ -443,8 +427,8 @@ func (g Generator) VisitForStmt(stmt *ast.ForStmt) any {
 
 	// Increment: cvar = cvar + step
 	incr := &AssignStmt{
-		Lhs: cvar,
-		Rhs: &BinaryExpr{
+		Left: cvar,
+		Right: &BinaryExpr{
 			Op:    Add,
 			Left:  cvar,
 			Right: step,
@@ -492,8 +476,12 @@ func (g Generator) VisitGuard(guard *ast.Guard) any {
 }
 
 func (g Generator) VisitImport(i *ast.Import) any {
-	//TODO implement me
-	panic("implement me")
+	i.ImportPath = append(i.ImportPath, i.Name)
+
+	return &Import{
+		Alias: i.Alias,
+		Path:  strings.Join(i.ImportPath, "."),
+	}
 }
 
 func (g Generator) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
@@ -502,7 +490,7 @@ func (g Generator) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	// === Parameters ===
 	var (
 		params     []*Param
-		resultType Type
+		resultType types.Type
 		locals     []Decl
 		body       *CompoundStmt
 	)
@@ -516,7 +504,7 @@ func (g Generator) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	if decl.Head.FP != nil {
 		params = decl.Head.FP.Accept(g).([]*Param)
 		if decl.Head.FP.RetType != nil {
-			resultType = decl.Head.FP.RetType.Accept(g).(Type)
+			resultType = decl.Head.Name.SemaType
 		}
 	}
 
@@ -526,13 +514,13 @@ func (g Generator) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 		body = g.visitStmtSeq(decl.Body.StmtSeq)
 	}
 
-	return &Procedure{
+	return &ProcedureDecl{
 		Name:       name,
 		Params:     params,
 		Result:     resultType,
 		Locals:     locals,
 		Body:       body,
-		IsExported: decl.Head.Name.Symbol.Props() == ast.Exported,
+		IsExported: decl.Head.Name.Props == ast.Exported,
 	}
 }
 
@@ -543,7 +531,7 @@ func (g Generator) VisitProcedureBody(body *ast.ProcedureBody) any { return body
 func (g Generator) VisitReceiver(recv *ast.Receiver) any {
 	return &Param{
 		Name: recv.Name.Name,
-		Type: g.emitType(recv.Type.Type()),
+		Type: recv.Type.Type(),
 		Kind: g.emitParamKind(recv.Kind),
 	}
 }
@@ -562,13 +550,12 @@ func (g Generator) VisitFormalParams(params *ast.FormalParams) any {
 func (g Generator) VisitFPSection(sec *ast.FPSection) any {
 	var params []*Param
 
-	typ := sec.Type.Accept(g).(Type)
 	kind := g.emitParamKind(sec.Kind)
 
 	for _, id := range sec.Names {
 		params = append(params, &Param{
 			Name: id.Name,
-			Type: typ,
+			Type: id.SemaType,
 			Kind: kind, // "VAR", "IN", etc
 		})
 	}
@@ -579,12 +566,11 @@ func (g Generator) VisitFPSection(sec *ast.FPSection) any {
 func (g Generator) VisitVariableDecl(decl *ast.VariableDecl) any {
 	var decls []Decl
 
-	ty := decl.Type.Accept(g).(Type)
-
 	for _, id := range decl.IdentList {
 		decls = append(decls, &VarDecl{
-			Name: id.Name,
-			Type: ty,
+			Name:       id.Name,
+			Type:       id.SemaType,
+			IsExported: id.Props == ast.Exported,
 		})
 	}
 
@@ -594,162 +580,35 @@ func (g Generator) VisitVariableDecl(decl *ast.VariableDecl) any {
 func (g Generator) VisitConstantDecl(decl *ast.ConstantDecl) any {
 	return &ConstDecl{
 		Name:  decl.Name.Name,
-		Type:  g.emitType(decl.Name.SemaType),
-		Value: decl.Value.Accept(g).(ConstValue),
+		Type:  decl.Name.SemaType,
+		Value: decl.Value.Accept(g).(Expr),
 	}
 }
 
 func (g Generator) VisitTypeDecl(decl *ast.TypeDecl) any {
-	hirType := decl.DenotedType.Accept(g).(Type)
-
 	return &TypeDecl{
 		Name: decl.Name.Name,
-		Type: hirType,
+		Type: decl.Name.SemaType,
 	}
 }
 
-func (g Generator) VisitBasicType(ty *ast.BasicType) any {
-	switch ty.Kind {
-	case token.BYTE:
-		return &IntType{Bits: 8, Signed: false}
-	case token.INT8, token.INT16, token.INT32, token.INT64, token.SHORTINT, token.INTEGER, token.LONGINT:
-		var size int
-		switch ty.Kind {
-		case token.INT8:
-			size = 8
-		case token.INT16:
-			size = 16
-		case token.INT32:
-			size = 32
-		case token.INT64:
-			size = 64
-		case token.SHORTINT:
-			size = 16
-		case token.INTEGER:
-			size = 32
-		case token.LONGINT:
-			size = 64
-		default:
-			size = 1
-		}
+func (g Generator) VisitBasicType(ty *ast.BasicType) any { return ty }
 
-		return &IntType{Bits: size, Signed: true}
-	case token.REAL, token.LONGREAL:
-		size := 4
-		if ty.Kind == token.LONGREAL {
-			size = 8
-		}
-		return &RealType{Bits: size}
-	case token.CHAR, token.WCHAR:
-		return &CharType{}
-	case token.BOOLEAN:
-		return &BoolType{}
-	case token.SET:
-		return &SetType{}
-	case token.NIL:
-		return &NilType{}
-	default:
-		return &UnknownType{}
-	}
-}
+func (g Generator) VisitArrayType(ty *ast.ArrayType) any { return ty }
 
-func (g Generator) VisitArrayType(ty *ast.ArrayType) any {
-	elemType := ty.ElemType.Accept(g).(Type)
+func (g Generator) VisitLenList(list *ast.LenList) any { return list }
 
-	if ty.LenList == nil || len(ty.LenList.List) == 0 {
-		// Open array: create single dimension with Length = -1
-		return &ArrayType{
-			Length: -1,
-			Base:   elemType,
-		}
-	}
+func (g Generator) VisitPointerType(ty *ast.PointerType) any { return ty }
 
-	dims := g.VisitLenList(ty.LenList).([]int64)
+func (g Generator) VisitProcedureType(ty *ast.ProcedureType) any { return ty }
 
-	// Wrap innermost to outermost
-	typ := elemType
-	for i := len(dims) - 1; i >= 0; i-- {
-		typ = &ArrayType{
-			Length: dims[i],
-			Base:   typ,
-		}
-	}
-
-	return typ
-
-}
-
-func (g Generator) VisitLenList(list *ast.LenList) any {
-	if list == nil {
-		return nil
-	}
-
-	isVar := list.Modifier == token.VAR
-	var lengths []int64
-
-	for _, expr := range list.List {
-		expr.Accept(g)
-
-		if isVar {
-			lengths = append(lengths, -1)
-		} else {
-			// Constant-length expression
-			val := ast.EvalConstExpr(expr)
-			n := val.(int64)
-			lengths = append(lengths, n)
-		}
-	}
-
-	return lengths
-}
-
-func (g Generator) VisitPointerType(ty *ast.PointerType) any {
-	return &PointerType{Base: ty.Base.Accept(g).(Type)}
-}
-
-func (g Generator) VisitProcedureType(ty *ast.ProcedureType) any {
-	proc := &ProcedureType{IsTypeBoundType: ty.IsTypeBound}
-	if ty.FP != nil {
-		proc.Params = ty.FP.Accept(g).([]*Param)
-		if ty.FP.RetType != nil {
-			proc.Result = ty.FP.RetType.Accept(g).(Type)
-		}
-	}
-
-	return proc
-}
-
-func (g Generator) VisitRecordType(ty *ast.RecordType) any {
-	var fields []*Field
-	for _, field := range ty.Env.Elems() {
-		fields = append(fields, &Field{
-			Name: field.Name(),
-			Type: g.emitType(field.Type()),
-		})
-	}
-
-	return &RecordType{
-		Base:   ty.Base.Accept(g).(*RecordType),
-		Fields: fields,
-	}
-}
+func (g Generator) VisitRecordType(ty *ast.RecordType) any { return ty }
 
 func (g Generator) VisitFieldList(list *ast.FieldList) any { return list }
 
-func (g Generator) VisitEnumType(ty *ast.EnumType) any {
-	names := map[string]int{}
+func (g Generator) VisitEnumType(ty *ast.EnumType) any { return ty }
 
-	for i, variant := range ty.Variants {
-		names[variant.Name] = i
-	}
-
-	return &types.EnumType{Variants: names}
-}
-
-func (g Generator) VisitNamedType(ty *ast.NamedType) any {
-	ty.Name.Accept(g)
-	return &NamedType{Name: ty.Name.String(), Symbol: ty.Symbol}
-}
+func (g Generator) VisitNamedType(ty *ast.NamedType) any { return ty }
 
 func (g Generator) VisitBadExpr(expr *ast.BadExpr) any { return expr }
 

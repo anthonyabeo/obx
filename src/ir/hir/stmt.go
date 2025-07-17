@@ -8,17 +8,17 @@ import (
 
 type (
 	AssignStmt struct {
-		Lhs Expr
-		Rhs Expr
+		Left  Expr
+		Right Expr
 	}
 
 	CallStmt struct {
-		Proc Expr
+		Proc *Procedure
 		Args []Expr
 	}
 
 	ReturnStmt struct {
-		Result Expr // nil for procedures
+		Result Expr
 	}
 
 	IfStmt struct {
@@ -84,7 +84,7 @@ func (*WithStmt) isStmt()     {}
 func (*ExitStmt) isStmt()     {}
 func (*CompoundStmt) isStmt() {}
 
-func (stmt *AssignStmt) String() string { return fmt.Sprintf("%s := %s", stmt.Lhs, stmt.Rhs) }
+func (stmt *AssignStmt) String() string { return fmt.Sprintf("%s := %s", stmt.Left, stmt.Right) }
 func (stmt *CallStmt) String() string {
 	var args []string
 	for _, arg := range stmt.Args {

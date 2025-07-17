@@ -1,27 +1,46 @@
 package hir
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/anthonyabeo/obx/src/types"
+)
 
-type VarDecl struct {
-	Name string
-	Type Type
-}
+type (
+	VarDecl struct {
+		Name       string
+		Type       types.Type
+		IsExported bool
+	}
 
-type ConstDecl struct {
-	Name  string
-	Type  Type
-	Value ConstValue
-}
+	ConstDecl struct {
+		Name       string
+		Type       types.Type
+		Value      Expr
+		IsExported bool
+	}
 
-type TypeDecl struct {
-	Name string
-	Type Type
-}
+	TypeDecl struct {
+		Name       string
+		Type       types.Type
+		IsExported bool
+	}
 
-func (*VarDecl) isDecl()   {}
-func (*ConstDecl) isDecl() {}
-func (*TypeDecl) isDecl()  {}
+	ProcedureDecl struct {
+		Name       string
+		Params     []*Param
+		Result     types.Type // nil if procedure has no return
+		Locals     []Decl
+		Body       *CompoundStmt
+		IsExported bool
+	}
+)
 
-func (v *VarDecl) String() string   { return fmt.Sprintf("%s: %s", v.Name, v.Type) }
-func (c *ConstDecl) String() string { return fmt.Sprintf("%s = %s", c.Name, c.Value) }
-func (t *TypeDecl) String() string  { return fmt.Sprintf("%s = %s", t.Name, t.Type) }
+func (*VarDecl) isDecl()       {}
+func (*ConstDecl) isDecl()     {}
+func (*TypeDecl) isDecl()      {}
+func (*ProcedureDecl) isDecl() {}
+
+func (d *VarDecl) String() string       { return fmt.Sprintf("%s: %s", d.Name, d.Type) }
+func (d *ConstDecl) String() string     { return fmt.Sprintf("%s = %s", d.Name, d.Value) }
+func (d *TypeDecl) String() string      { return fmt.Sprintf("%s = %s", d.Name, d.Type) }
+func (d *ProcedureDecl) String() string { panic("not implemented") }
