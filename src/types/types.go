@@ -1,8 +1,6 @@
 package types
 
-import (
-	"github.com/anthonyabeo/obx/src/syntax/token"
-)
+import "github.com/anthonyabeo/obx/src/syntax/token"
 
 type Type interface {
 	String() string
@@ -17,14 +15,14 @@ func TypeIncludes(a, b Type) bool {
 	}
 
 	switch a {
-	case Int64Type, LongIntType:
+	case Int64Type /*, LongIntType*/ :
 		return b == Int32Type || b == Int16Type || b == Int8Type || b == ByteType ||
-			b == IntegerType || b == ShortIntType || b == Int64Type || b == LongIntType
-	case Int32Type, IntegerType:
-		return b == Int16Type || b == Int8Type || b == ByteType || b == ShortIntType ||
-			b == Int32Type || b == IntegerType
-	case Int16Type, ShortIntType:
-		return b == Int8Type || b == ByteType || b == Int16Type || b == ShortIntType
+			/*b == IntegerType || b == ShortIntType ||*/ b == Int64Type /*|| b == LongIntType*/
+	case Int32Type /*, IntegerType*/ :
+		return b == Int16Type || b == Int8Type || b == ByteType || /*b == ShortIntType ||*/
+			b == Int32Type /*|| b == IntegerType*/
+	case Int16Type /*, ShortIntType*/ :
+		return b == Int8Type || b == ByteType || b == Int16Type /*|| b == ShortIntType*/
 	case LongRealType:
 		return b == RealType || b == Int32Type || b == Int16Type || b == Int8Type || b == ByteType
 	case RealType:
@@ -75,7 +73,7 @@ func EqualType(Ta, Tb Type) bool {
 		}
 
 		// Open arrays
-		return EqualType(at.Base, bt.Base)
+		return EqualType(at.Elem, bt.Elem)
 	case *PointerType:
 		bt, ok := Tb.(*PointerType)
 		if !ok {
@@ -177,7 +175,7 @@ func AssignmentCompatible(exprType, varType Type) bool {
 	// 9. Te is open array, Tv is array with equal base type
 	if eo, ok := exprType.(*ArrayType); ok && eo.IsOpen() {
 		if va, ok2 := varType.(*ArrayType); ok2 && !va.IsOpen() {
-			if EqualType(eo.Base, va.Base) {
+			if EqualType(eo.Elem, va.Elem) {
 				return true
 			}
 		}
@@ -195,7 +193,7 @@ func AssignmentCompatible(exprType, varType Type) bool {
 		if arr, isArr := exprType.(*ArrayType); isArr {
 			TeLen = arr.Length
 		}
-		
+
 		return TeLen < TvLen
 	}
 
@@ -268,22 +266,22 @@ func ArrayCompatible(actual, formal Type) bool {
 
 	if okF && formalArr.IsOpen() {
 		// Case 5: BYTE string
-		if formalArr.Base == ByteType && IsLatin1OrByteString(actual) {
+		if formalArr.Elem == ByteType && IsLatin1OrByteString(actual) {
 			return true
 		}
 
 		// Case 4: WCHAR string
-		if formalArr.Base == WCharType && IsUnicodeOrLatin1String(actual) {
+		if formalArr.Elem == WCharType && IsUnicodeOrLatin1String(actual) {
 			return true
 		}
 
 		// Case 3: CHAR string
-		if formalArr.Base == CharType && IsLatin1OrByteString(actual) {
+		if formalArr.Elem == CharType && IsLatin1OrByteString(actual) {
 			return true
 		}
 
 		if okA {
-			return ArrayCompatible(actualArr.Base, formalArr.Base)
+			return ArrayCompatible(actualArr.Elem, formalArr.Elem)
 		}
 	}
 
@@ -392,7 +390,7 @@ func Identical(a, b Type) bool {
 		return ok && a.Kind == bb.Kind
 	case *ArrayType:
 		ab, ok := b.(*ArrayType)
-		return ok && !a.IsOpen() && !ab.IsOpen() && a.Length == ab.Length && Identical(a.Base, ab.Base)
+		return ok && !a.IsOpen() && !ab.IsOpen() && a.Length == ab.Length && Identical(a.Elem, ab.Elem)
 	case *PointerType:
 		pb, ok := b.(*PointerType)
 		return ok && Identical(a.Base, pb.Base)

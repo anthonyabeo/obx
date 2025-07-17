@@ -4,15 +4,15 @@ import "fmt"
 
 type ArrayType struct {
 	Length int64
-	Base   Type
+	Elem   Type
 }
 
 func (a *ArrayType) String() string {
 	if a.Length == -1 {
-		return fmt.Sprintf("ARRAY OF %s", a.Base.String())
+		return fmt.Sprintf("ARRAY OF %s", a.Elem.String())
 	}
 
-	return fmt.Sprintf("ARRAY %d OF %s", a.Length, a.Base.String())
+	return fmt.Sprintf("ARRAY %d OF %s", a.Length, a.Elem.String())
 
 }
 
@@ -21,7 +21,7 @@ func (a *ArrayType) Width() int {
 		return -1 // Open array, width is not defined
 	}
 
-	baseWidth := a.Base.Width()
+	baseWidth := a.Elem.Width()
 	if baseWidth == -1 {
 		return -1 // If base type has undefined width, return -1
 	}
@@ -29,7 +29,7 @@ func (a *ArrayType) Width() int {
 }
 
 func (a *ArrayType) Dimensions() int {
-	base, ok := a.Base.(*ArrayType)
+	base, ok := a.Elem.(*ArrayType)
 	if ok {
 		return 1 + base.Dimensions()
 	}
@@ -46,7 +46,7 @@ func (a *ArrayType) Equals(other Type) bool {
 	if !ok {
 		return false
 	}
-	return a.Length == o.Length && a.Base.Equals(o.Base)
+	return a.Length == o.Length && a.Elem.Equals(o.Elem)
 }
 
 func (a *ArrayType) IsOpen() bool {

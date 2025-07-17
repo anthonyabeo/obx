@@ -8,9 +8,6 @@ var PredefinedTypes = map[token.Kind]Type{
 	token.INT16:    Int16Type,
 	token.INT32:    Int32Type,
 	token.INT64:    Int64Type,
-	token.SHORTINT: ShortIntType,
-	token.INTEGER:  IntegerType,
-	token.LONGINT:  LongIntType,
 	token.REAL:     RealType,
 	token.LONGREAL: LongRealType,
 	token.CHAR:     CharType,
@@ -20,14 +17,11 @@ var PredefinedTypes = map[token.Kind]Type{
 }
 
 var integerTypeRank = map[BasicKind]int{
-	INT8:     0,
-	BYTE:     1,
-	INT16:    2,
-	INT32:    3,
-	INT64:    4,
-	SHORTINT: 2,
-	INTEGER:  3,
-	LONGINT:  4,
+	INT8:  0,
+	BYTE:  1,
+	INT16: 2,
+	INT32: 3,
+	INT64: 4,
 }
 
 var numericTypeRank = map[BasicKind]int{
@@ -36,9 +30,6 @@ var numericTypeRank = map[BasicKind]int{
 	INT16:    2,
 	INT32:    3,
 	INT64:    4,
-	SHORTINT: 2,
-	INTEGER:  3,
-	LONGINT:  4,
 	REAL:     5,
 	LONGREAL: 6,
 }
@@ -118,7 +109,7 @@ func IsBoolean(ty Type) bool {
 
 func IsInteger(ty Type) bool {
 	switch ty {
-	case ByteType, Int8Type, Int16Type, ShortIntType, IntegerType, Int32Type, LongIntType, Int64Type:
+	case ByteType, Int8Type, Int16Type /*ShortIntType, IntegerType,*/, Int32Type /*LongIntType,*/, Int64Type:
 		return true
 	}
 	return false
@@ -231,12 +222,12 @@ func IsPointerExtensionOf(sub, sup Type) bool {
 
 func IsArrayOf(t Type, elem Type) bool {
 	a, ok := t.(*ArrayType)
-	return ok && EqualType(a.Base, elem)
+	return ok && EqualType(a.Elem, elem)
 }
 
 func IsCharArrayOrString(t Type) bool {
 	if a, ok := t.(*ArrayType); ok {
-		return a.Base == CharType || a.Base == WCharType
+		return a.Elem == CharType || a.Elem == WCharType
 	}
 
 	_, ok := t.(*StringType)
@@ -246,7 +237,7 @@ func IsCharArrayOrString(t Type) bool {
 
 func IsLatin1CharArrayOrString(t Type) bool {
 	if a, ok := t.(*ArrayType); ok {
-		return a.Base == CharType
+		return a.Elem == CharType
 	}
 
 	_, ok := t.(*StringType)
@@ -256,12 +247,12 @@ func IsLatin1CharArrayOrString(t Type) bool {
 
 func IsLatin1OrByteString(t Type) bool {
 	arr, ok := t.(*ArrayType)
-	return ok && (arr.Base == CharType || arr.Base == ByteType)
+	return ok && (arr.Elem == CharType || arr.Elem == ByteType)
 }
 
 func IsUnicodeOrLatin1String(t Type) bool {
 	arr, ok := t.(*ArrayType)
-	return ok && (arr.Base == WCharType || arr.Base == CharType || arr.Base == ByteType)
+	return ok && (arr.Elem == WCharType || arr.Elem == CharType || arr.Elem == ByteType)
 }
 
 func IsPointerToRecord(t Type) bool {

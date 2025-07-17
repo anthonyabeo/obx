@@ -27,9 +27,6 @@ var (
 	Int16Type    = &BasicType{INT16, 2, 2}
 	Int32Type    = &BasicType{INT32, 4, 4}
 	Int64Type    = &BasicType{INT64, 8, 8}
-	ShortIntType = &BasicType{SHORTINT, 2, 2}
-	IntegerType  = &BasicType{INTEGER, 4, 4}
-	LongIntType  = &BasicType{LONGINT, 8, 8}
 	RealType     = &BasicType{REAL, 4, 4}
 	LongRealType = &BasicType{LONGREAL, 8, 8}
 	CharType     = &BasicType{CHAR, 1, 1}

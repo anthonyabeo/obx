@@ -32,10 +32,10 @@ func TestSameType_NamedType(t *testing.T) {
 }
 
 func TestSameType_Arrays(t *testing.T) {
-	arr1 := &ArrayType{Length: 5, Base: Int32Type}
-	arr2 := &ArrayType{Length: 5, Base: Int32Type}
-	arr3 := &ArrayType{Length: 10, Base: Int32Type}
-	arr4 := &ArrayType{Length: 5, Base: Int64Type}
+	arr1 := &ArrayType{Length: 5, Elem: Int32Type}
+	arr2 := &ArrayType{Length: 5, Elem: Int32Type}
+	arr3 := &ArrayType{Length: 10, Elem: Int32Type}
+	arr4 := &ArrayType{Length: 5, Elem: Int64Type}
 
 	if !SameType(arr1, arr2) {
 		t.Errorf("expected arrays of same length and element type to be same")
@@ -49,9 +49,9 @@ func TestSameType_Arrays(t *testing.T) {
 }
 
 func TestSameType_OpenArray(t *testing.T) {
-	openArr := &ArrayType{Length: -1, Base: Int32Type} // Convention: -1 = open array
-	fixedArr := &ArrayType{Length: 3, Base: Int32Type}
-	openArr2 := &ArrayType{Length: -1, Base: Int32Type}
+	openArr := &ArrayType{Length: -1, Elem: Int32Type} // Convention: -1 = open array
+	fixedArr := &ArrayType{Length: 3, Elem: Int32Type}
+	openArr2 := &ArrayType{Length: -1, Elem: Int32Type}
 
 	if SameType(openArr, fixedArr) {
 		t.Errorf("expected open array and fixed array to differ")
@@ -69,26 +69,26 @@ func TestMatchingParams(t *testing.T) {
 	}{
 		{
 			name: "same params, same kinds and types",
-			a:    []*FormalParam{{Kind: "", Type: IntegerType}},
-			b:    []*FormalParam{{Kind: "", Type: IntegerType}},
+			a:    []*FormalParam{{Kind: "", Type: Int32Type}},
+			b:    []*FormalParam{{Kind: "", Type: Int32Type}},
 			want: true,
 		},
 		{
 			name: "different kinds",
-			a:    []*FormalParam{{Kind: "VAR", Type: IntegerType}},
-			b:    []*FormalParam{{Kind: "", Type: IntegerType}},
+			a:    []*FormalParam{{Kind: "VAR", Type: Int32Type}},
+			b:    []*FormalParam{{Kind: "", Type: Int32Type}},
 			want: false,
 		},
 		{
 			name: "different types",
-			a:    []*FormalParam{{Kind: "", Type: IntegerType}},
+			a:    []*FormalParam{{Kind: "", Type: Int32Type}},
 			b:    []*FormalParam{{Kind: "", Type: RealType}},
 			want: false,
 		},
 		{
 			name: "different lengths",
-			a:    []*FormalParam{{Kind: "", Type: IntegerType}},
-			b:    []*FormalParam{{Kind: "", Type: IntegerType}, {Kind: "", Type: IntegerType}},
+			a:    []*FormalParam{{Kind: "", Type: Int32Type}},
+			b:    []*FormalParam{{Kind: "", Type: Int32Type}, {Kind: "", Type: Int32Type}},
 			want: false,
 		},
 	}
@@ -105,30 +105,30 @@ func TestMatchingParams(t *testing.T) {
 
 func TestEqualType_Procedure(t *testing.T) {
 	proc1 := &ProcedureType{
-		Params: []*FormalParam{{Kind: "", Type: IntegerType}},
+		Params: []*FormalParam{{Kind: "", Type: Int32Type}},
 	}
 
 	proc2 := &ProcedureType{
-		Params: []*FormalParam{{Kind: "", Type: IntegerType}},
+		Params: []*FormalParam{{Kind: "", Type: Int32Type}},
 	}
 
 	proc3 := &ProcedureType{
-		Params: []*FormalParam{{Kind: "VAR", Type: IntegerType}},
+		Params: []*FormalParam{{Kind: "VAR", Type: Int32Type}},
 	}
 
 	func1 := &ProcedureType{
-		Params: []*FormalParam{{Kind: "", Type: IntegerType}},
+		Params: []*FormalParam{{Kind: "", Type: Int32Type}},
 		Result: RealType,
 	}
 
 	func2 := &ProcedureType{
-		Params: []*FormalParam{{Kind: "", Type: IntegerType}},
+		Params: []*FormalParam{{Kind: "", Type: Int32Type}},
 		Result: RealType,
 	}
 
 	func3 := &ProcedureType{
-		Params: []*FormalParam{{Kind: "", Type: IntegerType}},
-		Result: IntegerType,
+		Params: []*FormalParam{{Kind: "", Type: Int32Type}},
+		Result: Int32Type,
 	}
 
 	tests := []struct {
@@ -194,13 +194,13 @@ func TestTypeIncludes(t *testing.T) {
 		{RealType, Int32Type, false},
 
 		// LONGINT hierarchy
-		{LongIntType, IntegerType, true},
-		{LongIntType, ShortIntType, true},
-		{LongIntType, Int8Type, true},
+		{Int64Type, Int32Type, true},
+		{Int64Type, Int16Type, true},
+		{Int64Type, Int8Type, true},
 
 		// INTEGER hierarchy
-		{IntegerType, ShortIntType, true},
-		{IntegerType, Int8Type, true},
+		{Int32Type, Int16Type, true},
+		{Int32Type, Int8Type, true},
 
 		// WCHAR hierarchy
 		{WCharType, CharType, true},
@@ -232,12 +232,12 @@ func TestAssignmentCompatible(t *testing.T) {
 
 	// Helper to build arrays
 	arr := func(elem Type, length int) Type {
-		return &ArrayType{Base: elem, Length: int64(length)}
+		return &ArrayType{Elem: elem, Length: int64(length)}
 	}
 
 	// Helper to build open arrays
 	openArr := func(elem Type) Type {
-		return &ArrayType{Base: elem, Length: -1}
+		return &ArrayType{Elem: elem, Length: -1}
 	}
 
 	tests := []struct {
@@ -325,18 +325,18 @@ func TestAssignmentCompatible(t *testing.T) {
 
 func TestParameterCompatible(t *testing.T) {
 	var (
-		recordA = &RecordType{Fields: map[string]*Field{"A": {"A", IntegerType, false}}}
-		recordB = &RecordType{Base: recordA, Fields: map[string]*Field{"B": {"B", IntegerType, false}}}
+		recordA = &RecordType{Fields: map[string]*Field{"A": {"A", Int32Type, false}}}
+		recordB = &RecordType{Base: recordA, Fields: map[string]*Field{"B": {"B", Int32Type, false}}}
 
 		// Base types
 		int32Ptr = &PointerType{Base: Int32Type}
 		int16Ptr = &PointerType{Base: Int16Type}
 
 		// Open and fixed arrays
-		openCharArray   = &ArrayType{Length: -1, Base: CharType}
-		openWCharArray  = &ArrayType{Length: -1, Base: WCharType}
-		fixedCharArray  = &ArrayType{Length: 10, Base: CharType}
-		fixedWCharArray = &ArrayType{Length: 10, Base: WCharType}
+		openCharArray   = &ArrayType{Length: -1, Elem: CharType}
+		openWCharArray  = &ArrayType{Length: -1, Elem: WCharType}
+		fixedCharArray  = &ArrayType{Length: 10, Elem: CharType}
+		fixedWCharArray = &ArrayType{Length: 10, Elem: WCharType}
 
 		// Procedures
 		procA = &ProcedureType{
@@ -466,7 +466,7 @@ func TestParameterCompatible(t *testing.T) {
 
 func TestArrayCompatible(t *testing.T) {
 	makeArray := func(elem Type, len int) *ArrayType {
-		return &ArrayType{Length: int64(len), Base: elem}
+		return &ArrayType{Length: int64(len), Elem: elem}
 	}
 
 	tests := []struct {
@@ -560,7 +560,7 @@ func TestArrayCompatible(t *testing.T) {
 
 func TestArrayCompatible_Multidimensional(t *testing.T) {
 	makeArray := func(elem Type, len int) *ArrayType {
-		return &ArrayType{Length: int64(len), Base: elem}
+		return &ArrayType{Length: int64(len), Elem: elem}
 	}
 
 	tests := []struct {
@@ -630,7 +630,7 @@ func TestArrayCompatible_Multidimensional(t *testing.T) {
 
 func TestArrayCompatible_DeepNesting(t *testing.T) {
 	makeArray := func(elem Type, len int) *ArrayType {
-		return &ArrayType{Length: int64(len), Base: elem}
+		return &ArrayType{Length: int64(len), Elem: elem}
 	}
 
 	tests := []struct {
@@ -690,7 +690,7 @@ func TestArrayCompatible_DeepNesting(t *testing.T) {
 	}
 }
 
-func TestSmallestIntegerType(t *testing.T) {
+func TestSmallestInt32Type(t *testing.T) {
 	tests := []struct {
 		a, b Type
 		want Type
@@ -698,17 +698,17 @@ func TestSmallestIntegerType(t *testing.T) {
 		{Int16Type, Int32Type, Int32Type},
 		{ByteType, Int8Type, ByteType},
 		{Int8Type, Int8Type, Int8Type},
-		{ShortIntType, LongIntType, LongIntType},
-		{IntegerType, LongIntType, LongIntType},
+		{Int16Type, Int64Type, Int64Type},
+		{Int32Type, Int64Type, Int64Type},
 		{Int32Type, Int64Type, Int64Type},
 		{Int64Type, Int32Type, Int64Type},
-		{IntegerType, Int16Type, IntegerType},
+		{Int32Type, Int16Type, Int32Type},
 	}
 
 	for _, tt := range tests {
 		got := SmallestIntegerType(tt.a, tt.b)
 		if got != tt.want {
-			t.Errorf("SmallestIntegerType(%v, %v) = %v; want %v", tt.a, tt.b, got, tt.want)
+			t.Errorf("SmallestInt32Type(%v, %v) = %v; want %v", tt.a, tt.b, got, tt.want)
 		}
 	}
 }
@@ -721,8 +721,8 @@ func TestSmallestNumericType(t *testing.T) {
 		{Int8Type, RealType, RealType},
 		{RealType, LongRealType, LongRealType},
 		{Int64Type, Int32Type, Int64Type},
-		{IntegerType, LongRealType, LongRealType},
-		{ShortIntType, Int8Type, ShortIntType},
+		{Int32Type, LongRealType, LongRealType},
+		{Int16Type, Int8Type, Int16Type},
 		{ByteType, RealType, RealType},
 	}
 
