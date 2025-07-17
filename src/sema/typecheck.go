@@ -136,7 +136,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 					}
 				}
 
-				typ = arr.Base
+				typ = arr.Elem
 			case *types.PointerType:
 				a, ok := types.Underlying(arr.Base).(*types.ArrayType)
 				if !ok {
@@ -149,7 +149,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 
 				for _, expr := range s.List {
 					expr.Accept(t)
-					if !types.SameType(expr.Type(), types.IntegerType) {
+					if !types.SameType(expr.Type(), types.Int32Type) {
 						t.ctx.Reporter.Report(report.Diagnostic{
 							Severity: report.Error,
 							Message:  fmt.Sprintf("array index '%s' does not resolve to an integer", expr),
@@ -158,7 +158,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 					}
 				}
 
-				typ = a.Base
+				typ = a.Elem
 			default:
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
@@ -1111,7 +1111,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		case types.CharType, types.BooleanType:
 			call.SemaType = types.ByteType
 		case types.WCharType:
-			call.SemaType = types.ShortIntType
+			call.SemaType = types.Int16Type
 		case types.SetType:
 			call.SemaType = types.Int32Type // Ordinal of a set is an integer
 		default:
@@ -2988,7 +2988,7 @@ func (t *TypeChecker) VisitArrayType(ty *ast.ArrayType) any {
 		// Open array: create single dimension with Length = -1
 		return &types.ArrayType{
 			Length: -1,
-			Base:   elemType,
+			Elem:   elemType,
 		}
 	}
 
@@ -2999,7 +2999,7 @@ func (t *TypeChecker) VisitArrayType(ty *ast.ArrayType) any {
 	for i := len(dims) - 1; i >= 0; i-- {
 		typ = &types.ArrayType{
 			Length: dims[i],
-			Base:   typ,
+			Elem:   typ,
 		}
 	}
 

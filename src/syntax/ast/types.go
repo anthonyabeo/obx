@@ -51,8 +51,7 @@ type (
 	RecordType struct {
 		Base   Type
 		Fields []*FieldList
-		//Environment    *RecordEnv
-		Env *RecordScope
+		Env    *RecordScope
 
 		StartOffset int
 		EndOffset   int

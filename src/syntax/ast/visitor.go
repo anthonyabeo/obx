@@ -1,7 +1,6 @@
 package ast
 
 type Visitor interface {
-	VisitOberon(*OberonX) any
 	VisitModule(*Module) any
 	VisitMetaSection(*MetaSection) any
 	VisitDefinition(*Definition) any
