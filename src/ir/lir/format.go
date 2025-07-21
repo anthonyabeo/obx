@@ -86,7 +86,7 @@ func FormatProc(w io.Writer, p *Procedure) error {
 
 func FormatBlock(w io.Writer, b *Block) error {
 	fmt.Fprintf(w, "%s:\n", b.Name)
-	for _, instr := range b.Instrs {
+	for _, instr := range b.Inst {
 		fmt.Fprintf(w, "  %s\n", instr.String())
 	}
 	return nil

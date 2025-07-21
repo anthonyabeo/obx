@@ -27,7 +27,7 @@ type (
 	}
 
 	LabelInst struct {
-		Label string
+		Name Label
 	}
 
 	ReturnInst struct {
@@ -42,31 +42,6 @@ type (
 		Callee Operand
 		Args   []Operand
 	}
-
-	BinaryInst struct {
-		Dst   Operand
-		Op    string // "+", "-", "*", "/", etc.
-		Left  Operand
-		Right Operand
-	}
-
-	UnaryInst struct {
-		Dst  Operand
-		Op   string
-		Expr Operand
-	}
-
-	FuncCallInst struct {
-		Dst  Operand
-		Func Operand
-		Args []Operand
-	}
-
-	CmpInst struct {
-		Dst  Operand
-		Op   string
-		X, Y Operand
-	}
 )
 
 func (*AssignInst) isInstr()   {}
@@ -76,10 +51,6 @@ func (*CondBrInst) isInstr()   {}
 func (*LabelInst) isInstr()    {}
 func (*ReturnInst) isInstr()   {}
 func (*ExitInst) isInstr()     {}
-func (*BinaryInst) isInstr()   {}
-func (*UnaryInst) isInstr()    {}
-func (*FuncCallInst) isInstr() {}
-func (*CmpInst) isInstr()      {}
 
 func (i *AssignInst) String() string { return fmt.Sprintf("%v = %v", i.Target, i.Value) }
 func (i *ProcCallInst) String() string {
@@ -93,7 +64,7 @@ func (i *JumpInst) String() string { return fmt.Sprintf("jmp %s", i.Target) }
 func (i *CondBrInst) String() string {
 	return fmt.Sprintf("br %s, label %s, label %s", i.Cond, i.TrueLabel, i.FalseLabel)
 }
-func (i *LabelInst) String() string { return i.Label }
+func (i *LabelInst) String() string { return fmt.Sprintf("%v:", i.Name) }
 func (i *ReturnInst) String() string {
 	ret := "ret"
 	if i.Result != nil {
@@ -103,16 +74,3 @@ func (i *ReturnInst) String() string {
 	return ret
 }
 func (i *ExitInst) String() string { return "exit" }
-func (v *BinaryInst) String() string {
-	return fmt.Sprintf("%s = %s %s %s", v.Dst, v.Left, v.Op, v.Right)
-}
-func (v *UnaryInst) String() string { return fmt.Sprintf("%s = %s %s", v.Dst, v.Op, v.Expr) }
-func (v *FuncCallInst) String() string {
-	var args []string
-	for _, op := range v.Args {
-		args = append(args, op.String())
-	}
-
-	return fmt.Sprintf("%s = call %s(%s)", v.Dst, v.Func, strings.Join(args, ", "))
-}
-func (i *CmpInst) String() string { return fmt.Sprintf("cmp %s %s, %s", i.Op, i.X, i.Y) }

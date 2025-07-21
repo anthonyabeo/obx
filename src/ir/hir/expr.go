@@ -2,6 +2,7 @@ package hir
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/ir"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -60,14 +61,14 @@ type (
 	}
 
 	BinaryExpr struct {
-		Op    Op
+		Op    ir.Operator
 		Left  Expr
 		Right Expr
 		Ty    types.Type
 	}
 
 	UnaryExpr struct {
-		Op      Op
+		Op      ir.Operator
 		Operand Expr
 		Ty      types.Type
 	}

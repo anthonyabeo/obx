@@ -11,8 +11,8 @@ type Module struct {
 	IsEntry    bool
 	Imports    []Import
 	Globals    []Decl
-	Procedures []*Procedure
-	Init       *Procedure
+	Procedures []*ProcedureDecl
+	Init       *ProcedureDecl
 }
 
 type Import struct {

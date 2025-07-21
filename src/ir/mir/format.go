@@ -74,7 +74,7 @@ func FormatModule(mod *Module, indent string) string {
 	return b.String()
 }
 
-func FormatProcedure(proc *Procedure, indent string) string {
+func FormatProcedure(proc *ProcedureDecl, indent string) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("proc %s(", proc.Name))

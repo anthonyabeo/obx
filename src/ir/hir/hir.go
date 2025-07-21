@@ -26,22 +26,22 @@ type Expr interface {
 	Type() types.Type
 }
 
-type Op string
-
-const (
-	Add  Op = "+"
-	Sub  Op = "-"
-	Mul  Op = "*"
-	Quot Op = "/"
-	Div  Op = "div"
-	Mod  Op = "mod"
-	And  Op = "and"
-	Or   Op = "or"
-	Eq   Op = "="
-	Neq  Op = "#"
-	Lt   Op = "<"
-	Gt   Op = ">"
-	Le   Op = "<="
-	Ge   Op = ">="
-	Not  Op = "~"
-)
+//type Op string
+//
+//const (
+//	Add  Op = "+"
+//	Sub  Op = "-"
+//	Mul  Op = "*"
+//	Quot Op = "/"
+//	Div  Op = "div"
+//	Mod  Op = "mod"
+//	And  Op = "and"
+//	Or   Op = "or"
+//	Eq   Op = "="
+//	Neq  Op = "#"
+//	Lt   Op = "<"
+//	Gt   Op = ">"
+//	Le   Op = "<="
+//	Ge   Op = ">="
+//	Not  Op = "~"
+//)

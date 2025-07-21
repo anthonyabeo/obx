@@ -2,6 +2,7 @@ package hir
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/ir"
 	"github.com/anthonyabeo/obx/src/types"
 	"strings"
 
@@ -300,7 +301,7 @@ func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
 
 	// WHILE <cond>
 	cond := stmt.BoolExpr.Accept(g).(Expr)
-	negated := &UnaryExpr{Op: Not, Operand: cond}
+	negated := &UnaryExpr{Op: ir.OpNot, Operand: cond}
 	body.Stmts = append(body.Stmts, &IfStmt{
 		Cond: negated,
 		Then: &CompoundStmt{[]Stmt{&ExitStmt{loopLabel: stmt.Label}}},
@@ -314,7 +315,7 @@ func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
 	// ELSIF branches
 	for _, branch := range stmt.ElsIfs {
 		bCond := branch.BoolExpr.Accept(g).(Expr)
-		negB := &UnaryExpr{Op: Not, Operand: bCond}
+		negB := &UnaryExpr{Op: ir.OpNot, Operand: bCond}
 
 		body.Stmts = append(body.Stmts, &IfStmt{
 			Cond: negB,
@@ -412,7 +413,7 @@ func (g Generator) VisitForStmt(stmt *ast.ForStmt) any {
 	// Condition: cvar > final => break
 	breakIf := &IfStmt{
 		Cond: &BinaryExpr{
-			Op:    Gt,
+			Op:    ir.OpGt,
 			Left:  cvar,
 			Right: final,
 		},
@@ -429,7 +430,7 @@ func (g Generator) VisitForStmt(stmt *ast.ForStmt) any {
 	incr := &AssignStmt{
 		Left: cvar,
 		Right: &BinaryExpr{
-			Op:    Add,
+			Op:    ir.OpAdd,
 			Left:  cvar,
 			Right: step,
 		},

@@ -27,7 +27,7 @@ type (
 		Type Type
 	}
 
-	Procedure struct {
+	ProcedureDecl struct {
 		Name   string
 		Params []*Param
 		Result Type // nil if procedure is a command
@@ -44,10 +44,10 @@ type (
 
 func (*ConstDecl) isDecl() {}
 func (*VarDecl) isDecl()   {}
-func (*TypeDecl) isDecl()  {}
-func (*Procedure) isDecl() {}
+func (*TypeDecl) isDecl()      {}
+func (*ProcedureDecl) isDecl() {}
 
 func (d *ConstDecl) String() string { return fmt.Sprintf("CONST %s: %s", d.Name, d.Value) }
 func (d *VarDecl) String() string   { return fmt.Sprintf("VAR %s: %s", d.Name, d.Type) }
-func (d *TypeDecl) String() string  { return fmt.Sprintf("TYPE %s: %s", d.Name, d.Type) }
-func (d *Procedure) String() string { return FormatProcedure(d, "  ") }
+func (d *TypeDecl) String() string      { return fmt.Sprintf("TYPE %s: %s", d.Name, d.Type) }
+func (d *ProcedureDecl) String() string { return FormatProcedure(d, "  ") }

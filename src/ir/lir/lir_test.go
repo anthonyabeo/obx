@@ -18,7 +18,7 @@ func TestMIRToLIR_Lowering(t *testing.T) {
 			name: "simple assignment",
 			mir: &mir.Module{
 				Name: "Main",
-				Procedures: []*mir.Procedure{
+				Procedures: []*mir.ProcedureDecl{
 					{
 						Name:   "Init",
 						Params: []*mir.Param{},
@@ -60,7 +60,7 @@ entry:
 			name: "return statement",
 			mir: &mir.Module{
 				Name: "Math",
-				Procedures: []*mir.Procedure{
+				Procedures: []*mir.ProcedureDecl{
 					{
 						Name: "Double",
 						Params: []*mir.Param{
@@ -103,7 +103,7 @@ entry:
 			name: "SimpleAddition",
 			mir: &mir.Module{
 				Name: "Main",
-				Procedures: []*mir.Procedure{
+				Procedures: []*mir.ProcedureDecl{
 					{
 						Name: "Init",
 						Params: []*mir.Param{
@@ -148,7 +148,7 @@ entry:
 			name: "LoopWithExit",
 			mir: &mir.Module{
 				Name: "Main",
-				Procedures: []*mir.Procedure{
+				Procedures: []*mir.ProcedureDecl{
 					{
 						Name: "LoopTest",
 						Locals: []mir.Decl{
@@ -226,7 +226,7 @@ exit:
 			name: "ProcedureCall",
 			mir: &mir.Module{
 				Name: "Main",
-				Procedures: []*mir.Procedure{
+				Procedures: []*mir.ProcedureDecl{
 					{
 						Name: "MainProc",
 						Blocks: []*mir.Block{
@@ -261,7 +261,7 @@ entry:
 				Globals: []mir.Decl{
 					&mir.VarDecl{Name: "g", Type: mir.Int32Type},
 				},
-				Procedures: []*mir.Procedure{
+				Procedures: []*mir.ProcedureDecl{
 					{
 						Name:   "GetG",
 						Result: mir.Int32Type,

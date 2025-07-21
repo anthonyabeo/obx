@@ -2,17 +2,37 @@ package mir
 
 import (
 	"bytes"
-	"github.com/anthonyabeo/obx/src/ir/hir"
 	"log"
+
+	"github.com/anthonyabeo/obx/src/types"
 )
 
-func toMIRType(t hir.Type) Type {
+func (g *Generator) genMIRType(t types.Type) Type {
 	switch t := t.(type) {
-	case *hir.IntType:
-		return &IntegerType{Bits: t.Bits, Signed: t.Signed}
+	case *types.BasicType:
+		switch t.Kind {
+		case types.BOOLEAN:
+			return Int1Type
+		case types.BYTE:
+			return UInt8Type
+		case types.INT32:
+			return Int32Type
+		case types.INT16:
+			return Int16Type
+		case types.INT8:
+			return Int8Type
+		case types.INT64:
+			return Int64Type
+		case types.REAL:
+			return Float32Type
+		case types.LONGREAL:
+			return Float64Type
+		}
 	default:
 		return nil
 	}
+
+	return nil
 }
 
 func getMIRText(prog *Program) string {

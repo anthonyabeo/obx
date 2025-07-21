@@ -2,6 +2,7 @@ package lir
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/ir"
 	"strings"
 )
 
@@ -41,14 +42,14 @@ type (
 	}
 
 	BinaryInst struct {
-		Op  Op      // "add", "sub", "mul", "and", etc.
-		Dst Operand // result register or variable
+		Op  ir.Operator // "add", "sub", "mul", "and", etc.
+		Dst Operand     // result register or variable
 		Lhs Operand
 		Rhs Operand
 	}
 
 	UnaryInst struct {
-		Op  string // "neg", "not"
+		Op  ir.Operator // "neg", "not"
 		Dst Operand
 		Val Operand
 	}
@@ -66,7 +67,7 @@ type (
 
 	CmpInst struct {
 		Dst  Operand
-		Op   Op
+		Op   ir.Operator
 		X, Y Operand
 	}
 )
