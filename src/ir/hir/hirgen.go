@@ -2,13 +2,12 @@ package hir
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/ir"
-	"github.com/anthonyabeo/obx/src/types"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
+	"github.com/anthonyabeo/obx/src/types"
 )
 
 type Generator struct {
@@ -20,45 +19,27 @@ func NewGenerator(ctx *report.Context) *Generator {
 	return &Generator{ctx: ctx}
 }
 
-func (g Generator) Generate() *Module {
+func (g Generator) Generate() *Program {
+	program := &Program{}
+
 	for _, unit := range g.obx.Units {
-		mod, ok := unit.Accept(g).(*Module)
-		if !ok {
-
-		}
-
-		return mod
+		mod := unit.Accept(g).(*Module)
+		program.Modules = append(program.Modules, mod)
 	}
 
-	return nil
+	return program
 }
 
 func (g Generator) VisitModule(module *ast.Module) any {
 	name := module.BName
-	var (
-		globals    []Decl
-		procedures []*ProcedureDecl
-		stmts      *CompoundStmt
-	)
-
-	for _, declaration := range module.DeclSeq {
-		switch decl := declaration.(type) {
-		case *ast.ProcedureDecl:
-			procedures = append(procedures, g.VisitProcedureDecl(decl).(*ProcedureDecl))
-		case *ast.VariableDecl:
-			globals = append(globals, decl.Accept(g).([]Decl)...)
-		default:
-			globals = append(globals, decl.Accept(g).(Decl))
-		}
-	}
-
-	stmts = g.visitStmtSeq(module.StmtSeq)
+	decls := g.visitDeclSeq(module.DeclSeq)
+	stmts := g.visitStmtSeq(module.StmtSeq)
+	// TODO metaparams
+	// TODO imports
 
 	return &Module{
-		Name:       name,
-		Imports:    nil,
-		Globals:    globals,
-		Procedures: procedures,
+		Name:  name,
+		Decls: decls,
 		Init: &ProcedureDecl{
 			Name: fmt.Sprintf("__init_%s", name),
 			Body: stmts,
@@ -70,27 +51,12 @@ func (g Generator) VisitMetaSection(section *ast.MetaSection) any { return secti
 
 func (g Generator) VisitDefinition(definition *ast.Definition) any {
 	name := definition.BName
-	var (
-		globals    []Decl
-		procedures []*ProcedureDecl
-	)
-
-	for _, declaration := range definition.DeclSeq {
-		switch decl := declaration.(type) {
-		case *ast.ProcedureDecl:
-			procedures = append(procedures, g.VisitProcedureDecl(decl).(*ProcedureDecl))
-		case *ast.VariableDecl:
-			globals = append(globals, decl.Accept(g).([]Decl)...)
-		default:
-			globals = append(globals, decl.Accept(g).(Decl))
-		}
-	}
+	decls := g.visitDeclSeq(definition.DeclSeq)
+	// TODO imports
 
 	return &Module{
-		Name:       name,
-		Imports:    nil,
-		Globals:    globals,
-		Procedures: procedures,
+		Name:  name,
+		Decls: decls,
 	}
 }
 
@@ -100,18 +66,9 @@ func (g Generator) VisitBinaryExpr(expr *ast.BinaryExpr) any {
 	return &BinaryExpr{
 		Left:  expr.Left.Accept(g).(Expr),
 		Right: expr.Right.Accept(g).(Expr),
-		Op:    g.emitOp(expr.Op),
+		Op:    expr.Op,
 		Ty:    expr.SemaType,
 	}
-}
-
-func (g Generator) visitExprList(list []ast.Expression) (l []Expr) {
-	for _, expression := range list {
-		expr := expression.Accept(g).(Expr)
-		l = append(l, expr)
-	}
-
-	return l
 }
 
 func (g Generator) VisitDesignator(dsg *ast.Designator) any {
@@ -137,6 +94,7 @@ func (g Generator) VisitDesignator(dsg *ast.Designator) any {
 				Ty:      Dsg.Type(),
 			}
 		case *ast.TypeGuard:
+			// TODO implement this
 		}
 	}
 
@@ -155,7 +113,7 @@ func (g Generator) VisitFunctionCall(call *ast.FunctionCall) any {
 
 func (g Generator) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 	return &UnaryExpr{
-		Op:      g.emitOp(expr.Op),
+		Op:      expr.Op,
 		Operand: expr.Operand.Accept(g).(Expr),
 		Ty:      expr.SemaType,
 	}
@@ -261,25 +219,21 @@ func (g Generator) VisitReturnStmt(stmt *ast.ReturnStmt) any {
 	if stmt.Value != nil {
 		result = stmt.Value.Accept(g).(Expr)
 	}
-	return []Stmt{&ReturnStmt{Result: result}}
+	return &ReturnStmt{Result: result}
 }
 
 func (g Generator) VisitProcedureCall(call *ast.ProcedureCall) any {
 	callee := call.Callee.Accept(g).(*Procedure)
 
-	return &CallStmt{
+	return &ProcedureCallStmt{
 		Proc: callee,
 		Args: g.visitExprList(call.ActualParams),
 	}
 }
 
 func (g Generator) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
-	body := &CompoundStmt{}
-
 	// Process REPEAT body
-	for _, s := range stmt.StmtSeq {
-		body.Stmts = append(body.Stmts, s.Accept(g).(Stmt))
-	}
+	body := g.visitStmtSeq(stmt.StmtSeq)
 
 	// Generate condition expression
 	cond := stmt.BoolExpr.Accept(g).(Expr)
@@ -301,7 +255,7 @@ func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
 
 	// WHILE <cond>
 	cond := stmt.BoolExpr.Accept(g).(Expr)
-	negated := &UnaryExpr{Op: ir.OpNot, Operand: cond}
+	negated := &UnaryExpr{Op: token.NOT, Operand: cond}
 	body.Stmts = append(body.Stmts, &IfStmt{
 		Cond: negated,
 		Then: &CompoundStmt{[]Stmt{&ExitStmt{loopLabel: stmt.Label}}},
@@ -315,7 +269,7 @@ func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
 	// ELSIF branches
 	for _, branch := range stmt.ElsIfs {
 		bCond := branch.BoolExpr.Accept(g).(Expr)
-		negB := &UnaryExpr{Op: ir.OpNot, Operand: bCond}
+		negB := &UnaryExpr{Op: token.NOT, Operand: bCond}
 
 		body.Stmts = append(body.Stmts, &IfStmt{
 			Cond: negB,
@@ -413,7 +367,7 @@ func (g Generator) VisitForStmt(stmt *ast.ForStmt) any {
 	// Condition: cvar > final => break
 	breakIf := &IfStmt{
 		Cond: &BinaryExpr{
-			Op:    ir.OpGt,
+			Op:    token.GREAT,
 			Left:  cvar,
 			Right: final,
 		},
@@ -430,7 +384,7 @@ func (g Generator) VisitForStmt(stmt *ast.ForStmt) any {
 	incr := &AssignStmt{
 		Left: cvar,
 		Right: &BinaryExpr{
-			Op:    ir.OpAdd,
+			Op:    token.PLUS,
 			Left:  cvar,
 			Right: step,
 		},
@@ -457,12 +411,11 @@ func (g Generator) VisitWithStmt(stmt *ast.WithStmt) any {
 		guards = append(guards, guard)
 	}
 
-	return []Stmt{
-		&WithStmt{
-			Guards: guards,
-			Else:   g.visitStmtSeq(stmt.Else),
-		},
+	return &WithStmt{
+		Guards: guards,
+		Else:   g.visitStmtSeq(stmt.Else),
 	}
+
 }
 
 func (g Generator) VisitGuard(guard *ast.Guard) any {
@@ -516,12 +469,12 @@ func (g Generator) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	}
 
 	return &ProcedureDecl{
-		Name:       name,
-		Params:     params,
-		Result:     resultType,
-		Locals:     locals,
-		Body:       body,
-		IsExported: decl.Head.Name.Props == ast.Exported,
+		Name:   name,
+		Params: params,
+		Result: resultType,
+		Locals: locals,
+		Body:   body,
+		Props:  decl.Head.Name.Props,
 	}
 }
 
@@ -568,10 +521,10 @@ func (g Generator) VisitVariableDecl(decl *ast.VariableDecl) any {
 	var decls []Decl
 
 	for _, id := range decl.IdentList {
-		decls = append(decls, &VarDecl{
-			Name:       id.Name,
-			Type:       id.SemaType,
-			IsExported: id.Props == ast.Exported,
+		decls = append(decls, &VariableDecl{
+			Name:  id.Name,
+			Type:  id.SemaType,
+			Props: id.Props,
 		})
 	}
 

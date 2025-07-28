@@ -74,8 +74,8 @@ func TestHIRGen(t *testing.T) {
           UNTIL x > 10
         END Test.`,
 			expected: &Module{
-				Name:    "Test",
-				Globals: []Decl{&VarDecl{Name: "x", Type: types.Int32Type}},
+				Name:  "Test",
+				Decls: []Decl{&VariableDecl{Name: "x", Type: types.Int32Type}},
 				Init: &ProcedureDecl{
 					Name: "__init_Test",
 					Body: &CompoundStmt{
@@ -87,7 +87,7 @@ func TestHIRGen(t *testing.T) {
 										&AssignStmt{
 											Left: &Variable{Name: "x", Ty: types.Int32Type},
 											Right: &BinaryExpr{
-												Op: "+",
+												Op: token.PLUS,
 												Left: &Variable{
 													Name: "x",
 													Ty:   types.Int32Type,
@@ -102,7 +102,7 @@ func TestHIRGen(t *testing.T) {
 										},
 										&IfStmt{
 											Cond: &BinaryExpr{
-												Op:    ">",
+												Op:    token.GREAT,
 												Left:  &Variable{Name: "x", Ty: types.Int32Type},
 												Right: &Literal{Kind: token.BYTE_LIT, Value: "10", Ty: types.ByteType},
 												Ty:    types.BooleanType,
@@ -134,8 +134,8 @@ func TestHIRGen(t *testing.T) {
   `,
 			expected: &Module{
 				Name: "M",
-				Globals: []Decl{
-					&VarDecl{Name: "i", Type: types.Int32Type},
+				Decls: []Decl{
+					&VariableDecl{Name: "i", Type: types.Int32Type},
 				},
 				Init: &ProcedureDecl{
 					Name: "__init_M",
@@ -147,9 +147,9 @@ func TestHIRGen(t *testing.T) {
 									Stmts: []Stmt{
 										&IfStmt{
 											Cond: &UnaryExpr{
-												Op: Not,
+												Op: token.NOT,
 												Operand: &BinaryExpr{
-													Op:    "<",
+													Op:    token.LESS,
 													Left:  &Variable{Name: "i", Ty: types.Int32Type},
 													Right: &Literal{Kind: token.BYTE_LIT, Value: "5", Ty: types.ByteType},
 													Ty:    types.BooleanType,
@@ -160,7 +160,7 @@ func TestHIRGen(t *testing.T) {
 										&AssignStmt{
 											Left: &Variable{Name: "i", Ty: types.Int32Type},
 											Right: &BinaryExpr{
-												Op:    "+",
+												Op:    token.PLUS,
 												Left:  &Variable{Name: "i", Ty: types.Int32Type},
 												Right: &Literal{Kind: token.BYTE_LIT, Value: "1", Ty: types.ByteType},
 												Ty:    types.Int32Type,
@@ -185,8 +185,8 @@ func TestHIRGen(t *testing.T) {
   `,
 			expected: &Module{
 				Name: "M",
-				Globals: []Decl{
-					&VarDecl{Name: "a", Type: types.Int32Type},
+				Decls: []Decl{
+					&VariableDecl{Name: "a", Type: types.Int32Type},
 				},
 				Init: &ProcedureDecl{
 					Name: "__init_M",
@@ -194,7 +194,7 @@ func TestHIRGen(t *testing.T) {
 						Stmts: []Stmt{
 							&IfStmt{
 								Cond: &BinaryExpr{
-									Op:    "=",
+									Op:    token.EQUAL,
 									Left:  &Variable{Name: "a", Ty: types.Int32Type},
 									Right: &Literal{Kind: token.BYTE_LIT, Value: "0", Ty: types.ByteType},
 									Ty:    types.BooleanType,
@@ -230,8 +230,8 @@ func TestHIRGen(t *testing.T) {
   `,
 			expected: &Module{
 				Name: "M",
-				Procedures: []*ProcedureDecl{
-					{
+				Decls: []Decl{
+					&ProcedureDecl{
 						Name:   "Write",
 						Params: []*Param{{Name: "x", Type: types.Int32Type}},
 					},
@@ -240,7 +240,7 @@ func TestHIRGen(t *testing.T) {
 					Name: "__init_M",
 					Body: &CompoundStmt{
 						Stmts: []Stmt{
-							&CallStmt{
+							&ProcedureCallStmt{
 								Proc: &Procedure{Name: "Write", Ty: &types.ProcedureType{
 									Params:          []*types.FormalParam{{Name: "x", Type: types.Int32Type, Kind: "VALUE"}},
 									Result:          nil,
@@ -268,7 +268,7 @@ END M.
 `,
 			expected: &Module{
 				Name: "M",
-				Globals: []Decl{
+				Decls: []Decl{
 					&TypeDecl{
 						Name: "T",
 						Type: &types.PointerType{
@@ -283,9 +283,7 @@ END M.
 							},
 						},
 					},
-				},
-				Procedures: []*ProcedureDecl{
-					{
+					&ProcedureDecl{
 						Name: "Act",
 						Params: []*Param{
 							{
@@ -306,7 +304,7 @@ END M.
 								},
 							},
 						},
-						IsExported: true,
+						Props: ast.Exported,
 					},
 				},
 				Init: &ProcedureDecl{
@@ -326,7 +324,7 @@ END M.
 
 			if diff := cmp.Diff(tt.expected, hirModule,
 				cmp.AllowUnexported(
-					Module{}, ProcedureDecl{}, VarDecl{},
+					Module{}, ProcedureDecl{}, VariableDecl{},
 					LoopStmt{}, CompoundStmt{}, AssignStmt{},
 					Variable{}, Literal{}, BinaryExpr{},
 					IfStmt{}, ExitStmt{}, Procedure{},

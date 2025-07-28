@@ -1,7 +1,7 @@
 package lir
 
-// Procedure : A procedure/function in LIR.
-type Procedure struct {
+// Function : A procedure/function in LIR.
+type Function struct {
 	Name       string   // e.g. "main", "Insert"
 	Ret        Type     // void if procedure is a command
 	Params     []*Param // input registers (may include return reg)
@@ -17,6 +17,7 @@ type Param struct {
 }
 
 type Local struct {
-	Name string
-	Type Type
+	Name   string
+	Offset int // offset in stack frame
+	Type   Type
 }

@@ -12,7 +12,7 @@ type (
 		Right Expr
 	}
 
-	CallStmt struct {
+	ProcedureCallStmt struct {
 		Proc *Procedure
 		Args []Expr
 	}
@@ -74,18 +74,18 @@ type (
 	}
 )
 
-func (*AssignStmt) isStmt()   {}
-func (*CallStmt) isStmt()     {}
-func (*ReturnStmt) isStmt()   {}
-func (*IfStmt) isStmt()       {}
-func (*LoopStmt) isStmt()     {}
-func (*CaseStmt) isStmt()     {}
-func (*WithStmt) isStmt()     {}
-func (*ExitStmt) isStmt()     {}
-func (*CompoundStmt) isStmt() {}
+func (*AssignStmt) stmt()        {}
+func (*ProcedureCallStmt) stmt() {}
+func (*ReturnStmt) stmt()        {}
+func (*IfStmt) stmt()            {}
+func (*LoopStmt) stmt()          {}
+func (*CaseStmt) stmt()          {}
+func (*WithStmt) stmt()          {}
+func (*ExitStmt) stmt()          {}
+func (*CompoundStmt) stmt()      {}
 
 func (stmt *AssignStmt) String() string { return fmt.Sprintf("%s := %s", stmt.Left, stmt.Right) }
-func (stmt *CallStmt) String() string {
+func (stmt *ProcedureCallStmt) String() string {
 	var args []string
 	for _, arg := range stmt.Args {
 		args = append(args, arg.String())
@@ -95,10 +95,10 @@ func (stmt *CallStmt) String() string {
 }
 func (stmt *ReturnStmt) String() string {
 	if stmt.Result != nil {
-		return fmt.Sprintf("RETURN %s", stmt.Result)
+		return fmt.Sprintf("return %s", stmt.Result)
 	}
 
-	return "RETURN"
+	return "return"
 }
 func (stmt *IfStmt) String() string   { panic("not implemented") }
 func (stmt *LoopStmt) String() string { return fmt.Sprintf("LOOP %s END", stmt.Body) }

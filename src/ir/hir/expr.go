@@ -2,7 +2,6 @@ package hir
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/ir"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -61,15 +60,15 @@ type (
 	}
 
 	BinaryExpr struct {
-		Op    ir.Operator
 		Left  Expr
 		Right Expr
+		Op    token.Kind
 		Ty    types.Type
 	}
 
 	UnaryExpr struct {
-		Op      ir.Operator
 		Operand Expr
+		Op      token.Kind
 		Ty      types.Type
 	}
 
@@ -91,19 +90,19 @@ type (
 	}
 )
 
-func (*Literal) isExpr()       {}
-func (*BinaryExpr) isExpr()    {}
-func (*UnaryExpr) isExpr()     {}
-func (*FuncCallExpr) isExpr()  {}
-func (*FieldAccess) isExpr()   {}
-func (*IndexExpr) isExpr()     {}
-func (*DerefExpr) isExpr()     {}
-func (*TypeGuardExpr) isExpr() {}
-func (*SetExpr) isExpr()       {}
-func (*RangeExpr) isExpr()     {}
-func (*Variable) isExpr()      {}
-func (*Constant) isExpr()      {}
-func (*Procedure) isExpr()     {}
+func (*Literal) expr()       {}
+func (*BinaryExpr) expr()    {}
+func (*UnaryExpr) expr()     {}
+func (*FuncCallExpr) expr()  {}
+func (*FieldAccess) expr()   {}
+func (*IndexExpr) expr()     {}
+func (*DerefExpr) expr()     {}
+func (*TypeGuardExpr) expr() {}
+func (*SetExpr) expr()       {}
+func (*RangeExpr) expr()     {}
+func (*Variable) expr()      {}
+func (*Constant) expr()      {}
+func (*Procedure) expr()     {}
 
 func (e *Literal) Type() types.Type       { return e.Ty }
 func (e *BinaryExpr) Type() types.Type    { return e.Ty }

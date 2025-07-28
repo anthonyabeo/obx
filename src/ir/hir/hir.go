@@ -11,37 +11,17 @@ type Node interface {
 }
 
 type Stmt interface {
-	isStmt()
+	stmt()
 	Node
 }
 
 type Decl interface {
-	isDecl()
+	decl()
 	Node
 }
 
 type Expr interface {
 	Node
-	isExpr()
+	expr()
 	Type() types.Type
 }
-
-//type Op string
-//
-//const (
-//	Add  Op = "+"
-//	Sub  Op = "-"
-//	Mul  Op = "*"
-//	Quot Op = "/"
-//	Div  Op = "div"
-//	Mod  Op = "mod"
-//	And  Op = "and"
-//	Or   Op = "or"
-//	Eq   Op = "="
-//	Neq  Op = "#"
-//	Lt   Op = "<"
-//	Gt   Op = ">"
-//	Le   Op = "<="
-//	Ge   Op = ">="
-//	Not  Op = "~"
-//)

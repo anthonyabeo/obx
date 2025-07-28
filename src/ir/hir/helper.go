@@ -5,43 +5,6 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
-func (g Generator) emitOp(tok token.Kind) Op {
-	switch tok {
-	case token.PLUS:
-		return Add
-	case token.MINUS:
-		return Sub
-	case token.STAR:
-		return Mul
-	case token.QUOT:
-		return Quot
-	case token.DIV:
-		return Div
-	case token.MOD:
-		return Mod
-	case token.AND:
-		return And
-	case token.OR:
-		return Or
-	case token.EQUAL:
-		return Eq
-	case token.NEQ:
-		return Neq
-	case token.LESS:
-		return Lt
-	case token.LEQ:
-		return Le
-	case token.GREAT:
-		return Gt
-	case token.GEQ:
-		return Ge
-	case token.NOT:
-		return Not
-	default:
-		return "nil"
-	}
-}
-
 func (g Generator) emitParamKind(kind token.Kind) ParamKind {
 	switch kind {
 	case token.VAR:
@@ -60,9 +23,7 @@ func (g Generator) visitStmtSeq(stmts []ast.Statement) *CompoundStmt {
 		bodyStmts = append(bodyStmts, hirStmt)
 	}
 
-	return &CompoundStmt{
-		Stmts: bodyStmts,
-	}
+	return &CompoundStmt{Stmts: bodyStmts}
 }
 
 func (g Generator) visitDeclSeq(decls []ast.Declaration) (d []Decl) {
@@ -80,4 +41,13 @@ func (g Generator) visitElseIfs(branches []*ast.ElseIfBranch) []*ElseIfBranch {
 	}
 
 	return elseIfs
+}
+
+func (g Generator) visitExprList(list []ast.Expression) (l []Expr) {
+	for _, expression := range list {
+		expr := expression.Accept(g).(Expr)
+		l = append(l, expr)
+	}
+
+	return l
 }
