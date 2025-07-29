@@ -9,16 +9,22 @@ import (
 
 type (
 	VariableDecl struct {
-		Name  string
-		Type  types.Type
-		Props ast.IdentProps
+		Name       string
+		Type       types.Type
+		Size       int
+		Offset     int
+		IsExport   bool
+		IsReadOnly bool
 	}
 
 	ConstDecl struct {
-		Name  string
-		Type  types.Type
-		Value Expr
-		Props ast.IdentProps
+		Name       string
+		Type       types.Type
+		Value      Expr
+		Size       int
+		Offset     int
+		IsExport   bool
+		IsReadOnly bool
 	}
 
 	TypeDecl struct {

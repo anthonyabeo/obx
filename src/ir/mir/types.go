@@ -20,11 +20,14 @@ type (
 	PointerType struct {
 		Ref Type
 	}
+
+	VoidType string
 )
 
 func (*IntegerType) isMIRType() {}
 func (*PointerType) isMIRType() {}
 func (*FloatType) isMIRType()   {}
+func (VoidType) isMIRType()     {}
 
 func (t *PointerType) String() string { return fmt.Sprintf("*%s", t.Ref) }
 func (t *IntegerType) String() string {
@@ -35,6 +38,7 @@ func (t *IntegerType) String() string {
 	return fmt.Sprintf("u%d", t.Bits)
 }
 func (t *FloatType) String() string { return fmt.Sprintf("f%d", t.Bits) }
+func (t VoidType) String() string   { return "void" }
 
 var (
 	Int1Type = &IntegerType{Bits: 1, Signed: true}
@@ -50,4 +54,6 @@ var (
 
 	Float32Type = &FloatType{Bits: 32}
 	Float64Type = &FloatType{Bits: 64}
+
+	Void = VoidType("void")
 )

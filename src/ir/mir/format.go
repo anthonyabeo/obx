@@ -46,49 +46,50 @@ func FormatModule(mod *Module, indent string) string {
 	}
 
 	// Globals
-	if len(mod.Globals) > 0 {
+	if len(mod.Decl) > 0 {
 		b.WriteString(indent)
 		b.WriteString("globals:\n")
-		for _, g := range mod.Globals {
-			b.WriteString(indent + "  ")
-			b.WriteString(g.String())
-			b.WriteString("\n")
-		}
-		b.WriteString("\n")
-	}
+		for _, g := range mod.Decl {
+			switch g := g.(type) {
+			case *Function:
+				b.WriteString(indent + "  ")
+				b.WriteString(FormatFunction(g, indent+"  "))
+				b.WriteString("\n")
+			}
 
-	// Procedures
-	for _, proc := range mod.Procedures {
-		b.WriteString(indent)
-		b.WriteString(FormatProcedure(proc, indent))
+		}
 		b.WriteString("\n")
 	}
 
 	// Init procedure
 	if mod.Init != nil {
 		b.WriteString("  init:\n")
-		b.WriteString(FormatProcedure(mod.Init, indent))
+		b.WriteString(FormatFunction(mod.Init, indent))
 	}
 
 	b.WriteString("}\n")
 	return b.String()
 }
 
-func FormatProcedure(proc *ProcedureDecl, indent string) string {
+func FormatFunction(fn *Function, indent string) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("proc %s(", proc.Name))
-	for i, p := range proc.Params {
+	sb.WriteString(fmt.Sprintf("fn @%s(", fn.Name))
+	for i, p := range fn.Params {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
 		sb.WriteString(p.Name + ": " + p.Type.String())
 	}
-	sb.WriteString(")\n")
+	sb.WriteString(")")
+	if fn.Result != nil {
+		sb.WriteString(fmt.Sprintf(" -> %s", fn.Result))
+	}
+	sb.WriteString("\n")
 
-	for _, blk := range proc.Blocks {
+	for _, blk := range fn.Blocks {
 		sb.WriteString(indent)
-		sb.WriteString(FormatBlock(blk, "  "))
+		sb.WriteString(FormatBlock(blk, indent))
 	}
 
 	return sb.String()
@@ -98,7 +99,7 @@ func FormatBlock(b *Block, indent string) string {
 	indent = indent + "  "
 	var sb strings.Builder
 	sb.WriteString(b.Label + ":\n")
-	for _, instr := range b.Instrs {
+	for _, instr := range b.Inst {
 		sb.WriteString(indent)
 		sb.WriteString(instr.String())
 		sb.WriteString("\n")

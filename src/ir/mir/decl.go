@@ -10,6 +10,20 @@ type Decl interface {
 	String() string
 }
 
+type LocalKind int
+
+const (
+	Var LocalKind = iota
+	Const
+)
+
+type Local struct {
+	Name   string
+	Kind   LocalKind
+	Offset int
+	Size   int
+}
+
 type (
 	ConstDecl struct {
 		Name  string
@@ -27,11 +41,11 @@ type (
 		Type Type
 	}
 
-	ProcedureDecl struct {
+	Function struct {
 		Name   string
 		Params []*Param
 		Result Type // nil if procedure is a command
-		Locals []Decl
+		Locals []Local
 		Blocks []*Block
 	}
 
@@ -44,10 +58,10 @@ type (
 
 func (*ConstDecl) isDecl() {}
 func (*VarDecl) isDecl()   {}
-func (*TypeDecl) isDecl()      {}
-func (*ProcedureDecl) isDecl() {}
+func (*TypeDecl) isDecl()  {}
+func (*Function) isDecl()  {}
 
 func (d *ConstDecl) String() string { return fmt.Sprintf("CONST %s: %s", d.Name, d.Value) }
 func (d *VarDecl) String() string   { return fmt.Sprintf("VAR %s: %s", d.Name, d.Type) }
-func (d *TypeDecl) String() string      { return fmt.Sprintf("TYPE %s: %s", d.Name, d.Type) }
-func (d *ProcedureDecl) String() string { return FormatProcedure(d, "  ") }
+func (d *TypeDecl) String() string  { return fmt.Sprintf("TYPE %s: %s", d.Name, d.Type) }
+func (d *Function) String() string  { return FormatFunction(d, "  ") }

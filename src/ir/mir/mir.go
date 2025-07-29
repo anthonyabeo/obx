@@ -7,12 +7,11 @@ type Program struct {
 
 // Module is the high level compilation unit
 type Module struct {
-	Name       string
-	IsEntry    bool
-	Imports    []Import
-	Globals    []Decl
-	Procedures []*ProcedureDecl
-	Init       *ProcedureDecl
+	Name    string
+	IsEntry bool
+	Imports []Import
+	Decl    []Decl
+	Init    *Function
 }
 
 type Import struct {

@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/anthonyabeo/obx/src/ir"
 	"github.com/anthonyabeo/obx/src/ir/hir"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Generator struct {
-	currentProc *ProcedureDecl
+	currentFn   *Function
 	currentBlk  *Block
 	program     *Program
 	labelCount  int
@@ -21,75 +23,79 @@ func NewGenerator() *Generator {
 	return &Generator{}
 }
 
-func (g *Generator) Generate(prog *hir.Module) *Program {
+func (g *Generator) Generate(prog *hir.Program) *Program {
 	g.program = &Program{}
 
-	m := &Module{Name: prog.Name}
-	g.program.Modules = append(g.program.Modules, m)
+	for _, mod := range prog.Modules {
+		m := &Module{Name: mod.Name}
 
-	for _, proc := range prog.Procedures {
-		m.Procedures = append(m.Procedures, g.genProc(proc))
-	}
+		var decl Decl
+		for _, glob := range mod.Decls {
+			switch d := glob.(type) {
+			case *hir.VariableDecl:
+				decl = &VarDecl{Name: d.Name, Type: g.genType(d.Type)}
+			case *hir.TypeDecl:
+				decl = &TypeDecl{Name: d.Name, Type: g.genType(d.Type)}
+			case *hir.ConstDecl:
+				decl = &ConstDecl{Name: d.Name, Value: g.genOperand(d.Value)}
+			}
 
-	var decl Decl
-	for _, glob := range prog.Globals {
-		switch d := glob.(type) {
-		case *hir.VarDecl:
-			decl = &VarDecl{Name: d.Name, Type: g.genMIRType(d.Type)}
-		case *hir.TypeDecl:
-			decl = &TypeDecl{Name: d.Name, Type: g.genMIRType(d.Type)}
-		case *hir.ConstDecl:
-			decl = &ConstDecl{Name: d.Name, Value: g.genExpr(d.Value)}
+			m.Decl = append(m.Decl, decl)
 		}
 
-		m.Globals = append(m.Globals, decl)
+		m.Init = g.genFunction(mod.Init)
+
+		g.program.Modules = append(g.program.Modules, m)
 	}
 
 	return g.program
 }
 
-func (g *Generator) genProc(h *hir.ProcedureDecl) *ProcedureDecl {
+func (g *Generator) genFunction(h *hir.ProcedureDecl) *Function {
 	g.labelCount, g.tempCount = 0, 0
 
-	p := &ProcedureDecl{
-		Name:   h.Name,
-		Result: g.genMIRType(h.Result),
-	}
+	fn := &Function{Name: h.Name, Result: g.genType(h.Result)}
 
 	for _, param := range h.Params {
-		p.Params = append(p.Params, &Param{
+		fn.Params = append(fn.Params, &Param{
 			Name: param.Name,
-			Type: g.genMIRType(param.Type),
+			Type: g.genType(param.Type),
 			Kind: param.Kind,
 		})
 	}
 
-	var decl Decl
 	for _, local := range h.Locals {
 		switch d := local.(type) {
-		case *hir.VarDecl:
-			decl = &VarDecl{Name: d.Name, Type: g.genMIRType(d.Type)}
-		case *hir.TypeDecl:
-			decl = &TypeDecl{Name: d.Name, Type: g.genMIRType(d.Type)}
+		case *hir.VariableDecl:
+			fn.Locals = append(fn.Locals, Local{
+				Name:   d.Name,
+				Kind:   Var,
+				Offset: d.Offset,
+				Size:   d.Size,
+			})
 		case *hir.ConstDecl:
-
+			fn.Locals = append(fn.Locals, Local{
+				Name:   d.Name,
+				Kind:   Const,
+				Offset: d.Offset,
+				Size:   d.Size,
+			})
 		}
-		p.Locals = append(p.Locals, decl)
 	}
 
 	entry := &Block{Label: "entry"}
 	g.currentBlk = entry
-	p.Blocks = []*Block{entry}
-	g.currentProc = p
+	fn.Blocks = []*Block{entry}
+	g.currentFn = fn
 
 	g.genCompoundStmt(h.Body)
 
-	return p
+	return fn
 }
 
 func (g *Generator) genAssignStmt(s *hir.AssignStmt) {
-	target := g.genExpr(s.Left)
-	value := g.genExpr(s.Right)
+	target := g.genOperand(s.Left)
+	value := g.genOperand(s.Right)
 
 	// Emit the assignment instruction
 	g.emit(&AssignInst{Target: target, Value: value})
@@ -98,7 +104,7 @@ func (g *Generator) genAssignStmt(s *hir.AssignStmt) {
 func (g *Generator) genReturnStmt(s *hir.ReturnStmt) {
 	var result Operand
 	if s.Result != nil {
-		result = g.genExpr(s.Result)
+		result = g.genOperand(s.Result)
 	}
 	g.emit(&ReturnInst{Result: result})
 }
@@ -108,8 +114,6 @@ func (g *Generator) genCompoundStmt(s *hir.CompoundStmt) {
 		switch s := st.(type) {
 		case *hir.AssignStmt:
 			g.genAssignStmt(s)
-		case *hir.CallStmt:
-			g.genCallStmt(s)
 		case *hir.ReturnStmt:
 			g.genReturnStmt(s)
 		case *hir.IfStmt:
@@ -127,15 +131,24 @@ func (g *Generator) genCompoundStmt(s *hir.CompoundStmt) {
 	}
 }
 
-func (g *Generator) genCallStmt(s *hir.CallStmt) {
-	callee := g.genExpr(s.Proc)
+func (g *Generator) genFuncCall(s *hir.FuncCall) Operand {
+	retType := g.genType(s.RetType)
+	t := g.newTemp(retType)
+
+	callee := g.genOperand(s.Proc)
 
 	var args []Operand
 	for _, arg := range s.Args {
-		args = append(args, g.genExpr(arg))
+		args = append(args, g.genOperand(arg))
 	}
 
-	g.emit(&ProcCallInst{Callee: callee, Args: args})
+	g.emit(&AssignInst{Target: t, Value: &FuncCall{
+		Callee:  callee,
+		Args:    args,
+		RetType: retType,
+	}})
+
+	return t
 }
 
 func (g *Generator) genIfStmt(s *hir.IfStmt) {
@@ -146,23 +159,30 @@ func (g *Generator) genIfStmt(s *hir.IfStmt) {
 		{Cond: s.Cond, Body: s.Then},
 	}, s.ElseIfs...)
 
-	var nextLabel string
+	var trueLabel, falseLabel string
 
 	for i, branch := range allConds {
-		cond := g.genExpr(branch.Cond)
-		nextLabel = g.newLabel(fmt.Sprintf("if.next_%d", i))
+		cond := g.genOperand(branch.Cond)
+		falseLabel = g.newLabel(fmt.Sprintf("if.next_%d", i))
+		trueLabel = g.newLabel(fmt.Sprintf("if.true_%d", i))
 
 		g.emit(&CondBrInst{
 			Cond:       cond,
-			FalseLabel: nextLabel,
+			TrueLabel:  trueLabel,
+			FalseLabel: falseLabel,
 		})
+
+		// Emit the conditional label for the true path block
+		nextBlk := &Block{Label: trueLabel}
+		g.currentFn.Blocks = append(g.currentFn.Blocks, nextBlk)
+		g.currentBlk = nextBlk
 
 		g.genCompoundStmt(branch.Body)
 		g.emit(&JumpInst{Target: endLabel})
 
-		// Emit the next conditional label block
-		nextBlk := &Block{Label: nextLabel}
-		g.currentProc.Blocks = append(g.currentProc.Blocks, nextBlk)
+		// Emit the false path conditional label block
+		nextBlk = &Block{Label: falseLabel}
+		g.currentFn.Blocks = append(g.currentFn.Blocks, nextBlk)
 		g.currentBlk = nextBlk
 	}
 
@@ -170,16 +190,17 @@ func (g *Generator) genIfStmt(s *hir.IfStmt) {
 	if s.Else != nil {
 		g.genCompoundStmt(s.Else)
 	}
+	g.emit(&JumpInst{Target: endLabel})
 
 	// Final end block
 	endBlk := &Block{Label: endLabel}
-	g.currentProc.Blocks = append(g.currentProc.Blocks, endBlk)
+	g.currentFn.Blocks = append(g.currentFn.Blocks, endBlk)
 	g.currentBlk = endBlk
 }
 
 func (g *Generator) genLoopStmt(s *hir.LoopStmt) {
-	loopLabel := g.newLabel("loop")
-	exitLabel := g.newLabel("exit")
+	loopLabel := g.newLabel(s.Label)
+	exitLabel := g.newLabel(s.Label + ".exit")
 
 	// Register exit label for EXIT lowering
 	prevExit := g.currentExit
@@ -188,7 +209,7 @@ func (g *Generator) genLoopStmt(s *hir.LoopStmt) {
 
 	// Emit loop label
 	loopBlk := &Block{Label: loopLabel}
-	g.currentProc.Blocks = append(g.currentProc.Blocks, loopBlk)
+	g.currentFn.Blocks = append(g.currentFn.Blocks, loopBlk)
 	g.currentBlk = loopBlk
 
 	// Emit loop body
@@ -199,96 +220,140 @@ func (g *Generator) genLoopStmt(s *hir.LoopStmt) {
 
 	// Emit loop exit label
 	exitBlk := &Block{Label: exitLabel}
-	g.currentProc.Blocks = append(g.currentProc.Blocks, exitBlk)
+	g.currentFn.Blocks = append(g.currentFn.Blocks, exitBlk)
 	g.currentBlk = exitBlk
 }
 
-func (g *Generator) genExitStmt(s *hir.ExitStmt) {
+func (g *Generator) genExitStmt(*hir.ExitStmt) {
 	if g.currentExit == "" {
 		panic("EXIT used outside loop")
 	}
 	g.emit(&JumpInst{Target: g.currentExit})
 }
 
-func (g *Generator) genExprs(exprs []hir.Expr) []Operand {
-	var ops []Operand
-	for _, e := range exprs {
-		ops = append(ops, g.genExpr(e))
-	}
-	return ops
+func (g *Generator) genBinaryExpr(b *hir.BinaryExpr) Operand {
+	t := g.newTemp(g.genType(b.Ty))
+	lhs := g.genOperand(b.Left)
+	rhs := g.genOperand(b.Right)
+	bin := g.genBinaryOp(b.Op, lhs, rhs)
+
+	g.emit(&AssignInst{Target: t, Value: bin})
+
+	return t
 }
 
-func (g *Generator) genExpr(e hir.Expr) Operand {
-	switch e := e.(type) {
-	case *hir.Literal:
-		switch e.Kind {
-		case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
-			value, err := strconv.ParseInt(e.Value, 10, 64)
-			if err != nil {
-				panic("invalid literal value: " + e.Value)
-			}
-			return &IntConst{Value: value}
-		}
-	case *hir.BinaryExpr:
-		return &Binary{
-			Op:    e.Op,
-			Left:  g.genExpr(e.Left),
-			Right: g.genExpr(e.Right),
-		}
-	case *hir.UnaryExpr:
-		return &Unary{
-			Op:   e.Op,
-			Expr: g.genExpr(e.Operand),
-		}
-	case *hir.FuncCallExpr:
-		var args []Operand
-		for _, arg := range e.Args {
-			args = append(args, g.genExpr(arg))
+func (g *Generator) genUnaryExpr(u *hir.UnaryExpr) Operand {
+	typ := g.genType(u.Ty)
+	t := g.newTemp(typ)
+
+	var lhs Operand
+
+	switch u.Op {
+	case token.MINUS:
+		if isIntType(typ) {
+			lhs = &IntegerConst{Value: 0, Signed: true, Typ: typ}
+		} else if isFloatType(typ) {
+			lhs = &FloatConst{Value: 0.0, Bits: 64, Typ: typ}
 		}
 
-		return &FuncCall{
-			Func: g.genExpr(e.Proc),
-			Args: args,
-		}
-	case *hir.FieldAccess:
-		return &FieldAccess{
-			Record: g.genExpr(e.Record),
-			Field:  e.Field,
-		}
-	case *hir.IndexExpr:
-		return &IndexExpr{
-			Array: g.genExpr(e.Array),
-			Index: g.genExprs(e.Index),
-		}
-	case *hir.DerefExpr:
-		return &DerefExpr{
-			Pointer: g.genExpr(e.Pointer),
-		}
-	case *hir.TypeGuardExpr:
-	case *hir.SetExpr:
-	case *hir.RangeExpr:
-	case *hir.Variable:
+		rhs := g.genOperand(u.Operand)
+		g.emit(&AssignInst{Target: t, Value: g.genBinaryOp(token.MINUS, lhs, rhs)})
+	case token.NOT:
+		rhs := g.genOperand(u.Operand)
+
+		g.emit(&AssignInst{Target: t, Value: &Binary{
+			Op:    ir.Xor,
+			Left:  True,
+			Right: rhs,
+			Typ:   Int1Type,
+		}})
+	case token.PLUS:
+	default:
+
+	}
+
+	return t
+}
+
+func (g *Generator) genIdent(n *hir.Ident) Operand {
+	switch n.Kind {
+	case ast.VariableSymbolKind:
 		return &Variable{
-			Name:     e.Name,
-			UniqName: e.MangledName,
-			Type:     g.genMIRType(e.Type()),
-			Props:    e.Props,
+			Name:       n.Name,
+			Typ:        g.genType(n.Ty),
+			Size:       n.Size,
+			Offset:     n.Offset,
+			IsExport:   n.Props == ast.Exported,
+			IsReadOnly: n.Props == ast.ReadOnly,
 		}
-	case *hir.Constant:
-		return &Constant{
-			Name:     e.Name,
-			UniqName: e.MangledName,
-			Type:     g.genMIRType(e.Type()),
-			Props:    e.Props,
-		}
-	case *hir.Procedure:
-		return &Procedure{
-			Name:     e.Name,
-			UniqName: e.MangledName,
-			Ty:       g.genMIRType(e.Type()),
-			Props:    e.Props,
+	default:
+		panic(fmt.Sprintf("unknown symbol kind '%v'", n.Kind))
+	}
+}
+
+func (g *Generator) genConst(c *hir.Literal) Operand {
+	t := g.newTemp(g.genType(c.Ty))
+
+	var v Operand
+
+	switch c.Kind {
+	case token.BYTE_LIT:
+		value, _ := strconv.ParseUint(c.Value, 10, 8)
+		v = &IntegerConst{Value: value, Bits: 8, Signed: false, Typ: g.genType(c.Ty)}
+	case token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
+		value, _ := strconv.ParseUint(c.Value, 10, 64)
+
+		var bits uint
+		if c.Kind == token.INT8_LIT {
+			bits = 8
+		} else if c.Kind == token.INT16_LIT {
+			bits = 16
+		} else if c.Kind == token.INT32_LIT {
+			bits = 32
+		} else {
+			bits = 64
 		}
 
+		v = &IntegerConst{Value: value, Bits: bits, Signed: true, Typ: g.genType(c.Ty)}
+	case token.REAL_LIT, token.LONGREAL_LIT:
+		value, _ := strconv.ParseFloat(c.Value, 64)
+
+		var bits uint
+		if c.Kind == token.REAL_LIT {
+			bits = 32
+		} else {
+			bits = 64
+		}
+
+		v = &FloatConst{Value: value, Bits: bits, Typ: g.genType(c.Ty)}
+	case token.CHAR_LIT, token.WCHAR_LIT:
+
+		v = &CharConst{Value: []rune(c.Value), Typ: g.genType(c.Ty) /* additional info? */}
+	case token.HEX_STR_LIT, token.STR_LIT:
+		v = &StrConst{Value: c.Value, Typ: g.genType(c.Ty)}
+	case token.TRUE:
+		v = True
+	case token.FALSE:
+		v = False
+	}
+
+	g.emit(&AssignInst{Target: t, Value: v})
+
+	return t
+}
+
+func (g *Generator) genOperand(e hir.Expr) Operand {
+	switch e := e.(type) {
+	case *hir.Ident:
+		return g.genIdent(e)
+	case *hir.Literal:
+		return g.genConst(e)
+	case *hir.BinaryExpr:
+		return g.genBinaryExpr(e)
+	case *hir.UnaryExpr:
+		return g.genUnaryExpr(e)
+	case *hir.FuncCall:
+		return g.genFuncCall(e)
 	default:
 		panic("unhandled expr: " + fmt.Sprintf("%T", e))
 	}

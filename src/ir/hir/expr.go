@@ -16,25 +16,13 @@ type (
 		Ty    types.Type
 	}
 
-	Variable struct {
-		Name        string
-		MangledName string
-		Ty          types.Type
-		Props       ast.IdentProps
-	}
-
-	Constant struct {
-		Name        string
-		MangledName string
-		Ty          types.Type
-		Props       ast.IdentProps
-	}
-
-	Procedure struct {
-		Name        string
-		MangledName string
-		Ty          types.Type
-		Props       ast.IdentProps
+	Ident struct {
+		Name   string
+		Kind   ast.SymbolKind
+		Ty     types.Type
+		Props  ast.IdentProps
+		Offset int
+		Size   int
 	}
 
 	FieldAccess struct {
@@ -72,10 +60,10 @@ type (
 		Ty      types.Type
 	}
 
-	FuncCallExpr struct {
-		Proc *Procedure
-		Args []Expr
-		Ty   types.Type
+	FuncCall struct {
+		Proc    *Ident
+		Args    []Expr
+		RetType types.Type
 	}
 
 	SetExpr struct {
@@ -93,35 +81,31 @@ type (
 func (*Literal) expr()       {}
 func (*BinaryExpr) expr()    {}
 func (*UnaryExpr) expr()     {}
-func (*FuncCallExpr) expr()  {}
+func (*FuncCall) expr()      {}
 func (*FieldAccess) expr()   {}
 func (*IndexExpr) expr()     {}
 func (*DerefExpr) expr()     {}
 func (*TypeGuardExpr) expr() {}
 func (*SetExpr) expr()       {}
 func (*RangeExpr) expr()     {}
-func (*Variable) expr()      {}
-func (*Constant) expr()      {}
-func (*Procedure) expr()     {}
+func (*Ident) expr()         {}
 
 func (e *Literal) Type() types.Type       { return e.Ty }
 func (e *BinaryExpr) Type() types.Type    { return e.Ty }
 func (e *UnaryExpr) Type() types.Type     { return e.Ty }
-func (e *FuncCallExpr) Type() types.Type  { return e.Ty }
+func (e *FuncCall) Type() types.Type      { return e.RetType }
 func (e *FieldAccess) Type() types.Type   { return e.Ty }
 func (e *IndexExpr) Type() types.Type     { return e.Ty }
 func (e *DerefExpr) Type() types.Type     { return e.Ty }
 func (e *TypeGuardExpr) Type() types.Type { return e.Ty }
 func (e *SetExpr) Type() types.Type       { return e.Ty }
 func (e *RangeExpr) Type() types.Type     { return e.Ty }
-func (e *Variable) Type() types.Type      { return e.Ty }
-func (e *Constant) Type() types.Type      { return e.Ty }
-func (e *Procedure) Type() types.Type     { return e.Ty }
+func (e *Ident) Type() types.Type         { return e.Ty }
 
 func (e *Literal) String() string    { return fmt.Sprintf("%s(%v)", e.Kind, e.Value) }
 func (e *BinaryExpr) String() string { return fmt.Sprintf("%s %s %s", e.Left, e.Op, e.Right) }
 func (e *UnaryExpr) String() string  { return fmt.Sprintf("%s%s", e.Op, e.Operand) }
-func (e *FuncCallExpr) String() string {
+func (e *FuncCall) String() string {
 	var args []string
 	for _, arg := range e.Args {
 		args = append(args, arg.String())
@@ -142,6 +126,4 @@ func (e *DerefExpr) String() string     { return fmt.Sprintf("%s^", e.Pointer) }
 func (e *TypeGuardExpr) String() string { panic("not implemented") }
 func (e *SetExpr) String() string       { panic("not implemented") }
 func (e *RangeExpr) String() string     { panic("not implemented") }
-func (e *Variable) String() string      { return e.Name }
-func (e *Constant) String() string      { return e.Name }
-func (e *Procedure) String() string     { return e.Name }
+func (e *Ident) String() string         { return e.Name }

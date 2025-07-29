@@ -12,11 +12,6 @@ type (
 		Right Expr
 	}
 
-	ProcedureCallStmt struct {
-		Proc *Procedure
-		Args []Expr
-	}
-
 	ReturnStmt struct {
 		Result Expr
 	}
@@ -35,7 +30,7 @@ type (
 
 	LoopStmt struct {
 		Body  *CompoundStmt
-		label string
+		Label string
 	}
 
 	CaseStmt struct {
@@ -74,25 +69,17 @@ type (
 	}
 )
 
-func (*AssignStmt) stmt()        {}
-func (*ProcedureCallStmt) stmt() {}
-func (*ReturnStmt) stmt()        {}
-func (*IfStmt) stmt()            {}
-func (*LoopStmt) stmt()          {}
-func (*CaseStmt) stmt()          {}
-func (*WithStmt) stmt()          {}
-func (*ExitStmt) stmt()          {}
-func (*CompoundStmt) stmt()      {}
+func (*AssignStmt) stmt() {}
+
+func (*ReturnStmt) stmt()   {}
+func (*IfStmt) stmt()       {}
+func (*LoopStmt) stmt()     {}
+func (*CaseStmt) stmt()     {}
+func (*WithStmt) stmt()     {}
+func (*ExitStmt) stmt()     {}
+func (*CompoundStmt) stmt() {}
 
 func (stmt *AssignStmt) String() string { return fmt.Sprintf("%s := %s", stmt.Left, stmt.Right) }
-func (stmt *ProcedureCallStmt) String() string {
-	var args []string
-	for _, arg := range stmt.Args {
-		args = append(args, arg.String())
-	}
-
-	return fmt.Sprintf("%s(%s)", stmt.Proc, strings.Join(args, ", "))
-}
 func (stmt *ReturnStmt) String() string {
 	if stmt.Result != nil {
 		return fmt.Sprintf("return %s", stmt.Result)

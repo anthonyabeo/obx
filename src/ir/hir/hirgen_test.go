@@ -85,12 +85,12 @@ func TestHIRGen(t *testing.T) {
 								Body: &CompoundStmt{
 									Stmts: []Stmt{
 										&AssignStmt{
-											Left: &Variable{Name: "x", Ty: types.Int32Type},
+											Left: &Variable{Ident: "x", Ty: types.Int32Type},
 											Right: &BinaryExpr{
 												Op: token.PLUS,
 												Left: &Variable{
-													Name: "x",
-													Ty:   types.Int32Type,
+													Ident: "x",
+													Ty:    types.Int32Type,
 												},
 												Right: &Literal{
 													Value: "1",
@@ -103,7 +103,7 @@ func TestHIRGen(t *testing.T) {
 										&IfStmt{
 											Cond: &BinaryExpr{
 												Op:    token.GREAT,
-												Left:  &Variable{Name: "x", Ty: types.Int32Type},
+												Left:  &Variable{Ident: "x", Ty: types.Int32Type},
 												Right: &Literal{Kind: token.BYTE_LIT, Value: "10", Ty: types.ByteType},
 												Ty:    types.BooleanType,
 											},
@@ -150,7 +150,7 @@ func TestHIRGen(t *testing.T) {
 												Op: token.NOT,
 												Operand: &BinaryExpr{
 													Op:    token.LESS,
-													Left:  &Variable{Name: "i", Ty: types.Int32Type},
+													Left:  &Variable{Ident: "i", Ty: types.Int32Type},
 													Right: &Literal{Kind: token.BYTE_LIT, Value: "5", Ty: types.ByteType},
 													Ty:    types.BooleanType,
 												},
@@ -158,10 +158,10 @@ func TestHIRGen(t *testing.T) {
 											Then: &CompoundStmt{Stmts: []Stmt{&ExitStmt{loopLabel: "while.loop.0"}}},
 										},
 										&AssignStmt{
-											Left: &Variable{Name: "i", Ty: types.Int32Type},
+											Left: &Variable{Ident: "i", Ty: types.Int32Type},
 											Right: &BinaryExpr{
 												Op:    token.PLUS,
-												Left:  &Variable{Name: "i", Ty: types.Int32Type},
+												Left:  &Variable{Ident: "i", Ty: types.Int32Type},
 												Right: &Literal{Kind: token.BYTE_LIT, Value: "1", Ty: types.ByteType},
 												Ty:    types.Int32Type,
 											},
@@ -195,14 +195,14 @@ func TestHIRGen(t *testing.T) {
 							&IfStmt{
 								Cond: &BinaryExpr{
 									Op:    token.EQUAL,
-									Left:  &Variable{Name: "a", Ty: types.Int32Type},
+									Left:  &Variable{Ident: "a", Ty: types.Int32Type},
 									Right: &Literal{Kind: token.BYTE_LIT, Value: "0", Ty: types.ByteType},
 									Ty:    types.BooleanType,
 								},
 								Then: &CompoundStmt{
 									Stmts: []Stmt{
 										&AssignStmt{
-											Left:  &Variable{Name: "a", Ty: types.Int32Type},
+											Left:  &Variable{Ident: "a", Ty: types.Int32Type},
 											Right: &Literal{Kind: token.BYTE_LIT, Value: "1", Ty: types.ByteType},
 										},
 									},
@@ -210,7 +210,7 @@ func TestHIRGen(t *testing.T) {
 								Else: &CompoundStmt{
 									Stmts: []Stmt{
 										&AssignStmt{
-											Left:  &Variable{Name: "a", Ty: types.Int32Type},
+											Left:  &Variable{Ident: "a", Ty: types.Int32Type},
 											Right: &Literal{Kind: token.BYTE_LIT, Value: "2", Ty: types.ByteType},
 										},
 									},
@@ -241,7 +241,7 @@ func TestHIRGen(t *testing.T) {
 					Body: &CompoundStmt{
 						Stmts: []Stmt{
 							&ProcedureCallStmt{
-								Proc: &Procedure{Name: "Write", Ty: &types.ProcedureType{
+								Proc: &Procedure{Ident: "Write", Ty: &types.ProcedureType{
 									Params:          []*types.FormalParam{{Name: "x", Type: types.Int32Type, Kind: "VALUE"}},
 									Result:          nil,
 									IsTypeBoundType: false,

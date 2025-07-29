@@ -102,12 +102,12 @@ func (g Generator) VisitDesignator(dsg *ast.Designator) any {
 }
 
 func (g Generator) VisitFunctionCall(call *ast.FunctionCall) any {
-	callee := call.Callee.Accept(g).(*Procedure)
+	callee := call.Callee.Accept(g).(*Ident)
 
-	return &FuncCallExpr{
-		Proc: callee,
-		Args: g.visitExprList(call.ActualParams),
-		Ty:   call.SemaType,
+	return &FuncCall{
+		Proc:    callee,
+		Args:    g.visitExprList(call.ActualParams),
+		RetType: call.SemaType,
 	}
 }
 
@@ -120,31 +120,14 @@ func (g Generator) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 }
 
 func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
-	switch ident.Symbol.Kind() {
-	case ast.VariableSymbolKind:
-		return &Variable{
-			Name:        ident.Name,
-			Ty:          ident.SemaType,
-			Props:       ident.Symbol.Props(),
-			MangledName: ident.Symbol.MangledName(),
-		}
-	case ast.ConstantSymbolKind:
-		return &Constant{
-			Name:        ident.Name,
-			Ty:          ident.SemaType,
-			Props:       ident.Symbol.Props(),
-			MangledName: ident.Symbol.MangledName(),
-		}
-	case ast.ProcedureSymbolKind:
-		return &Procedure{
-			Name:        ident.Name,
-			Ty:          ident.SemaType,
-			Props:       ident.Symbol.Props(),
-			MangledName: ident.Symbol.MangledName(),
-		}
+	return &Ident{
+		Name:   ident.Symbol.MangledName(),
+		Kind:   ident.Symbol.Kind(),
+		Ty:     ident.SemaType,
+		Props:  ident.Symbol.Props(),
+		Offset: ident.Symbol.Offset(),
+		Size:   ident.SemaType.Width(),
 	}
-
-	return nil
 }
 
 func (g Generator) VisitSet(set *ast.Set) any {
@@ -223,9 +206,9 @@ func (g Generator) VisitReturnStmt(stmt *ast.ReturnStmt) any {
 }
 
 func (g Generator) VisitProcedureCall(call *ast.ProcedureCall) any {
-	callee := call.Callee.Accept(g).(*Procedure)
+	callee := call.Callee.Accept(g).(*Ident)
 
-	return &ProcedureCallStmt{
+	return &FuncCall{
 		Proc: callee,
 		Args: g.visitExprList(call.ActualParams),
 	}
@@ -247,7 +230,7 @@ func (g Generator) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
 
 	body.Stmts = append(body.Stmts, exit)
 
-	return &LoopStmt{Body: body, label: stmt.Label}
+	return &LoopStmt{Body: body, Label: stmt.Label}
 }
 
 func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
@@ -285,7 +268,7 @@ func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
 		}
 	}
 
-	return &LoopStmt{label: stmt.Label, Body: body}
+	return &LoopStmt{Label: stmt.Label, Body: body}
 }
 
 func (g Generator) VisitLoopStmt(stmt *ast.LoopStmt) any {
@@ -343,11 +326,11 @@ func (g Generator) VisitLabelRange(r *ast.LabelRange) any {
 }
 
 func (g Generator) VisitForStmt(stmt *ast.ForStmt) any {
-	cvar := &Variable{
-		Name:        stmt.CtlVar.Name,
-		Ty:          stmt.CtlVar.SemaType,
-		Props:       stmt.CtlVar.Props,
-		MangledName: stmt.CtlVar.Symbol.MangledName(),
+	cvar := &Ident{
+		Name:  stmt.CtlVar.Symbol.MangledName(),
+		Kind:  ast.VariableSymbolKind,
+		Ty:    stmt.CtlVar.SemaType,
+		Props: stmt.CtlVar.Props,
 	}
 	init := stmt.InitVal.Accept(g).(Expr)
 	final := stmt.FinalVal.Accept(g).(Expr)
@@ -508,9 +491,11 @@ func (g Generator) VisitFPSection(sec *ast.FPSection) any {
 
 	for _, id := range sec.Names {
 		params = append(params, &Param{
-			Name: id.Name,
-			Type: id.SemaType,
-			Kind: kind, // "VAR", "IN", etc
+			Name:   id.Name,
+			Type:   id.SemaType,
+			Kind:   kind, // "VAR", "IN", etc
+			Offset: id.Symbol.Offset(),
+			Size:   id.SemaType.Width(),
 		})
 	}
 
@@ -522,9 +507,12 @@ func (g Generator) VisitVariableDecl(decl *ast.VariableDecl) any {
 
 	for _, id := range decl.IdentList {
 		decls = append(decls, &VariableDecl{
-			Name:  id.Name,
-			Type:  id.SemaType,
-			Props: id.Props,
+			Name:       id.Name,
+			Type:       id.SemaType,
+			Size:       id.SemaType.Width(),
+			Offset:     id.Symbol.Offset(),
+			IsExport:   id.Props == ast.Exported,
+			IsReadOnly: id.Props == ast.ReadOnly,
 		})
 	}
 

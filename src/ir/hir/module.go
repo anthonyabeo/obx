@@ -4,8 +4,7 @@ type Module struct {
 	Name    string
 	Imports []Import
 	Decls   []Decl
-	//Procedures []*ProcedureDecl
-	Init *ProcedureDecl
+	Init    *ProcedureDecl
 }
 
 type Import struct {

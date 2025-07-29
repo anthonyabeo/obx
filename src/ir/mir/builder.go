@@ -7,11 +7,11 @@ func (g *Generator) newLabel(prefix string) string {
 	return prefix + "_" + strconv.Itoa(g.labelCount)
 }
 
-func (g *Generator) newTemp() string {
+func (g *Generator) newTemp(typ Type) Temp {
 	g.tempCount++
-	return "_t" + strconv.Itoa(g.tempCount)
+	return Temp{Name: "_t" + strconv.Itoa(g.tempCount), Typ: typ}
 }
 
 func (g *Generator) emit(instr Inst) {
-	g.currentBlk.Instrs = append(g.currentBlk.Instrs, instr)
+	g.currentBlk.Inst = append(g.currentBlk.Inst, instr)
 }
