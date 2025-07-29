@@ -1,17 +1,17 @@
-package ast
+package pprint
 
 import (
 	"encoding/json"
-	"github.com/anthonyabeo/obx/src/pprint"
 	"os"
 	"testing"
 
 	"github.com/anthonyabeo/obx/adt"
 	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
 
-func parseSource(t *testing.T, ctx *report.Context) *OberonX {
+func parseSource(t *testing.T, ctx *report.Context) *ast.OberonX {
 	p := parser.NewParser(ctx)
 	unit := p.Parse()
 
@@ -20,7 +20,7 @@ func parseSource(t *testing.T, ctx *report.Context) *OberonX {
 		t.Fatalf("Parser errors")
 	}
 
-	obx := NewOberonX()
+	obx := ast.NewOberonX()
 	obx.AddUnit(unit)
 
 	return obx
@@ -39,7 +39,7 @@ func TestPrettyPrintJSON(t *testing.T) {
 	ctx := &report.Context{
 		FileName: filename,
 		Content:  input,
-		Env:      NewEnv(),
+		Env:      ast.NewEnv(),
 		Source:   mgr,
 		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
 			Source: mgr,
@@ -47,11 +47,11 @@ func TestPrettyPrintJSON(t *testing.T) {
 		}),
 		TabWidth:  4,
 		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]Expression](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	obx := parseSource(t, ctx)
-	data, err := pprint.PrettyPrintJSON(obx, ctx)
+	data, err := PrettyPrintJSON(obx, ctx)
 	if err != nil {
 		t.Fatalf("PrettyPrintJSON failed: %v", err)
 	}
@@ -126,11 +126,11 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 		END Bigger.
 	`)
 
-	table := NewLexicalScope(Global, "Bigger")
-	out := NewLexicalScope(Global, "Out")
-	out.Insert(NewProcedureSymbol("Int", Exported, nil, nil, ProperProcedureKind))
+	table := ast.NewLexicalScope(ast.Global, "Bigger")
+	out := ast.NewLexicalScope(ast.Global, "Out")
+	out.Insert(ast.NewProcedureSymbol("Int", ast.Exported, nil, nil, ast.ProperProcedureKind))
 
-	envs := NewEnv()
+	envs := ast.NewEnv()
 	envs.AddModuleScope("Bigger", table)
 	envs.AddModuleScope("Out", out)
 
@@ -147,12 +147,12 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 		}),
 		TabWidth:  4,
 		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]Expression](),
+		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	obx := parseSource(t, ctx)
 
-	data, err := pprint.PrettyPrintJSON(obx, ctx)
+	data, err := PrettyPrintJSON(obx, ctx)
 	if err != nil {
 		t.Fatalf("PrettyPrintJSON failed: %v", err)
 	}
