@@ -62,6 +62,7 @@ type Symbol interface {
 	Props() IdentProps
 	SetMangledName(string)
 	MangledName() string
+	Offset() int
 }
 
 type TypeSymbol struct {
@@ -84,6 +85,7 @@ func (t *TypeSymbol) SetParent(parent *LexicalScope) { t.parent = parent }
 func (t *TypeSymbol) Props() IdentProps              { return t.props }
 func (t *TypeSymbol) MangledName() string            { return t.mangledName }
 func (t *TypeSymbol) SetMangledName(name string)     { t.mangledName = name }
+func (t *TypeSymbol) Offset() int                    { panic("not implemented") }
 
 func NewTypeSymbol(name string, props IdentProps, typ Type) *TypeSymbol {
 	return &TypeSymbol{name: name, kind: TypeSymbolKind, props: props, astType: typ}
@@ -123,6 +125,7 @@ func (p *ProcedureSymbol) SetMangledName(name string)     { p.mangledName = name
 func (p *ProcedureSymbol) Type() types.Type               { return p.semaType }
 func (p *ProcedureSymbol) SetType(ty types.Type)          { p.semaType = ty }
 func (p *ProcedureSymbol) AstType() Type                  { return p.astType }
+func (p *ProcedureSymbol) Offset() int                    { panic("not implemented") }
 
 type ModuleSymbol struct {
 	name        string
@@ -148,6 +151,7 @@ func (m *ModuleSymbol) Props() IdentProps              { panic("not implemented"
 func (m *ModuleSymbol) MangledName() string            { return m.mangledName }
 func (m *ModuleSymbol) SetMangledName(name string)     { m.mangledName = name }
 func (m *ModuleSymbol) AstType() Type                  { return nil }
+func (m *ModuleSymbol) Offset() int                    { panic("not implemented") }
 
 type VariableSymbol struct {
 	name        string
@@ -172,6 +176,7 @@ func (v *VariableSymbol) SetType(ty types.Type)          { v.semaType = ty }
 func (v *VariableSymbol) Props() IdentProps              { return v.props }
 func (v *VariableSymbol) MangledName() string            { return v.mangledName }
 func (v *VariableSymbol) SetMangledName(name string)     { v.mangledName = name }
+func (v *VariableSymbol) Offset() int                    { panic("not implemented") }
 
 type ConstantSymbol struct {
 	name        string
@@ -196,6 +201,7 @@ func (c *ConstantSymbol) Props() IdentProps              { return c.props }
 func (c *ConstantSymbol) MangledName() string            { return c.mangledName }
 func (c *ConstantSymbol) SetMangledName(name string)     { c.mangledName = name }
 func (c *ConstantSymbol) AstType() Type                  { return nil }
+func (c *ConstantSymbol) Offset() int                    { panic("not implemented") }
 
 type FieldSymbol struct {
 	name        string
@@ -220,6 +226,7 @@ func (f *FieldSymbol) SetType(ty types.Type)         { f.semaType = ty }
 func (f *FieldSymbol) Props() IdentProps             { return f.props }
 func (f *FieldSymbol) MangledName() string           { return f.mangledName }
 func (f *FieldSymbol) SetMangledName(name string)    { f.mangledName = name }
+func (f *FieldSymbol) Offset() int                   { panic("not implemented") }
 
 type ParamSymbol struct {
 	name        string
@@ -245,6 +252,7 @@ func (p *ParamSymbol) Props() IdentProps              { panic("not implemented")
 func (p *ParamSymbol) MangledName() string            { return p.mangledName }
 func (p *ParamSymbol) SetMangledName(name string)     { p.mangledName = name }
 func (p *ParamSymbol) AstType() Type                  { return p.astType }
+func (p *ParamSymbol) Offset() int                    { panic("not implemented") }
 
 func Mangle(sym Symbol) string {
 	var parts []string

@@ -2,8 +2,9 @@ package ast
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/types"
 	"strings"
+
+	"github.com/anthonyabeo/obx/src/types"
 )
 
 type (
