@@ -6,8 +6,11 @@ var PredefinedTypes = map[token.Kind]Type{
 	token.BYTE:     ByteType,
 	token.INT8:     Int8Type,
 	token.INT16:    Int16Type,
+	token.SHORTINT: ShortIntType,
 	token.INT32:    Int32Type,
+	token.INTEGER:  IntegerType,
 	token.INT64:    Int64Type,
+	token.LONGINT:  LongIntType,
 	token.REAL:     RealType,
 	token.LONGREAL: LongRealType,
 	token.CHAR:     CharType,
@@ -17,19 +20,25 @@ var PredefinedTypes = map[token.Kind]Type{
 }
 
 var integerTypeRank = map[BasicKind]int{
-	INT8:  0,
-	BYTE:  1,
-	INT16: 2,
-	INT32: 3,
-	INT64: 4,
+	INT8:     0,
+	BYTE:     1,
+	INT16:    2,
+	SHORTINT: 2,
+	INT32:    3,
+	INTEGER:  3,
+	INT64:    4,
+	LONGINT:  4,
 }
 
 var numericTypeRank = map[BasicKind]int{
 	INT8:     0,
 	BYTE:     1,
 	INT16:    2,
+	SHORTINT: 2,
 	INT32:    3,
+	INTEGER:  3,
 	INT64:    4,
+	LONGINT:  4,
 	REAL:     5,
 	LONGREAL: 6,
 }
@@ -109,7 +118,7 @@ func IsBoolean(ty Type) bool {
 
 func IsInteger(ty Type) bool {
 	switch ty {
-	case ByteType, Int8Type, Int16Type /*ShortIntType, IntegerType,*/, Int32Type /*LongIntType,*/, Int64Type:
+	case ByteType, Int8Type, Int16Type, ShortIntType, IntegerType, Int32Type, LongIntType, Int64Type:
 		return true
 	}
 	return false

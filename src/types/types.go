@@ -15,14 +15,14 @@ func TypeIncludes(a, b Type) bool {
 	}
 
 	switch a {
-	case Int64Type /*, LongIntType*/ :
+	case Int64Type, LongIntType:
 		return b == Int32Type || b == Int16Type || b == Int8Type || b == ByteType ||
-			/*b == IntegerType || b == ShortIntType ||*/ b == Int64Type /*|| b == LongIntType*/
-	case Int32Type /*, IntegerType*/ :
-		return b == Int16Type || b == Int8Type || b == ByteType || /*b == ShortIntType ||*/
-			b == Int32Type /*|| b == IntegerType*/
-	case Int16Type /*, ShortIntType*/ :
-		return b == Int8Type || b == ByteType || b == Int16Type /*|| b == ShortIntType*/
+			b == IntegerType || b == ShortIntType || b == Int64Type || b == LongIntType
+	case Int32Type, IntegerType:
+		return b == Int16Type || b == Int8Type || b == ByteType || b == ShortIntType ||
+			b == Int32Type || b == IntegerType
+	case Int16Type, ShortIntType:
+		return b == Int8Type || b == ByteType || b == Int16Type || b == ShortIntType
 	case LongRealType:
 		return b == RealType || b == Int32Type || b == Int16Type || b == Int8Type || b == ByteType
 	case RealType:
