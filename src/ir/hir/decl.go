@@ -34,12 +34,13 @@ type (
 	}
 
 	ProcedureDecl struct {
-		Name   string
-		Params []*Param
-		Result types.Type // nil if procedure has no return
-		Locals []Decl
-		Body   *CompoundStmt
-		Props  ast.IdentProps
+		Name        string
+		Params      []*Param
+		Result      types.Type // nil if procedure has no return
+		Locals      []Decl
+		Body        *CompoundStmt
+		Props       ast.IdentProps
+		IsTypeBound bool
 	}
 )
 

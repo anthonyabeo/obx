@@ -1,41 +1,55 @@
 package lir
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/anthonyabeo/obx/src/ir/mir"
+)
 
 type (
+	// Register represents a temporary variable in the LIR. These correspond to
+	// registers in the target architecture.
 	Register struct {
 		Name string // e.g., "t1", "r3", etc.
-		Type Type
+		Type mir.Type
 	}
 
-	Addr struct {
-		Base Operand
+	// Mem represents a memory location, starting at address 'BaseAddr'.
+	// It can be used to represent global variables, stack variables,
+	// array/record locations, etc.
+	Mem struct {
+		BaseAddr Operand
 	}
 
-	Label struct {
-		Name string
+	IntegerConst struct {
+		Value  uint64
+		Signed bool
+		Bits   uint
+		Typ    mir.Type
 	}
 
-	PhiArm struct {
-		Pred Label   // predecessor block
-		Val  Operand // value from that block
-	}
-
-	Var struct {
-		Name string
+	// RealConst represents a constant floating-point value.
+	RealConst struct {
+		Value float64
+		Bits  uint
+		Typ   mir.Type
 	}
 )
 
-func (Label) isOperand()    {}
-func (Addr) isOperand()     {}
-func (Register) isOperand() {}
-func (PhiArm) isOperand()   {}
-func (Var) isOperand()      {}
+func (*Label) isOperand()       {}
+func (*Mem) isOperand()         {}
+func (*Register) isOperand()    {}
+func (IntegerConst) isOperand() {}
+func (RealConst) isOperand()    {}
 
-func (l Label) String() string    { return "%" + l.Name }
-func (a Addr) String() string     { return a.Base.String() }
-func (r Register) String() string { return r.Name }
-func (a PhiArm) String() string {
-	return fmt.Sprintf("[%s: %s]", a.Pred, a.Val)
-}
-func (v Var) String() string { return "%" + v.Name }
+func (o *Label) Children() []Node     { return []Node{} }
+func (o *Mem) Children() []Node       { return []Node{o.BaseAddr} }
+func (o *Register) Children() []Node  { return []Node{} }
+func (IntegerConst) Children() []Node { return []Node{} }
+func (RealConst) Children() []Node    { return []Node{} }
+
+// func (o *Label) String() string       { return "%" + o.Name }
+func (o *Mem) String() string         { return fmt.Sprintf("[%s]", o.BaseAddr.String()) }
+func (o *Register) String() string    { return "$" + o.Name }
+func (o IntegerConst) String() string { return fmt.Sprintf("$%d", o.Value) }
+func (o RealConst) String() string    { return fmt.Sprintf("$%f", o.Value) }

@@ -2,9 +2,14 @@ package lir
 
 import "fmt"
 
+type Node interface {
+	Children() []Node
+	fmt.Stringer
+}
+
 // Operand represents any value that can be used as input to an instruction.
 type Operand interface {
-	String() string
+	Node
 	isOperand()
 }
 
@@ -14,46 +19,150 @@ type Constant interface {
 }
 
 type Inst interface {
+	Node
 	isInstr()
-	fmt.Stringer
 }
 
 type Type interface {
+	Node
 	isLIRType()
-	fmt.Stringer
 }
 
-// Program : An entire LIR program — may have multiple modules or procedures
-type Program struct {
-	Modules []*Module
-}
+type InstrOpCode int
 
-type Module struct {
-	Name    string
-	Procs   []*Procedure  // All procedures defined
-	Globals []*GlobalDecl // Global variables (optional)
+func (i InstrOpCode) String() string {
+	switch i {
+	case Add:
+		return "+"
+	case FAdd:
+		return "+"
+	case Sub:
+		return "-"
+	case FSub:
+		return "-"
+	case Mul:
+		return "*"
+	case FMul:
+		return "*"
+	case SDiv:
+		return "/"
+	case UDiv:
+		return "/"
+	case FDiv:
+		return "/"
+	case SRem:
+		return "%"
+	case URem:
+		return "%"
+	case FRem:
+		return "%"
+	case And:
+		return "&"
+	case Or:
+		return "|"
+	case Ashr:
+		return ">>>"
+	case Shl:
+		return "<<"
+	case Shr:
+		return ">>"
+	case Xor:
+		return "xor"
+	case Lsl:
+		return "lsl"
+	case Neg:
+		return "-"
+	case FNeg:
+		return "-"
+	case Inc:
+		return "inc"
+	case Dec:
+		return "dec"
+	case ICmpEq:
+		return "icmp.eq"
+	case ICmpNeq:
+		return "icmp.neq"
+	case ICmpLt:
+		return "icmp.lt"
+	case ICmpGt:
+		return "icmp.gt"
+	case ICmpLe:
+		return "icmp.le"
+	case ICmpGe:
+		return "icmp.ge"
+	case Store:
+		return "store"
+	case Load:
+		return "load"
+	case Move:
+		return "mov"
+	case Jmp:
+		return "jmp"
+	case Br:
+		return "br"
+	case Ret:
+		return "ret"
+	case Call:
+		return "call"
+	default: // Nop
+		return ""
+	}
 }
-
-// GlobalDecl : Global variable/constant declaration
-type GlobalDecl struct {
-	Name string  // Global name
-	Type Type    // Type (e.g. "i32")
-	Init Operand // Optional init value or empty
-}
-
-type Op string
 
 const (
-	Add = "add"
-	Sub = "sub"
-	Mul = "mul"
-	Div = "div"
-	Mod = "mod"
-	Not = "not"
-	Eq  = "eq"
-	Neq = "neq"
-	Lt  = "lt"
-	Leq = "leq"
-	Gt  = "gt"
-	Geq = "geq"
+	// Arithmetic Binary operations
+	Add InstrOpCode = iota
+	FAdd
+	Sub
+	FSub
+	Mul
+	FMul
+	SDiv
+	UDiv
+	FDiv
+	SRem
+	URem
+	FRem
+
+	// Bitwise Binary operations
+	And
+	Or
+	Ashr
+	Shl
+	Shr
+	Xor
+	Lsl
+
+	// Unary operations
+	Neg
+	FNeg
+	Inc
+	Dec
+
+	ICmpEq
+	ICmpNeq
+	ICmpLt
+	ICmpGt
+	ICmpLe
+	ICmpGe
+
+	Store
+	Load
+	Move
+
+	Jmp
+	Br
+	Ret
+	Call
+
+	Nop
+	Lbl
+	Halt
 )
+
+// Label represents a named location in the LIR, typically used for
+// jump targets, procedure entry points or data (e.g. variables)
+type Label struct {
+	Name string
+	Kind string
+}

@@ -78,6 +78,7 @@ func (*CaseStmt) stmt()     {}
 func (*WithStmt) stmt()     {}
 func (*ExitStmt) stmt()     {}
 func (*CompoundStmt) stmt() {}
+func (*FuncCall) stmt()     {}
 
 func (stmt *AssignStmt) String() string { return fmt.Sprintf("%s := %s", stmt.Left, stmt.Right) }
 func (stmt *ReturnStmt) String() string {

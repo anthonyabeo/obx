@@ -2,6 +2,7 @@ package hir
 
 type Module struct {
 	Name    string
+	IsEntry bool
 	Imports []Import
 	Decls   []Decl
 	Init    *ProcedureDecl
