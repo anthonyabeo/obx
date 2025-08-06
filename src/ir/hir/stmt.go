@@ -69,8 +69,7 @@ type (
 	}
 )
 
-func (*AssignStmt) stmt() {}
-
+func (*AssignStmt) stmt()   {}
 func (*ReturnStmt) stmt()   {}
 func (*IfStmt) stmt()       {}
 func (*LoopStmt) stmt()     {}

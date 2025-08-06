@@ -5,8 +5,9 @@ import "github.com/anthonyabeo/obx/src/syntax/token"
 // Module
 // --------------
 type Module struct {
-	BName string
-	EName string
+	BName   string
+	EName   string
+	IsEntry bool
 
 	MetaParams []*MetaSection
 	ImportList []*Import

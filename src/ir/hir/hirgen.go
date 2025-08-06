@@ -2,7 +2,6 @@ package hir
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -35,12 +34,12 @@ func (g Generator) VisitModule(module *ast.Module) any {
 	decls := g.visitDeclSeq(module.DeclSeq)
 	stmts := g.visitStmtSeq(module.StmtSeq)
 	// TODO metaparams
-	// TODO imports
 
 	return &Module{
-		Name:  name,
-		Decls: decls,
-		Init: &ProcedureDecl{
+		Name:    name,
+		IsEntry: module.IsEntry,
+		Decls:   decls,
+		Init: &Function{
 			Name: fmt.Sprintf("__init_%s", name),
 			Body: stmts,
 		},
@@ -52,7 +51,6 @@ func (g Generator) VisitMetaSection(section *ast.MetaSection) any { return secti
 func (g Generator) VisitDefinition(definition *ast.Definition) any {
 	name := definition.BName
 	decls := g.visitDeclSeq(definition.DeclSeq)
-	// TODO imports
 
 	return &Module{
 		Name:  name,
@@ -64,10 +62,10 @@ func (g Generator) VisitIdentifierDef(def *ast.IdentifierDef) any { return def }
 
 func (g Generator) VisitBinaryExpr(expr *ast.BinaryExpr) any {
 	return &BinaryExpr{
-		Left:  expr.Left.Accept(g).(Expr),
-		Right: expr.Right.Accept(g).(Expr),
-		Op:    expr.Op,
-		Ty:    expr.SemaType,
+		Left:     expr.Left.Accept(g).(Expr),
+		Right:    expr.Right.Accept(g).(Expr),
+		Op:       expr.Op,
+		SemaType: expr.SemaType,
 	}
 }
 
@@ -78,20 +76,20 @@ func (g Generator) VisitDesignator(dsg *ast.Designator) any {
 		switch sel := selector.(type) {
 		case *ast.DotOp:
 			Dsg = &FieldAccess{
-				Record: Dsg,
-				Field:  sel.Field,
-				Ty:     sel.Symbol.Type(),
+				Record:   Dsg,
+				Field:    sel.Field,
+				SemaType: sel.Symbol.Type(),
 			}
 		case *ast.IndexOp:
 			Dsg = &IndexExpr{
-				Array: Dsg,
-				Index: g.visitExprList(sel.List),
-				Ty:    Dsg.Type(),
+				Array:    Dsg,
+				Index:    g.visitExprList(sel.List),
+				SemaType: Dsg.Type(),
 			}
 		case *ast.PtrDeref:
 			Dsg = &DerefExpr{
-				Pointer: Dsg,
-				Ty:      Dsg.Type(),
+				Pointer:  Dsg,
+				SemaType: Dsg.Type(),
 			}
 		case *ast.TypeGuard:
 			// TODO implement this
@@ -102,7 +100,7 @@ func (g Generator) VisitDesignator(dsg *ast.Designator) any {
 }
 
 func (g Generator) VisitFunctionCall(call *ast.FunctionCall) any {
-	callee := call.Callee.Accept(g).(*Ident)
+	callee := call.Callee.Accept(g).(*FunctionRef)
 
 	return &FuncCall{
 		Proc:    callee,
@@ -113,20 +111,59 @@ func (g Generator) VisitFunctionCall(call *ast.FunctionCall) any {
 
 func (g Generator) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 	return &UnaryExpr{
-		Op:      expr.Op,
-		Operand: expr.Operand.Accept(g).(Expr),
-		Ty:      expr.SemaType,
+		Op:       expr.Op,
+		Operand:  expr.Operand.Accept(g).(Expr),
+		SemaType: expr.SemaType,
 	}
 }
 
 func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
-	return &Ident{
-		Name:   ident.Symbol.MangledName(),
-		Kind:   ident.Symbol.Kind(),
-		Ty:     ident.SemaType,
-		Props:  ident.Symbol.Props(),
-		Offset: ident.Symbol.Offset(),
-		Size:   ident.SemaType.Width(),
+	switch ident.Symbol.Kind() {
+	case ast.VariableSymbolKind:
+		return &VariableRef{
+			Name:       ident.Name,
+			Mangled:    ident.Symbol.MangledName(),
+			SemaType:   ident.SemaType,
+			Module:     ident.Prefix,
+			IsExported: ident.Symbol.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
+			IsReadOnly: ident.Symbol.Props() == ast.ReadOnly,
+			Offset:     ident.Symbol.Offset(),
+			Size:       ident.SemaType.Width(),
+		}
+	case ast.ConstantSymbolKind:
+		sym := ident.Symbol.(*ast.ConstantSymbol)
+		return &ConstantRef{
+			Name:       ident.Name,
+			Value:      sym.Value.Accept(g).(Expr),
+			Mangled:    sym.MangledName(),
+			SemaType:   ident.SemaType,
+			Module:     ident.Prefix,
+			IsExported: sym.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
+			IsReadOnly: sym.Props() == ast.ReadOnly,
+			Offset:     sym.Offset(),
+			Size:       ident.SemaType.Width(),
+		}
+	case ast.ProcedureSymbolKind:
+		sym := ident.Symbol.(*ast.ProcedureSymbol)
+
+		return &FunctionRef{
+			Name:       ident.Name,
+			Mangled:    sym.MangledName(),
+			Kind:       sym.ProcKind,
+			Module:     ident.Prefix,
+			SemaType:   ident.SemaType,
+			IsExported: sym.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
+			IsReadOnly: sym.Props() == ast.ReadOnly,
+			Offset:     sym.Offset(),
+			Size:       ident.SemaType.Width(),
+		}
+	//case ast.TypeSymbolKind:
+	//case ast.ModuleSymbolKind:
+	//case ast.FieldSymbolKind:
+	//case ast.DefinitionSymbolKind:
+	//case ast.ParamSymbolKind:
+	default:
+		panic("unhandled symbol kind")
 	}
 }
 
@@ -136,14 +173,14 @@ func (g Generator) VisitSet(set *ast.Set) any {
 		elems = append(elems, expression.Accept(g).(Expr))
 	}
 
-	return &SetExpr{Elems: elems, Ty: set.SemaType}
+	return &SetExpr{Elems: elems, SemaType: set.SemaType}
 }
 
 func (g Generator) VisitBasicLit(lit *ast.BasicLit) any {
 	return &Literal{
-		Kind:  lit.Kind,
-		Value: lit.Val,
-		Ty:    lit.SemaType,
+		Kind:     lit.Kind,
+		Value:    lit.Val,
+		SemaType: lit.SemaType,
 	}
 }
 
@@ -155,9 +192,9 @@ func (g Generator) VisitExprRange(r *ast.ExprRange) any {
 
 func (g Generator) VisitNil(n *ast.Nil) any {
 	return &Literal{
-		Kind:  token.NIL,
-		Value: "nil",
-		Ty:    n.SemaType,
+		Kind:     token.NIL,
+		Value:    "nil",
+		SemaType: n.SemaType,
 	}
 }
 
@@ -206,7 +243,7 @@ func (g Generator) VisitReturnStmt(stmt *ast.ReturnStmt) any {
 }
 
 func (g Generator) VisitProcedureCall(call *ast.ProcedureCall) any {
-	callee := call.Callee.Accept(g).(*Ident)
+	callee := call.Callee.Accept(g).(*FunctionRef)
 
 	return &FuncCall{
 		Proc: callee,
@@ -326,17 +363,18 @@ func (g Generator) VisitLabelRange(r *ast.LabelRange) any {
 }
 
 func (g Generator) VisitForStmt(stmt *ast.ForStmt) any {
-	cvar := &Ident{
-		Name:  stmt.CtlVar.Symbol.MangledName(),
-		Kind:  ast.VariableSymbolKind,
-		Ty:    stmt.CtlVar.SemaType,
-		Props: stmt.CtlVar.Props,
+	cvar := &VariableRef{
+		Name:       stmt.CtlVar.Symbol.Name(),
+		Mangled:    stmt.CtlVar.Symbol.MangledName(),
+		SemaType:   stmt.CtlVar.SemaType,
+		IsExported: stmt.CtlVar.Props == ast.Exported || stmt.CtlVar.Props == ast.ExportedReadOnly,
+		IsReadOnly: stmt.CtlVar.Props == ast.ReadOnly,
 	}
 	init := stmt.InitVal.Accept(g).(Expr)
 	final := stmt.FinalVal.Accept(g).(Expr)
 
 	// Default step is 1
-	var step Expr = &Literal{Value: "1", Ty: stmt.CtlVar.SemaType}
+	var step Expr = &Literal{Value: "1", SemaType: stmt.CtlVar.SemaType}
 	if stmt.By != nil {
 		step = stmt.By.Accept(g).(Expr)
 	}
@@ -412,14 +450,7 @@ func (g Generator) VisitGuard(guard *ast.Guard) any {
 	}
 }
 
-func (g Generator) VisitImport(i *ast.Import) any {
-	i.ImportPath = append(i.ImportPath, i.Name)
-
-	return &Import{
-		Alias: i.Alias,
-		Path:  strings.Join(i.ImportPath, "."),
-	}
-}
+func (g Generator) VisitImport(i *ast.Import) any { return i }
 
 func (g Generator) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	name := decl.Head.Name.Name
@@ -451,13 +482,14 @@ func (g Generator) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 		body = g.visitStmtSeq(decl.Body.StmtSeq)
 	}
 
-	return &ProcedureDecl{
-		Name:   name,
-		Params: params,
-		Result: resultType,
-		Locals: locals,
-		Body:   body,
-		Props:  decl.Head.Name.Props,
+	return &Function{
+		Name:       name,
+		Params:     params,
+		Result:     resultType,
+		Locals:     locals,
+		Body:       body,
+		IsExport:   decl.Head.Name.Props == ast.Exported || decl.Head.Name.Props == ast.ExportedReadOnly,
+		IsReadOnly: decl.Head.Name.Props == ast.ReadOnly,
 	}
 }
 
@@ -506,7 +538,7 @@ func (g Generator) VisitVariableDecl(decl *ast.VariableDecl) any {
 	var decls []Decl
 
 	for _, id := range decl.IdentList {
-		decls = append(decls, &VariableDecl{
+		decls = append(decls, &Variable{
 			Name:       id.Name,
 			Type:       id.SemaType,
 			Size:       id.SemaType.Width(),
@@ -520,17 +552,22 @@ func (g Generator) VisitVariableDecl(decl *ast.VariableDecl) any {
 }
 
 func (g Generator) VisitConstantDecl(decl *ast.ConstantDecl) any {
-	return &ConstDecl{
-		Name:  decl.Name.Name,
-		Type:  decl.Name.SemaType,
-		Value: decl.Value.Accept(g).(Expr),
+	return &Constant{
+		Name:       decl.Name.Name,
+		Type:       decl.Name.SemaType,
+		Value:      decl.Value.Accept(g).(Expr),
+		Size:       decl.Name.SemaType.Width(),
+		Offset:     decl.Name.Symbol.Offset(),
+		IsExport:   decl.Name.Props == ast.Exported || decl.Name.Props == ast.ExportedReadOnly,
+		IsReadOnly: decl.Name.Props == ast.ReadOnly,
 	}
 }
 
 func (g Generator) VisitTypeDecl(decl *ast.TypeDecl) any {
-	return &TypeDecl{
-		Name: decl.Name.Name,
-		Type: decl.Name.SemaType,
+	return &Type{
+		Name:     decl.Name.Name,
+		Type:     decl.Name.SemaType,
+		IsExport: decl.Name.Props == ast.Exported || decl.Name.Props == ast.ExportedReadOnly,
 	}
 }
 

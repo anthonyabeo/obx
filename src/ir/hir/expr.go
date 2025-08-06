@@ -11,70 +11,108 @@ import (
 
 type (
 	Literal struct {
-		Kind  token.Kind
-		Value string
-		Ty    types.Type
-	}
-
-	Ident struct {
-		Name   string
-		Kind   ast.SymbolKind
-		Ty     types.Type
-		Props  ast.IdentProps
-		Offset int
-		Size   int
-	}
-
-	FieldAccess struct {
-		Record Expr
-		Field  string
-		Ty     types.Type
-	}
-
-	IndexExpr struct {
-		Array Expr
-		Index []Expr
-		Ty    types.Type
-	}
-
-	DerefExpr struct {
-		Pointer Expr
-		Ty      types.Type
-	}
-
-	TypeGuardExpr struct {
-		Expr Expr
-		Ty   types.Type
+		Kind     token.Kind
+		Value    string
+		SemaType types.Type
 	}
 
 	BinaryExpr struct {
-		Left  Expr
-		Right Expr
-		Op    token.Kind
-		Ty    types.Type
+		Left     Expr
+		Right    Expr
+		Op       token.Kind
+		SemaType types.Type
 	}
 
 	UnaryExpr struct {
-		Operand Expr
-		Op      token.Kind
-		Ty      types.Type
+		Operand  Expr
+		Op       token.Kind
+		SemaType types.Type
+	}
+
+	SetExpr struct {
+		Elems    []Expr
+		SemaType types.Type
+	}
+
+	RangeExpr struct {
+		Low      Expr
+		High     Expr
+		SemaType types.Type
 	}
 
 	FuncCall struct {
-		Proc    *Ident
+		Func    *FunctionRef
 		Args    []Expr
 		RetType types.Type
 	}
 
-	SetExpr struct {
-		Elems []Expr
-		Ty    types.Type
+	VariableRef struct {
+		Name       string     // name of the variable
+		Mangled    string     // mangled name for code emission
+		SemaType   types.Type // variable type
+		Module     string     // name of the module in which it declared/used
+		IsExported bool
+		IsReadOnly bool
+		Offset     int
+		Size       int
 	}
 
-	RangeExpr struct {
-		Low  Expr
-		High Expr
-		Ty   types.Type
+	ConstantRef struct {
+		Name       string // name of the variable
+		Mangled    string // mangled name for code emission
+		Value      Expr
+		SemaType   types.Type // variable type
+		Module     string     // name of the module in which it declared/used
+		IsExported bool
+		IsReadOnly bool
+		Offset     int
+		Size       int
+	}
+
+	FunctionRef struct {
+		Name       string     // name of the variable
+		Mangled    string     // mangled name for code emission
+		SemaType   types.Type // variable type
+		Kind       ast.ProcedureKind
+		Module     string // name of the module in which it declared/used
+		IsExported bool
+		IsReadOnly bool
+		Offset     int
+		Size       int
+	}
+
+	TypeRef struct {
+		Name       string
+		Mangled    string // mangled name for code emission
+		UnderType  types.Type
+		Module     string // name of the module in which it declared/used
+		IsExported bool
+		IsReadOnly bool
+		Offset     int
+		Size       int
+	}
+
+	FieldAccess struct {
+		Record   Expr
+		Field    string
+		SemaType types.Type
+	}
+
+	IndexExpr struct {
+		Array    Expr
+		Index    []Expr
+		SemaType types.Type
+	}
+
+	DerefExpr struct {
+		Pointer  Expr
+		SemaType types.Type
+	}
+
+	TypeGuardExpr struct {
+		Expr     Expr
+		Typ      types.Type
+		SemaType types.Type
 	}
 )
 
@@ -88,19 +126,25 @@ func (*DerefExpr) expr()     {}
 func (*TypeGuardExpr) expr() {}
 func (*SetExpr) expr()       {}
 func (*RangeExpr) expr()     {}
-func (*Ident) expr()         {}
+func (*VariableRef) expr()   {}
+func (*ConstantRef) expr()   {}
+func (*FunctionRef) expr()   {}
+func (*TypeRef) expr()       {}
 
-func (e *Literal) Type() types.Type       { return e.Ty }
-func (e *BinaryExpr) Type() types.Type    { return e.Ty }
-func (e *UnaryExpr) Type() types.Type     { return e.Ty }
+func (e *Literal) Type() types.Type       { return e.SemaType }
+func (e *BinaryExpr) Type() types.Type    { return e.SemaType }
+func (e *UnaryExpr) Type() types.Type     { return e.SemaType }
 func (e *FuncCall) Type() types.Type      { return e.RetType }
-func (e *FieldAccess) Type() types.Type   { return e.Ty }
-func (e *IndexExpr) Type() types.Type     { return e.Ty }
-func (e *DerefExpr) Type() types.Type     { return e.Ty }
-func (e *TypeGuardExpr) Type() types.Type { return e.Ty }
-func (e *SetExpr) Type() types.Type       { return e.Ty }
-func (e *RangeExpr) Type() types.Type     { return e.Ty }
-func (e *Ident) Type() types.Type         { return e.Ty }
+func (e *FieldAccess) Type() types.Type   { return e.SemaType }
+func (e *IndexExpr) Type() types.Type     { return e.SemaType }
+func (e *DerefExpr) Type() types.Type     { return e.SemaType }
+func (e *TypeGuardExpr) Type() types.Type { return e.SemaType }
+func (e *SetExpr) Type() types.Type       { return e.SemaType }
+func (e *RangeExpr) Type() types.Type     { return e.SemaType }
+func (e *VariableRef) Type() types.Type   { return e.SemaType }
+func (e *ConstantRef) Type() types.Type   { return e.SemaType }
+func (e *FunctionRef) Type() types.Type   { return e.SemaType }
+func (e *TypeRef) Type() types.Type       { return e.UnderType }
 
 func (e *Literal) String() string    { return fmt.Sprintf("%s(%v)", e.Kind, e.Value) }
 func (e *BinaryExpr) String() string { return fmt.Sprintf("%s %s %s", e.Left, e.Op, e.Right) }
@@ -120,10 +164,13 @@ func (e *IndexExpr) String() string {
 		indices = append(indices, fmt.Sprintf("[%s]", index))
 	}
 
-	return fmt.Sprintf("%s%s: %s", e.Array, strings.Join(indices, ""), e.Ty)
+	return fmt.Sprintf("%s%s: %s", e.Array, strings.Join(indices, ""), e.SemaType)
 }
 func (e *DerefExpr) String() string     { return fmt.Sprintf("%s^", e.Pointer) }
 func (e *TypeGuardExpr) String() string { panic("not implemented") }
 func (e *SetExpr) String() string       { panic("not implemented") }
 func (e *RangeExpr) String() string     { panic("not implemented") }
-func (e *Ident) String() string         { return e.Name }
+func (e *VariableRef) String() string   { return e.Name }
+func (e *ConstantRef) String() string   { return e.Name }
+func (e *FunctionRef) String() string   { return e.Name }
+func (e *TypeRef) String() string       { return e.Name }

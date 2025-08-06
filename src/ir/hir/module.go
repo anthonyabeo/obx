@@ -3,14 +3,8 @@ package hir
 type Module struct {
 	Name    string
 	IsEntry bool
-	Imports []Import
 	Decls   []Decl
-	Init    *ProcedureDecl
-}
-
-type Import struct {
-	Path  string
-	Alias string
+	Init    *Function
 }
 
 type Program struct {

@@ -3,12 +3,27 @@ package hir
 import (
 	"fmt"
 
-	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/types"
 )
 
+type Param struct {
+	Name   string
+	Kind   ParamKind // Value, Var, In
+	Type   types.Type
+	Size   int
+	Offset int
+}
+
+type ParamKind int
+
+const (
+	ValueParam ParamKind = iota
+	VarParam
+	InParam
+)
+
 type (
-	VariableDecl struct {
+	Variable struct {
 		Name       string
 		Type       types.Type
 		Size       int
@@ -17,7 +32,7 @@ type (
 		IsReadOnly bool
 	}
 
-	ConstDecl struct {
+	Constant struct {
 		Name       string
 		Type       types.Type
 		Value      Expr
@@ -27,29 +42,31 @@ type (
 		IsReadOnly bool
 	}
 
-	TypeDecl struct {
-		Name  string
-		Type  types.Type
-		Props ast.IdentProps
+	Type struct {
+		Name       string
+		Type       types.Type
+		IsExport   bool
+		IsReadOnly bool
 	}
 
-	ProcedureDecl struct {
+	Function struct {
 		Name        string
 		Params      []*Param
 		Result      types.Type // nil if procedure has no return
 		Locals      []Decl
 		Body        *CompoundStmt
-		Props       ast.IdentProps
+		IsExport    bool
+		IsReadOnly  bool
 		IsTypeBound bool
 	}
 )
 
-func (*VariableDecl) decl()  {}
-func (*ConstDecl) decl()     {}
-func (*TypeDecl) decl()      {}
-func (*ProcedureDecl) decl() {}
+func (*Variable) decl() {}
+func (*Constant) decl() {}
+func (*Type) decl()     {}
+func (*Function) decl() {}
 
-func (d *VariableDecl) String() string  { return fmt.Sprintf("%s: %s", d.Name, d.Type) }
-func (d *ConstDecl) String() string     { return fmt.Sprintf("%s = %s", d.Name, d.Value) }
-func (d *TypeDecl) String() string      { return fmt.Sprintf("%s = %s", d.Name, d.Type) }
-func (d *ProcedureDecl) String() string { panic("not implemented") }
+func (d *Variable) String() string { return fmt.Sprintf("%s: %s", d.Name, d.Type) }
+func (d *Constant) String() string { return fmt.Sprintf("%s = %s", d.Name, d.Value) }
+func (d *Type) String() string     { return fmt.Sprintf("%s = %s", d.Name, d.Type) }
+func (d *Function) String() string { panic("not implemented") }

@@ -1,8 +1,6 @@
 package report
 
-import (
-	"fmt"
-)
+import "fmt"
 
 type Reporter interface {
 	Report(Diagnostic)
