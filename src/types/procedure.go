@@ -33,7 +33,7 @@ func (p *ProcedureType) Alignment() int {
 }
 
 func (p *ProcedureType) Width() int {
-	panic("Not implemented")
+	return 8
 }
 
 func (p *ProcedureType) Equals(other Type) bool {
