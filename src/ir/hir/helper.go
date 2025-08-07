@@ -28,7 +28,7 @@ func (g Generator) visitStmtSeq(stmts []ast.Statement) *CompoundStmt {
 
 func (g Generator) visitDeclSeq(decls []ast.Declaration) (d []Decl) {
 	for _, decl := range decls {
-		d = append(d, decl.Accept(g).(Decl))
+		d = append(d, decl.Accept(g).([]Decl)...)
 	}
 
 	return d

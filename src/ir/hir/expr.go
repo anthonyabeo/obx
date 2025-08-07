@@ -155,7 +155,7 @@ func (e *FuncCall) String() string {
 		args = append(args, arg.String())
 	}
 
-	return fmt.Sprintf("%s(%s)", e.Proc, strings.Join(args, ", "))
+	return fmt.Sprintf("%s(%s)", e.Func, strings.Join(args, ", "))
 }
 func (e *FieldAccess) String() string { return fmt.Sprintf("%s.%s", e.Record, e.Field) }
 func (e *IndexExpr) String() string {

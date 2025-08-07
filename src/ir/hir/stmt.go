@@ -61,7 +61,7 @@ type (
 	}
 
 	ExitStmt struct {
-		loopLabel string
+		LoopLabel string
 	}
 
 	CompoundStmt struct {

@@ -14,8 +14,8 @@ type Generator struct {
 	obx *ast.OberonX
 }
 
-func NewGenerator(ctx *report.Context) *Generator {
-	return &Generator{ctx: ctx}
+func NewGenerator(ctx *report.Context, obx *ast.OberonX) *Generator {
+	return &Generator{ctx: ctx, obx: obx}
 }
 
 func (g Generator) Generate() *Program {
@@ -103,7 +103,7 @@ func (g Generator) VisitFunctionCall(call *ast.FunctionCall) any {
 	callee := call.Callee.Accept(g).(*FunctionRef)
 
 	return &FuncCall{
-		Proc:    callee,
+		Func:    callee,
 		Args:    g.visitExprList(call.ActualParams),
 		RetType: call.SemaType,
 	}
@@ -127,8 +127,8 @@ func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 			Module:     ident.Prefix,
 			IsExported: ident.Symbol.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
 			IsReadOnly: ident.Symbol.Props() == ast.ReadOnly,
-			Offset:     ident.Symbol.Offset(),
-			Size:       ident.SemaType.Width(),
+			//Offset:     ident.Symbol.Offset(),
+			Size: ident.SemaType.Width(),
 		}
 	case ast.ConstantSymbolKind:
 		sym := ident.Symbol.(*ast.ConstantSymbol)
@@ -140,8 +140,8 @@ func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 			Module:     ident.Prefix,
 			IsExported: sym.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
 			IsReadOnly: sym.Props() == ast.ReadOnly,
-			Offset:     sym.Offset(),
-			Size:       ident.SemaType.Width(),
+			//Offset:     sym.Offset(),
+			Size: ident.SemaType.Width(),
 		}
 	case ast.ProcedureSymbolKind:
 		sym := ident.Symbol.(*ast.ProcedureSymbol)
@@ -154,8 +154,8 @@ func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 			SemaType:   ident.SemaType,
 			IsExported: sym.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
 			IsReadOnly: sym.Props() == ast.ReadOnly,
-			Offset:     sym.Offset(),
-			Size:       ident.SemaType.Width(),
+			//Offset:     sym.Offset(),
+			Size: ident.SemaType.Width(),
 		}
 	//case ast.TypeSymbolKind:
 	//case ast.ModuleSymbolKind:
@@ -246,7 +246,7 @@ func (g Generator) VisitProcedureCall(call *ast.ProcedureCall) any {
 	callee := call.Callee.Accept(g).(*FunctionRef)
 
 	return &FuncCall{
-		Proc: callee,
+		Func: callee,
 		Args: g.visitExprList(call.ActualParams),
 	}
 }
@@ -262,7 +262,7 @@ func (g Generator) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
 	// exit if cond
 	exit := &IfStmt{
 		Cond: cond,
-		Then: &CompoundStmt{[]Stmt{&ExitStmt{loopLabel: stmt.Label}}},
+		Then: &CompoundStmt{[]Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
 	}
 
 	body.Stmts = append(body.Stmts, exit)
@@ -278,7 +278,7 @@ func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
 	negated := &UnaryExpr{Op: token.NOT, Operand: cond}
 	body.Stmts = append(body.Stmts, &IfStmt{
 		Cond: negated,
-		Then: &CompoundStmt{[]Stmt{&ExitStmt{loopLabel: stmt.Label}}},
+		Then: &CompoundStmt{[]Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
 	})
 
 	// Body
@@ -295,7 +295,7 @@ func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
 			Cond: negB,
 			Then: &CompoundStmt{
 				[]Stmt{
-					&ExitStmt{loopLabel: stmt.Label},
+					&ExitStmt{LoopLabel: stmt.Label},
 				},
 			},
 		})
@@ -392,7 +392,7 @@ func (g Generator) VisitForStmt(stmt *ast.ForStmt) any {
 			Left:  cvar,
 			Right: final,
 		},
-		Then: &CompoundStmt{[]Stmt{&ExitStmt{loopLabel: stmt.Label}}},
+		Then: &CompoundStmt{[]Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
 	}
 
 	// Generate loop body
@@ -421,7 +421,7 @@ func (g Generator) VisitForStmt(stmt *ast.ForStmt) any {
 }
 
 func (g Generator) VisitExitStmt(stmt *ast.ExitStmt) any {
-	return &ExitStmt{loopLabel: stmt.Label}
+	return &ExitStmt{LoopLabel: stmt.Label}
 }
 
 func (g Generator) VisitWithStmt(stmt *ast.WithStmt) any {
@@ -482,7 +482,8 @@ func (g Generator) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 		body = g.visitStmtSeq(decl.Body.StmtSeq)
 	}
 
-	return &Function{
+	var decls []Decl
+	decls = append(decls, &Function{
 		Name:       name,
 		Params:     params,
 		Result:     resultType,
@@ -490,7 +491,9 @@ func (g Generator) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 		Body:       body,
 		IsExport:   decl.Head.Name.Props == ast.Exported || decl.Head.Name.Props == ast.ExportedReadOnly,
 		IsReadOnly: decl.Head.Name.Props == ast.ReadOnly,
-	}
+	})
+
+	return decls
 }
 
 func (g Generator) VisitProcedureHeading(head *ast.ProcedureHeading) any { return head }
@@ -523,11 +526,11 @@ func (g Generator) VisitFPSection(sec *ast.FPSection) any {
 
 	for _, id := range sec.Names {
 		params = append(params, &Param{
-			Name:   id.Name,
-			Type:   id.SemaType,
-			Kind:   kind, // "VAR", "IN", etc
-			Offset: id.Symbol.Offset(),
-			Size:   id.SemaType.Width(),
+			Name: id.Name,
+			Type: id.SemaType,
+			Kind: kind, // "VAR", "IN", etc
+			//Offset: id.Symbol.Offset(),
+			Size: id.SemaType.Width(),
 		})
 	}
 
@@ -539,10 +542,10 @@ func (g Generator) VisitVariableDecl(decl *ast.VariableDecl) any {
 
 	for _, id := range decl.IdentList {
 		decls = append(decls, &Variable{
-			Name:       id.Name,
-			Type:       id.SemaType,
-			Size:       id.SemaType.Width(),
-			Offset:     id.Symbol.Offset(),
+			Name: id.Name,
+			Type: id.SemaType,
+			Size: id.SemaType.Width(),
+			// Offset:     id.Symbol.Offset(),
 			IsExport:   id.Props == ast.Exported,
 			IsReadOnly: id.Props == ast.ReadOnly,
 		})
@@ -552,23 +555,31 @@ func (g Generator) VisitVariableDecl(decl *ast.VariableDecl) any {
 }
 
 func (g Generator) VisitConstantDecl(decl *ast.ConstantDecl) any {
-	return &Constant{
-		Name:       decl.Name.Name,
-		Type:       decl.Name.SemaType,
-		Value:      decl.Value.Accept(g).(Expr),
-		Size:       decl.Name.SemaType.Width(),
-		Offset:     decl.Name.Symbol.Offset(),
+	var decls []Decl
+
+	decls = append(decls, &Constant{
+		Name:  decl.Name.Name,
+		Type:  decl.Name.SemaType,
+		Value: decl.Value.Accept(g).(Expr),
+		Size:  decl.Name.SemaType.Width(),
+		//Offset:     decl.Name.Symbol.Offset(),
 		IsExport:   decl.Name.Props == ast.Exported || decl.Name.Props == ast.ExportedReadOnly,
 		IsReadOnly: decl.Name.Props == ast.ReadOnly,
-	}
+	})
+
+	return decls
 }
 
 func (g Generator) VisitTypeDecl(decl *ast.TypeDecl) any {
-	return &Type{
+	var decls []Decl
+
+	decls = append(decls, &Type{
 		Name:     decl.Name.Name,
 		Type:     decl.Name.SemaType,
 		IsExport: decl.Name.Props == ast.Exported || decl.Name.Props == ast.ExportedReadOnly,
-	}
+	})
+
+	return decls
 }
 
 func (g Generator) VisitBasicType(ty *ast.BasicType) any { return ty }
