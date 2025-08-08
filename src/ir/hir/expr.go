@@ -9,6 +9,14 @@ import (
 	"github.com/anthonyabeo/obx/src/types"
 )
 
+type ParamKind int
+
+const (
+	ValueParam ParamKind = iota
+	VarParam
+	InParam
+)
+
 type (
 	Literal struct {
 		Kind     token.Kind
@@ -114,6 +122,12 @@ type (
 		Typ      types.Type
 		SemaType types.Type
 	}
+
+	Param struct {
+		Name string
+		Kind ParamKind // Value, Var, In
+		Typ  types.Type
+	}
 )
 
 func (*Literal) expr()       {}
@@ -174,3 +188,7 @@ func (e *VariableRef) String() string   { return e.Name }
 func (e *ConstantRef) String() string   { return e.Name }
 func (e *FunctionRef) String() string   { return e.Name }
 func (e *TypeRef) String() string       { return e.Name }
+
+func (p *Param) expr()            {}
+func (p *Param) Type() types.Type { return p.Typ }
+func (p *Param) String() string   { return p.Name }

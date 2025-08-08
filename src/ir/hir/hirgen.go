@@ -127,8 +127,8 @@ func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 			Module:     ident.Prefix,
 			IsExported: ident.Symbol.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
 			IsReadOnly: ident.Symbol.Props() == ast.ReadOnly,
-			//Offset:     ident.Symbol.Offset(),
-			Size: ident.SemaType.Width(),
+			Offset:     ident.Symbol.Offset(),
+			Size:       ident.SemaType.Width(),
 		}
 	case ast.ConstantSymbolKind:
 		sym := ident.Symbol.(*ast.ConstantSymbol)
@@ -140,8 +140,8 @@ func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 			Module:     ident.Prefix,
 			IsExported: sym.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
 			IsReadOnly: sym.Props() == ast.ReadOnly,
-			//Offset:     sym.Offset(),
-			Size: ident.SemaType.Width(),
+			Offset:     sym.Offset(),
+			Size:       ident.SemaType.Width(),
 		}
 	case ast.ProcedureSymbolKind:
 		sym := ident.Symbol.(*ast.ProcedureSymbol)
@@ -154,14 +154,30 @@ func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 			SemaType:   ident.SemaType,
 			IsExported: sym.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
 			IsReadOnly: sym.Props() == ast.ReadOnly,
-			//Offset:     sym.Offset(),
-			Size: ident.SemaType.Width(),
+			Offset:     sym.Offset(),
+			//Size:       ident.SemaType.Width(),
 		}
 	//case ast.TypeSymbolKind:
 	//case ast.ModuleSymbolKind:
 	//case ast.FieldSymbolKind:
 	//case ast.DefinitionSymbolKind:
-	//case ast.ParamSymbolKind:
+	case ast.ParamSymbolKind:
+		sym := ident.Symbol.(*ast.ParamSymbol)
+		var mod ParamKind
+		switch sym.Mod {
+		case token.IN:
+			mod = InParam
+		case token.VAR:
+			mod = VarParam
+		default:
+			mod = ValueParam
+		}
+
+		return &Param{
+			Name: ident.Name,
+			Kind: mod,
+			Typ:  ident.SemaType,
+		}
 	default:
 		panic("unhandled symbol kind")
 	}
@@ -472,7 +488,8 @@ func (g Generator) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	if decl.Head.FP != nil {
 		params = decl.Head.FP.Accept(g).([]*Param)
 		if decl.Head.FP.RetType != nil {
-			resultType = decl.Head.Name.SemaType
+			ty := decl.Head.Name.SemaType.(*types.ProcedureType)
+			resultType = ty.Result
 		}
 	}
 
@@ -504,7 +521,7 @@ func (g Generator) VisitProcedureBody(body *ast.ProcedureBody) any { return body
 func (g Generator) VisitReceiver(recv *ast.Receiver) any {
 	return &Param{
 		Name: recv.Name.Name,
-		Type: recv.Type.Type(),
+		Typ:  recv.Type.Type(),
 		Kind: g.emitParamKind(recv.Kind),
 	}
 }
@@ -527,11 +544,9 @@ func (g Generator) VisitFPSection(sec *ast.FPSection) any {
 
 	for _, id := range sec.Names {
 		params = append(params, &Param{
-			Name:   id.Name,
-			Type:   id.SemaType,
-			Kind:   kind, // "VAR", "IN", etc
-			Offset: id.Symbol.Offset(),
-			Size:   id.SemaType.Width(),
+			Name: id.Name,
+			Typ:  id.SemaType,
+			Kind: kind, // "VAR", "IN", etc
 		})
 	}
 
