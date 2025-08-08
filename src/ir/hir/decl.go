@@ -25,6 +25,7 @@ const (
 type (
 	Variable struct {
 		Name       string
+		Mangled    string
 		Type       types.Type
 		Size       int
 		Offset     int
@@ -34,6 +35,7 @@ type (
 
 	Constant struct {
 		Name       string
+		Mangled    string
 		Type       types.Type
 		Value      Expr
 		Size       int
@@ -44,6 +46,7 @@ type (
 
 	Type struct {
 		Name       string
+		Mangled    string
 		Type       types.Type
 		IsExport   bool
 		IsReadOnly bool
@@ -51,6 +54,7 @@ type (
 
 	Function struct {
 		Name        string
+		Mangled     string
 		Params      []*Param
 		Result      types.Type // nil if procedure has no return
 		Locals      []Decl

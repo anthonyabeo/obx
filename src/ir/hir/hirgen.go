@@ -485,6 +485,7 @@ func (g Generator) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	var decls []Decl
 	decls = append(decls, &Function{
 		Name:       name,
+		Mangled:    decl.Head.Name.Symbol.MangledName(),
 		Params:     params,
 		Result:     resultType,
 		Locals:     locals,
@@ -526,11 +527,11 @@ func (g Generator) VisitFPSection(sec *ast.FPSection) any {
 
 	for _, id := range sec.Names {
 		params = append(params, &Param{
-			Name: id.Name,
-			Type: id.SemaType,
-			Kind: kind, // "VAR", "IN", etc
-			//Offset: id.Symbol.Offset(),
-			Size: id.SemaType.Width(),
+			Name:   id.Name,
+			Type:   id.SemaType,
+			Kind:   kind, // "VAR", "IN", etc
+			Offset: id.Symbol.Offset(),
+			Size:   id.SemaType.Width(),
 		})
 	}
 
@@ -542,10 +543,11 @@ func (g Generator) VisitVariableDecl(decl *ast.VariableDecl) any {
 
 	for _, id := range decl.IdentList {
 		decls = append(decls, &Variable{
-			Name: id.Name,
-			Type: id.SemaType,
-			Size: id.SemaType.Width(),
-			// Offset:     id.Symbol.Offset(),
+			Name:       id.Name,
+			Mangled:    id.Symbol.MangledName(),
+			Type:       id.SemaType,
+			Size:       id.SemaType.Width(),
+			Offset:     id.Symbol.Offset(),
 			IsExport:   id.Props == ast.Exported,
 			IsReadOnly: id.Props == ast.ReadOnly,
 		})
@@ -558,11 +560,12 @@ func (g Generator) VisitConstantDecl(decl *ast.ConstantDecl) any {
 	var decls []Decl
 
 	decls = append(decls, &Constant{
-		Name:  decl.Name.Name,
-		Type:  decl.Name.SemaType,
-		Value: decl.Value.Accept(g).(Expr),
-		Size:  decl.Name.SemaType.Width(),
-		//Offset:     decl.Name.Symbol.Offset(),
+		Name:       decl.Name.Name,
+		Mangled:    decl.Name.Symbol.MangledName(),
+		Type:       decl.Name.SemaType,
+		Value:      decl.Value.Accept(g).(Expr),
+		Size:       decl.Name.SemaType.Width(),
+		Offset:     decl.Name.Symbol.Offset(),
 		IsExport:   decl.Name.Props == ast.Exported || decl.Name.Props == ast.ExportedReadOnly,
 		IsReadOnly: decl.Name.Props == ast.ReadOnly,
 	})
@@ -575,6 +578,7 @@ func (g Generator) VisitTypeDecl(decl *ast.TypeDecl) any {
 
 	decls = append(decls, &Type{
 		Name:     decl.Name.Name,
+		Mangled:  decl.Name.Symbol.MangledName(),
 		Type:     decl.Name.SemaType,
 		IsExport: decl.Name.Props == ast.Exported || decl.Name.Props == ast.ExportedReadOnly,
 	})
