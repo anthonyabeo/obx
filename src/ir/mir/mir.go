@@ -9,12 +9,21 @@ type Program struct {
 type Module struct {
 	Name    string
 	IsEntry bool
-	Imports []Import
-	Decl    []Decl
-	Init    *Function
+	Globals map[string]*Global
+	Funcs   []*Function
 }
 
-type Import struct {
-	Path  string // e.g. "Math"
-	Alias string // e.g. "M" for "IMPORT M := Math"
+type Function struct {
+	Name   string
+	Result Type
+	Params []Value           // formal parameters
+	Locals []Value           // local variable, constant, procedure declarations
+	Blocks map[string]*Block // basic blocks (in order, but can build CFG)
+	Entry  *Block            // pointer to entry block
+
+	TempMap map[string]*Temp // optional: for SSA or debug
+	SSAInfo *SSAInfo
+	DomTree *DominatorTree
+
+	Constants map[string]*Const
 }

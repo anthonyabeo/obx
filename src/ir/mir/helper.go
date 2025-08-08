@@ -1,252 +1,17 @@
 package mir
 
 import (
-	"fmt"
-
-	"github.com/anthonyabeo/obx/src/ir"
 	"github.com/anthonyabeo/obx/src/ir/hir"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/types"
 )
 
-func (g *Generator) genExprs(exprs []hir.Expr) []Operand {
-	var ops []Operand
+func (g *Generator) genExprs(exprs []hir.Expr) []Value {
+	var ops []Value
 	for _, e := range exprs {
-		ops = append(ops, g.genOperand(e))
+		ops = append(ops, g.genValue(e))
 	}
 	return ops
-}
-
-func (g *Generator) genBinaryOp(op token.Kind, lhs, rhs Operand) Operand {
-	switch op {
-	case token.PLUS:
-		var oper ir.OpCode
-
-		if isFloatType(lhs.Type()) && isFloatType(rhs.Type()) {
-			oper = ir.FAdd
-		} else {
-			oper = ir.Add
-		}
-
-		t := g.newTemp(lhs.Type())
-		g.emit(&AssignInst{Target: t, Value: &Binary{
-			Op:    oper,
-			Left:  lhs,
-			Right: rhs,
-			Typ:   lhs.Type(),
-		}})
-
-		return t
-	case token.MINUS:
-		var oper ir.OpCode
-		if isFloatType(lhs.Type()) && isFloatType(rhs.Type()) {
-			oper = ir.FSub
-		} else {
-			oper = ir.Sub
-		}
-
-		t := g.newTemp(lhs.Type())
-		g.emit(&AssignInst{Target: t, Value: &Binary{
-			Op:    oper,
-			Left:  lhs,
-			Right: rhs,
-			Typ:   lhs.Type(),
-		}})
-
-		return t
-	case token.STAR:
-		var oper ir.OpCode
-		if isFloatType(lhs.Type()) && isFloatType(rhs.Type()) {
-			oper = ir.FMul
-		} else {
-			oper = ir.Mul
-		}
-
-		t := g.newTemp(lhs.Type())
-		g.emit(&AssignInst{Target: t, Value: &Binary{
-			Op:    oper,
-			Left:  lhs,
-			Right: rhs,
-			Typ:   lhs.Type(),
-		}})
-
-		return t
-	case token.DIV:
-		var oper ir.OpCode
-
-		if isFloatType(lhs.Type()) && isFloatType(rhs.Type()) {
-			oper = ir.FDiv
-		} else if isUInt(lhs.Type()) && isUInt(rhs.Type()) {
-			oper = ir.UDiv
-		} else {
-			oper = ir.SDiv
-		}
-
-		t := g.newTemp(lhs.Type())
-		g.emit(&AssignInst{Target: t, Value: &Binary{
-			Op:    oper,
-			Left:  lhs,
-			Right: rhs,
-			Typ:   lhs.Type(),
-		}})
-
-		return t
-	case token.MOD:
-		var oper ir.OpCode
-		if isFloatType(lhs.Type()) && isFloatType(rhs.Type()) {
-			oper = ir.FRem
-		} else if isUInt(lhs.Type()) && isUInt(rhs.Type()) {
-			oper = ir.URem
-		} else {
-			oper = ir.SRem
-		}
-
-		t := g.newTemp(lhs.Type())
-		g.emit(&AssignInst{Target: t, Value: &Binary{
-			Op:    oper,
-			Left:  lhs,
-			Right: rhs,
-			Typ:   lhs.Type(),
-		}})
-
-		return t
-	case token.AND:
-		t := g.newTemp(Int1Type)
-		g.emit(&AssignInst{Target: t, Value: &Binary{
-			Op:    ir.And,
-			Left:  lhs,
-			Right: rhs,
-			Typ:   Int1Type,
-		}})
-
-		return t
-	case token.OR:
-		t := g.newTemp(Int1Type)
-		g.emit(&AssignInst{Target: t, Value: &Binary{
-			Op:    ir.Or,
-			Left:  lhs,
-			Right: rhs,
-			Typ:   Int1Type,
-		}})
-
-		return t
-	case token.LESS:
-		t := g.newTemp(Int1Type)
-		g.emit(&AssignInst{
-			Target: t,
-			Value: &Binary{
-				Op:    ir.ICmpLt,
-				Left:  lhs,
-				Right: rhs,
-				Typ:   Int1Type,
-			},
-		})
-
-		return t
-	case token.GREAT:
-		t := g.newTemp(Int1Type)
-		g.emit(&AssignInst{
-			Target: t,
-			Value: &Binary{
-				Op:    ir.ICmpGt,
-				Left:  lhs,
-				Right: rhs,
-				Typ:   Int1Type,
-			},
-		})
-
-		return t
-	case token.EQUAL:
-		t := g.newTemp(Int1Type)
-		g.emit(&AssignInst{
-			Target: t,
-			Value: &Binary{
-				Op:    ir.ICmpEq,
-				Left:  lhs,
-				Right: rhs,
-				Typ:   Int1Type,
-			},
-		})
-
-		return t
-	case token.LEQ:
-		t1 := g.newTemp(Int1Type)
-		g.emit(&AssignInst{Target: t1, Value: &Binary{
-			Op:    ir.ICmpLt,
-			Left:  lhs,
-			Right: rhs,
-			Typ:   Int1Type,
-		}})
-
-		t2 := g.newTemp(Int1Type)
-		g.emit(&AssignInst{Target: t2, Value: &Binary{
-			Op:    ir.ICmpEq,
-			Left:  lhs,
-			Right: rhs,
-			Typ:   Int1Type,
-		}})
-
-		t3 := g.newTemp(Int1Type)
-		g.emit(&AssignInst{Target: t3, Value: &Binary{
-			Op:    ir.Or,
-			Left:  t1,
-			Right: t2,
-			Typ:   Int1Type,
-		}})
-
-		return t3
-	case token.GEQ:
-		t1 := g.newTemp(Int1Type)
-		g.emit(&AssignInst{Target: t1, Value: &Binary{
-			Op:    ir.ICmpGt,
-			Left:  lhs,
-			Right: rhs,
-			Typ:   Int1Type,
-		}})
-
-		t2 := g.newTemp(Int1Type)
-		g.emit(&AssignInst{Target: t2, Value: &Binary{
-			Op:    ir.ICmpEq,
-			Left:  lhs,
-			Right: rhs,
-			Typ:   Int1Type,
-		}})
-
-		t3 := g.newTemp(Int1Type)
-		g.emit(&AssignInst{Target: t3, Value: &Binary{
-			Op:    ir.Or,
-			Left:  t1,
-			Right: t2,
-			Typ:   Int1Type,
-		}})
-
-		return t3
-	case token.NEQ:
-		t := g.newTemp(Int1Type)
-		g.emit(&AssignInst{
-			Target: t,
-			Value: &Binary{
-				Op:    ir.ICmpEq,
-				Left:  lhs,
-				Right: rhs,
-				Typ:   Int1Type,
-			},
-		})
-
-		t1 := g.newTemp(Int1Type)
-
-		g.emit(&AssignInst{Target: t1, Value: &Binary{
-			Op:    ir.Xor,
-			Left:  True,
-			Right: t,
-			Typ:   Int1Type,
-		}})
-
-		return t1
-		// TODO complete this
-	default:
-		panic(fmt.Sprintf("unknown operator type %v", op))
-	}
 }
 
 func (g *Generator) genType(ty types.Type) Type {
@@ -290,34 +55,31 @@ func (g *Generator) genType(ty types.Type) Type {
 	return Void
 }
 
-func isUInt(t Type) bool {
-	ty, ok := t.(*IntegerType)
-	return ok && !ty.Signed
-}
-
-func isSInt(t Type) bool {
-	ty, ok := t.(*IntegerType)
-	return ok && ty.Signed
-}
-
-func isFloat32(t Type) bool {
-	f, ok := t.(*FloatType)
-	return ok && f.Bits == 32
-}
-
-func isFloat64(t Type) bool {
-	f, ok := t.(*FloatType)
-	return ok && f.Bits == 64
-}
-
-func isFloatType(t Type) bool {
-	return isFloatType(t) || isFloatType(t)
-}
-
-func isIntType(t Type) bool {
-	return isUInt(t) || isSInt(t)
-}
-
-func isNumericType(t Type) bool {
-	return isIntType(t) || isFloatType(t)
+func (g *Generator) genOp(op token.Kind) InstrOp {
+	switch op {
+	case token.PLUS:
+		return ADD
+	case token.MINUS:
+		return SUB
+	case token.STAR:
+		return MUL
+	case token.DIV:
+		return DIV
+	case token.NOT:
+		return NOT
+	case token.EQUAL:
+		return EQ
+	case token.NEQ:
+		return NEQ
+	case token.LESS:
+		return LT
+	case token.LEQ:
+		return LTE
+	case token.GREAT:
+		return GT
+	case token.GEQ:
+		return GTE
+	default:
+		panic("unknown operator " + op.String())
+	}
 }

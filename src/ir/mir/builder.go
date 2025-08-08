@@ -9,9 +9,9 @@ func (g *Generator) newLabel(prefix string) string {
 
 func (g *Generator) newTemp(typ Type) Temp {
 	g.tempCount++
-	return Temp{Name: "_t" + strconv.Itoa(g.tempCount), Typ: typ}
+	return Temp{ID: "_t" + strconv.Itoa(g.tempCount), Typ: typ}
 }
 
-func (g *Generator) emit(instr Inst) {
-	g.currentBlk.Inst = append(g.currentBlk.Inst, instr)
+func (g *Generator) emit(instr Instr) {
+	g.currentBlk.Instrs = append(g.currentBlk.Instrs, instr)
 }
