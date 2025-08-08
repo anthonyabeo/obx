@@ -17,36 +17,22 @@ const (
 	NEG
 	NOT
 
+	OR
+	AND
+
 	cmp_begin
 	EQ
+	NE
 	LT
-	LTE
+	LE
 	GT
-	GTE
-	NEQ
-	IS
-	IN
+	GE
 	cmp_end
 )
 
-func (c InstrOp) String() string {
-	switch c {
-	case EQ:
-		return "eq"
-	case LT:
-		return "lt"
-	case LTE:
-		return "lte"
-	case GT:
-		return "gt"
-	case GTE:
-		return "gte"
-	case NEQ:
-		return "neq"
-	case IS:
-		return "is"
-	case IN:
-		return "in"
+func (op InstrOp) IsCmpCondCode() bool { return cmp_begin < op && op < cmp_end }
+func (op InstrOp) String() string {
+	switch op {
 	case ADD:
 		return "add"
 	case SUB:
@@ -59,6 +45,26 @@ func (c InstrOp) String() string {
 		return "quot"
 	case REM:
 		return "rem"
+	case NOT:
+		return "not"
+	case NEG:
+		return "neg"
+	case EQ:
+		return "eq"
+	case NE:
+		return "ne"
+	case LT:
+		return "lt"
+	case LE:
+		return "le"
+	case GT:
+		return "gt"
+	case GE:
+		return "ge"
+	case OR:
+		return "or"
+	case AND:
+		return "and"
 	default:
 		return "unknown"
 	}

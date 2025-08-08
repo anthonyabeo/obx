@@ -96,10 +96,10 @@ func (o Global) Name() string       { return o.NameStr }
 
 func (o Temp) String() string         { return o.ID }
 func (o Const) String() string        { return o.ID }
-func (o IntegerConst) String() string { return fmt.Sprintf("%d %s", o.Value, o.Typ) }
-func (o FloatConst) String() string   { return fmt.Sprintf("%f %s", o.Value, o.Typ) }
-func (o CharConst) String() string    { return fmt.Sprintf("%v %s", o.Value, o.Typ) }
-func (o StrConst) String() string     { return fmt.Sprintf("%s %s", o.Value, o.Typ) }
+func (o IntegerConst) String() string { return fmt.Sprintf("%d", o.Value) }
+func (o FloatConst) String() string   { return fmt.Sprintf("%f", o.Value) }
+func (o CharConst) String() string    { return fmt.Sprintf("%v", o.Value) }
+func (o StrConst) String() string     { return fmt.Sprintf("%s", o.Value) }
 func (o Global) String() string       { return o.NameStr }
 
 func (a *Addr) value()         {}

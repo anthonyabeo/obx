@@ -3,6 +3,7 @@ package mir
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/ir/mir"
@@ -17,22 +18,43 @@ func formatBlock(b *mir.Block) string {
 	if b.Term != nil {
 		sb.WriteString("  " + b.Term.String() + "\n")
 	}
+	sb.WriteString("\n")
+
 	return sb.String()
 }
 
 func FormatFunction(fn *mir.Function) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("func %s @%s(", fn.Result, fn.Name))
-	for i, p := range fn.Params {
-		if i > 0 {
+	var i int
+	for _, p := range fn.Params {
+		sb.WriteString(fmt.Sprintf("%s %s", p.Type(), p.Name()))
+		if i < len(fn.Params)-1 {
 			sb.WriteString(", ")
 		}
-		sb.WriteString(p.Name())
 	}
 	sb.WriteString("):\n")
 
-	for _, block := range fn.Blocks {
-		sb.WriteString(formatBlock(block))
+	// Print constants
+	for _, c := range fn.Constants {
+		sb.WriteString(fmt.Sprintf("  const %s: %s = %v\n", c.ID, c.Typ, c.Value))
+	}
+
+	// Print local variables
+	for _, l := range fn.Locals {
+		sb.WriteString(fmt.Sprintf("  var %s: %s\n", l.Name(), l.Type()))
+	}
+
+	// Collect and sort block IDs
+	blocks := make([]int, 0, len(fn.Blocks))
+	for id := range fn.Blocks {
+		blocks = append(blocks, id)
+	}
+	sort.Ints(blocks)
+
+	// Iterate in sorted order
+	for _, id := range blocks {
+		sb.WriteString(formatBlock(fn.Blocks[id]))
 	}
 
 	sb.WriteString("end\n\n")
@@ -48,8 +70,10 @@ func FormatProgram(p *mir.Program) string {
 			if g.Value != nil {
 				sb.WriteString(fmt.Sprintf(" := %v", g.Value))
 			}
-			sb.WriteString("\n\n")
+			sb.WriteString("\n")
 		}
+		sb.WriteString("\n")
+
 		for _, f := range m.Funcs {
 			sb.WriteString(FormatFunction(f))
 		}

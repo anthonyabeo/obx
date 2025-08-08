@@ -14,7 +14,7 @@ type Instr interface {
 
 type (
 	CmpInst struct {
-		Target *Temp
+		Target Value
 		Op     InstrOp
 		Left   Value
 		Right  Value
@@ -111,8 +111,7 @@ func (*CmpInst) inst()           {}
 func (c *CmpInst) Def() Value    { return c.Target }
 func (c *CmpInst) Uses() []Value { return []Value{c.Left, c.Right} }
 func (c *CmpInst) String() string {
-	return fmt.Sprintf("%s := %s %s, %s",
-		c.Target.Name(), c.Op, c.Left.Name(), c.Right.Name())
+	return fmt.Sprintf("%s := icmp %s %s, %s", c.Target.Name(), c.Op, c.Left.Name(), c.Right.Name())
 }
 
 func (b *BinaryInst) inst()         {}

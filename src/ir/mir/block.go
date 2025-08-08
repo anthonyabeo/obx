@@ -26,19 +26,25 @@ type DominatorTree struct {
 	DF      map[*Block][]*Block // Dominance frontiers
 }
 
+var BlockID int
+
 type Block struct {
-	Label  string            // e.g. "L1"
-	Instrs []Instr           // IR instructions
-	Term   Instr             // Final terminator: br, goto, return
-	Preds  map[string]*Block // Filled during CFG construction
-	Succs  map[string]*Block
+	ID     int
+	Label  string          // e.g. "L1"
+	Instrs []Instr         // IR instructions
+	Term   Instr           // Final terminator: br, goto, return
+	Preds  map[uint]*Block // Filled during CFG construction
+	Succs  map[uint]*Block
 }
 
 func NewBlock(name string) *Block {
+	BlockID++
+
 	return &Block{
+		ID:     BlockID,
 		Label:  name,
 		Instrs: make([]Instr, 0),
-		Preds:  make(map[string]*Block),
-		Succs:  make(map[string]*Block),
+		Preds:  make(map[uint]*Block),
+		Succs:  make(map[uint]*Block),
 	}
 }

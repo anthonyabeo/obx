@@ -9,16 +9,15 @@ import (
 )
 
 type Generator struct {
-	currentFn   *Function
-	currentBlk  *Block
 	program     *Program
-	labelCount  int
-	tempCount   int
+	build       *Builder
 	currentExit string
 }
 
 func NewGenerator() *Generator {
-	return &Generator{}
+	return &Generator{
+		build: NewBuilder(),
+	}
 }
 
 func (g *Generator) Generate(prog *hir.Program) *Program {
@@ -71,18 +70,21 @@ func (g *Generator) genModule(module *hir.Module) *Module {
 }
 
 func (g *Generator) genFunction(h *hir.Function) *Function {
-	g.labelCount, g.tempCount = 0, 0
+	fn := NewFunction(h.Name, g.genType(h.Result))
 
-	fn := &Function{Name: h.Name, Result: g.genType(h.Result), Blocks: make(map[string]*Block)}
+	currentFn := g.build.Func
+	defer func() { g.build.Func = currentFn }()
+
+	g.build.Func = fn
 
 	for _, param := range h.Params {
 		switch param.Kind {
 		case hir.ValueParam, hir.InParam:
-			fn.Params = append(fn.Params, &Temp{
+			fn.Params[param.Name] = &Temp{
 				ID:      param.Name,
 				SrcName: param.Name,
-				Typ:     g.genType(param.Type),
-			})
+				Typ:     g.genType(param.Typ),
+			}
 		case hir.VarParam:
 		}
 	}
@@ -111,9 +113,8 @@ func (g *Generator) genFunction(h *hir.Function) *Function {
 	}
 
 	entry := NewBlock("entry")
-	g.currentBlk = entry
-	fn.Blocks["entry"] = entry
-	g.currentFn = fn
+	g.build.SetBlock(entry)
+	fn.Blocks[entry.ID] = entry
 
 	g.genCompoundStmt(h.Body)
 
@@ -125,7 +126,7 @@ func (g *Generator) genAssignStmt(s *hir.AssignStmt) {
 	value := g.genValue(s.Right)
 
 	// Emit the assignment instruction
-	g.emit(&AssignInst{Target: target, Value: value})
+	g.build.Emit(&AssignInst{Target: target, Value: value})
 }
 
 func (g *Generator) genReturnStmt(s *hir.ReturnStmt) {
@@ -133,7 +134,7 @@ func (g *Generator) genReturnStmt(s *hir.ReturnStmt) {
 	if s.Result != nil {
 		result = g.genValue(s.Result)
 	}
-	g.emit(&ReturnInst{Result: result})
+	g.build.Emit(&ReturnInst{Result: result})
 }
 
 func (g *Generator) genCompoundStmt(s *hir.CompoundStmt) {
@@ -151,6 +152,8 @@ func (g *Generator) genCompoundStmt(s *hir.CompoundStmt) {
 			g.genExitStmt(s)
 		case *hir.CompoundStmt:
 			g.genCompoundStmt(s)
+		case *hir.FuncCall:
+			g.genFuncCall(s)
 		case *hir.CaseStmt:
 		case *hir.WithStmt:
 		default:
@@ -159,21 +162,16 @@ func (g *Generator) genCompoundStmt(s *hir.CompoundStmt) {
 }
 
 func (g *Generator) genFuncCall(s *hir.FuncCall) Value {
-	retType := g.genType(s.RetType)
-	t := g.newTemp(retType)
-
 	var args []Value
 	for _, arg := range s.Args {
 		args = append(args, g.genValue(arg))
 	}
 
-	g.emit(&CallInst{Target: t, Callee: s.Func.Name, Args: args})
-
-	return t
+	return g.build.CreateCallInst(s.Func.Name, args)
 }
 
 func (g *Generator) genIfStmt(s *hir.IfStmt) {
-	endLabel := g.newLabel("if.end")
+	endLabel := g.build.NewLabel("if.end")
 
 	// Track all conditional branches (initial + elsif)
 	allConds := append([]*hir.ElseIfBranch{
@@ -184,44 +182,41 @@ func (g *Generator) genIfStmt(s *hir.IfStmt) {
 
 	for i, branch := range allConds {
 		cond := g.genValue(branch.Cond)
-		falseLabel = g.newLabel(fmt.Sprintf("if.next_%d", i))
-		trueLabel = g.newLabel(fmt.Sprintf("if.true_%d", i))
+		falseLabel = g.build.NewLabel(fmt.Sprintf("if.next.%d", i))
+		trueLabel = g.build.NewLabel(fmt.Sprintf("if.true.%d", i))
 
-		g.emit(&CondBrInst{
+		g.build.Emit(&CondBrInst{
 			Cond:       cond,
 			TrueLabel:  trueLabel,
 			FalseLabel: falseLabel,
 		})
 
 		// Emit the conditional label for the true path block
-		nextBlk := NewBlock(trueLabel)
-		g.currentFn.Blocks[trueLabel] = nextBlk
-		g.currentBlk = nextBlk
+		nextBlk := g.build.NewBlock(trueLabel)
+		g.build.SetBlock(nextBlk)
 
 		g.genCompoundStmt(branch.Body)
-		g.emit(&JumpInst{Target: endLabel})
+		g.build.Emit(&JumpInst{Target: endLabel})
 
 		// Emit the false path conditional label block
-		nextBlk = NewBlock(falseLabel)
-		g.currentFn.Blocks[falseLabel] = nextBlk
-		g.currentBlk = nextBlk
+		nextBlk = g.build.NewBlock(falseLabel)
+		g.build.SetBlock(nextBlk)
 	}
 
 	// ELSE branch or fallthrough
 	if s.Else != nil {
 		g.genCompoundStmt(s.Else)
 	}
-	g.emit(&JumpInst{Target: endLabel})
+	g.build.Emit(&JumpInst{Target: endLabel})
 
 	// Final end block
-	endBlk := NewBlock(endLabel)
-	g.currentFn.Blocks[endLabel] = endBlk
-	g.currentBlk = endBlk
+	endBlk := g.build.NewBlock(endLabel)
+	g.build.SetBlock(endBlk)
 }
 
 func (g *Generator) genLoopStmt(s *hir.LoopStmt) {
-	loopLabel := g.newLabel(s.Label)
-	exitLabel := g.newLabel(s.Label + ".exit")
+	loopLabel := g.build.NewLabel(s.Label)
+	exitLabel := g.build.NewLabel(s.Label + ".exit")
 
 	// Register exit label for EXIT lowering
 	prevExit := g.currentExit
@@ -229,65 +224,52 @@ func (g *Generator) genLoopStmt(s *hir.LoopStmt) {
 	defer func() { g.currentExit = prevExit }()
 
 	// Emit loop label
-	loopBlk := NewBlock(loopLabel)
-	g.currentFn.Blocks[loopLabel] = loopBlk
-	g.currentBlk = loopBlk
+	loopBlk := g.build.NewBlock(loopLabel)
+	g.build.SetBlock(loopBlk)
 
 	// Emit loop body
 	g.genCompoundStmt(s.Body)
 
 	// Jump back to loop
-	g.emit(&JumpInst{Target: loopLabel})
+	g.build.Emit(&JumpInst{Target: loopLabel})
 
 	// Emit loop exit label
-	exitBlk := NewBlock(exitLabel)
-	g.currentFn.Blocks[exitLabel] = exitBlk
-	g.currentBlk = exitBlk
+	exitBlk := g.build.NewBlock(exitLabel)
+	g.build.SetBlock(exitBlk)
 }
 
 func (g *Generator) genExitStmt(*hir.ExitStmt) {
 	if g.currentExit == "" {
 		panic("EXIT used outside loop")
 	}
-	g.emit(&JumpInst{Target: g.currentExit})
+	g.build.Emit(&JumpInst{Target: g.currentExit})
 }
 
 func (g *Generator) genBinaryExpr(b *hir.BinaryExpr) Value {
-	t := g.newTemp(g.genType(b.SemaType))
 	lhs := g.genValue(b.Left)
 	rhs := g.genValue(b.Right)
+	op := g.genOp(b.Op)
 
-	g.emit(&BinaryInst{Target: t, Op: g.genOp(b.Op), Left: lhs, Right: rhs})
-
-	return t
+	return g.build.CreateBinary(op, lhs, rhs)
 }
 
 func (g *Generator) genUnaryExpr(u *hir.UnaryExpr) Value {
-	typ := g.genType(u.SemaType)
-	t := g.newTemp(typ)
-
 	var op InstrOp
 	switch u.Op {
 	case token.PLUS:
 		op = ADD
 	case token.MINUS:
-		op = SUB
+		op = NEG
 	case token.NOT:
 		op = NOT
 	}
 
-	g.emit(&UnaryInst{
-		Target:  t,
-		Op:      op,
-		Operand: g.genValue(u.Operand),
-	})
+	operand := g.genValue(u.Operand)
 
-	return t
+	return g.build.CreateUnary(op, operand)
 }
 
 func (g *Generator) genConst(c *hir.Literal) Value {
-	t := g.newTemp(g.genType(c.SemaType))
-
 	var v Value
 
 	switch c.Kind {
@@ -330,9 +312,7 @@ func (g *Generator) genConst(c *hir.Literal) Value {
 		v = False
 	}
 
-	g.emit(&AssignInst{Target: t, Value: v})
-
-	return t
+	return v
 }
 
 func (g *Generator) genValue(e hir.Expr) Value {
@@ -356,7 +336,9 @@ func (g *Generator) genValue(e hir.Expr) Value {
 			Typ:     g.genType(e.SemaType),
 		}
 	case *hir.ConstantRef:
-		return g.currentFn.Constants[e.Mangled].Value
+		return g.build.Func.Constants[e.Mangled].Value
+	case *hir.Param:
+		return g.build.Func.Params[e.Name]
 	case *hir.FunctionRef:
 	case *hir.TypeRef:
 	case *hir.FieldAccess:
