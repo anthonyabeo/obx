@@ -11,7 +11,7 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
 
-func parseSourceAndLowerToMIR(t *testing.T, ctx *report.Context) *mir.Program {
+func ParseSourceAndLowerToMIR(t *testing.T, ctx *report.Context) *mir.Program {
 	p := parser.NewParser(ctx)
 	unit := p.Parse()
 

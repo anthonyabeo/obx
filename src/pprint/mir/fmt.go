@@ -15,9 +15,7 @@ func formatBlock(b *mir.Block) string {
 	for _, instr := range b.Instrs {
 		sb.WriteString("  " + instr.String() + "\n")
 	}
-	if b.Term != nil {
-		sb.WriteString("  " + b.Term.String() + "\n")
-	}
+
 	sb.WriteString("\n")
 
 	return sb.String()

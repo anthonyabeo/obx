@@ -149,7 +149,7 @@ end Main
 				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
 
-			program := parseSourceAndLowerToMIR(t, ctx)
+			program := ParseSourceAndLowerToMIR(t, ctx)
 
 			if err := EmitMIR(os.Stdout, program); err != nil {
 				t.Fatalf("EmitMIR failed: %v", err)
