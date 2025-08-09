@@ -56,6 +56,8 @@ func (g *Generator) genOp(op token.Kind) InstrOp {
 		return MUL
 	case token.DIV:
 		return DIV
+	case token.MOD:
+		return REM
 	case token.NOT:
 		return NOT
 	case token.EQUAL:
@@ -72,6 +74,7 @@ func (g *Generator) genOp(op token.Kind) InstrOp {
 		return GE
 	case token.OR:
 		return OR
+
 	default:
 		panic("unknown operator " + op.String())
 	}

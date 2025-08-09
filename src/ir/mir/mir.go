@@ -1,5 +1,11 @@
 package mir
 
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
 // Program ...
 type Program struct {
 	Modules []*Module
@@ -36,4 +42,38 @@ func NewFunction(name string, ret Type) *Function {
 		Blocks: make(map[int]*Block),
 		Params: make(map[string]Value),
 	}
+}
+
+func (fn *Function) GetBlock(name string) *Block {
+	for _, block := range fn.Blocks {
+		if block.Label == name {
+			return block
+		}
+	}
+	return nil
+}
+
+func (fn *Function) OutputDOT() string {
+	var keys []int
+	for id := range fn.Blocks {
+		keys = append(keys, id)
+	}
+	sort.Ints(keys)
+
+	var sb strings.Builder
+	sb.WriteString("digraph CFG {\n")
+	for _, key := range keys {
+
+		block := fn.Blocks[key]
+		label := fmt.Sprintf("%s:\\l", block.Label)
+		for _, instr := range block.Instrs {
+			label += instr.String() + "\\l"
+		}
+		sb.WriteString(fmt.Sprintf("  %q [shape=box,label=\"%s\"];\n", block.Label, label))
+		for _, succ := range block.Succs {
+			sb.WriteString(fmt.Sprintf("  %q -> %q;\n", block.Label, succ.Label))
+		}
+	}
+	sb.WriteString("}\n")
+	return sb.String()
 }
