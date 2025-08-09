@@ -30,11 +30,11 @@ var BlockID int
 
 type Block struct {
 	ID     int
-	Label  string          // e.g. "L1"
-	Instrs []Instr         // IR instructions
-	Term   Instr           // Final terminator: br, goto, return
-	Preds  map[uint]*Block // Filled during CFG construction
-	Succs  map[uint]*Block
+	Label  string         // e.g. "L1"
+	Instrs []Instr        // IR instructions
+	Term   Instr          // Final terminator: br, goto, return
+	Preds  map[int]*Block // Filled during CFG construction
+	Succs  map[int]*Block
 }
 
 func NewBlock(name string) *Block {
@@ -44,7 +44,12 @@ func NewBlock(name string) *Block {
 		ID:     BlockID,
 		Label:  name,
 		Instrs: make([]Instr, 0),
-		Preds:  make(map[uint]*Block),
-		Succs:  make(map[uint]*Block),
+		Preds:  make(map[int]*Block),
+		Succs:  make(map[int]*Block),
 	}
+}
+
+func (b *Block) HasPred(block *Block) bool {
+	_, exists := b.Preds[block.ID]
+	return exists
 }
