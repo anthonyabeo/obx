@@ -35,6 +35,10 @@ func (b *Builder) SetTerm(term Instr) {
 	b.Block.Term = term
 }
 
+func (b *Builder) BlockTermSet() bool {
+	return b.Block.Term != nil
+}
+
 func (b *Builder) NewBlock(label string) *Block {
 	blk := NewBlock(label)
 	b.Func.Blocks[blk.ID] = blk
@@ -52,12 +56,7 @@ func (b *Builder) CreateBinary(op InstrOp, left, right Value) Value {
 	if op.IsCmpCondCode() {
 		b.Emit(&CmpInst{Target: t, Op: op, Left: left, Right: right})
 	} else {
-		b.Emit(&BinaryInst{
-			Target: t,
-			Op:     op,
-			Left:   left,
-			Right:  right,
-		})
+		b.Emit(&BinaryInst{Target: t, Op: op, Left: left, Right: right})
 	}
 
 	return t
@@ -83,4 +82,10 @@ func (b *Builder) CreateCallInst(callee string, args []Value) Value {
 	})
 
 	return t
+}
+
+func (b *Builder) CreateReturn(value Value) {
+	ret := &ReturnInst{Result: value}
+	b.SetTerm(ret)
+	b.Emit(ret)
 }
