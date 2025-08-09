@@ -1,18 +1,9 @@
 package mir
 
 import (
-	"github.com/anthonyabeo/obx/src/ir/hir"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/types"
 )
-
-func (g *Generator) genExprs(exprs []hir.Expr) []Value {
-	var ops []Value
-	for _, e := range exprs {
-		ops = append(ops, g.genValue(e))
-	}
-	return ops
-}
 
 func (g *Generator) genType(ty types.Type) Type {
 	if ty == nil {

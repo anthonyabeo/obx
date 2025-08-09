@@ -10,7 +10,6 @@ const (
 	SUB
 	MUL
 	DIV
-	QUOT
 	REM
 	arith_binary_end
 
@@ -41,8 +40,6 @@ func (op InstrOp) String() string {
 		return "mul"
 	case DIV:
 		return "div"
-	case QUOT:
-		return "quot"
 	case REM:
 		return "rem"
 	case NOT:
