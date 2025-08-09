@@ -134,7 +134,8 @@ func (g *Generator) genReturnStmt(s *hir.ReturnStmt) {
 	if s.Result != nil {
 		result = g.genValue(s.Result)
 	}
-	g.build.Emit(&ReturnInst{Result: result})
+
+	g.build.CreateReturn(result)
 }
 
 func (g *Generator) genCompoundStmt(s *hir.CompoundStmt) {
@@ -185,18 +186,23 @@ func (g *Generator) genIfStmt(s *hir.IfStmt) {
 		falseLabel = g.build.NewLabel(fmt.Sprintf("if.next.%d", i))
 		trueLabel = g.build.NewLabel(fmt.Sprintf("if.true.%d", i))
 
-		g.build.Emit(&CondBrInst{
-			Cond:       cond,
-			TrueLabel:  trueLabel,
-			FalseLabel: falseLabel,
-		})
+		// set conditional branch as the terminator instruction for this block
+		// and add it to the list of instructions in the block
+		br := &CondBrInst{Cond: cond, TrueLabel: trueLabel, FalseLabel: falseLabel}
+		g.build.SetTerm(br)
+		g.build.Emit(br)
 
 		// Emit the conditional label for the true path block
 		nextBlk := g.build.NewBlock(trueLabel)
 		g.build.SetBlock(nextBlk)
 
 		g.genCompoundStmt(branch.Body)
-		g.build.Emit(&JumpInst{Target: endLabel})
+
+		if !g.build.BlockTermSet() {
+			jmp := &JumpInst{Target: endLabel}
+			g.build.SetTerm(jmp)
+			g.build.Emit(jmp)
+		}
 
 		// Emit the false path conditional label block
 		nextBlk = g.build.NewBlock(falseLabel)
@@ -207,7 +213,12 @@ func (g *Generator) genIfStmt(s *hir.IfStmt) {
 	if s.Else != nil {
 		g.genCompoundStmt(s.Else)
 	}
-	g.build.Emit(&JumpInst{Target: endLabel})
+	//g.build.Emit(&JumpInst{Target: endLabel})
+	if !g.build.BlockTermSet() {
+		jmp := &JumpInst{Target: endLabel}
+		g.build.SetTerm(jmp)
+		g.build.Emit(jmp)
+	}
 
 	// Final end block
 	endBlk := g.build.NewBlock(endLabel)
@@ -231,7 +242,9 @@ func (g *Generator) genLoopStmt(s *hir.LoopStmt) {
 	g.genCompoundStmt(s.Body)
 
 	// Jump back to loop
-	g.build.Emit(&JumpInst{Target: loopLabel})
+	jmp := &JumpInst{Target: loopLabel}
+	g.build.SetTerm(jmp)
+	g.build.Emit(jmp)
 
 	// Emit loop exit label
 	exitBlk := g.build.NewBlock(exitLabel)
@@ -242,7 +255,10 @@ func (g *Generator) genExitStmt(*hir.ExitStmt) {
 	if g.currentExit == "" {
 		panic("EXIT used outside loop")
 	}
-	g.build.Emit(&JumpInst{Target: g.currentExit})
+
+	jmp := &JumpInst{Target: g.currentExit}
+	g.build.SetTerm(jmp)
+	g.build.Emit(jmp)
 }
 
 func (g *Generator) genBinaryExpr(b *hir.BinaryExpr) Value {
