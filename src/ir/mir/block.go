@@ -49,6 +49,14 @@ func NewBlock(name string) *Block {
 	}
 }
 
+func (b *Block) IsJoinBlock() bool {
+	return len(b.Preds) > 1
+}
+
+func (b *Block) IsBrBlock() bool {
+	return len(b.Succs) > 1
+}
+
 func (b *Block) HasPred(block *Block) bool {
 	_, exists := b.Preds[block.ID]
 	return exists

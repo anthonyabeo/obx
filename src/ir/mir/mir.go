@@ -53,6 +53,17 @@ func (fn *Function) GetBlock(name string) *Block {
 	return nil
 }
 
+func (fn *Function) RemoveBlock(target *Block) {
+	out := make(map[int]*Block)
+	for _, b := range fn.Blocks {
+		if b != target {
+			out[b.ID] = b
+		}
+	}
+
+	fn.Blocks = out
+}
+
 func (fn *Function) OutputDOT() string {
 	var keys []int
 	for id := range fn.Blocks {
@@ -63,7 +74,6 @@ func (fn *Function) OutputDOT() string {
 	var sb strings.Builder
 	sb.WriteString("digraph CFG {\n")
 	for _, key := range keys {
-
 		block := fn.Blocks[key]
 		label := fmt.Sprintf("%s:\\l", block.Label)
 		for _, instr := range block.Instrs {
