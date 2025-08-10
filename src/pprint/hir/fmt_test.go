@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/anthonyabeo/obx/adt"
+	"github.com/anthonyabeo/obx/cmd/cli"
 	"github.com/anthonyabeo/obx/src/ir/hir"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/sema"
@@ -74,8 +75,14 @@ func TestFormatSampleProgram(t *testing.T) {
 		t.Fatalf("failed to marshal formatted HIR: %v", err)
 	}
 
+	Root, err := cli.FindProjectRoot()
+	if err != nil {
+		t.Errorf("FindProjectRoot failed: %v", err)
+	}
+
 	// Write the JSON to a file for debugging (optional)
-	_ = os.WriteFile("test_output.json", data, 0644)
+	outFile := fmt.Sprintf("%s/out/test_output.json", Root)
+	_ = os.WriteFile(outFile, data, 0644)
 
 	var out map[string]any
 	if err := json.Unmarshal(data, &out); err != nil {
@@ -141,8 +148,14 @@ func TestFormatProgramWithProcedureAndCall(t *testing.T) {
 		t.Fatalf("failed to marshal formatted HIR: %v", err)
 	}
 
+	Root, err := cli.FindProjectRoot()
+	if err != nil {
+		t.Errorf("FindProjectRoot failed: %v", err)
+	}
+
 	// Write the JSON to a file for debugging (optional)
-	_ = os.WriteFile(fmt.Sprintf("%s.json", filename), data, 0644)
+	outputFile := fmt.Sprintf("%s/out/%s.json", Root, filename)
+	_ = os.WriteFile(outputFile, data, 0644)
 
 	var out map[string]any
 	if err := json.Unmarshal(data, &out); err != nil {
@@ -248,7 +261,14 @@ func TestFormatProgramWithMultipleStatementsAndLoop(t *testing.T) {
 		t.Fatalf("failed to marshal formatted HIR: %v", err)
 	}
 
-	_ = os.WriteFile(fmt.Sprintf("%s.json", filename), data, 0644)
+	Root, err := cli.FindProjectRoot()
+	if err != nil {
+		t.Errorf("FindProjectRoot failed: %v", err)
+	}
+
+	// Write the JSON to a file for debugging (optional)
+	outputFile := fmt.Sprintf("%s/out/%s.json", Root, filename)
+	_ = os.WriteFile(outputFile, data, 0644)
 
 	var out map[string]any
 	if err := json.Unmarshal(data, &out); err != nil {

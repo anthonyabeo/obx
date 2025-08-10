@@ -2,10 +2,12 @@ package ast
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/anthonyabeo/obx/adt"
+	"github.com/anthonyabeo/obx/cmd/cli"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
@@ -56,8 +58,14 @@ func TestPrettyPrintJSON(t *testing.T) {
 		t.Fatalf("PrettyPrintJSON failed: %v", err)
 	}
 
+	Root, err := cli.FindProjectRoot()
+	if err != nil {
+		t.Errorf("FindProjectRoot failed: %v", err)
+	}
+
 	// Write the JSON to a file for debugging (optional)
-	_ = os.WriteFile("test_output.json", data, 0644)
+	outFile := fmt.Sprintf("%s/out/test_output.json", Root)
+	_ = os.WriteFile(outFile, data, 0644)
 
 	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {
