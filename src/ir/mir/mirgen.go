@@ -113,8 +113,12 @@ func (g *Generator) genFunction(h *hir.Function) *Function {
 	}
 
 	entry := NewBlock("entry")
-	g.build.SetBlock(entry)
+
 	fn.Blocks[entry.ID] = entry
+	fn.Entry = entry
+
+	// mark "entry" as currently active block for inserting instructions
+	g.build.SetBlock(entry)
 
 	g.genCompoundStmt(h.Body)
 
