@@ -58,6 +58,8 @@ func BuildCFG(fn *mir.Function) {
 			s.Preds[blk.ID] = blk
 		}
 	}
+
+	CleanCFG(fn)
 }
 
 func CleanCFG(f *mir.Function) {
@@ -83,85 +85,116 @@ func CleanCFG(f *mir.Function) {
 	}
 }
 
-//func ComputeDominators(fn *mir.Function) map[*mir.Block]map[*mir.Block]bool {
-//	blocks := fn.Blocks
-//	dom := map[*mir.Block]map[*mir.Block]bool{}
-//	all := map[*mir.Block]bool{}
-//	for _, b := range blocks {
-//		all[b] = true
-//	}
-//
-//	// init
-//	for _, b := range blocks {
-//		dom[b] = map[*mir.Block]bool{}
-//		if b == fn.Entry {
-//			dom[b][b] = true
-//		} else {
-//			for bb := range all {
-//				dom[b][bb] = true
-//			}
-//		}
-//	}
-//
-//	changed := true
-//	for changed {
-//		changed = false
-//		for _, b := range blocks {
-//			if b == fn.Entry {
-//				continue
-//			}
-//			// intersect doms of preds
-//			newdom := copySet(all) // start with all, then intersect
-//			first := true
-//			for _, p := range b.Preds {
-//				if first {
-//					newdom = copyMap(dom[p])
-//					first = false
-//				} else {
-//					newdom = intersect(newdom, dom[p])
-//				}
-//			}
-//			newdom[b] = true
-//			if !equalSets(newdom, dom[b]) {
-//				dom[b] = newdom
-//				changed = true
-//			}
-//		}
-//	}
-//	return dom
-//}
+func ComputeDominators(fn *mir.Function) map[*mir.Block]map[*mir.Block]struct{} {
+	doms := make(map[*mir.Block]map[*mir.Block]struct{})
 
-//func ComputeDominanceFrontiers(fn *mir.Function, idom map[*mir.Block]*mir.Block) map[*mir.Block][]*mir.Block {
-//	// compute children in dominator tree
-//	children := map[*mir.Block][]*mir.Block{}
-//	for b, p := range idom {
-//		if p != nil {
-//			children[p] = append(children[p], b)
-//		}
-//	}
-//	DF := map[*mir.Block]map[*mir.Block]bool{}
-//	for _, b := range fn.Blocks {
-//		DF[b] = map[*mir.Block]bool{}
-//	}
-//
-//	// for each block b:
-//	for _, b := range fn.Blocks {
-//		if len(b.Preds) >= 2 {
-//			for _, p := range b.Preds {
-//				runner := p
-//				for runner != nil && runner != idom[b] {
-//					DF[runner][b] = true
-//					runner = idom[runner]
-//				}
-//			}
-//		}
-//	}
-//	// convert map->slice
-//	result := map[*mir.Block][]*mir.Block{}
-//	for b, set := range DF {
-//		for x := range set {
-//			result[b] = append(result[b], x)
-//		}
-//	}
-//	return result
-//}
+	blocks := fn.Blocks
+
+	// Step 1: initialize
+	for _, b := range blocks {
+		doms[b] = make(map[*mir.Block]struct{})
+		if b == fn.Entry {
+			doms[b][b] = struct{}{}
+		} else {
+			// Start with all blocks
+			for _, bb := range blocks {
+				doms[b][bb] = struct{}{}
+			}
+		}
+	}
+
+	changed := true
+	for changed {
+		changed = false
+		for _, b := range blocks {
+			if b == fn.Entry {
+				continue
+			}
+			// Intersection of predecessors
+			newDom := intersectAllPreds(doms, b.Predecessors())
+			// Add self
+			newDom[b] = struct{}{}
+
+			if !sameSet(doms[b], newDom) {
+				doms[b] = newDom
+				changed = true
+			}
+		}
+	}
+
+	return doms
+}
+
+func ImmediateDominators(fn *mir.Function, doms map[*mir.Block]map[*mir.Block]struct{}) map[*mir.Block]*mir.Block {
+	idom := make(map[*mir.Block]*mir.Block)
+	for _, b := range fn.Blocks {
+		if b == fn.Entry {
+			idom[b] = nil // Entry has no idom
+			continue
+		}
+
+		// candidates = dominators except b itself
+		candidates := make(map[*mir.Block]struct{})
+		for d := range doms[b] {
+			if d != b {
+				candidates[d] = struct{}{}
+			}
+		}
+
+		// pick the one that is not dominated by any other candidate
+		var immediate *mir.Block
+		for c := range candidates {
+			isImmediate := true
+			for other := range candidates {
+				if other != c {
+					if _, ok := doms[other][c]; ok {
+						// c is dominated by other, so it's not immediate
+						isImmediate = false
+						break
+					}
+				}
+			}
+			if isImmediate {
+				immediate = c
+				break
+			}
+		}
+		idom[b] = immediate
+	}
+
+	fn.Dom.IDom = idom
+	fn.Dom.DomTree = DominatorTree(idom)
+
+	return idom
+}
+
+func DominatorTree(idom map[*mir.Block]*mir.Block) map[*mir.Block][]*mir.Block {
+	tree := make(map[*mir.Block][]*mir.Block)
+	for b, parent := range idom {
+		if parent != nil {
+			tree[parent] = append(tree[parent], b)
+		}
+	}
+	return tree
+}
+
+func ComputeDF(fn *mir.Function, idom map[*mir.Block]*mir.Block) map[*mir.Block][]*mir.Block {
+	df := make(map[*mir.Block][]*mir.Block)
+
+	for _, b := range fn.Blocks {
+		if b.IsJoinBlock() {
+			for _, p := range b.Preds {
+				runner := p
+				for runner != idom[b] {
+					if !contains(df[runner], b) {
+						df[runner] = append(df[runner], b)
+					}
+					runner = idom[runner]
+				}
+			}
+		}
+	}
+
+	fn.Dom.DF = df
+	return df
+}
