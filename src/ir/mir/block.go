@@ -26,6 +26,14 @@ type DominatorTree struct {
 	DF      map[*Block][]*Block // Dominance frontiers
 }
 
+func NewDominatorTree() *DominatorTree {
+	return &DominatorTree{
+		IDom:    make(map[*Block]*Block),
+		DomTree: make(map[*Block][]*Block),
+		DF:      make(map[*Block][]*Block),
+	}
+}
+
 var BlockID int
 
 type Block struct {
@@ -60,4 +68,13 @@ func (b *Block) IsBrBlock() bool {
 func (b *Block) HasPred(block *Block) bool {
 	_, exists := b.Preds[block.ID]
 	return exists
+}
+
+func (b *Block) Predecessors() []*Block {
+	values := make([]*Block, 0, len(b.Preds))
+	for _, v := range b.Preds {
+		values = append(values, v)
+	}
+
+	return values
 }
