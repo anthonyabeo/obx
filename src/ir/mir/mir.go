@@ -30,7 +30,7 @@ type Function struct {
 
 	TempMap map[string]*Temp // optional: for SSA or debug
 	SSAInfo *SSAInfo
-	DomTree *DominatorTree
+	Dom     *DominatorTree
 
 	Constants map[string]*Const
 }
@@ -41,6 +41,7 @@ func NewFunction(name string, ret Type) *Function {
 		Result: ret,
 		Blocks: make(map[int]*Block),
 		Params: make(map[string]Value),
+		Dom:    NewDominatorTree(),
 	}
 }
 
@@ -54,14 +55,59 @@ func (fn *Function) GetBlock(name string) *Block {
 }
 
 func (fn *Function) RemoveBlock(target *Block) {
-	out := make(map[int]*Block)
-	for _, b := range fn.Blocks {
-		if b != target {
-			out[b.ID] = b
+	delete(fn.Blocks, target.ID)
+}
+
+// DFSOrder returns the blocks in depth-first order starting from entry.
+func (fn *Function) DFSOrder() []int {
+	visited := make(map[int]bool)
+	order := []int{}
+
+	var dfs func(b *Block)
+	dfs = func(b *Block) {
+		if visited[b.ID] {
+			return
+		}
+		visited[b.ID] = true
+		order = append(order, b.ID)
+		for _, succ := range b.Succs {
+			dfs(succ)
 		}
 	}
 
-	fn.Blocks = out
+	if len(fn.Blocks) > 0 {
+		dfs(fn.Entry)
+	}
+	return order
+}
+
+// ReversePostOrder returns blocks in reverse postorder from entry.
+func (fn *Function) ReversePostOrder() []int {
+	visited := make(map[int]bool)
+	postorder := []int{}
+
+	var dfs func(b *Block)
+	dfs = func(b *Block) {
+		if visited[b.ID] {
+			return
+		}
+		visited[b.ID] = true
+		for _, succ := range b.Succs {
+			dfs(succ)
+		}
+		postorder = append(postorder, b.ID)
+	}
+
+	if len(fn.Blocks) > 0 {
+		dfs(fn.Entry)
+	}
+
+	// reverse
+	rpo := make([]int, len(postorder))
+	for i := range postorder {
+		rpo[len(postorder)-1-i] = postorder[i]
+	}
+	return rpo
 }
 
 func (fn *Function) OutputDOT() string {
