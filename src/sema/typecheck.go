@@ -14,6 +14,8 @@ import (
 
 type TypeChecker struct {
 	ctx *report.Context
+
+	varOffset int
 }
 
 func NewTypeChecker(ctx *report.Context) *TypeChecker {
@@ -2762,8 +2764,11 @@ func (t *TypeChecker) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 func (t *TypeChecker) VisitVariableDecl(decl *ast.VariableDecl) any {
 	ty := decl.Type.Accept(t).(types.Type)
 	for _, id := range decl.IdentList {
+		id.Symbol.SetOffset(t.varOffset)
 		id.Symbol.SetType(ty)
 		id.SemaType = ty
+
+		t.varOffset += alignTo(ty.Width(), ty.Alignment())
 	}
 
 	return decl
@@ -3675,6 +3680,10 @@ func (t *TypeChecker) assertConst(expr ast.Expression) {
 }
 
 func (t *TypeChecker) checkTypeBoundRedefinition(proc *ast.ProcedureDecl) {
+	offset := t.varOffset
+	t.varOffset = 0
+	defer func() { t.varOffset = offset }()
+
 	if proc.Kind != ast.TypeBoundProcedureKind || proc.Head.Rcv == nil {
 		return // not a type-bound procedure
 	}

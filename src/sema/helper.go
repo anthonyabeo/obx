@@ -2,6 +2,7 @@ package sema
 
 import (
 	"fmt"
+
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/types"
 )
@@ -143,4 +144,14 @@ func IsValidGuardExpr(expr ast.Expression) bool {
 		return types.IsRecord(vt)
 	}
 	return false
+}
+
+// alignTo rounds `offset` up to the nearest multiple of `alignment`.
+// alignment must be a power of two.
+func alignTo(offset, alignment int) int {
+	if alignment <= 0 {
+		panic("alignment must be > 0")
+	}
+	mask := alignment - 1
+	return (offset + mask) &^ mask
 }

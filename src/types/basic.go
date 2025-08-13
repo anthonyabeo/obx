@@ -49,9 +49,7 @@ type BasicType struct {
 
 func (b *BasicType) Width() int { return b.Size }
 
-func (b *BasicType) Alignment() int {
-	panic("Not implemented")
-}
+func (b *BasicType) Alignment() int { return b.Align }
 
 func (b *BasicType) String() string {
 	return basicKindToString[b.Kind]

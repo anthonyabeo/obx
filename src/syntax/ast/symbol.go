@@ -63,6 +63,7 @@ type Symbol interface {
 	SetMangledName(string)
 	MangledName() string
 	Offset() int
+	SetOffset(int)
 }
 
 type TypeSymbol struct {
@@ -87,6 +88,7 @@ func (t *TypeSymbol) Props() IdentProps              { return t.props }
 func (t *TypeSymbol) MangledName() string            { return t.mangledName }
 func (t *TypeSymbol) SetMangledName(name string)     { t.mangledName = name }
 func (t *TypeSymbol) Offset() int                    { return t.Displace }
+func (t *TypeSymbol) SetOffset(disp int)             { t.Displace = disp }
 
 func NewTypeSymbol(name string, props IdentProps, typ Type) *TypeSymbol {
 	return &TypeSymbol{name: name, kind: TypeSymbolKind, props: props, astType: typ}
@@ -128,6 +130,7 @@ func (p *ProcedureSymbol) Type() types.Type               { return p.semaType }
 func (p *ProcedureSymbol) SetType(ty types.Type)          { p.semaType = ty }
 func (p *ProcedureSymbol) AstType() Type                  { return p.astType }
 func (p *ProcedureSymbol) Offset() int                    { return p.Displace }
+func (p *ProcedureSymbol) SetOffset(disp int)             { p.Displace = disp }
 
 type ModuleSymbol struct {
 	name        string
@@ -155,6 +158,7 @@ func (m *ModuleSymbol) MangledName() string            { return m.mangledName }
 func (m *ModuleSymbol) SetMangledName(name string)     { m.mangledName = name }
 func (m *ModuleSymbol) AstType() Type                  { return nil }
 func (m *ModuleSymbol) Offset() int                    { return m.Displace }
+func (m *ModuleSymbol) SetOffset(disp int)             { m.Displace = disp }
 
 type VariableSymbol struct {
 	name        string
@@ -181,6 +185,7 @@ func (v *VariableSymbol) Props() IdentProps              { return v.props }
 func (v *VariableSymbol) MangledName() string            { return v.mangledName }
 func (v *VariableSymbol) SetMangledName(name string)     { v.mangledName = name }
 func (v *VariableSymbol) Offset() int                    { return v.Displace }
+func (v *VariableSymbol) SetOffset(disp int)             { v.Displace = disp }
 
 type ConstantSymbol struct {
 	name        string
@@ -207,6 +212,7 @@ func (c *ConstantSymbol) MangledName() string            { return c.mangledName 
 func (c *ConstantSymbol) SetMangledName(name string)     { c.mangledName = name }
 func (c *ConstantSymbol) AstType() Type                  { return nil }
 func (c *ConstantSymbol) Offset() int                    { return c.Displace }
+func (c *ConstantSymbol) SetOffset(disp int)             { c.Displace = disp }
 
 type FieldSymbol struct {
 	name        string
@@ -233,6 +239,7 @@ func (f *FieldSymbol) Props() IdentProps             { return f.props }
 func (f *FieldSymbol) MangledName() string           { return f.mangledName }
 func (f *FieldSymbol) SetMangledName(name string)    { f.mangledName = name }
 func (f *FieldSymbol) Offset() int                   { return f.Displace }
+func (f *FieldSymbol) SetOffset(disp int)            { f.Displace = disp }
 
 type ParamSymbol struct {
 	name        string
@@ -260,6 +267,7 @@ func (p *ParamSymbol) MangledName() string            { return p.mangledName }
 func (p *ParamSymbol) SetMangledName(name string)     { p.mangledName = name }
 func (p *ParamSymbol) AstType() Type                  { return p.astType }
 func (p *ParamSymbol) Offset() int                    { return p.Displace }
+func (p *ParamSymbol) SetOffset(disp int)             { p.Displace = disp }
 
 func Mangle(sym Symbol) string {
 	var parts []string
