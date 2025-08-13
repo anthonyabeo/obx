@@ -5,24 +5,24 @@ import (
 )
 
 type Value interface {
-	value()
 	Name() string
+	BaseName() string
 	String() string
 	Type() Type
 }
 
 var (
-	True  = IntegerConst{Value: 1, Signed: true, Bits: 1, Typ: Int1Type}
-	False = IntegerConst{Value: 0, Signed: true, Bits: 1, Typ: Int1Type}
+	True  = &IntegerConst{Value: 1, Signed: true, Bits: 1, Typ: Int1Type}
+	False = &IntegerConst{Value: 0, Signed: true, Bits: 1, Typ: Int1Type}
 )
 
 type (
 	Temp struct {
-		ID      string
-		SrcName string
-		Typ     Type
-		Offset  int
-		Size    int
+		ID     string
+		BName  string
+		Typ    Type
+		Offset int
+		Size   int
 	}
 
 	Const struct {
@@ -58,6 +58,7 @@ type (
 
 	Global struct {
 		NameStr string
+		BName   string
 		Kind    string
 		Typ     Type
 		Value   any
@@ -66,43 +67,48 @@ type (
 	}
 
 	Addr struct {
-		Src *Temp
+		Src Value
 	}
 )
 
-func (Temp) value()         {}
-func (Const) value()        {}
-func (IntegerConst) value() {}
-func (FloatConst) value()   {}
-func (CharConst) value()    {}
-func (StrConst) value()     {}
-func (Global) value()       {}
+func (o *Temp) Type() Type       { return o.Typ }
+func (o *Temp) Name() string     { return o.ID }
+func (o *Temp) BaseName() string { return o.BName }
+func (o *Temp) String() string   { return o.ID }
 
-func (o Temp) Type() Type         { return o.Typ }
-func (o Const) Type() Type        { return o.Typ }
-func (o IntegerConst) Type() Type { return o.Typ }
-func (o FloatConst) Type() Type   { return o.Typ }
-func (o CharConst) Type() Type    { return o.Typ }
-func (o StrConst) Type() Type     { return o.Typ }
-func (o Global) Type() Type       { return o.Typ }
+func (o Const) Type() Type       { return o.Typ }
+func (o Const) Name() string     { return o.ID }
+func (o Const) BaseName() string { return o.ID }
+func (o Const) String() string   { return o.ID }
 
-func (o Temp) Name() string         { return o.ID }
-func (o Const) Name() string        { return o.ID }
-func (o IntegerConst) Name() string { return fmt.Sprintf("%v", o.Value) }
-func (o FloatConst) Name() string   { return fmt.Sprintf("%v", o.Value) }
-func (o CharConst) Name() string    { return fmt.Sprintf("%v", o.Value) }
-func (o StrConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
-func (o Global) Name() string       { return o.NameStr }
+func (o IntegerConst) Type() Type       { return o.Typ }
+func (o IntegerConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
+func (o IntegerConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }
+func (o IntegerConst) String() string   { return fmt.Sprintf("%d", o.Value) }
 
-func (o Temp) String() string         { return o.ID }
-func (o Const) String() string        { return o.ID }
-func (o IntegerConst) String() string { return fmt.Sprintf("%d", o.Value) }
+func (o FloatConst) Type() Type       { return o.Typ }
+func (o FloatConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
+func (o FloatConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }
 func (o FloatConst) String() string   { return fmt.Sprintf("%f", o.Value) }
-func (o CharConst) String() string    { return fmt.Sprintf("%v", o.Value) }
-func (o StrConst) String() string     { return fmt.Sprintf("%s", o.Value) }
-func (o Global) String() string       { return o.NameStr }
 
-func (a *Addr) value()         {}
-func (a *Addr) Type() Type     { return &PointerType{Ref: a.Src.Type()} }
-func (a *Addr) Name() string   { return "&" + a.Src.ID }
-func (a *Addr) String() string { return "&" + a.Src.ID }
+func (o CharConst) Type() Type       { return o.Typ }
+func (o CharConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
+func (o CharConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }
+func (o CharConst) String() string   { return fmt.Sprintf("%v", o.Value) }
+
+func (StrConst) value()             {}
+func (o StrConst) Type() Type       { return o.Typ }
+func (o StrConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
+func (o StrConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }
+func (o StrConst) String() string   { return fmt.Sprintf("%s", o.Value) }
+
+func (o *Global) Type() Type          { return o.Typ }
+func (o *Global) Name() string        { return o.NameStr }
+func (o *Global) BaseName() string    { return o.BName }
+func (o *Global) SetName(name string) { o.NameStr = name }
+func (o *Global) String() string      { return o.NameStr }
+
+func (a Addr) Type() Type       { return &PointerType{Ref: a.Src.Type()} }
+func (a Addr) Name() string     { return "&" + a.Src.Name() }
+func (a Addr) BaseName() string { return "&" + a.Src.Name() }
+func (a Addr) String() string   { return "&" + a.Src.Name() }
