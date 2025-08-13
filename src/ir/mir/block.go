@@ -1,23 +1,96 @@
 package mir
 
+import "fmt"
+
 type SSAInfo struct {
 	// Current version for each variable (used during renaming)
 	VersionCounter map[string]int
 
 	// Stack of SSA names per source name (used in recursive renaming)
-	VersionStack map[string][]*Temp
+	VersionStack map[string][]string
 
 	// Map of block labels to φ-functions inserted there
-	PhiFuncs map[string][]*Phi
+	PhiFuncs map[string][]*PhiInst
 
 	// Optional: Def-to-Use or Use-to-Def chains
-	DefSites map[*Temp]*Block
-	UseSites map[*Temp][]Instr
+	DefSites map[string]map[*Block]struct{}
+	UseSites map[string]map[*Block]struct{}
 }
 
-type Phi struct {
-	Target Temp
-	Args   map[*Block]Value // one incoming value per predecessor block
+func NewSSAInfo() *SSAInfo {
+	return &SSAInfo{
+		VersionCounter: make(map[string]int),
+		VersionStack:   make(map[string][]string),
+		PhiFuncs:       make(map[string][]*PhiInst),
+		DefSites:       make(map[string]map[*Block]struct{}),
+		UseSites:       make(map[string]map[*Block]struct{}),
+	}
+}
+
+func (r *SSAInfo) NewValue(v Value) Value {
+	switch value := v.(type) {
+	case *Temp:
+		return &Temp{
+			ID:     r.Current(value.BName),
+			BName:  value.BName,
+			Typ:    value.Typ,
+			Offset: value.Offset,
+			Size:   value.Size,
+		}
+	case *Global:
+		return &Global{
+			NameStr: r.Current(value.BName),
+			BName:   value.BName,
+			Kind:    value.Kind,
+			Typ:     value.Typ,
+			Value:   value.Value,
+			Offset:  value.Offset,
+			Size:    value.Size,
+		}
+	case *IntegerConst, *FloatConst, *CharConst, *StrConst, *Const:
+		return value
+	case *Addr:
+		panic("not implemented: Addr in SSA")
+	default:
+		panic(fmt.Sprintf("unknown value type in SSA: %T", v))
+	}
+}
+
+func (r *SSAInfo) Push(v string) string {
+	id := r.VersionCounter[v]
+	r.VersionCounter[v]++
+
+	newName := fmt.Sprintf("%s.%d", v, id)
+	r.VersionStack[v] = append(r.VersionStack[v], newName)
+	return newName
+}
+
+// Current name (top of stack) or original if none
+func (r *SSAInfo) Current(v string) string {
+	s := r.VersionStack[v]
+	if len(s) == 0 {
+		return v
+	}
+	return s[len(s)-1]
+}
+
+// Pop name
+func (r *SSAInfo) Pop(v string) {
+	s := r.VersionStack[v]
+	if len(s) == 0 {
+		return
+	}
+	r.VersionStack[v] = s[:len(s)-1]
+}
+
+// BaseName returns original var base (strip ".N" suffix if present)
+func (r *SSAInfo) BaseName(v string) string {
+	for i := len(v) - 1; i >= 0; i-- {
+		if v[i] == '.' {
+			return v[:i]
+		}
+	}
+	return v
 }
 
 type DominatorTree struct {
@@ -77,4 +150,21 @@ func (b *Block) Predecessors() []*Block {
 	}
 
 	return values
+}
+
+func (b *Block) HasPhi(v string) bool {
+	for _, ins := range b.Instrs {
+		if p, ok := ins.(*PhiInst); ok {
+			if p.Target.Name() == v {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// AddPhi inserts a phi node for v at the top of b (preserving order)
+func (b *Block) AddPhi(p *PhiInst) {
+	// Insert at beginning to ensure φs come before other instructions
+	b.Instrs = append([]Instr{p}, b.Instrs...)
 }
