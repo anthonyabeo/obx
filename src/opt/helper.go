@@ -123,3 +123,28 @@ func VizCFG(fn *mir.Function) error {
 
 	return nil
 }
+
+func VizSSA(fn *mir.Function) error {
+	dot := fn.OutputDOT()
+
+	Root, err := cli.FindProjectRoot()
+	if err != nil {
+		return err
+	}
+
+	dotFile := fmt.Sprintf("%s/out/%s.ssa.cfg.dot", Root, fn.Name)
+	pngFile := fmt.Sprintf("%s/out/%s.ssa.cfg.png", Root, fn.Name)
+
+	if err := os.WriteFile(dotFile, []byte(dot), 0644); err != nil {
+		return err
+	}
+
+	cmd := exec.Command("dot", "-Tpng", dotFile, "-o", pngFile)
+	if err := cmd.Run(); err != nil {
+		return err
+	} else {
+		fmt.Printf("Generated %s\n", pngFile)
+	}
+
+	return nil
+}
