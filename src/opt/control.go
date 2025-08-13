@@ -162,9 +162,6 @@ func ImmediateDominators(fn *mir.Function, doms map[*mir.Block]map[*mir.Block]st
 		idom[b] = immediate
 	}
 
-	fn.Dom.IDom = idom
-	fn.Dom.DomTree = DominatorTree(idom)
-
 	return idom
 }
 
@@ -195,6 +192,46 @@ func ComputeDF(fn *mir.Function, idom map[*mir.Block]*mir.Block) map[*mir.Block]
 		}
 	}
 
-	fn.Dom.DF = df
 	return df
+}
+
+func ComputeDefUse(fn *mir.Function) (map[string]map[*mir.Block]struct{},
+	map[string]map[*mir.Block]struct{}) {
+	defSites := make(map[string]map[*mir.Block]struct{})
+	useSites := make(map[string]map[*mir.Block]struct{})
+
+	for _, b := range fn.Blocks {
+		for _, instr := range b.Instrs {
+			if instr.Def() != nil {
+				if defSites[instr.Def().Name()] == nil {
+					defSites[instr.Def().Name()] = make(map[*mir.Block]struct{})
+				}
+				defSites[instr.Def().Name()][b] = struct{}{}
+			}
+
+			// record uses
+			for _, arg := range instr.Uses() {
+				if useSites[arg.Name()] == nil {
+					useSites[arg.Name()] = make(map[*mir.Block]struct{})
+				}
+				useSites[arg.Name()][b] = struct{}{}
+			}
+		}
+	}
+
+	return defSites, useSites
+}
+
+func ComputeDom(fn *mir.Function) {
+	dom := ComputeDominators(fn)
+	idom := ImmediateDominators(fn, dom)
+	tree := DominatorTree(idom)
+	df := ComputeDF(fn, idom)
+	defSites, useSites := ComputeDefUse(fn)
+
+	fn.Dom.DomTree = tree
+	fn.Dom.IDom = idom
+	fn.Dom.DF = df
+	fn.SSAInfo.DefSites = defSites
+	fn.SSAInfo.UseSites = useSites
 }
