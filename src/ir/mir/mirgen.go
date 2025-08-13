@@ -31,46 +31,53 @@ func (g *Generator) Generate(prog *hir.Program) *Program {
 }
 
 func (g *Generator) genModule(module *hir.Module) *Module {
-
-	fxn := make([]*Function, 0)
+	env := NewSymbolTable(nil)
+	functions := make([]*Function, 0)
 	globals := make(map[string]*Global)
 
 	for _, decl := range module.Decls {
 		switch d := decl.(type) {
 		case *hir.Function:
-			fxn = append(fxn, g.genFunction(d))
+			functions = append(functions, g.genFunction(d, NewSymbolTable(env)))
 		case *hir.Constant:
-			globals[d.Name] = &Global{
+			g := &Global{
 				NameStr: d.Name,
+				BName:   d.Name,
 				Kind:    "CONST",
 				Typ:     g.genType(d.Type),
 				Value:   g.genValue(d.Value),
 				Offset:  d.Offset,
 				Size:    d.Size,
 			}
+			globals[d.Name] = g
+			env.Define(g.NameStr, g)
 		case *hir.Variable:
-			globals[d.Name] = &Global{
+			g := &Global{
 				NameStr: d.Name,
+				BName:   d.Name,
 				Kind:    "VAR",
 				Typ:     g.genType(d.Type),
 				Offset:  d.Offset,
 				Size:    d.Size,
 			}
+			globals[d.Name] = g
+			env.Define(g.NameStr, g)
 		}
 	}
 
-	fxn = append(fxn, g.genFunction(module.Init))
+	functions = append(functions, g.genFunction(module.Init, NewSymbolTable(env)))
 
 	return &Module{
 		Name:    module.Name,
 		IsEntry: module.IsEntry,
 		Globals: globals,
-		Funcs:   fxn,
+		Funcs:   functions,
+		Env:     env,
 	}
 }
 
-func (g *Generator) genFunction(h *hir.Function) *Function {
-	fn := NewFunction(h.Name, g.genType(h.Result))
+func (g *Generator) genFunction(h *hir.Function, env *SymbolTable) *Function {
+	fn := NewFunction(h.Name, g.genType(h.Result), env)
 
 	currentFn := g.build.Func
 	defer func() { g.build.Func = currentFn }()
@@ -80,11 +87,14 @@ func (g *Generator) genFunction(h *hir.Function) *Function {
 	for _, param := range h.Params {
 		switch param.Kind {
 		case hir.ValueParam, hir.InParam:
-			fn.Params[param.Name] = &Temp{
-				ID:      param.Name,
-				SrcName: param.Name,
-				Typ:     g.genType(param.Typ),
+			t := &Temp{
+				ID:    param.Name,
+				BName: param.Name,
+				Typ:   g.genType(param.Typ),
 			}
+
+			fn.Params[param.Name] = t
+			fn.Env.Define(t.ID, t)
 		case hir.VarParam:
 		}
 	}
@@ -92,13 +102,15 @@ func (g *Generator) genFunction(h *hir.Function) *Function {
 	for _, local := range h.Locals {
 		switch d := local.(type) {
 		case *hir.Variable:
-			fn.Locals = append(fn.Locals, &Temp{
-				ID:      d.Name,
-				SrcName: d.Name,
-				Typ:     g.genType(d.Type),
-				Offset:  d.Offset,
-				Size:    d.Size,
-			})
+			t := &Temp{
+				ID:     d.Name,
+				BName:  d.Name,
+				Typ:    g.genType(d.Type),
+				Offset: d.Offset,
+				Size:   d.Size,
+			}
+			fn.Locals = append(fn.Locals, t)
+			fn.Env.Define(t.ID, t)
 		case *hir.Constant:
 			c := &Const{
 				ID:     d.Name,
@@ -108,6 +120,7 @@ func (g *Generator) genFunction(h *hir.Function) *Function {
 				Size:   d.Size,
 			}
 			fn.Constants[d.Mangled] = c
+			fn.Env.Define(c.ID, c)
 		case *hir.Function:
 		}
 	}
@@ -348,17 +361,18 @@ func (g *Generator) genValue(e hir.Expr) Value {
 	case *hir.SetExpr:
 	case *hir.RangeExpr:
 	case *hir.VariableRef:
-		return &Temp{
-			ID:      e.Name,
-			SrcName: e.Name,
-			Offset:  e.Offset,
-			Size:    e.Size,
-			Typ:     g.genType(e.SemaType),
+		if v, found := g.build.Func.Env.Lookup(e.Name); found {
+			return v
 		}
+
+		panic(fmt.Sprintf("undefined variable: '%s'", e.Name))
 	case *hir.ConstantRef:
 		return g.build.Func.Constants[e.Mangled].Value
 	case *hir.Param:
-		return g.build.Func.Params[e.Name]
+		if v, found := g.build.Func.Env.Lookup(e.Name); found {
+			return v
+		}
+		panic(fmt.Sprintf("undefined parameter: '%s'", e.Name))
 	case *hir.FunctionRef:
 	case *hir.TypeRef:
 	case *hir.FieldAccess:

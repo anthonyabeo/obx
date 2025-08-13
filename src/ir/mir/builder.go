@@ -17,9 +17,10 @@ func NewBuilder() *Builder {
 	return &Builder{}
 }
 
-func (b *Builder) NewTemp() Temp {
+func (b *Builder) NewTemp() *Temp {
 	b.TempGen++
-	return Temp{ID: fmt.Sprintf("t%d", b.TempGen)}
+	name := fmt.Sprintf("t%d", b.TempGen)
+	return &Temp{ID: name, BName: name}
 }
 
 func (b *Builder) NewLabel(prefix string) string {

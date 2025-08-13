@@ -17,6 +17,7 @@ type Module struct {
 	IsEntry bool
 	Globals map[string]*Global
 	Funcs   []*Function
+	Env     *SymbolTable
 }
 
 type Function struct {
@@ -33,15 +34,19 @@ type Function struct {
 	Dom     *DominatorTree
 
 	Constants map[string]*Const
+	Env       *SymbolTable // symbol table for this function
 }
 
-func NewFunction(name string, ret Type) *Function {
+func NewFunction(name string, ret Type, env *SymbolTable) *Function {
 	return &Function{
-		Name:   name,
-		Result: ret,
-		Blocks: make(map[int]*Block),
-		Params: make(map[string]Value),
-		Dom:    NewDominatorTree(),
+		Name:    name,
+		Result:  ret,
+		Env:     env,
+		TempMap: make(map[string]*Temp),
+		Blocks:  make(map[int]*Block),
+		Params:  make(map[string]Value),
+		Dom:     NewDominatorTree(),
+		SSAInfo: NewSSAInfo(),
 	}
 }
 
@@ -132,4 +137,32 @@ func (fn *Function) OutputDOT() string {
 	}
 	sb.WriteString("}\n")
 	return sb.String()
+}
+
+type SymbolTable struct {
+	Parent  *SymbolTable
+	Symbols map[string]Value
+}
+
+// NewSymbolTable creates a new symbol table with an optional parent.
+func NewSymbolTable(parent *SymbolTable) *SymbolTable {
+	return &SymbolTable{
+		Parent:  parent,
+		Symbols: make(map[string]Value),
+	}
+}
+
+// Define adds a symbol to the current table.
+func (st *SymbolTable) Define(name string, val Value) {
+	st.Symbols[name] = val
+}
+
+// Lookup searches for a symbol, checking parents up to the module.
+func (st *SymbolTable) Lookup(name string) (Value, bool) {
+	for table := st; table != nil; table = table.Parent {
+		if val, ok := table.Symbols[name]; ok {
+			return val, true
+		}
+	}
+	return nil, false
 }
