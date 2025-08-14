@@ -13,6 +13,12 @@ type Instr interface {
 	ReplaceDef(Value)
 }
 
+type Foldable interface {
+	Instr
+	CanFold() bool
+	Fold() Value
+}
+
 type (
 	CmpInst struct {
 		Target Value
@@ -164,6 +170,77 @@ func (b *BinaryInst) ReplaceUses(m map[string]Value) {
 	}
 }
 func (b *BinaryInst) ReplaceDef(t Value) { b.Target = t }
+func (b *BinaryInst) CanFold() bool {
+	_, okLeft := b.Left.(Constant)
+	_, okRight := b.Right.(Constant)
+	return okLeft && okRight
+}
+func (b *BinaryInst) Fold() Value {
+	switch b.Op {
+	case ADD:
+		leftConst, okLeft := b.Left.(*IntegerConst)
+		rightConst, okRight := b.Right.(*IntegerConst)
+		if okLeft && okRight {
+			sum := leftConst.Value + rightConst.Value
+			return &IntegerConst{
+				Value:  sum,
+				Signed: leftConst.Signed,
+				Bits:   leftConst.Bits,
+				Typ:    leftConst.Typ,
+			}
+		}
+
+		sl, okLeft := b.Left.(*StrConst)
+		sr, okRight := b.Right.(*StrConst)
+		if okLeft && okRight {
+			concat := sl.Value + sr.Value
+			return &StrConst{
+				Value: concat,
+				Typ:   sr.Typ,
+			}
+		}
+	case SUB:
+		leftConst, okLeft := b.Left.(*IntegerConst)
+		rightConst, okRight := b.Right.(*IntegerConst)
+		if okLeft && okRight {
+			diff := leftConst.Value - rightConst.Value
+			return &IntegerConst{
+				Value:  diff,
+				Signed: leftConst.Signed,
+				Bits:   leftConst.Bits,
+				Typ:    leftConst.Typ,
+			}
+		}
+	case MUL:
+		leftConst, okLeft := b.Left.(*IntegerConst)
+		rightConst, okRight := b.Right.(*IntegerConst)
+		if okLeft && okRight {
+			product := leftConst.Value * rightConst.Value
+			return &IntegerConst{
+				Value:  product,
+				Signed: leftConst.Signed,
+				Bits:   leftConst.Bits,
+				Typ:    leftConst.Typ,
+			}
+		}
+	case DIV:
+		leftConst, okLeft := b.Left.(*IntegerConst)
+		rightConst, okRight := b.Right.(*IntegerConst)
+		if okLeft && okRight && rightConst.Value != 0 {
+			div := leftConst.Value / rightConst.Value
+			return &IntegerConst{
+				Value:  div,
+				Signed: leftConst.Signed,
+				Bits:   leftConst.Bits,
+				Typ:    leftConst.Typ,
+			}
+		}
+	default:
+		panic(fmt.Sprintf("unsupported binary operation: %s", b.Op))
+	}
+
+	return nil
+}
 
 func (u *UnaryInst) Def() Value    { return u.Target }
 func (u *UnaryInst) Uses() []Value { return []Value{u.Operand} }
@@ -176,6 +253,8 @@ func (u *UnaryInst) ReplaceUses(m map[string]Value) {
 	}
 }
 func (u *UnaryInst) ReplaceDef(t Value) { u.Target = t }
+func (u *UnaryInst) CanFold() bool      { panic("not implemented") }
+func (u *UnaryInst) Fold() bool         { panic("not implemented") }
 
 func (c *CallInst) Def() Value    { return c.Target }
 func (c *CallInst) Uses() []Value { return c.Args }

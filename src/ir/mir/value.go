@@ -11,6 +11,11 @@ type Value interface {
 	Type() Type
 }
 
+type Constant interface {
+	Value
+	Const()
+}
+
 var (
 	True  = &IntegerConst{Value: 1, Signed: true, Bits: 1, Typ: Int1Type}
 	False = &IntegerConst{Value: 0, Signed: true, Bits: 1, Typ: Int1Type}
@@ -81,22 +86,25 @@ func (o Const) Name() string     { return o.ID }
 func (o Const) BaseName() string { return o.ID }
 func (o Const) String() string   { return o.ID }
 
+func (o IntegerConst) Const()           {}
 func (o IntegerConst) Type() Type       { return o.Typ }
 func (o IntegerConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
 func (o IntegerConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }
 func (o IntegerConst) String() string   { return fmt.Sprintf("%d", o.Value) }
 
+func (o FloatConst) Const()           {}
 func (o FloatConst) Type() Type       { return o.Typ }
 func (o FloatConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
 func (o FloatConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }
 func (o FloatConst) String() string   { return fmt.Sprintf("%f", o.Value) }
 
+func (o CharConst) Const()           {}
 func (o CharConst) Type() Type       { return o.Typ }
 func (o CharConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
 func (o CharConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }
 func (o CharConst) String() string   { return fmt.Sprintf("%v", o.Value) }
 
-func (StrConst) value()             {}
+func (StrConst) Const()             {}
 func (o StrConst) Type() Type       { return o.Typ }
 func (o StrConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
 func (o StrConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }

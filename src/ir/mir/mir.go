@@ -26,10 +26,8 @@ type Function struct {
 	Params map[string]Value // formal parameters
 	Locals []Value          // local variable, constant, procedure declarations
 
-	Blocks map[int]*Block // basic blocks (in order, but can build CFG)
-	Entry  *Block         // pointer to entry block
-
-	TempMap map[string]*Temp // optional: for SSA or debug
+	Blocks  map[int]*Block // basic blocks (in order, but can build CFG)
+	Entry   *Block         // pointer to entry block
 	SSAInfo *SSAInfo
 	Dom     *DominatorTree
 
@@ -42,7 +40,6 @@ func NewFunction(name string, ret Type, env *SymbolTable) *Function {
 		Name:    name,
 		Result:  ret,
 		Env:     env,
-		TempMap: make(map[string]*Temp),
 		Blocks:  make(map[int]*Block),
 		Params:  make(map[string]Value),
 		Dom:     NewDominatorTree(),

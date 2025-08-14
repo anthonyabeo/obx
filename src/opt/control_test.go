@@ -298,13 +298,9 @@ func CFGBravo() *mir.Function {
 	blocks[exit.ID] = exit
 
 	fn := &mir.Function{
-		Name:      "Foo",
-		Blocks:    blocks,
-		Entry:     entry,
-		TempMap:   nil,
-		SSAInfo:   nil,
-		Dom:       nil,
-		Constants: nil,
+		Name:   "Foo",
+		Blocks: blocks,
+		Entry:  entry,
 	}
 
 	return fn
@@ -389,13 +385,9 @@ func TestDominatorTree(t *testing.T) {
 	blocks[exit.ID] = exit
 
 	fn := &mir.Function{
-		Name:      "Foo",
-		Blocks:    blocks,
-		Entry:     entry,
-		TempMap:   nil,
-		SSAInfo:   nil,
-		Dom:       nil,
-		Constants: nil,
+		Name:   "Foo",
+		Blocks: blocks,
+		Entry:  entry,
 	}
 
 	dom := ComputeDominators(fn)
