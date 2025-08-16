@@ -136,6 +136,10 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 							Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Pos(), expr.End()),
 						})
 					}
+
+					if elem, ok := arr.Elem.(*types.ArrayType); ok {
+						arr = elem
+					}
 				}
 
 				typ = arr.Elem
@@ -869,7 +873,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 				return
 			}
 
-			dim := tx.(*types.ArrayType).Dimensions()
+			dim := tx.(*types.ArrayType).Dimensions
 			value, err := t.EvalConstUint32(y)
 			if err != nil {
 				t.ctx.Reporter.Report(report.Diagnostic{
@@ -879,7 +883,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 				})
 			}
 
-			if int(value) >= dim {
+			if int(value) >= len(dim) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message:  fmt.Sprintf("ARRAY has fewer than %d dimensions", value+1),
@@ -1778,8 +1782,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 				return
 			}
 
-			dim := types.Underlying(argType.(*types.PointerType).Base).(*types.ArrayType).Dimensions()
-			if dim != len(call.ActualParams[1:]) {
+			dim := types.Underlying(argType.(*types.PointerType).Base).(*types.ArrayType).Dimensions
+			if len(dim) != len(call.ActualParams[1:]) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message: fmt.Sprintf("'%s': expected %d dimension lengths for open array type, got %d",
@@ -2987,28 +2991,45 @@ func (t *TypeChecker) VisitBasicType(ty *ast.BasicType) any {
 }
 
 func (t *TypeChecker) VisitArrayType(ty *ast.ArrayType) any {
+	//elemType := ty.ElemType.Accept(t).(types.Type)
+	//
+	//if ty.LenList == nil || len(ty.LenList.List) == 0 {
+	//	// Open array: create single dimension with Length = -1
+	//	return &types.ArrayType{
+	//		Length: -1,
+	//		Elem:   elemType,
+	//	}
+	//}
+	//
+	//dims := t.VisitLenList(ty.LenList).([]int64)
+	//
+	//// Wrap innermost to outermost
+	//typ := elemType
+	//for i := len(dims) - 1; i >= 0; i-- {
+	//	typ = &types.ArrayType{
+	//		Length: dims[i],
+	//		Elem:   typ,
+	//	}
+	//}
+	//
+	//return typ
 	elemType := ty.ElemType.Accept(t).(types.Type)
 
+	var dims []int64
 	if ty.LenList == nil || len(ty.LenList.List) == 0 {
-		// Open array: create single dimension with Length = -1
-		return &types.ArrayType{
-			Length: -1,
-			Elem:   elemType,
-		}
+		// Open array: single dimension with Length = -1
+		dims = []int64{-1}
+	} else {
+		dims = t.VisitLenList(ty.LenList).([]int64)
 	}
 
-	dims := t.VisitLenList(ty.LenList).([]int64)
-
-	// Wrap innermost to outermost
-	typ := elemType
-	for i := len(dims) - 1; i >= 0; i-- {
-		typ = &types.ArrayType{
-			Length: dims[i],
-			Elem:   typ,
-		}
+	return &types.ArrayType{
+		Length:     dims[0], // Length of the outermost dimension
+		Dimensions: dims,
+		Elem:       elemType,
+		ElemSize:   elemType.Width(),
 	}
 
-	return typ
 }
 
 func (t *TypeChecker) VisitLenList(list *ast.LenList) any {
