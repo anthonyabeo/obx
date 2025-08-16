@@ -71,10 +71,19 @@ type (
 		Size    int
 	}
 
-	Addr struct {
-		Src Value
+	AddrOf struct {
+		Obj Value
+	}
+
+	Mem struct {
+		Addr Value // Address of the memory location
 	}
 )
+
+func (m Mem) Name() string     { return fmt.Sprintf("[%s]", m.Addr.Name()) }
+func (m Mem) BaseName() string { return fmt.Sprintf("[%s]", m.Addr.Name()) }
+func (m Mem) String() string   { return fmt.Sprintf("[%s]", m.Addr.Name()) }
+func (m Mem) Type() Type       { return m.Addr.Type() }
 
 func (o *Temp) Type() Type       { return o.Typ }
 func (o *Temp) Name() string     { return o.ID }
@@ -116,7 +125,7 @@ func (o *Global) BaseName() string    { return o.BName }
 func (o *Global) SetName(name string) { o.NameStr = name }
 func (o *Global) String() string      { return o.NameStr }
 
-func (a Addr) Type() Type       { return &PointerType{Ref: a.Src.Type()} }
-func (a Addr) Name() string     { return "&" + a.Src.Name() }
-func (a Addr) BaseName() string { return "&" + a.Src.Name() }
-func (a Addr) String() string   { return "&" + a.Src.Name() }
+func (a AddrOf) Type() Type       { return &PointerType{Ref: a.Obj.Type()} }
+func (a AddrOf) Name() string     { return "&" + a.Obj.Name() }
+func (a AddrOf) BaseName() string { return "&" + a.Obj.Name() }
+func (a AddrOf) String() string   { return "&" + a.Obj.Name() }
