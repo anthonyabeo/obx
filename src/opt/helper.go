@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
-	"github.com/anthonyabeo/obx/cmd/cli"
 	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
@@ -102,7 +102,7 @@ func printIDoms(idom map[*mir.Block]*mir.Block) {
 func VizCFG(fn *mir.Function) error {
 	dot := fn.OutputDOT()
 
-	Root, err := cli.FindProjectRoot()
+	Root, err := FindProjectRoot()
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func VizCFG(fn *mir.Function) error {
 func VizSSA(fn *mir.Function) error {
 	dot := fn.OutputDOT()
 
-	Root, err := cli.FindProjectRoot()
+	Root, err := FindProjectRoot()
 	if err != nil {
 		return err
 	}
@@ -147,4 +147,22 @@ func VizSSA(fn *mir.Function) error {
 	}
 
 	return nil
+}
+
+func FindProjectRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break // reached root
+		}
+		dir = parent
+	}
+	return "", os.ErrNotExist
 }

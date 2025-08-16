@@ -2,15 +2,18 @@ package cli
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/sema"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/anthonyabeo/obx/src/ir/hir"
+	"github.com/anthonyabeo/obx/src/ir/mir"
+	"github.com/anthonyabeo/obx/src/opt"
 	"github.com/spf13/cobra"
 
 	"github.com/anthonyabeo/obx/modgraph"
 	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
@@ -20,6 +23,11 @@ var buildArgs struct {
 	Path     string
 	TabWidth int
 	Output   string
+
+	OptLevel      int
+	EnablePasses  string
+	DisablePasses string
+	Verbose       bool
 }
 
 var buildCmd = &cobra.Command{
@@ -28,6 +36,11 @@ var buildCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		path, _ := cmd.Flags().GetString("path")
 		tabWidth, _ := cmd.Flags().GetInt("tabWidth")
+
+		optLevel, _ := cmd.Flags().GetInt("optlevel")
+		enablePasses, _ := cmd.Flags().GetString("passes")
+		disablePasses, _ := cmd.Flags().GetString("disable-passes")
+		verbose, _ := cmd.Flags().GetBool("verbose")
 
 		files, err := modgraph.DiscoverModuleFiles(path)
 		if err != nil {
@@ -98,5 +111,33 @@ var buildCmd = &cobra.Command{
 		// semantics analysis
 		s := sema.NewSema(ctx, obx)
 		s.Validate()
+
+		// lowering & opt
+		hirGen := hir.NewGenerator(ctx, obx)
+		hirProgram := hirGen.Generate()
+
+		mirGen := mir.NewGenerator(ctx)
+		mirProgram := mirGen.Generate(hirProgram)
+
+		// Optimization
+		config := map[string]any{
+			"verbose":       verbose,
+			"optlevel":      optLevel,
+			"enablePasses":  enablePasses,
+			"disablePasses": disablePasses,
+		}
+
+		pm := opt.NewPassManager()
+		pm.ConfigurePasses(config)
+
+		for _, module := range mirProgram.Modules {
+			for _, fn := range module.Funcs {
+				opt.SSAConstruct(fn)
+
+				// Run to fixed point
+				pm.RunFixedPoint(fn, 10)
+			}
+		}
+
 	},
 }

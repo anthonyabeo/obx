@@ -8,6 +8,11 @@ func Run() error {
 	buildCmd.Flags().StringVarP(&buildArgs.Output, "output", "o", "", "the name of the output file to produce")
 	buildCmd.Flags().IntVarP(&buildArgs.TabWidth, "tabWidth", "t", 4, "how many space should represent a tab")
 
+	buildCmd.Flags().IntVarP(&buildArgs.OptLevel, "optlevel", "O", 2, "Optimisation level (0-3)")
+	buildCmd.Flags().StringVarP(&buildArgs.EnablePasses, "passes", "P", "", "Comma-separated list of optimisation passes to enable (overrides -O)")
+	buildCmd.Flags().StringVarP(&buildArgs.DisablePasses, "disable-passes", "D", "", "Comma-separated list of optimisation passes to disable")
+	buildCmd.Flags().BoolVarP(&buildArgs.Verbose, "verbose", "V", false, "Output detailed optimization output")
+
 	var rootCmd = &cobra.Command{
 		Use:   "obx",
 		Short: "obx is a tool for managing Oberon+ source code",

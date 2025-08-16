@@ -2,6 +2,7 @@ package opt
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/anthonyabeo/obx/src/ir/mir"
 	mir2 "github.com/anthonyabeo/obx/src/pprint/mir"
@@ -56,17 +57,70 @@ type PassManager struct {
 	Verbose bool
 	passes  []Pass
 	ctx     *PassContext
+
+	defaultO map[int][]string
 }
 
-func NewPassManager(verbose bool) *PassManager {
+func NewPassManager() *PassManager {
 	return &PassManager{
-		Verbose: verbose,
-		passes:  make([]Pass, 0),
-		ctx:     NewPassContext(),
+		passes: make([]Pass, 0),
+		ctx:    NewPassContext(),
+
+		defaultO: map[int][]string{
+			0: {},
+			1: {"constprop", "dce"},
+			2: {"constprop", "dce", "sccp"},
+			3: {"constprop", "dce", "sccp", "loopunroll"},
+		},
 	}
 }
 
 func (pm *PassManager) Add(p Pass) { pm.passes = append(pm.passes, p) }
+
+func (pm *PassManager) ConfigurePasses(config map[string]any) {
+	var (
+		optLevel int
+		verbose  bool
+		passes   string
+		disable  string
+	)
+
+	optLevel = config["optlevel"].(int)
+	verbose = config["verbose"].(bool)
+	if enablePasses := config["enablePasses"]; enablePasses != nil {
+		passes = enablePasses.(string)
+	}
+	if disablePasses := config["disablePasses"]; disablePasses != nil {
+		disable = disablePasses.(string)
+	}
+
+	selected := map[string]bool{}
+
+	if passes != "" {
+		for _, name := range strings.Split(passes, ",") {
+			selected[strings.ToLower(strings.TrimSpace(name))] = true
+		}
+	} else {
+		for _, name := range pm.defaultO[optLevel] {
+			selected[name] = true
+		}
+	}
+
+	if disable != "" {
+		for _, name := range strings.Split(disable, ",") {
+			delete(selected, strings.ToLower(strings.TrimSpace(name)))
+		}
+	}
+
+	pm.Verbose = verbose
+
+	// Add passes in order
+	for name := range selected {
+		if p, ok := passRegistry[name]; ok {
+			pm.Add(p)
+		}
+	}
+}
 
 // RunOnce runs all passes once in order.
 func (pm *PassManager) RunOnce(fn *mir.Function) {
@@ -136,4 +190,14 @@ func (pm *PassManager) RunFixedPoint(fn *mir.Function, maxIters int) {
 	if pm.Verbose {
 		fmt.Println("Stopped due to maxIters; may not be at a fixed point.")
 	}
+}
+
+var passRegistry = map[string]Pass{}
+
+func RegisterPass(p Pass) {
+	passRegistry[strings.ToLower(p.Name())] = p
+}
+
+func init() {
+	RegisterPass(ConstantFold{})
 }
