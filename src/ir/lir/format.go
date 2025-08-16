@@ -17,16 +17,16 @@ package lir
 //
 //// FormatModule pretty-prints a LIR Module to the writer.
 //func FormatModule(w io.Writer, m *Module, indent string) error {
-//	fmt.Fprintf(w, "module %s {\n", m.Name)
+//	fmt.Fprintf(w, "module %s {\n", m.ID)
 //
 //	// Print global variables (if any)
 //	if len(m.Globals) > 0 {
 //		fmt.Fprintln(w, "  globals:")
 //		for _, g := range m.Globals {
 //			if g.Init != nil {
-//				fmt.Fprintf(w, "    VAR %s: %s = %s\n", g.Name, g.Type.String(), g.Init.String())
+//				fmt.Fprintf(w, "    VAR %s: %s = %s\n", g.ID, g.Type.String(), g.Init.String())
 //			} else {
-//				fmt.Fprintf(w, "    VAR %s: %s\n", g.Name, g.Type.String())
+//				fmt.Fprintf(w, "    VAR %s: %s\n", g.ID, g.Type.String())
 //			}
 //		}
 //		fmt.Fprintln(w)
@@ -46,7 +46,7 @@ package lir
 //}
 //
 //func FormatFunction(w io.Writer, fn *Function, indent string) error {
-//	fmt.Fprintf(w, "func %s:\n%s", fn.Name, indent)
+//	fmt.Fprintf(w, "func %s:\n%s", fn.ID, indent)
 //
 //	// Print return type if it exists
 //	if fn.Ret != nil {
@@ -60,13 +60,13 @@ package lir
 //		ret = fmt.Sprintf(" -> %s", p.Ret.String())
 //	}
 //
-//	fmt.Fprintf(w, "%sproc %s(%s)%s\n", exportPrefix, p.Name, strings.Join(paramList, ", "), ret)
+//	fmt.Fprintf(w, "%sproc %s(%s)%s\n", exportPrefix, p.ID, strings.Join(paramList, ", "), ret)
 //
 //	// Format locals
 //	if len(p.Locals) > 0 {
 //		fmt.Fprintf(w, "  locals:")
 //		for _, local := range p.Locals {
-//			fmt.Fprintf(w, " %s: %s", local.Name, local.Type)
+//			fmt.Fprintf(w, " %s: %s", local.ID, local.Type)
 //		}
 //		fmt.Fprintln(w)
 //	}
@@ -91,11 +91,11 @@ package lir
 //	case *LoadInst:
 //		fmt.Fprintf(w, "%s = load %s", v.Dst, v.Src)
 //	case *LabelInst:
-//		fmt.Fprintf(w, "\n%s:", v.Label.Name)
+//		fmt.Fprintf(w, "\n%s:", v.Label.ID)
 //	case *CondBrInst:
 //		fmt.Fprintf(w, "br %s, label %s, label %s", v.Cond, v.IfTrue, v.IfFalse)
 //	case *JmpInst:
-//		fmt.Fprintf(w, "jmp %s", v.Dst.Name)
+//		fmt.Fprintf(w, "jmp %s", v.Dst.ID)
 //	case *RetInst:
 //		if v.Value != nil {
 //			fmt.Fprintf(w, "ret %s", v.Value)
