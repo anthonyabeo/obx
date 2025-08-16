@@ -35,6 +35,11 @@ func (g *Generator) genType(ty types.Type) Type {
 			return UInt32Type
 		}
 	case *types.ArrayType:
+		return &ArrayType{
+			Dimns:     ty.Dimensions,
+			Elem:      g.genType(ty.Elem),
+			ElemWidth: ty.ElemSize,
+		}
 	case types.StringType:
 	case types.EnumType:
 	case *types.RecordType:
