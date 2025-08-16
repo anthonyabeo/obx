@@ -5,17 +5,20 @@ import (
 	"strconv"
 
 	"github.com/anthonyabeo/obx/src/ir/hir"
+	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Generator struct {
+	ctx         *report.Context
 	program     *Program
 	build       *Builder
 	currentExit string
 }
 
-func NewGenerator() *Generator {
+func NewGenerator(ctx *report.Context) *Generator {
 	return &Generator{
+		ctx:   ctx,
 		build: NewBuilder(),
 	}
 }
@@ -348,6 +351,43 @@ func (g *Generator) genConst(c *hir.Literal) Value {
 	return v
 }
 
+func (g *Generator) genIndexExpr(e *hir.IndexExpr) Value {
+	// Generate the base array or pointer value
+	arr := g.genValue(e.Array)
+	arrayType := arr.Type().(*ArrayType)
+
+	var indices []Value
+	for _, idx := range e.Index {
+		indices = append(indices, g.genValue(idx))
+	}
+
+	elemSize := arrayType.ElemWidth
+	dims := arrayType.Dimns
+	n := len(indices)
+
+	// Precompute products of later dims
+	prod := make([]int64, n)
+	prod[n-1] = 1
+	for k := n - 2; k >= 0; k-- {
+		prod[k] = prod[k+1] * dims[k+1]
+	}
+
+	// sum = 0
+	var sum Value
+	sum = g.build.NewTemp()
+	g.build.CreateAssign(sum, &IntegerConst{Value: 0})
+
+	for k := 0; k < n; k++ {
+		term := g.build.CreateBinary(MUL, indices[k], &IntegerConst{Value: uint64(prod[k])})
+		sum = g.build.CreateBinary(ADD, sum, term)
+	}
+
+	scaled := g.build.CreateBinary(MUL, sum, &IntegerConst{Value: uint64(elemSize)})
+	final := g.build.CreateBinary(ADD, &AddrOf{arr}, scaled)
+
+	return &Mem{final}
+}
+
 func (g *Generator) genValue(e hir.Expr) Value {
 	switch e := e.(type) {
 	case *hir.Literal:
@@ -377,6 +417,7 @@ func (g *Generator) genValue(e hir.Expr) Value {
 	case *hir.TypeRef:
 	case *hir.FieldAccess:
 	case *hir.IndexExpr:
+		return g.genIndexExpr(e)
 	case *hir.DerefExpr:
 	case *hir.TypeGuardExpr:
 	default:

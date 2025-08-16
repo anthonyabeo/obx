@@ -49,7 +49,7 @@ func (r *SSAInfo) NewValue(v Value) Value {
 		}
 	case *IntegerConst, *FloatConst, *CharConst, *StrConst, *Const:
 		return value
-	case *Addr:
+	case *AddrOf:
 		panic("not implemented: Addr in SSA")
 	default:
 		panic(fmt.Sprintf("unknown value type in SSA: %T", v))

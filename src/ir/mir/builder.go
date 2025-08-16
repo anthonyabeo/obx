@@ -90,3 +90,10 @@ func (b *Builder) CreateReturn(value Value) {
 	b.SetTerm(ret)
 	b.Emit(ret)
 }
+
+func (b *Builder) CreateAssign(target, value Value) {
+	b.Emit(&AssignInst{
+		Target: target,
+		Value:  value,
+	})
+}
