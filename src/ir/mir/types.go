@@ -21,9 +21,8 @@ type (
 	}
 
 	ArrayType struct {
-		Dimns     []int64 // Dimensions of the array, -1 for open arrays
-		Elem      Type    // Element type of the array
-		ElemWidth int
+		Len  int
+		Elem Type // Element type of the array
 	}
 
 	PointerType struct {
@@ -33,29 +32,26 @@ type (
 	VoidType string
 )
 
-func (a ArrayType) IsOpen() bool {
-	return len(a.Dimns) == 1 && a.Dimns[0] == -1
-}
+func (a ArrayType) IsOpen() bool { return a.Len == -1 }
 func (a ArrayType) String() string {
 	if a.IsOpen() {
 		return fmt.Sprintf("[%s]", a.Elem.String())
 	}
 
+	dims := a.Dimensions()
 	var sb strings.Builder
-	for i := 0; i < len(a.Dimns); i++ {
-		sb.WriteString(fmt.Sprintf("[%d x ", a.Dimns[i]))
+	for i := 0; i < len(dims); i++ {
+		sb.WriteString(fmt.Sprintf("[%d x ", dims[i]))
 	}
 	sb.WriteString(fmt.Sprintf("%s", a.Elem.String()))
+	sb.WriteString(strings.Repeat("]", len(dims)))
 
-	for i := 0; i < len(a.Dimns); i++ {
-		sb.WriteString("]")
-	}
 	return sb.String()
 
 }
 func (a ArrayType) Width() int {
 	if a.IsOpen() {
-		return -1 // Open array, width is not defined
+		return -1 // Open arrays have undefined width
 	}
 
 	baseWidth := a.Elem.Width()
@@ -63,15 +59,42 @@ func (a ArrayType) Width() int {
 		return -1 // If base type has undefined width, return -1
 	}
 
-	// Use all dimensions to calculate total width
-	total := int64(1)
-	for _, dim := range a.Dimns {
-		if dim == -1 {
-			return -1 // Open dimension, width is not defined
+	totalWidth := baseWidth * a.Len
+	return totalWidth
+}
+func (a ArrayType) Dimensions() []int {
+	if !a.IsOpen() {
+		dims := []int{a.Len}
+		if sub, ok := a.Elem.(*ArrayType); ok {
+			dims = append(dims, sub.Dimensions()...)
 		}
-		total *= dim
+
+		return dims
 	}
-	return int(total) * baseWidth
+
+	return nil
+}
+func (a ArrayType) Strides() []int {
+	dims := a.Dimensions()
+	n := len(dims)
+	strides := make([]int, n)
+	stride := a.BaseElemSize()
+	for i := n - 1; i >= 0; i-- {
+		strides[i] = stride
+		stride *= dims[i]
+	}
+	return strides
+}
+func (a ArrayType) BaseElemSize() int {
+	if a.IsOpen() {
+		return -1 // Open arrays have undefined base element size
+	}
+
+	if arr, ok := a.Elem.(*ArrayType); ok {
+		return arr.BaseElemSize()
+	}
+
+	return a.Elem.Width()
 }
 
 func (t *IntegerType) String() string {

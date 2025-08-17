@@ -361,31 +361,28 @@ func (g *Generator) genIndexExpr(e *hir.IndexExpr) Value {
 		indices = append(indices, g.genValue(idx))
 	}
 
-	elemSize := arrayType.ElemWidth
-	dims := arrayType.Dimns
-	n := len(indices)
-
-	// Precompute products of later dims
-	prod := make([]int64, n)
-	prod[n-1] = 1
-	for k := n - 2; k >= 0; k-- {
-		prod[k] = prod[k+1] * dims[k+1]
+	// 2) Compute offset in BYTES using strides
+	strides := arrayType.Strides()
+	if len(strides) != len(indices) {
+		panic("LowerArrayIndexAddr: index count does not match array rank")
 	}
 
-	// sum = 0
-	var sum Value
-	sum = g.build.NewTemp()
-	g.build.CreateAssign(sum, &IntegerConst{Value: 0})
+	// acc = 0
+	var acc Value
+	acc = g.build.NewTemp()
+	g.build.CreateAssign(acc, &IntegerConst{Value: 0})
 
-	for k := 0; k < n; k++ {
-		term := g.build.CreateBinary(MUL, indices[k], &IntegerConst{Value: uint64(prod[k])})
-		sum = g.build.CreateBinary(ADD, sum, term)
+	for k := 0; k < len(indices); k++ {
+		// term = indices[k] * strides[k]
+		tMul := g.build.CreateBinary(MUL, indices[k], &IntegerConst{Value: uint64(strides[k])})
+
+		// acc = acc + term
+		acc = g.build.CreateBinary(ADD, acc, tMul)
 	}
 
-	scaled := g.build.CreateBinary(MUL, sum, &IntegerConst{Value: uint64(elemSize)})
-	final := g.build.CreateBinary(ADD, &AddrOf{arr}, scaled)
-
-	return &Mem{final}
+	// 3) addr = baseAddr + acc
+	addr := g.build.CreateBinary(ADD, &AddrOf{arr}, acc)
+	return &Mem{addr}
 }
 
 func (g *Generator) genValue(e hir.Expr) Value {
