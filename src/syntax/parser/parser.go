@@ -126,14 +126,14 @@ func (p *Parser) parseMetaSection() *ast.MetaSection {
 	}
 
 	ms.EndOffset = p.end
-	ms.Ids = append(ms.Ids, p.parseIdentifierDef())
+	ms.Ids = append(ms.Ids, p.parseIdentifier())
 	for p.tok == token.COMMA || p.tok == token.IDENTIFIER {
 		if p.tok == token.COMMA {
 			p.next()
 		}
 
 		ms.EndOffset = p.end
-		ms.Ids = append(ms.Ids, p.parseIdentifierDef())
+		ms.Ids = append(ms.Ids, p.parseIdentifier())
 	}
 
 	if p.tok == token.COLON {
@@ -483,7 +483,7 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 
 // TypeDeclaration = identdef '=' type
 func (p *Parser) parseTypeDecl() *ast.TypeDecl {
-	name := p.parseIdentifierDef()
+	name := p.parseIdentifier()
 	p.match(token.EQUAL)
 	Typ := p.parseType()
 
@@ -504,7 +504,7 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 
 // ConstDeclaration = identdef '=' ConstExpression
 func (p *Parser) parseConstantDecl() *ast.ConstantDecl {
-	name := p.parseIdentifierDef()
+	name := p.parseIdentifier()
 	p.match(token.EQUAL)
 	value := p.parseExpression()
 
@@ -580,12 +580,12 @@ func (p *Parser) parseEnumType() *ast.EnumType {
 	enum := &ast.EnumType{StartOffset: pos}
 	p.next()
 
-	enum.Variants = append(enum.Variants, p.parseIdentifierDef())
+	enum.Variants = append(enum.Variants, p.parseIdentifier())
 	for p.tok == token.COMMA || p.tok == token.IDENTIFIER {
 		if p.tok == token.COMMA {
 			p.next()
 		}
-		enum.Variants = append(enum.Variants, p.parseIdentifierDef())
+		enum.Variants = append(enum.Variants, p.parseIdentifier())
 	}
 
 	enum.EndOffset = p.pos
@@ -1141,7 +1141,7 @@ func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
 func (p *Parser) parseLiteral() (lit ast.Expression) {
 	switch p.tok {
 	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
-		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.WCHAR_LIT, token.TRUE, token.FALSE:
+		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.WCHAR_LIT, token.TRUE, token.FALSE, token.NIL:
 
 		lit = &ast.BasicLit{Kind: p.tok, Val: p.lexeme, StartOffset: p.pos, EndOffset: p.end}
 		p.next()
@@ -1166,9 +1166,6 @@ func (p *Parser) parseLiteral() (lit ast.Expression) {
 		set.EndOffset = end
 
 		lit = set
-	case token.NIL:
-		lit = &ast.Nil{StartOffset: p.pos, EndOffset: p.end}
-		p.next()
 	default:
 		p.errorExpected("literal or set")
 		pos := p.pos
@@ -1218,23 +1215,23 @@ func (p *Parser) parseQualifiedIdent() *ast.QualifiedIdent {
 
 // IdentList = identdef { [','] identdef}
 // identdef  = ident ['*' | '-']
-func (p *Parser) parseIdentList() (list []*ast.IdentifierDef) {
-	list = append(list, p.parseIdentifierDef())
+func (p *Parser) parseIdentList() (list []*ast.Identifier) {
+	list = append(list, p.parseIdentifier())
 
 	for p.tok == token.COMMA {
 		p.next()
-		list = append(list, p.parseIdentifierDef())
+		list = append(list, p.parseIdentifier())
 	}
 
 	return
 }
 
 // IdentDef = ident ['*' | '-']
-func (p *Parser) parseIdentifierDef() *ast.IdentifierDef {
+func (p *Parser) parseIdentifier() *ast.Identifier {
 	start := p.pos
 	end := p.end
 
-	id := &ast.IdentifierDef{
+	id := &ast.Identifier{
 		Name:        p.parseIdent(),
 		StartOffset: start,
 		EndOffset:   end,
@@ -1282,7 +1279,7 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 	thisScope := p.ctx.Env.CurrentScope()
 	thisScope.Name = proc.Head.Name.Name
 	proc.Env = thisScope
-	
+
 	p.populateEnvs(proc.Head, proc.Kind)
 
 	// ─── Parse the Procedure Body to the end of the Procedure ──────────────────────
@@ -1323,7 +1320,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 		head.Rcv = p.parseReceiver()
 	}
 
-	head.Name = p.parseIdentifierDef()
+	head.Name = p.parseIdentifier()
 	head.EndOffset = head.Name.EndOffset
 
 	if p.tok == token.LPAREN {
@@ -1374,10 +1371,10 @@ func (p *Parser) parseFPSection() (param *ast.FPSection) {
 		p.next()
 	}
 
-	param.Names = append(param.Names, p.parseIdentifierDef())
+	param.Names = append(param.Names, p.parseIdentifier())
 	for p.tok == token.COMMA {
 		p.next()
-		param.Names = append(param.Names, p.parseIdentifierDef())
+		param.Names = append(param.Names, p.parseIdentifier())
 	}
 
 	p.match(token.COLON)
@@ -1397,7 +1394,7 @@ func (p *Parser) parseReceiver() (rcv *ast.Receiver) {
 		p.next()
 	}
 
-	rcv.Name = p.parseIdentifierDef()
+	rcv.Name = p.parseIdentifier()
 	p.match(token.COLON)
 	q := p.parseQualifiedIdent()
 	rcv.Type = ast.NewNamedType(q, q.StartOffset, q.EndOffset)
@@ -1710,7 +1707,7 @@ func (p *Parser) parseForStmt() (stmt *ast.ForStmt) {
 	stmt = &ast.ForStmt{StartOffset: p.pos}
 
 	p.match(token.FOR)
-	stmt.CtlVar = p.parseIdentifierDef()
+	stmt.CtlVar = p.parseIdentifier()
 	p.match(token.BECOMES)
 	stmt.InitVal = p.parseExpression()
 	p.match(token.TO)

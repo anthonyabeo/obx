@@ -49,7 +49,7 @@ func TestConstantFold(t *testing.T) {
 		Blocks: map[int]*mir.Block{entry.ID: entry, tt.ID: tt, f.ID: f, j.ID: j, exit.ID: exit},
 	}
 
-	pm := NewPassManager(true)
+	pm := NewPassManager()
 	pm.Add(ConstantFold{})
 
 	// Run to fixed point

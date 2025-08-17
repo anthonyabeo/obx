@@ -139,7 +139,7 @@ func (p *Parser) copyParamsForProcedureType(FP *ast.FormalParams) *ast.FormalPar
 	for _, param := range FP.Params {
 		section := &ast.FPSection{Kind: param.Kind, Type: param.Type}
 		for _, id := range param.Names {
-			section.Names = append(section.Names, &ast.IdentifierDef{
+			section.Names = append(section.Names, &ast.Identifier{
 				Name:  "_",
 				Props: id.Props,
 			})

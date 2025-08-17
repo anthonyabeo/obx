@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/anthonyabeo/obx/adt"
-	pprint "github.com/anthonyabeo/obx/src/pprint/mir"
+	"github.com/anthonyabeo/obx/src/format"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
@@ -178,7 +178,7 @@ end Main
 				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
 
-			program := pprint.ParseSourceAndLowerToMIR(t, ctx)
+			program := format.ParseSourceAndLowerToMIR(t, ctx)
 			for _, module := range program.Modules {
 				for _, fn := range module.Funcs {
 					SSAConstruct(fn)

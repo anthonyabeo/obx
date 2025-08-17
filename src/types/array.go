@@ -2,33 +2,23 @@ package types
 
 import (
 	"fmt"
-	"strings"
 )
 
 type ArrayType struct {
-	Length     int64
-	Dimensions []int64
-	Elem       Type
-	ElemSize   int
+	Length int
+	Elem   Type
 }
 
 func (a *ArrayType) String() string {
-	if a.IsOpen() {
-		return fmt.Sprintf("ARRAY OF %s", a.Elem.String())
+	if a.Length == -1 {
+		return fmt.Sprintf("array of %s", a.Elem.String())
 	}
-
-	var dims []string
-	for _, dim := range a.Dimensions {
-		dims = append(dims, fmt.Sprintf("%d", dim))
-	}
-
-	return fmt.Sprintf("ARRAY [%s] OF %s", strings.Join(dims, ", "), a.Elem.String())
-
+	return fmt.Sprintf("array %d of %s", a.Length, a.Elem.String())
 }
 
 func (a *ArrayType) Width() int {
-	if a.IsOpen() {
-		return -1 // Open array, width is not defined
+	if a.Length == -1 {
+		return -1 // Open arrays have undefined width
 	}
 
 	baseWidth := a.Elem.Width()
@@ -36,37 +26,55 @@ func (a *ArrayType) Width() int {
 		return -1 // If base type has undefined width, return -1
 	}
 
-	// Use all dimensions to calculate total width
-	total := int64(1)
-	for _, dim := range a.Dimensions {
-		if dim == -1 {
-			return -1 // Open dimension, width is not defined
-		}
-		total *= dim
-	}
-	return int(total) * baseWidth
+	totalWidth := baseWidth * a.Length
+	return totalWidth
 }
 
 func (a *ArrayType) Alignment() int {
-	if a.Dimensions[0] == -1 {
-		return 1 // Open arrays typically have an alignment of 1
+	if a.Length == -1 {
+		return 1 // Open arrays have alignment of 1
 	}
 
 	baseAlignment := a.Elem.Alignment()
 	if baseAlignment == -1 {
 		return -1 // If base type has undefined alignment, return -1
 	}
+
 	return baseAlignment
 }
 
-func (a *ArrayType) Equals(other Type) bool {
-	o, ok := other.(*ArrayType)
-	if !ok {
-		return false
+func (a *ArrayType) Dimensions() []int {
+	dims := make([]int, 0)
+	if !a.IsOpen() {
+		dims = append(dims, a.Length)
+	} else {
+		dims = append(dims, -1) // Indicating an open array
 	}
-	return fmt.Sprintf("%v", a.Dimensions) == fmt.Sprintf("%v", o.Dimensions) && a.Elem.Equals(o.Elem)
+
+	if sub, ok := a.Elem.(*ArrayType); ok {
+		dims = append(dims, sub.Dimensions()...)
+	}
+
+	return dims
 }
 
-func (a *ArrayType) IsOpen() bool {
-	return len(a.Dimensions) == 1 && a.Dimensions[0] == -1
+func (a *ArrayType) Equals(other Type) bool {
+	if other == nil {
+		return false
+	}
+
+	if a == other {
+		return true
+	}
+
+	if otherArray, ok := other.(*ArrayType); ok {
+		if a.Length != otherArray.Length || !a.Elem.Equals(otherArray.Elem) {
+			return false
+		}
+		return true
+	}
+
+	return false
 }
+
+func (a *ArrayType) IsOpen() bool { return a.Length == -1 }

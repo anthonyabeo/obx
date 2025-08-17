@@ -47,7 +47,7 @@ func (m *Module) Children() []Node {
 
 type MetaSection struct {
 	Mode    token.Kind
-	Ids     []*IdentifierDef
+	Ids     []*Identifier
 	TyConst Type
 
 	StartOffset int

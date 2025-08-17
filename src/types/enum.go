@@ -35,14 +35,10 @@ func (e EnumType) String() string {
 }
 
 func (e EnumType) Width() int {
-	//TODO implement me
-	panic("implement me")
+	return len(e.Variants) * 4
 }
 
-func (e EnumType) Alignment() int {
-	//TODO implement me
-	panic("implement me")
-}
+func (e EnumType) Alignment() int { return 4 }
 
 func (e EnumType) Equals(t Type) bool {
 	//TODO implement me

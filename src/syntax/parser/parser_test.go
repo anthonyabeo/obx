@@ -191,7 +191,7 @@ begin
 	phi := i div 3                
 	phi := ~p or q                
 	phi := (i+j) * (i-j)          
-	phi := s - {8, 9, 13}         
+	phi := s - {8, 9, 13}
 	phi := i + x                  
 	phi := a[i+j] * a[i-j]        
 	phi := (0<=i) & (i<100)       

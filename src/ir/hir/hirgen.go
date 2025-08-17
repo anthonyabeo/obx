@@ -58,7 +58,7 @@ func (g Generator) VisitDefinition(definition *ast.Definition) any {
 	}
 }
 
-func (g Generator) VisitIdentifierDef(def *ast.IdentifierDef) any { return def }
+func (g Generator) VisitIdentifier(def *ast.Identifier) any { return def }
 
 func (g Generator) VisitBinaryExpr(expr *ast.BinaryExpr) any {
 	return &BinaryExpr{
@@ -206,13 +206,13 @@ func (g Generator) VisitExprRange(r *ast.ExprRange) any {
 	return &RangeExpr{Low: low, High: high}
 }
 
-func (g Generator) VisitNil(n *ast.Nil) any {
-	return &Literal{
-		Kind:     token.NIL,
-		Value:    "nil",
-		SemaType: n.SemaType,
-	}
-}
+//func (g Generator) VisitNil(n *ast.Nil) any {
+//	return &Literal{
+//		Kind:     token.NIL,
+//		Value:    "nil",
+//		SemaType: n.SemaType,
+//	}
+//}
 
 func (g Generator) VisitIfStmt(stmt *ast.IfStmt) any {
 	// Convert the main IF condition and THEN block

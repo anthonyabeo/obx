@@ -9,7 +9,7 @@ import (
 
 type (
 	ForStmt struct {
-		CtlVar   *IdentifierDef
+		CtlVar   *Identifier
 		InitVal  Expression
 		FinalVal Expression
 		By       Expression

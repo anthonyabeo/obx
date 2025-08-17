@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/anthonyabeo/obx/modgraph"
 	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
@@ -102,13 +103,20 @@ func printIDoms(idom map[*mir.Block]*mir.Block) {
 func VizCFG(fn *mir.Function) error {
 	dot := fn.OutputDOT()
 
-	Root, err := FindProjectRoot()
+	Root, err := modgraph.FindProjectRoot()
 	if err != nil {
 		return err
 	}
 
-	dotFile := fmt.Sprintf("%s/out/%s.cfg.dot", Root, fn.Name)
-	pngFile := fmt.Sprintf("%s/out/%s.cfg.png", Root, fn.Name)
+	outDir := filepath.Join(Root, "out")
+	if _, err := os.Stat(outDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(outDir, 0755); err != nil {
+			return fmt.Errorf("failed to create output directory: %w", err)
+		}
+	}
+
+	dotFile := fmt.Sprintf("%s/%s.ssa.cfg.dot", outDir, fn.Name)
+	pngFile := fmt.Sprintf("%s/%s.ssa.cfg.png", outDir, fn.Name)
 
 	if err := os.WriteFile(dotFile, []byte(dot), 0644); err != nil {
 		return err
@@ -127,13 +135,20 @@ func VizCFG(fn *mir.Function) error {
 func VizSSA(fn *mir.Function) error {
 	dot := fn.OutputDOT()
 
-	Root, err := FindProjectRoot()
+	Root, err := modgraph.FindProjectRoot()
 	if err != nil {
 		return err
 	}
 
-	dotFile := fmt.Sprintf("%s/out/%s.ssa.cfg.dot", Root, fn.Name)
-	pngFile := fmt.Sprintf("%s/out/%s.ssa.cfg.png", Root, fn.Name)
+	outDir := filepath.Join(Root, "out")
+	if _, err := os.Stat(outDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(outDir, 0755); err != nil {
+			return fmt.Errorf("failed to create output directory: %w", err)
+		}
+	}
+
+	dotFile := fmt.Sprintf("%s/%s.ssa.cfg.dot", outDir, fn.Name)
+	pngFile := fmt.Sprintf("%s/%s.ssa.cfg.png", outDir, fn.Name)
 
 	if err := os.WriteFile(dotFile, []byte(dot), 0644); err != nil {
 		return err
@@ -147,22 +162,4 @@ func VizSSA(fn *mir.Function) error {
 	}
 
 	return nil
-}
-
-func FindProjectRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break // reached root
-		}
-		dir = parent
-	}
-	return "", os.ErrNotExist
 }

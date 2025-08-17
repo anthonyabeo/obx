@@ -232,7 +232,7 @@ func TestAssignmentCompatible(t *testing.T) {
 
 	// Helper to build arrays
 	arr := func(elem Type, length int) Type {
-		return &ArrayType{Elem: elem, Length: int64(length)}
+		return &ArrayType{Elem: elem, Length: length}
 	}
 
 	// Helper to build open arrays
@@ -466,7 +466,7 @@ func TestParameterCompatible(t *testing.T) {
 
 func TestArrayCompatible(t *testing.T) {
 	makeArray := func(elem Type, len int) *ArrayType {
-		return &ArrayType{Length: int64(len), Elem: elem}
+		return &ArrayType{Length: len, Elem: elem}
 	}
 
 	tests := []struct {
@@ -560,7 +560,7 @@ func TestArrayCompatible(t *testing.T) {
 
 func TestArrayCompatible_Multidimensional(t *testing.T) {
 	makeArray := func(elem Type, len int) *ArrayType {
-		return &ArrayType{Length: int64(len), Elem: elem}
+		return &ArrayType{Length: len, Elem: elem}
 	}
 
 	tests := []struct {
@@ -630,7 +630,7 @@ func TestArrayCompatible_Multidimensional(t *testing.T) {
 
 func TestArrayCompatible_DeepNesting(t *testing.T) {
 	makeArray := func(elem Type, len int) *ArrayType {
-		return &ArrayType{Length: int64(len), Elem: elem}
+		return &ArrayType{Length: len, Elem: elem}
 	}
 
 	tests := []struct {

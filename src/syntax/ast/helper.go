@@ -14,7 +14,7 @@ func IsConstExpr(expr Expression) bool {
 	case *Set:
 		return true
 
-	case *IdentifierDef:
+	case *Identifier:
 		if sym, ok := e.Symbol.(*ConstantSymbol); ok {
 			return sym.Value != nil // Constant must have a known value
 		}
@@ -59,7 +59,7 @@ func IsZeroConstExpr(expr Expression) bool {
 		}
 		return false
 
-	case *IdentifierDef:
+	case *Identifier:
 		if sym, ok := e.Symbol.(*ConstantSymbol); ok && sym.Value != nil {
 			return isZeroValue(sym.Value)
 		}

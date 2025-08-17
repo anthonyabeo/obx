@@ -38,7 +38,7 @@ const (
 )
 
 type (
-	IdentifierDef struct {
+	Identifier struct {
 		Name        string
 		Props       IdentProps
 		Symbol      Symbol
@@ -112,12 +112,6 @@ type (
 		EndOffset   int
 	}
 
-	Nil struct {
-		SemaType    types.Type
-		StartOffset int
-		EndOffset   int
-	}
-
 	BadExpr struct {
 		SemaType    types.Type
 		StartOffset int
@@ -125,16 +119,8 @@ type (
 	}
 )
 
-func (*Nil) expr()                    {}
-func (*Nil) String() string           { return "nil" }
-func (n *Nil) Accept(vst Visitor) any { return vst.VisitNil(n) }
-func (n *Nil) Pos() int               { return n.StartOffset }
-func (n *Nil) End() int               { return n.EndOffset }
-func (n *Nil) Children() []Node       { return []Node{} }
-func (n *Nil) Type() types.Type       { return n.SemaType }
-
-func (id *IdentifierDef) expr() {}
-func (id *IdentifierDef) String() string {
+func (id *Identifier) expr() {}
+func (id *Identifier) String() string {
 	name := id.Name
 	switch id.Props {
 	case ExportedReadOnly:
@@ -146,11 +132,11 @@ func (id *IdentifierDef) String() string {
 
 	return name
 }
-func (id *IdentifierDef) Pos() int               { return id.StartOffset }
-func (id *IdentifierDef) End() int               { return id.EndOffset }
-func (id *IdentifierDef) Accept(vst Visitor) any { return vst.VisitIdentifierDef(id) }
-func (id *IdentifierDef) Children() []Node       { return []Node{} }
-func (id *IdentifierDef) Type() types.Type       { return id.SemaType }
+func (id *Identifier) Pos() int               { return id.StartOffset }
+func (id *Identifier) End() int               { return id.EndOffset }
+func (id *Identifier) Accept(vst Visitor) any { return vst.VisitIdentifier(id) }
+func (id *Identifier) Children() []Node       { return []Node{} }
+func (id *Identifier) Type() types.Type       { return id.SemaType }
 
 func (e *ExprRange) String() string         { return fmt.Sprintf("%s..%s", e.Low, e.High) }
 func (e *ExprRange) Accept(vst Visitor) any { return vst.VisitExprRange(e) }

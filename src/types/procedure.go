@@ -28,9 +28,7 @@ func (p *ProcedureType) String() string {
 	return ""
 }
 
-func (p *ProcedureType) Alignment() int {
-	panic("Not implemented")
-}
+func (p *ProcedureType) Alignment() int { return 8 }
 
 func (p *ProcedureType) Width() int {
 	return 8

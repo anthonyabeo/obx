@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/anthonyabeo/obx/adt"
-	"github.com/anthonyabeo/obx/cmd/cli"
+	"github.com/anthonyabeo/obx/modgraph"
+	"github.com/anthonyabeo/obx/src/format"
 	"github.com/anthonyabeo/obx/src/ir/mir"
-	pprint "github.com/anthonyabeo/obx/src/pprint/mir"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
@@ -182,7 +182,7 @@ end Main
 				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
 
-			program := pprint.ParseSourceAndLowerToMIR(t, ctx)
+			program := format.ParseSourceAndLowerToMIR(t, ctx)
 
 			for _, module := range program.Modules {
 				for _, function := range module.Funcs {
@@ -190,7 +190,7 @@ end Main
 
 					dot := function.OutputDOT()
 
-					Root, err := cli.FindProjectRoot()
+					Root, err := modgraph.FindProjectRoot()
 					if err != nil {
 						t.Errorf("failed to find project root: %s", err)
 						continue

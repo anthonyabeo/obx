@@ -18,7 +18,7 @@ const (
 
 type (
 	VariableDecl struct {
-		IdentList []*IdentifierDef
+		IdentList []*Identifier
 		Type      Type
 
 		StartOffset int
@@ -26,7 +26,7 @@ type (
 	}
 
 	ConstantDecl struct {
-		Name  *IdentifierDef
+		Name  *Identifier
 		Value Expression
 
 		StartOffset int
@@ -34,7 +34,7 @@ type (
 	}
 
 	TypeDecl struct {
-		Name        *IdentifierDef
+		Name        *Identifier
 		DenotedType Type
 
 		StartOffset int
@@ -57,7 +57,7 @@ type (
 
 	ProcedureHeading struct {
 		Rcv  *Receiver
-		Name *IdentifierDef
+		Name *Identifier
 		FP   *FormalParams
 
 		StartOffset int
@@ -76,7 +76,7 @@ type (
 	// ----------------------------------------------
 	FPSection struct {
 		Kind  token.Kind
-		Names []*IdentifierDef
+		Names []*Identifier
 		Type  Type
 
 		StartOffset int
@@ -93,7 +93,7 @@ type (
 
 	Receiver struct {
 		Kind token.Kind
-		Name *IdentifierDef
+		Name *Identifier
 		Type Type
 
 		StartOffset int

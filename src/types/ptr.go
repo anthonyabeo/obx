@@ -10,13 +10,9 @@ func (p *PointerType) String() string {
 	return fmt.Sprintf("POINTER TO %s", p.Base.String())
 }
 
-func (p *PointerType) Width() int {
-	panic("Not implemented")
-}
+func (p *PointerType) Width() int { return 8 }
 
-func (p *PointerType) Alignment() int {
-	panic("Not implemented")
-}
+func (p *PointerType) Alignment() int { return 8 }
 
 func (p *PointerType) Equals(other Type) bool {
 	o, ok := other.(*PointerType)

@@ -9,13 +9,9 @@ func (n *NamedType) String() string {
 	return n.Name
 }
 
-func (n *NamedType) Width() int {
-	panic("Not implemented")
-}
+func (n *NamedType) Width() int { return n.Def.Width() }
 
-func (n *NamedType) Alignment() int {
-	panic("Not implemented")
-}
+func (n *NamedType) Alignment() int { return n.Def.Alignment() }
 
 func (n *NamedType) Equals(other Type) bool {
 	if o, ok := other.(*NamedType); ok {

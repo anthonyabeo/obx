@@ -1,6 +1,8 @@
 package types
 
-import "github.com/anthonyabeo/obx/src/syntax/token"
+import (
+	"github.com/anthonyabeo/obx/src/syntax/token"
+)
 
 type Type interface {
 	String() string
@@ -185,9 +187,9 @@ func AssignmentCompatible(exprType, varType Type) bool {
 	if IsArrayOf(varType, WCharType) && IsCharArrayOrString(exprType) {
 		TvLen := varType.(*ArrayType).Length
 
-		var TeLen int64
+		var TeLen int
 		if str, isStr := exprType.(*StringType); isStr {
-			TeLen = int64(str.Length)
+			TeLen = str.Length
 		}
 
 		if arr, isArr := exprType.(*ArrayType); isArr {
@@ -201,9 +203,9 @@ func AssignmentCompatible(exprType, varType Type) bool {
 	if IsArrayOf(varType, CharType) && IsLatin1CharArrayOrString(exprType) {
 		TvLen := varType.(*ArrayType).Length
 
-		var TeLen int64
+		var TeLen int
 		if str, isStr := exprType.(*StringType); isStr {
-			TeLen = int64(str.Length)
+			TeLen = str.Length
 		}
 
 		if arr, isArr := exprType.(*ArrayType); isArr {

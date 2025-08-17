@@ -4,7 +4,7 @@ type Visitor interface {
 	VisitModule(*Module) any
 	VisitMetaSection(*MetaSection) any
 	VisitDefinition(*Definition) any
-	VisitIdentifierDef(*IdentifierDef) any
+	VisitIdentifier(*Identifier) any
 	VisitBinaryExpr(*BinaryExpr) any
 	VisitDesignator(*Designator) any
 	VisitFunctionCall(*FunctionCall) any
@@ -13,7 +13,6 @@ type Visitor interface {
 	VisitSet(*Set) any
 	VisitBasicLit(*BasicLit) any
 	VisitExprRange(*ExprRange) any
-	VisitNil(*Nil) any
 	VisitIfStmt(*IfStmt) any
 	VisitAssignmentStmt(*AssignmentStmt) any
 	VisitReturnStmt(*ReturnStmt) any

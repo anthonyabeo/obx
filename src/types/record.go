@@ -25,12 +25,10 @@ func (r *RecordType) String() string {
 }
 
 func (r *RecordType) Alignment() int {
-	panic("Not implemented")
+	return 8 /* yet to be implemented*/
 }
 
-func (r *RecordType) Width() int {
-	panic("Not implemented")
-}
+func (r *RecordType) Width() int { return 8 /* yet to be implemented*/ }
 
 func (r *RecordType) Equals(other Type) bool {
 	o, ok := other.(*RecordType)

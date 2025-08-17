@@ -58,7 +58,7 @@ type (
 	}
 
 	FieldList struct {
-		List []*IdentifierDef
+		List []*Identifier
 		Type Type
 		Env  *RecordScope
 
@@ -67,7 +67,7 @@ type (
 	}
 
 	EnumType struct {
-		Variants []*IdentifierDef
+		Variants []*Identifier
 
 		StartOffset int
 		EndOffset   int
