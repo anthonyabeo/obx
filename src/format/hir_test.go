@@ -1,13 +1,13 @@
-package hir
+package format
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/anthonyabeo/obx/modgraph"
 	"os"
 	"testing"
 
 	"github.com/anthonyabeo/obx/adt"
-	"github.com/anthonyabeo/obx/cmd/cli"
 	"github.com/anthonyabeo/obx/src/ir/hir"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/sema"
@@ -75,7 +75,7 @@ func TestFormatSampleProgram(t *testing.T) {
 		t.Fatalf("failed to marshal formatted HIR: %v", err)
 	}
 
-	Root, err := cli.FindProjectRoot()
+	Root, err := modgraph.FindProjectRoot()
 	if err != nil {
 		t.Errorf("FindProjectRoot failed: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestFormatProgramWithProcedureAndCall(t *testing.T) {
 		t.Fatalf("failed to marshal formatted HIR: %v", err)
 	}
 
-	Root, err := cli.FindProjectRoot()
+	Root, err := modgraph.FindProjectRoot()
 	if err != nil {
 		t.Errorf("FindProjectRoot failed: %v", err)
 	}
@@ -261,7 +261,7 @@ func TestFormatProgramWithMultipleStatementsAndLoop(t *testing.T) {
 		t.Fatalf("failed to marshal formatted HIR: %v", err)
 	}
 
-	Root, err := cli.FindProjectRoot()
+	Root, err := modgraph.FindProjectRoot()
 	if err != nil {
 		t.Errorf("FindProjectRoot failed: %v", err)
 	}

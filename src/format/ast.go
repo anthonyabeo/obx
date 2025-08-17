@@ -1,4 +1,4 @@
-package ast
+package format
 
 import (
 	"github.com/anthonyabeo/obx/src/report"
@@ -69,7 +69,7 @@ func (v *AstPrinter) VisitDefinition(n *ast.Definition) any {
 	}
 }
 
-func (v *AstPrinter) VisitIdentifierDef(n *ast.IdentifierDef) any {
+func (v *AstPrinter) VisitIdentifier(n *ast.Identifier) any {
 	return map[string]any{
 		"type":  "IdentifierDef",
 		"name":  n.Name,
@@ -149,12 +149,12 @@ func (v *AstPrinter) VisitExprRange(r *ast.ExprRange) any {
 	}
 }
 
-func (v *AstPrinter) VisitNil(n *ast.Nil) any {
-	return map[string]any{
-		"type":  "Nil",
-		"range": formatRange(v.ctx.Source.Span(v.ctx.FileName, n.StartOffset, n.EndOffset)),
-	}
-}
+//func (v *AstPrinter) VisitNil(n *ast.Nil) any {
+//	return map[string]any{
+//		"type":  "Nil",
+//		"range": formatRange(v.ctx.Source.Span(v.ctx.FileName, n.StartOffset, n.EndOffset)),
+//	}
+//}
 
 func (v *AstPrinter) VisitIfStmt(stmt *ast.IfStmt) any {
 	return map[string]any{

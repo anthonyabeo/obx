@@ -1,13 +1,14 @@
-package ast
+package format
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/anthonyabeo/obx/modgraph"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/anthonyabeo/obx/adt"
-	"github.com/anthonyabeo/obx/cmd/cli"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
@@ -58,13 +59,20 @@ func TestPrettyPrintJSON(t *testing.T) {
 		t.Fatalf("PrettyPrintJSON failed: %v", err)
 	}
 
-	Root, err := cli.FindProjectRoot()
+	Root, err := modgraph.FindProjectRoot()
 	if err != nil {
 		t.Errorf("FindProjectRoot failed: %v", err)
 	}
 
+	outDir := filepath.Join(Root, "out")
+	if _, err := os.Stat(outDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(outDir, 0755); err != nil {
+			t.Errorf("failed to create output directory: %s", err)
+		}
+	}
+
 	// Write the JSON to a file for debugging (optional)
-	outFile := fmt.Sprintf("%s/out/test_output.json", Root)
+	outFile := fmt.Sprintf("%s/test_output.json", outDir)
 	_ = os.WriteFile(outFile, data, 0644)
 
 	var result map[string]any
@@ -165,8 +173,21 @@ func TestPrettyPrintJSON_LargerProgram(t *testing.T) {
 		t.Fatalf("PrettyPrintJSON failed: %v", err)
 	}
 
+	Root, err := modgraph.FindProjectRoot()
+	if err != nil {
+		t.Errorf("FindProjectRoot failed: %v", err)
+	}
+
+	outDir := filepath.Join(Root, "out")
+	if _, err := os.Stat(outDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(outDir, 0755); err != nil {
+			t.Errorf("failed to create output directory: %s", err)
+		}
+	}
+
 	// Write the output to a file for debugging (optional)
-	_ = os.WriteFile("test_output.json", data, 0644)
+	outFile := fmt.Sprintf("%s/test_output.json", outDir)
+	_ = os.WriteFile(outFile, data, 0644)
 
 	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {

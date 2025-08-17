@@ -1,4 +1,4 @@
-package ast
+package format
 
 // FindModule returns the first module node in the top-level AST JSON.
 func FindModule(ast map[string]any) map[string]any {

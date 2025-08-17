@@ -1,4 +1,4 @@
-package hir
+package format
 
 import (
 	"github.com/anthonyabeo/obx/src/ir/hir"
@@ -52,7 +52,7 @@ func (fmt *Formatter) formatParams(params []*hir.Param) any {
 			"type":      "param",
 			"name":      param.Name,
 			"kind":      param.Kind,
-			"paramType": fmt.formatType(param.Type),
+			"paramType": fmt.formatType(param.Type()),
 		})
 	}
 
