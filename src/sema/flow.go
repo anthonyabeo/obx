@@ -58,7 +58,7 @@ func (f *FlowChecker) VisitBasicLit(lit *ast.BasicLit) any { return lit }
 
 func (f *FlowChecker) VisitExprRange(rng *ast.ExprRange) any { return rng }
 
-func (f *FlowChecker) VisitNil(n *ast.Nil) any { return n }
+//func (f *FlowChecker) VisitNil(n *ast.Nil) any { return n }
 
 func (f *FlowChecker) VisitIfStmt(stmt *ast.IfStmt) any {
 	for _, s := range stmt.ThenPath {
@@ -212,7 +212,7 @@ func (f *FlowChecker) VisitMetaSection(section *ast.MetaSection) any {
 	return section
 }
 
-func (f *FlowChecker) VisitIdentifierDef(def *ast.IdentifierDef) any { return def }
+func (f *FlowChecker) VisitIdentifier(def *ast.Identifier) any { return def }
 
 func (f *FlowChecker) VisitIndexOp(op *ast.IndexOp) any { return op }
 

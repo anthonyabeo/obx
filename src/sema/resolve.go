@@ -5,6 +5,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type NamesResolver struct {
@@ -69,7 +70,7 @@ func (n *NamesResolver) VisitDefinition(def *ast.Definition) any {
 	return def
 }
 
-func (n *NamesResolver) VisitIdentifierDef(def *ast.IdentifierDef) any {
+func (n *NamesResolver) VisitIdentifier(def *ast.Identifier) any {
 	if def.Name == "_" {
 		return def
 	}
@@ -322,7 +323,7 @@ func (n *NamesResolver) VisitExprRange(rng *ast.ExprRange) any {
 	return rng
 }
 
-func (n *NamesResolver) VisitNil(kneel *ast.Nil) any { return kneel }
+//func (n *NamesResolver) VisitNil(kneel *ast.Nil) any { return kneel }
 
 func (n *NamesResolver) VisitIfStmt(stmt *ast.IfStmt) any {
 	stmt.BoolExpr.Accept(n)
@@ -419,7 +420,7 @@ func (n *NamesResolver) VisitCaseStmt(stmt *ast.CaseStmt) any {
 
 			switch caseExprType.(type) {
 			case *ast.RecordType, *ast.PointerType:
-				if _, ok := labelRange.Low.(*ast.Nil); ok {
+				if lit, ok := labelRange.Low.(*ast.BasicLit); ok && lit.Kind == token.NIL {
 					continue
 				}
 
@@ -517,7 +518,7 @@ func (n *NamesResolver) VisitGuard(guard *ast.Guard) any {
 
 	n.ctx.SymbolOverrides[guard.Expr.String()] = ast.NewVariableSymbol(expr.Symbol.Name(), expr.Symbol.Props(), ty.Symbol.AstType())
 	defer delete(n.ctx.SymbolOverrides, guard.Expr.String())
-	
+
 	for _, stmt := range guard.StmtSeq {
 		stmt.Accept(n)
 	}

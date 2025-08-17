@@ -71,7 +71,7 @@ func (t *TypeChecker) VisitDefinition(def *ast.Definition) any {
 	return def
 }
 
-func (t *TypeChecker) VisitIdentifierDef(def *ast.IdentifierDef) any {
+func (t *TypeChecker) VisitIdentifier(def *ast.Identifier) any {
 	if def.Symbol == nil {
 		t.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
@@ -873,7 +873,7 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 				return
 			}
 
-			dim := tx.(*types.ArrayType).Dimensions
+			dim := tx.(*types.ArrayType).Dimensions()
 			value, err := t.EvalConstUint32(y)
 			if err != nil {
 				t.ctx.Reporter.Report(report.Diagnostic{
@@ -1782,12 +1782,12 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 				return
 			}
 
-			dim := types.Underlying(argType.(*types.PointerType).Base).(*types.ArrayType).Dimensions
+			dim := types.Underlying(argType.(*types.PointerType).Base).(*types.ArrayType).Dimensions()
 			if len(dim) != len(call.ActualParams[1:]) {
 				t.ctx.Reporter.Report(report.Diagnostic{
 					Severity: report.Error,
 					Message: fmt.Sprintf("'%s': expected %d dimension lengths for open array type, got %d",
-						pre.Name(), dim, len(call.ActualParams)-1),
+						pre.Name(), len(dim), len(call.ActualParams)-1),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 				})
 				return
@@ -2342,6 +2342,8 @@ func (t *TypeChecker) VisitBasicLit(lit *ast.BasicLit) any {
 		lit.SemaType = types.BooleanType
 	case token.FALSE:
 		lit.SemaType = types.BooleanType
+	case token.NIL:
+		lit.SemaType = types.NilType
 	default:
 		t.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
@@ -2369,11 +2371,6 @@ func (t *TypeChecker) VisitExprRange(n *ast.ExprRange) any {
 
 	n.SemaType = tLow
 	return tLow
-}
-
-func (t *TypeChecker) VisitNil(n *ast.Nil) any {
-	n.SemaType = types.NilType
-	return n
 }
 
 func (t *TypeChecker) VisitIfStmt(stmt *ast.IfStmt) any {
@@ -2991,45 +2988,28 @@ func (t *TypeChecker) VisitBasicType(ty *ast.BasicType) any {
 }
 
 func (t *TypeChecker) VisitArrayType(ty *ast.ArrayType) any {
-	//elemType := ty.ElemType.Accept(t).(types.Type)
-	//
-	//if ty.LenList == nil || len(ty.LenList.List) == 0 {
-	//	// Open array: create single dimension with Length = -1
-	//	return &types.ArrayType{
-	//		Length: -1,
-	//		Elem:   elemType,
-	//	}
-	//}
-	//
-	//dims := t.VisitLenList(ty.LenList).([]int64)
-	//
-	//// Wrap innermost to outermost
-	//typ := elemType
-	//for i := len(dims) - 1; i >= 0; i-- {
-	//	typ = &types.ArrayType{
-	//		Length: dims[i],
-	//		Elem:   typ,
-	//	}
-	//}
-	//
-	//return typ
 	elemType := ty.ElemType.Accept(t).(types.Type)
 
-	var dims []int64
 	if ty.LenList == nil || len(ty.LenList.List) == 0 {
-		// Open array: single dimension with Length = -1
-		dims = []int64{-1}
-	} else {
-		dims = t.VisitLenList(ty.LenList).([]int64)
+		// Open array: create single dimension with Length = -1
+		return &types.ArrayType{
+			Length: -1,
+			Elem:   elemType,
+		}
 	}
 
-	return &types.ArrayType{
-		Length:     dims[0], // Length of the outermost dimension
-		Dimensions: dims,
-		Elem:       elemType,
-		ElemSize:   elemType.Width(),
+	dims := t.VisitLenList(ty.LenList).([]int64)
+
+	// Wrap innermost to outermost
+	typ := elemType
+	for i := len(dims) - 1; i >= 0; i-- {
+		typ = &types.ArrayType{
+			Length: int(dims[i]),
+			Elem:   typ,
+		}
 	}
 
+	return typ
 }
 
 func (t *TypeChecker) VisitLenList(list *ast.LenList) any {
@@ -3591,7 +3571,7 @@ func (t *TypeChecker) checkTypeCase(stmt *ast.CaseStmt, caseType types.Type) {
 
 		if types.IsNil(labelType) {
 			nilLabelExists = true
-			nilLabel = label.Low.(*ast.Nil)
+			nilLabel = label.Low.(*ast.BasicLit)
 		}
 
 		if !types.IsPointer(types.Underlying(caseType)) && nilLabelExists {
@@ -3639,7 +3619,7 @@ func (t *TypeChecker) TypeOf(n ast.Node) types.Type {
 	switch e := n.(type) {
 	case ast.Expression:
 		return e.Type()
-	case *ast.IdentifierDef:
+	case *ast.Identifier:
 		if e.Symbol != nil {
 			return e.SemaType
 		}

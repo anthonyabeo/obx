@@ -28,7 +28,7 @@ func TestTypeCheckerPrograms(t *testing.T) {
 			source: `
 				MODULE Test;
 				VAR i: INTEGER; si: SHORTINT; li: LONGINT;  
-                    ch: CHAR; b: BYTE; bl: BOOL;
+                    ch: CHAR; b: BYTE; bl: BOOLEAN;
 					  i8: INT8; i16: INT16; i32: INT32; i64: INT64;
 					  r: REAL; lr: LONGREAL;
 					   wc: WCHAR;
@@ -85,7 +85,7 @@ func TestTypeCheckerPrograms(t *testing.T) {
 		VAR
 			x: INTEGER;
 			y: INTEGER;
-			b: BOOL;
+			b: BOOLEAN;
 			a: ARRAY 3 OF INTEGER;
 			p: POINTER TO RECORD f: INTEGER END;
 			usr: User
@@ -290,7 +290,7 @@ func TestExprCompatibilityValid(t *testing.T) {
 MODULE ExprCompatibilityTest;
 
 VAR
-  b1, b2: BOOL;
+  b1, b2: BOOLEAN;
   c1, c2: CHAR;
   i1: INT8;
   i2: INT16;
@@ -561,7 +561,7 @@ var predeclaredProcTests = []procTestEntry{
 			{
 				name: "ABS with non-numeric",
 				code: `MODULE Test;
-							VAR x: BOOL;
+							VAR x: BOOLEAN;
 							BEGIN x := ABS(TRUE)
 							END Test.`,
 				shouldPass:  false,
@@ -587,7 +587,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid ABS on BOOLEAN",
-				code:        `MODULE Test; VAR x, b: BOOL; BEGIN x := ABS(b) END Test.`,
+				code:        `MODULE Test; VAR x, b: BOOLEAN; BEGIN x := ABS(b) END Test.`,
 				shouldPass:  false,
 				expectError: "'ABS' expects a numeric argument",
 			},
@@ -733,7 +733,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid_CAP_on_boolean",
-				code:        "MODULE Test; VAR i, b: BOOL; BEGIN i := CAP(b) END Test.",
+				code:        "MODULE Test; VAR i, b: BOOLEAN; BEGIN i := CAP(b) END Test.",
 				shouldPass:  false,
 				expectError: "'CAP' expects a CHAR argument",
 			},
@@ -1220,7 +1220,7 @@ var predeclaredProcTests = []procTestEntry{
 				name: "ASSERT with valid BOOLEAN expression",
 				code: `
 				MODULE Test;
-				VAR x: BOOL;
+				VAR x: BOOLEAN;
 				BEGIN ASSERT(x)
 				END Test.`,
 				shouldPass: true,
@@ -1328,7 +1328,7 @@ var predeclaredProcTests = []procTestEntry{
 				code: `
 				MODULE Test;
 				VAR a: ARRAY 8 OF BYTE;
-				VAR b: BOOL;
+				VAR b: BOOLEAN;
 				BEGIN BYTES(a, b)
 				END Test.`,
 				shouldPass:  false,
@@ -1370,7 +1370,7 @@ var predeclaredProcTests = []procTestEntry{
 				code: `
 				MODULE Test;
 				VAR a: ARRAY 8 OF BYTE;
-				VAR b: BOOL;
+				VAR b: BOOLEAN;
 				BEGIN BYTES(a, b)
 				END Test.`,
 				shouldPass:  false,
@@ -1661,7 +1661,7 @@ var predeclaredProcTests = []procTestEntry{
 				code: `
 				MODULE Test;
 				VAR a: ARRAY 4 OF BYTE;
-				    s: BOOL;
+				    s: BOOLEAN;
 				BEGIN NUMBER(s, a)
 				END Test.`,
 				shouldPass:  false,
@@ -2132,7 +2132,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid_CHR_on_boolean",
-				code:        "MODULE Test; VAR c: CHAR; b: BOOL; BEGIN c := CHR(b) END Test.",
+				code:        "MODULE Test; VAR c: CHAR; b: BOOLEAN; BEGIN c := CHR(b) END Test.",
 				shouldPass:  false,
 				expectError: "'CHR' expects an integer argument",
 			},
@@ -2241,7 +2241,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid_BITAND_on_boolean",
-				code:        "MODULE Test; VAR x: BOOL; y: INT32; z: INT32; BEGIN z := BITAND(x, y) END Test.",
+				code:        "MODULE Test; VAR x: BOOLEAN; y: INT32; z: INT32; BEGIN z := BITAND(x, y) END Test.",
 				shouldPass:  false,
 				expectError: "predeclared procedure 'BITAND' expects INT32 or INT64 arguments",
 			},
@@ -2298,7 +2298,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid_BITASR_on_boolean",
-				code:        "MODULE Test; VAR x: BOOL; n: INT32; BEGIN x := BITASR(x, n) END Test.",
+				code:        "MODULE Test; VAR x: BOOLEAN; n: INT32; BEGIN x := BITASR(x, n) END Test.",
 				shouldPass:  false,
 				expectError: "predeclared procedure 'BITASR' expects the first argument to be INT32 or INT64",
 			},
@@ -2343,7 +2343,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid_BITNOT_BOOLEAN",
-				code:        "MODULE Test; VAR x: BOOL; BEGIN x := BITNOT(x) END Test.",
+				code:        "MODULE Test; VAR x: BOOLEAN; BEGIN x := BITNOT(x) END Test.",
 				shouldPass:  false,
 				expectError: "predeclared procedure 'BITNOT' expects an INT32 or INT64 argument",
 			},
@@ -2416,7 +2416,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid_BITOR_on_bool",
-				code:        "MODULE Test; VAR x: BOOL; y: INT32; z: INT32; BEGIN z := BITOR(x, y) END Test.",
+				code:        "MODULE Test; VAR x: BOOLEAN; y: INT32; z: INT32; BEGIN z := BITOR(x, y) END Test.",
 				shouldPass:  false,
 				expectError: "predeclared procedure 'BITOR' expects INT32 or INT64 arguments",
 			},
@@ -2456,7 +2456,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid_BITS_BOOL",
-				code:        "MODULE Test; VAR x: BOOL; s: SET; BEGIN s := BITS(x) END Test.",
+				code:        "MODULE Test; VAR x: BOOLEAN; s: SET; BEGIN s := BITS(x) END Test.",
 				shouldPass:  false,
 				expectError: "predeclared procedure 'BITS' expects an INT32 argument",
 			},
@@ -2525,7 +2525,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid_BITSHL_on_bool",
-				code:        "MODULE Test; VAR x: BOOL; n: INT32; BEGIN x := BITSHL(x, n) END Test.",
+				code:        "MODULE Test; VAR x: BOOLEAN; n: INT32; BEGIN x := BITSHL(x, n) END Test.",
 				shouldPass:  false,
 				expectError: "predeclared procedure 'BITSHL' expects the first argument to be INT32 or INT64",
 			},
@@ -2588,7 +2588,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid_BITSHR_on_bool",
-				code:        "MODULE Test; VAR x: BOOL; n: INT32; BEGIN x := BITSHR(x, n) END Test.",
+				code:        "MODULE Test; VAR x: BOOLEAN; n: INT32; BEGIN x := BITSHR(x, n) END Test.",
 				shouldPass:  false,
 				expectError: "predeclared procedure 'BITSHR' expects the first argument to be INT32 or INT64",
 			},
@@ -2643,7 +2643,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid_BITXOR_on_bool",
-				code:        "MODULE Test; VAR x: BOOL; y: INT32; BEGIN x := BITXOR(x, y) END Test.",
+				code:        "MODULE Test; VAR x: BOOLEAN; y: INT32; BEGIN x := BITXOR(x, y) END Test.",
 				shouldPass:  false,
 				expectError: "predeclared procedure 'BITXOR' expects INT32 or INT64 arguments",
 			},
@@ -2706,7 +2706,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid_FLOOR_BOOL",
-				code:        "MODULE Test; VAR x: BOOL; z: INT32; BEGIN z := FLOOR(x) END Test.",
+				code:        "MODULE Test; VAR x: BOOLEAN; z: INT32; BEGIN z := FLOOR(x) END Test.",
 				shouldPass:  false,
 				expectError: "predeclared procedure 'FLOOR' expects a REAL or LONGREAL argument",
 			},
@@ -2757,7 +2757,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:        "Invalid_FLT_BOOL",
-				code:        "MODULE Test; VAR x: BOOL; r: REAL; BEGIN r := FLT(x) END Test.",
+				code:        "MODULE Test; VAR x: BOOLEAN; r: REAL; BEGIN r := FLT(x) END Test.",
 				shouldPass:  false,
 				expectError: "predeclared procedure 'FLT' expects an INT32 or INT64 argument",
 			},
@@ -2993,7 +2993,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:       "Valid_ORD_BOOLEAN",
-				code:       "MODULE Test; VAR b: BOOL; n: BYTE; BEGIN n := ORD(b) END Test.",
+				code:       "MODULE Test; VAR b: BOOLEAN; n: BYTE; BEGIN n := ORD(b) END Test.",
 				shouldPass: true,
 			},
 			{
@@ -3032,51 +3032,51 @@ var predeclaredProcTests = []procTestEntry{
 		cases: []procTestCase{
 			{
 				name:       "Valid_ODD_INT8",
-				code:       "MODULE Test; VAR x: INT8; b: BOOL; BEGIN b := ODD(x) END Test.",
+				code:       "MODULE Test; VAR x: INT8; b: BOOLEAN; BEGIN b := ODD(x) END Test.",
 				shouldPass: true,
 			},
 			{
 				name:       "Valid_ODD_INT16",
-				code:       "MODULE Test; VAR x: INT16; b: BOOL; BEGIN b := ODD(x) END Test.",
+				code:       "MODULE Test; VAR x: INT16; b: BOOLEAN; BEGIN b := ODD(x) END Test.",
 				shouldPass: true,
 			},
 			{
 				name:       "Valid_ODD_INT32",
-				code:       "MODULE Test; VAR x: INT32; b: BOOL; BEGIN b := ODD(x) END Test.",
+				code:       "MODULE Test; VAR x: INT32; b: BOOLEAN; BEGIN b := ODD(x) END Test.",
 				shouldPass: true,
 			},
 			{
 				name:       "Valid_ODD_INT64",
-				code:       "MODULE Test; VAR x: INT64; b: BOOL; BEGIN b := ODD(x) END Test.",
+				code:       "MODULE Test; VAR x: INT64; b: BOOLEAN; BEGIN b := ODD(x) END Test.",
 				shouldPass: true,
 			},
 			{
 				name:        "Invalid_ODD_REAL",
-				code:        "MODULE Test; VAR x: REAL; b: BOOL; BEGIN b := ODD(x) END Test.",
+				code:        "MODULE Test; VAR x: REAL; b: BOOLEAN; BEGIN b := ODD(x) END Test.",
 				shouldPass:  false,
 				expectError: "'ODD' expects an integer argument",
 			},
 			{
 				name:        "Invalid_ODD_BOOLEAN",
-				code:        "MODULE Test; VAR x: BOOL; b: BOOL; BEGIN b := ODD(x) END Test.",
+				code:        "MODULE Test; VAR x: BOOLEAN; b: BOOLEAN; BEGIN b := ODD(x) END Test.",
 				shouldPass:  false,
 				expectError: "'ODD' expects an integer argument",
 			},
 			{
 				name:        "Invalid_ODD_CHAR",
-				code:        "MODULE Test; VAR x: CHAR; b: BOOL; BEGIN b := ODD(x) END Test.",
+				code:        "MODULE Test; VAR x: CHAR; b: BOOLEAN; BEGIN b := ODD(x) END Test.",
 				shouldPass:  false,
 				expectError: "'ODD' expects an integer argument",
 			},
 			{
 				name:        "Invalid_ODD_no_args",
-				code:        "MODULE Test; VAR b: BOOL; BEGIN b := ODD() END Test.",
+				code:        "MODULE Test; VAR b: BOOLEAN; BEGIN b := ODD() END Test.",
 				shouldPass:  false,
 				expectError: "'ODD' expects exactly one argument",
 			},
 			{
 				name:        "Invalid_ODD_too_many_args",
-				code:        "MODULE Test; VAR x: INT32; b: BOOL; BEGIN b := ODD(x, x) END Test.",
+				code:        "MODULE Test; VAR x: INT32; b: BOOLEAN; BEGIN b := ODD(x, x) END Test.",
 				shouldPass:  false,
 				expectError: "'ODD' expects exactly one argument",
 			},
@@ -3653,7 +3653,7 @@ var predeclaredProcTests = []procTestEntry{
 			},
 			{
 				name:       "Valid_DEFAULT_BOOLEAN",
-				code:       "MODULE Test; VAR b: BOOL; BEGIN b := DEFAULT(BOOL) END Test.",
+				code:       "MODULE Test; VAR b: BOOLEAN; BEGIN b := DEFAULT(BOOLEAN) END Test.",
 				shouldPass: true,
 			},
 			{
@@ -3716,24 +3716,24 @@ var predeclaredProcTests = []procTestEntry{
 		cases: []procTestCase{
 			{
 				name:       "Valid_LDMOD_string",
-				code:       "MODULE Test; VAR b: BOOL; BEGIN b := LDMOD(\"MyModule\") END Test.",
+				code:       "MODULE Test; VAR b: BOOLEAN; BEGIN b := LDMOD(\"MyModule\") END Test.",
 				shouldPass: true,
 			},
 			{
 				name:        "Invalid_LDMOD_no_args",
-				code:        "MODULE Test; VAR b: BOOL; BEGIN b := LDMOD() END Test.",
+				code:        "MODULE Test; VAR b: BOOLEAN; BEGIN b := LDMOD() END Test.",
 				shouldPass:  false,
 				expectError: "'LDMOD' expects exactly one argument",
 			},
 			{
 				name:        "Invalid_LDMOD_too_many_args",
-				code:        "MODULE Test; VAR b: BOOL; BEGIN b := LDMOD(\"A\", \"B\") END Test.",
+				code:        "MODULE Test; VAR b: BOOLEAN; BEGIN b := LDMOD(\"A\", \"B\") END Test.",
 				shouldPass:  false,
 				expectError: "'LDMOD' expects exactly one argument",
 			},
 			{
 				name:        "Invalid_LDMOD_non_string_arg",
-				code:        "MODULE Test; VAR b: BOOL; BEGIN b := LDMOD(123) END Test.",
+				code:        "MODULE Test; VAR b: BOOLEAN; BEGIN b := LDMOD(123) END Test.",
 				shouldPass:  false,
 				expectError: "'LDMOD' expects a string argument",
 			},
