@@ -27,6 +27,8 @@ const (
 	GT
 	GE
 	cmp_end
+
+	LD
 )
 
 func (op InstrOp) IsCmpCondCode() bool { return cmp_begin < op && op < cmp_end }
@@ -62,6 +64,9 @@ func (op InstrOp) String() string {
 		return "or"
 	case AND:
 		return "and"
+	case LD:
+		return "ld"
+
 	default:
 		return "unknown"
 	}
