@@ -21,10 +21,11 @@ func NewParser(lx *Lexer) *Parser {
 func (p *Parser) bump() {
 	p.cur = p.next
 	p.next = p.lx.NextToken()
+
 }
 
-func (p *Parser) peek() TokenType {
-	return p.next.Kind
+func (p *Parser) peek() Token {
+	return p.next
 }
 
 func (p *Parser) expect(tt TokenType) string {
@@ -62,13 +63,42 @@ func (p *Parser) expectString() string {
 	return tok
 }
 
-func (p *Parser) Parse() []*Rule {
-	var rules []*Rule
-	for p.cur.Kind != TokEOF {
-		rules = append(rules, p.parseRule())
+func (p *Parser) Parse() *MachineDesc {
+	md := &MachineDesc{}
+
+	if p.cur.Kind == TokHeader {
+		md.Header = p.parseHeader()
 	}
 
-	return rules
+	//var rules []*Rule
+	for p.cur.Kind != TokEOF {
+		md.Rules = append(md.Rules, p.parseRule())
+	}
+
+	return md
+}
+
+func (p *Parser) parseHeader() *Header {
+	h := &Header{Fields: make(map[string][]string)}
+
+	p.expect(TokHeader)
+	p.expect(TokLBrace)
+
+	for p.cur.Value != "}" && p.cur.Kind != TokEOF {
+		keyTok := p.expectIdent()
+		p.expect(TokColon)
+		valTok := p.peek()
+		switch valTok.Kind {
+		case TokIdent, TokString, TokInt:
+			p.bump()
+			h.Fields[keyTok] = append(h.Fields[keyTok], valTok.Value)
+		default:
+			panic(fmt.Sprintf("unexpected value '%s'in header", valTok.Value))
+		}
+	}
+
+	p.expect(TokRParen)
+	return h
 }
 
 func (p *Parser) parseRule() *Rule {

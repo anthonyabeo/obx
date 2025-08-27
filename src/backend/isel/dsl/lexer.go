@@ -30,6 +30,7 @@ const (
 	TokSemi
 	TokBang
 	TokDollar
+	TokHeader
 )
 
 type Token struct {

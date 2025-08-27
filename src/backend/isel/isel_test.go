@@ -27,9 +27,9 @@ rule LoadImm {
 	lexer := dsl.NewLexer(src)
 	parser := dsl.NewParser(lexer)
 
-	rules := parser.Parse()
+	machine := parser.Parse()
 
-	for _, rule := range rules {
+	for _, rule := range machine.Rules {
 		fmt.Println(rule.String())
 	}
 }
@@ -58,13 +58,13 @@ rule LoadImm {
     "ld $rd, %lo($offs)($t0)";
   }
   cost 2;
-  cond !ImmFits12($offs);
+  cond !SImmFits12($offs);
 }
 `
 	lexer := dsl.NewLexer(src)
 	parser := dsl.NewParser(lexer)
 
-	rules := parser.Parse()
+	machine := parser.Parse()
 
 	pattern := &dsl.Node{
 		Dst: &dsl.Node{Val: &dsl.Value{Kind: dsl.KindGPR, Reg: "t0"}},
@@ -79,7 +79,7 @@ rule LoadImm {
 			},
 		},
 	}
-	sel := NewSelector(rules, ralloc.NewRegisterAllocator())
+	sel := NewSelector(machine.Rules, ralloc.NewRegisterAllocator())
 	instr := sel.Select(pattern)
 
 	for _, s := range instr {

@@ -7,6 +7,15 @@ import (
 	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
+type MachineDesc struct {
+	Header *Header
+	Rules  []*Rule
+}
+
+type Header struct {
+	Fields map[string][]string
+}
+
 type Var struct {
 	Kind string // e.g. GPR, imm
 	Name string // e.g. $rd, $ofs
@@ -146,7 +155,7 @@ func RegisterPredicate(name string, fn PredicateFunc) {
 }
 
 func init() {
-	RegisterPredicate("ImmFits12", func(args []string, env map[string]*Value) bool {
+	RegisterPredicate("SImmFits12", func(args []string, env map[string]*Value) bool {
 		if len(args) != 1 {
 			return false
 		}
@@ -157,6 +166,45 @@ func init() {
 		}
 
 		return val.Imm >= -2048 && val.Imm <= 2047
+	})
+
+	RegisterPredicate("UImmFits12", func(args []string, env map[string]*Value) bool {
+		if len(args) != 1 {
+			return false
+		}
+
+		val, ok := env[args[0]]
+		if !ok || val.Kind != KindImm {
+			return false
+		}
+
+		return val.Imm >= 0 && val.Imm <= 4095
+	})
+
+	RegisterPredicate("UImmFits20", func(args []string, env map[string]*Value) bool {
+		if len(args) != 1 {
+			return false
+		}
+
+		val, ok := env[args[0]]
+		if !ok || val.Kind != KindImm {
+			return false
+		}
+
+		return val.Imm >= 0 && val.Imm <= (1<<20)-1
+	})
+
+	RegisterPredicate("ShamtFits6", func(args []string, env map[string]*Value) bool {
+		if len(args) != 1 {
+			return false
+		}
+
+		val, ok := env[args[0]]
+		if !ok || val.Kind != KindImm {
+			return false
+		}
+
+		return val.Imm >= 0 && val.Imm <= 63
 	})
 
 	RegisterPredicate("IsEven", func(args []string, env map[string]*Value) bool {
@@ -197,6 +245,7 @@ type ValueKind int
 const (
 	KindNone ValueKind = iota
 	KindGPR
+	KindFPR
 	KindImm
 )
 
