@@ -91,8 +91,10 @@ Kind:Name
 
 ### Examples:
 - `GPR:$rd` → general-purpose register bound to $rd.
-- `imm:$offs` → immediate operand bound to $ofs.
 - `FPR:$f1` → floating-point register bound to $f1.
+- `imm:$offs` → immediate operand bound to $offs.
+- `label:$true_path` → target label operand bound to $true_path
+
 
 ### Sections
 - **out**: destination operands.
