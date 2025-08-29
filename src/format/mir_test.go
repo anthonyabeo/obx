@@ -72,6 +72,7 @@ func TestFormatMIRPrograms(t *testing.T) {
 			  ELSE
 			   y := -1
 			  END
+				return y
 			 END IfTest.
 			`,
 			filename: "if_test.obx",
