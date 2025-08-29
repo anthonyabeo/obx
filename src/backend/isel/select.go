@@ -36,7 +36,9 @@ func (s *Selector) selectBest(pat *dsl.Node) *MatchResult {
 			classes[v.Name] = v.Kind
 		}
 
-		classes[rule.Out.Name] = rule.Out.Kind
+		if rule.Out.Name != "" {
+			classes[rule.Out.Name] = rule.Out.Kind
+		}
 
 		for _, v := range rule.Temps {
 			classes[v.Name] = v.Kind

@@ -15,7 +15,9 @@ type MatchResult struct {
 }
 
 func (m *MatchResult) BindTempsAndOuts(env map[string]*dsl.Value, ra ralloc.RegAlloc) {
-	env[m.Rule.Out.Name] = &dsl.Value{Kind: dsl.KindGPR, Reg: m.Pattern.Dst.Val.Reg}
+	if m.Pattern.Dst != nil {
+		env[m.Rule.Out.Name] = &dsl.Value{Kind: dsl.KindGPR, Reg: m.Pattern.Dst.Val.Reg}
+	}
 
 	for _, v := range m.Rule.Temps {
 		env[v.Name] = &dsl.Value{Kind: dsl.KindGPR, Reg: ra.NewVReg(v.Kind)}
@@ -51,8 +53,16 @@ func match(pt *dsl.Expr, ir *dsl.Node, env map[string]*dsl.Value, classes map[st
 			if ir.Val.Kind != dsl.KindGPR {
 				return false
 			}
+		case "FPR":
+			if ir.Val.Kind != dsl.KindFPR {
+				return false
+			}
 		case "imm":
 			if ir.Val.Kind != dsl.KindImm {
+				return false
+			}
+		case "label":
+			if ir.Val.Kind != dsl.KindLabel {
 				return false
 			}
 		default:
@@ -68,6 +78,7 @@ func match(pt *dsl.Expr, ir *dsl.Node, env map[string]*dsl.Value, classes map[st
 	if ir.Op != pt.Op || len(ir.Args) != len(pt.Args) {
 		return false
 	}
+
 	for i := range pt.Args {
 		if !match(pt.Args[i], ir.Args[i], env, classes) {
 			return false
@@ -84,18 +95,17 @@ var reVar = regexp.MustCompile(`\$(\w+)`)
 
 func Subst(line string, env map[string]*dsl.Value) string {
 	return reVar.ReplaceAllStringFunc(line, func(s string) string {
-		key := s[1:] // "rd"
-		v, ok := env[key]
-		if !ok {
-			return s
-		} // leave as-is if unknown
-		switch v.Kind {
-		case dsl.KindGPR:
-			return v.Reg
-		case dsl.KindImm:
-			return strconv.Itoa(v.Imm)
-		default:
-			return s
+		key := s[1:]
+		if v, ok := env[key]; ok {
+			switch v.Kind {
+			case dsl.KindGPR, dsl.KindFPR:
+				return v.Reg
+			case dsl.KindImm:
+				return strconv.Itoa(v.Imm)
+			case dsl.KindLabel:
+				return v.Label
+			}
 		}
+		return s
 	})
 }

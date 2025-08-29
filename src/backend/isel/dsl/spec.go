@@ -247,12 +247,14 @@ const (
 	KindGPR
 	KindFPR
 	KindImm
+	KindLabel
 )
 
 type Value struct {
-	Kind ValueKind
-	Reg  string // e.g., "x5" (virtual or physical)
-	Imm  int
+	Kind  ValueKind
+	Reg   string // e.g., "x5" (virtual or physical)
+	Imm   int
+	Label string
 }
 
 // PatMIRInst convert a MIR Instruction into a dsl.Node for matching against
