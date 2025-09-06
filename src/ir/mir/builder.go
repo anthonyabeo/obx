@@ -92,8 +92,22 @@ func (b *Builder) CreateReturn(value Value) {
 }
 
 func (b *Builder) CreateAssign(target, value Value) {
-	b.Emit(&AssignInst{
+	b.Emit(&MovInst{
 		Target: target,
 		Value:  value,
+	})
+}
+
+func (b *Builder) CreateStore(target, value Value) {
+	b.Emit(&StoreInst{
+		Addr: target,
+		Val:  value,
+	})
+}
+
+func (b *Builder) CreateLoad(dst, src Value) {
+	b.Emit(&LoadInst{
+		Target: dst,
+		Addr:   src,
 	})
 }

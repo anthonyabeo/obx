@@ -77,12 +77,13 @@ type (
 
 	Mem struct {
 		Addr Value // Address of the memory location
+		Offs int
 	}
 )
 
-func (m Mem) Name() string     { return fmt.Sprintf("[%s]", m.Addr.Name()) }
-func (m Mem) BaseName() string { return fmt.Sprintf("[%s]", m.Addr.Name()) }
-func (m Mem) String() string   { return fmt.Sprintf("[%s]", m.Addr.Name()) }
+func (m Mem) Name() string     { return fmt.Sprintf("%d(%s)", m.Offs, m.Addr.Name()) }
+func (m Mem) BaseName() string { return fmt.Sprintf("%d(%s)", m.Offs, m.Addr.Name()) }
+func (m Mem) String() string   { return fmt.Sprintf("%d(%s)", m.Offs, m.Addr.Name()) }
 func (m Mem) Type() Type       { return m.Addr.Type() }
 
 func (o *Temp) Type() Type       { return o.Typ }

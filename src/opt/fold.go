@@ -14,7 +14,7 @@ func (c ConstantFold) Run(fn *mir.Function, ctx *PassContext) *ChangeSet {
 		for i, instr := range blk.Instrs {
 			if foldable, ok := instr.(mir.Foldable); ok && foldable.CanFold() {
 				foldedValue := foldable.Fold()
-				asn := &mir.AssignInst{Target: instr.Def(), Value: foldedValue}
+				asn := &mir.MovInst{Target: instr.Def(), Value: foldedValue}
 				ctx.cs.Notef("folded %s -> %s", instr.String(), asn.String())
 				blk.Instrs[i] = asn
 			}

@@ -83,3 +83,11 @@ func (g *Generator) genOp(op token.Kind) InstrOp {
 		panic("unknown operator " + op.String())
 	}
 }
+
+func isMem(value Value) *Mem {
+	if mem, isMem := value.(*Mem); isMem {
+		return mem
+	}
+
+	return nil
+}

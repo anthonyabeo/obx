@@ -27,7 +27,7 @@ type (
 		Right  Value
 	}
 
-	AssignInst struct {
+	MovInst struct {
 		Target Value
 		Value  Value
 	}
@@ -86,15 +86,15 @@ type (
 	}
 )
 
-func (a *AssignInst) Def() Value     { return a.Target }
-func (a *AssignInst) Uses() []Value  { return []Value{a.Value} }
-func (a *AssignInst) String() string { return fmt.Sprintf("%v = %v", a.Target, a.Value) }
-func (a *AssignInst) ReplaceUses(m map[string]Value) {
+func (a *MovInst) Def() Value     { return a.Target }
+func (a *MovInst) Uses() []Value  { return []Value{a.Value} }
+func (a *MovInst) String() string { return fmt.Sprintf("mov %v, %v", a.Value, a.Target) }
+func (a *MovInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[a.Value.BaseName()]; ok {
 		a.Value = nv
 	}
 }
-func (a *AssignInst) ReplaceDef(t Value) { a.Target = t }
+func (a *MovInst) ReplaceDef(t Value) { a.Target = t }
 
 func (*JumpInst) Def() Value                     { return nil }
 func (*JumpInst) Uses() []Value                  { return nil }
@@ -293,7 +293,7 @@ func (l *LoadInst) ReplaceDef(t Value) { l.Target = t }
 func (s *StoreInst) Def() Value    { return nil }
 func (s *StoreInst) Uses() []Value { return []Value{s.Addr, s.Val} }
 func (s *StoreInst) String() string {
-	return fmt.Sprintf("store %s, %s", s.Addr.Name(), s.Val.Name())
+	return fmt.Sprintf("store %s, %s", s.Val.Name(), s.Addr.Name())
 }
 func (s *StoreInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[s.Addr.BaseName()]; ok {

@@ -145,8 +145,18 @@ func (g *Generator) genAssignStmt(s *hir.AssignStmt) {
 	target := g.genValue(s.Left)
 	value := g.genValue(s.Right)
 
+	if mem := isMem(target); mem != nil {
+		g.build.CreateStore(mem, value)
+		return
+	}
+
+	if mem := isMem(value); mem != nil {
+		g.build.CreateLoad(target, value)
+		return
+	}
+
 	// Emit the assignment instruction
-	g.build.Emit(&AssignInst{Target: target, Value: value})
+	g.build.Emit(&MovInst{Target: target, Value: value})
 }
 
 func (g *Generator) genReturnStmt(s *hir.ReturnStmt) {
@@ -382,7 +392,7 @@ func (g *Generator) genIndexExpr(e *hir.IndexExpr) Value {
 
 	// 3) addr = baseAddr + acc
 	addr := g.build.CreateBinary(ADD, &AddrOf{arr}, acc)
-	return &Mem{addr}
+	return &Mem{Addr: addr}
 }
 
 func (g *Generator) genValue(e hir.Expr) Value {
