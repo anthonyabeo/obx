@@ -1,40 +1,64 @@
 package isel
 
 import (
-	"regexp"
+	"fmt"
 	"strconv"
 
-	"github.com/anthonyabeo/obx/src/backend/isel/dsl"
-	"github.com/anthonyabeo/obx/src/backend/ralloc"
+	"github.com/anthonyabeo/obx/src/backend/isel/bud"
+	"github.com/anthonyabeo/obx/src/backend/isel/bud/ast"
+	"github.com/anthonyabeo/obx/src/ir/asm"
 )
 
 type MatchResult struct {
-	Rule    *dsl.Rule
-	Pattern *dsl.Node
-	Bind    map[string]*dsl.Value
+	Rule    *ast.Rule
+	Pattern *bud.Node
+	Bind    map[string]*bud.Value
 }
 
-func (m *MatchResult) BindTempsAndOuts(env map[string]*dsl.Value, ra ralloc.RegAlloc) {
+func (m *MatchResult) Binding(env map[string]*bud.Value) {
 	if m.Pattern.Dst != nil {
-		env[m.Rule.Out.Name] = &dsl.Value{Kind: dsl.KindGPR, Reg: m.Pattern.Dst.Val.Reg}
+		rd := m.Rule.Out.(*ast.Register)
+
+		kind := bud.KindGPR
+		if rd.Type == "FPR" {
+			kind = bud.KindFPR
+		}
+
+		env[rd.Name] = &bud.Value{
+			Kind: kind,
+			Reg: bud.Reg{
+				Name: m.Pattern.Dst.Val.Reg.Name,
+				Mode: rd.Mode,
+				Kind: rd.Type,
+			},
+		}
 	}
 
 	for _, v := range m.Rule.Temps {
-		env[v.Name] = &dsl.Value{Kind: dsl.KindGPR, Reg: ra.NewVReg(v.Kind)}
+		t := v.(*ast.Register)
+
+		env[t.Name] = &bud.Value{
+			Kind: bud.KindGPR,
+			Reg: bud.Reg{
+				Name: t.Name,
+				Mode: t.Mode,
+				Kind: t.Type,
+			},
+		}
 	}
 }
 
-func (m *MatchResult) Emit() []string {
-	out := make([]string, 0, len(m.Rule.Instructions))
-	for _, l := range m.Rule.Instructions {
-		out = append(out, Subst(l, m.Bind))
+func (m *MatchResult) Emit() []*asm.Instr {
+	out := make([]*asm.Instr, 0, len(m.Rule.Instructions))
+	for _, instr := range m.Rule.Instructions {
+		out = append(out, Subst(instr, m.Bind))
 	}
 	return out
 }
 
 // env binds "$name" -> Value captured from the IR during matching.
 // classes is the union of rule.In, rule.Out, rule.Temps (name -> class).
-func match(pt *dsl.Expr, ir *dsl.Node, env map[string]*dsl.Value, classes map[string]string) bool {
+func match(pt *ast.Pattern, ir *bud.Node, env map[string]*bud.Value, classes map[string]ast.Operand /*classes map[string]bud.Var*/) bool {
 	if pt == nil || ir == nil {
 		return false
 	}
@@ -48,22 +72,52 @@ func match(pt *dsl.Expr, ir *dsl.Node, env map[string]*dsl.Value, classes map[st
 			return false
 		}
 
-		switch cls {
-		case "GPR":
-			if ir.Val.Kind != dsl.KindGPR {
+		switch cls.Kind() {
+		case ast.OKRegister:
+			if ir.Val.Kind != bud.KindGPR && ir.Val.Kind != bud.KindFPR {
 				return false
 			}
-		case "FPR":
-			if ir.Val.Kind != dsl.KindFPR {
+
+			reg := cls.(*ast.Register)
+			ir.Val.Reg.Mode = reg.Mode
+			ir.Val.Reg.Kind = reg.Type
+		case ast.OKImm:
+			if ir.Val.Kind != bud.KindImm {
 				return false
 			}
-		case "imm":
-			if ir.Val.Kind != dsl.KindImm {
+		case ast.OKLabel:
+			if ir.Val.Kind != bud.KindLabel {
 				return false
 			}
-		case "label":
-			if ir.Val.Kind != dsl.KindLabel {
+		case ast.OKReloc:
+			if ir.Val.Kind != bud.KindReloc {
 				return false
+			}
+
+			reloc := cls.(*ast.Reloc)
+			ir.Val.Reloc.Fxn = reloc.Fxn
+			ir.Val.Reloc.Symbol = reloc.Symbol
+		case ast.OKMem:
+			if ir.Val.Kind != bud.KindMem {
+				return false
+			}
+
+			mem := cls.(*ast.Mem)
+			ir.Val.Mem.Base = bud.Reg{
+				Name: mem.Base.Name,
+				Mode: mem.Base.Mode,
+				Kind: mem.Base.Type,
+			}
+
+			if mem.Offs.Kind() == ast.OKImm {
+				offs := mem.Offs.(*ast.Imm)
+				ir.Val.Mem.Offs = offs.Value.(int)
+			} else {
+				offs := mem.Offs.(*ast.Reloc)
+				ir.Val.Mem.Reloc = bud.Reloc{
+					Fxn:    offs.Fxn,
+					Symbol: offs.Symbol,
+				}
 			}
 		default:
 			return false
@@ -91,21 +145,127 @@ func match(pt *dsl.Expr, ir *dsl.Node, env map[string]*dsl.Value, classes map[st
 // Subst replaces the variables in an instruction string with their respective
 // values in env
 // //////////////////////////////////////////////////////////////////////////////
-var reVar = regexp.MustCompile(`\$(\w+)`)
 
-func Subst(line string, env map[string]*dsl.Value) string {
-	return reVar.ReplaceAllStringFunc(line, func(s string) string {
-		key := s[1:]
-		if v, ok := env[key]; ok {
-			switch v.Kind {
-			case dsl.KindGPR, dsl.KindFPR:
-				return v.Reg
-			case dsl.KindImm:
-				return strconv.Itoa(v.Imm)
-			case dsl.KindLabel:
-				return v.Label
+func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
+	var asmOperands []asm.Operand
+	for _, operand := range inst.Operands {
+		switch op := operand.(type) {
+		case *ast.Register:
+			if op.Mode == "phys" {
+				asmOperands = append(asmOperands, &asm.Register{
+					Name: op.Name,
+					Mode: RegMode(op.Mode),
+					Kind: RegKind(op.Type),
+				})
+
+			} else {
+				if v, ok := env[op.Name]; ok && v.Kind == bud.KindGPR || v.Kind == bud.KindFPR {
+					operand := &asm.Register{
+						Name: v.Reg.Name,
+						Mode: RegMode(op.Mode),
+						Kind: RegKind(op.Type),
+					}
+
+					asmOperands = append(asmOperands, operand)
+				}
 			}
+		case *ast.Reloc:
+			if v, ok := env[op.Symbol]; ok {
+				var symbol string
+				if v.Kind == bud.KindImm {
+					symbol = strconv.Itoa(v.Imm)
+				} else if v.Kind == bud.KindLabel {
+					symbol = v.Label
+				}
+
+				asmOperands = append(asmOperands, &asm.RelocFunc{
+					Kind:   RelocFxn(op.Fxn),
+					Symbol: symbol,
+				})
+
+			}
+		case *ast.Imm:
+		case *ast.Label:
+			if v, ok := env[op.Name]; ok {
+				asmOperands = append(asmOperands, &asm.Label{Name: v.Label})
+			}
+		case *ast.Mem:
+			var offset asm.Operand
+
+			switch op.Offs.Kind() {
+			case ast.OKImm:
+				imm := op.Offs.(*ast.Imm)
+				offset = &asm.Imm{Value: imm.Value}
+			case ast.OKReloc:
+				var symbol string
+				rel := op.Offs.(*ast.Reloc)
+				if v, ok := env[rel.Symbol]; ok {
+
+					if v.Kind == bud.KindImm {
+						symbol = strconv.Itoa(v.Imm)
+					} else if v.Kind == bud.KindLabel {
+						symbol = v.Label
+					}
+				}
+
+				offset = &asm.RelocFunc{
+					Kind:   RelocFxn(rel.Fxn),
+					Symbol: symbol,
+				}
+			default:
+				panic("unreachable")
+			}
+
+			asmOperands = append(asmOperands, &asm.MemAddr{
+				Base: &asm.Register{
+					Name: op.Base.Name,
+					Mode: RegMode(op.Base.Mode),
+					Kind: RegKind(op.Base.Type),
+				},
+				Offset: offset,
+			})
+		default:
+			panic(fmt.Sprintf("invalid operand: %v", operand))
 		}
-		return s
-	})
+	}
+
+	return &asm.Instr{
+		Opcode:   inst.Opcode,
+		Operands: asmOperands,
+	}
+}
+
+func RegMode(mode string) asm.RegMode {
+	switch mode {
+	case "virt":
+		return asm.Virt
+	case "phys":
+		return asm.Phys
+	default:
+		panic("invalid register kind")
+	}
+}
+
+func RegKind(kind string) asm.RegKind {
+	switch kind {
+	case "GPR":
+		return asm.GPR
+	case "FPR":
+		return asm.FPR
+	case "SPR":
+		return asm.SPR
+	default:
+		panic("invalid register kind")
+	}
+}
+
+func RelocFxn(kind string) asm.RelocKind {
+	switch kind {
+	case "hi":
+		return asm.Hi
+	case "lo":
+		return asm.Lo
+	default:
+		panic("invalid reloc kind")
+	}
 }

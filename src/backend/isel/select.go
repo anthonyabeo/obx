@@ -1,47 +1,47 @@
 package isel
 
 import (
-	"github.com/anthonyabeo/obx/src/backend/isel/dsl"
-	"github.com/anthonyabeo/obx/src/backend/ralloc"
+	"github.com/anthonyabeo/obx/src/backend/isel/bud"
+	"github.com/anthonyabeo/obx/src/backend/isel/bud/ast"
+	"github.com/anthonyabeo/obx/src/ir/asm"
 )
 
 type Selector struct {
-	Rules []*dsl.Rule
-	alloc ralloc.RegAlloc
+	Rules []*ast.Rule
 }
 
-func NewSelector(rules []*dsl.Rule, alloc ralloc.RegAlloc) *Selector {
-	return &Selector{Rules: rules, alloc: alloc}
+func NewSelector(rules []*ast.Rule) *Selector {
+	return &Selector{Rules: rules}
 }
 
-func (s *Selector) Select(pat *dsl.Node) []string {
+func (s *Selector) Select(pat *bud.Node) []*asm.Instr {
 	res := s.selectBest(pat)
 	if res == nil {
 		panic("no match found")
 	}
 
-	res.BindTempsAndOuts(res.Bind, s.alloc)
+	res.Binding(res.Bind)
 
 	return res.Emit()
 }
 
-func (s *Selector) selectBest(pat *dsl.Node) *MatchResult {
+func (s *Selector) selectBest(pat *bud.Node) *MatchResult {
 	var best *MatchResult
 	bestCost := int(^uint(0) >> 1) // max int
 
 	for _, rule := range s.Rules {
-		env := map[string]*dsl.Value{}
-		classes := make(map[string]string, len(rule.In)+1+len(rule.Temps))
+		env := map[string]*bud.Value{}
+		classes := make(map[string]ast.Operand, len(rule.In)+1+len(rule.Temps))
 		for _, v := range rule.In {
-			classes[v.Name] = v.Kind
+			classes[v.Desc()] = v
 		}
 
-		if rule.Out.Name != "" {
-			classes[rule.Out.Name] = rule.Out.Kind
+		if rule.Out != nil {
+			classes[rule.Out.Desc()] = rule.Out
 		}
 
 		for _, v := range rule.Temps {
-			classes[v.Name] = v.Kind
+			classes[v.Desc()] = v
 		}
 
 		if match(rule.Pattern, pat, env, classes) && rule.CheckPredicates(env) {

@@ -4,83 +4,58 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/backend/isel/dsl"
-	"github.com/anthonyabeo/obx/src/backend/ralloc"
+	"github.com/anthonyabeo/obx/src/backend/isel/bud"
+	"github.com/anthonyabeo/obx/src/backend/isel/bud/parser"
+	"github.com/anthonyabeo/obx/src/ir/asm"
 )
-
-func TestDSLParser(t *testing.T) {
-	src := `
-rule LoadImm {
-  out   GPR:$rd;
-  in    GPR:$rs1, imm:$offs;
-  temps GPR:$t0;
-  pattern load(add($rs1, $offs));
-  asm {
-    "lui $t0, %hi($offs)";
-    "add $t0, $rs1, $t0";
-    "ld $rd, %lo($offs)($t0)";
-  }
-  cost 2;
-  cond imm_fits_hi_lo;
-}
-`
-	lexer := dsl.NewLexer(src)
-	parser := dsl.NewParser(lexer)
-
-	machine := parser.Parse()
-
-	for _, rule := range machine.Rules {
-		fmt.Println(rule.String())
-	}
-}
 
 func TestISelect(t *testing.T) {
 	src := `
 rule LDri {
-	out   GPR:$rd;
-	in    GPR:$rs1, imm:$offs;
+	out   GPR:virt:$rd;
+	in    GPR:virt:$rs1, imm:$offs;
 	pattern load(add($rs1, $offs));
-	asm {
-		"ld $rd, $offs($rs1)";
+	emit {
+		instr { opcode: "ld", operands: GPR:virt:$rd, imm:$offs, GPR:virt:$rs1 };
   	}
 	cost 1;
   	cond ImmFits12($offs);
 }
 
 rule LoadImm {
-  out   GPR:$rd;
-  in    GPR:$rs1, imm:$offs;
-  temps GPR:$t0;
+  out   GPR:virt:$rd;
+  in    GPR:virt:$rs1, imm:$offs;
+  temps GPR:virt:$t0;
   pattern load(add($rs1, $offs));
-  asm {
-    "lui $t0, %hi($offs)";
-    "addi $t0, $t0, %lo($offs)";
-    "add $t0, $rs1, $t0";
-    "ld $rd, 0($t0)";
+  emit {
+	instr { opcode: "lui", operands: GPR:virt:$t0, reloc:hi($offs) };
+	instr { opcode: "addi", operands: GPR:virt:$t0, GPR:virt:$t0, reloc:lo($offs) };
+	instr { opcode: "add", operands: GPR:virt:$t0, GPR:virt:$rs1, GPR:virt:$t0}
+	instr { opcode: "ld", operands: GPR:virt:$rd, mem:{base=GPR:virt:$t0, offset=imm:0} }
   }
   cost 2;
   cond !SImmFits12($offs);
 }
 `
-	lexer := dsl.NewLexer(src)
-	parser := dsl.NewParser(lexer)
+	lexer := parser.NewLexer(src)
+	p := parser.NewParser(lexer)
 
-	machine := parser.Parse()
+	machine := p.Parse()
 
-	pattern := &dsl.Node{
-		Dst: &dsl.Node{Val: &dsl.Value{Kind: dsl.KindGPR, Reg: "t0"}},
+	pattern := &bud.Node{
+		Dst: &bud.Node{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "res.t"}}},
 		Op:  "load",
-		Args: []*dsl.Node{
+		Args: []*bud.Node{
 			{
 				Op: "add",
-				Args: []*dsl.Node{
-					{Val: &dsl.Value{Kind: dsl.KindGPR, Reg: "t5"}},
-					{Val: &dsl.Value{Kind: dsl.KindImm, Imm: 4096}},
+				Args: []*bud.Node{
+					{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "t5"}}},
+					{Val: &bud.Value{Kind: bud.KindImm, Imm: 4096}},
 				},
 			},
 		},
 	}
-	sel := NewSelector(machine.Rules, ralloc.NewRegisterAllocator())
+	sel := NewSelector(machine.Rules)
 	instr := sel.Select(pattern)
 
 	for _, s := range instr {
@@ -93,23 +68,25 @@ func TestISelectUncondJump(t *testing.T) {
 rule JmpU {
     in label:$target;
     pattern jmp($target);
-    asm { "jal x0, $target"; }
+    emit {
+		instr { opcode: "jal", operands: GPR:phys:$x0, label:$target }
+	}
     cost 1;
 }
 `
-	lexer := dsl.NewLexer(src)
-	parser := dsl.NewParser(lexer)
+	lexer := parser.NewLexer(src)
+	p := parser.NewParser(lexer)
 
-	machine := parser.Parse()
+	machine := p.Parse()
 
-	pattern := &dsl.Node{
+	pattern := &bud.Node{
 		Op: "jmp",
-		Args: []*dsl.Node{
-			{Val: &dsl.Value{Kind: dsl.KindLabel, Label: "while.loop.end.2"}},
+		Args: []*bud.Node{
+			{Val: &bud.Value{Kind: bud.KindLabel, Label: "while.loop.end.2"}},
 		},
 	}
 
-	sel := NewSelector(machine.Rules, ralloc.NewRegisterAllocator())
+	sel := NewSelector(machine.Rules)
 	instr := sel.Select(pattern)
 
 	for _, s := range instr {
@@ -120,52 +97,53 @@ rule JmpU {
 func TestISelectCondBr(t *testing.T) {
 	src := `
 rule ICMP_gt {
-    out GPR:$rd;
-    in  GPR:$rs1, GPR:$rs2;
+    out GPR:virt:$rd;
+    in  GPR:virt:$rs1, GPR:virt:$rs2;
     pattern gt($rs1, rs2);
-    asm { "slt $rd, $rs2, $rs1"; }
+    emit { 
+		instr { opcode: "slt", operands: GPR:virt:$rd, GPR:virt:$rs2, GPR:virt:$rs1 };
+	}
     cost 1;
 }
 
 rule Br_bool {
-    in  GPR:$rs1, label:$true, label:$false;
+    in  GPR:virt:$rs1, label:$true, label:$false;
     pattern br($rs1, $true, $false);
-    asm {
-        "bne $rs1, x0, $true";
-        "jal x0, $false";
+    emit {
+		instr { opcode: "bne", operands: GPR:virt:$rs1, GPR:phys:x0, label:$true };
+		instr { opcode: "jal", operands: GPR:phys:x0, label:$false };
     }
-    cost 1;
+    cost 2;
 }
 `
-	lexer := dsl.NewLexer(src)
-	parser := dsl.NewParser(lexer)
+	lexer := parser.NewLexer(src)
+	p := parser.NewParser(lexer)
 
-	machine := parser.Parse()
-
+	machine := p.Parse()
 	// %cmp = icmp.gt %x, %y
 	// br %cmp, Ltrue, Lfalse
-	patterns := []*dsl.Node{
+	patterns := []*bud.Node{
 		{
-			Dst: &dsl.Node{Val: &dsl.Value{Kind: dsl.KindGPR, Reg: "cmp"}},
+			Dst: &bud.Node{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "cmp"}}},
 			Op:  "gt",
-			Args: []*dsl.Node{
-				{Val: &dsl.Value{Kind: dsl.KindGPR, Reg: "x"}},
-				{Val: &dsl.Value{Kind: dsl.KindGPR, Reg: "y"}},
+			Args: []*bud.Node{
+				{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "x"}}},
+				{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "y"}}},
 			},
 		},
 		{
 			Op: "br",
-			Args: []*dsl.Node{
-				{Val: &dsl.Value{Kind: dsl.KindGPR, Reg: "cmp"}},
-				{Val: &dsl.Value{Kind: dsl.KindLabel, Label: "LTrue"}},
-				{Val: &dsl.Value{Kind: dsl.KindLabel, Label: "LFalse"}},
+			Args: []*bud.Node{
+				{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "cmp"}}},
+				{Val: &bud.Value{Kind: bud.KindLabel, Label: "LTrue"}},
+				{Val: &bud.Value{Kind: bud.KindLabel, Label: "LFalse"}},
 			},
 		},
 	}
 
-	var instructions []string
+	var instructions []*asm.Instr
 	for _, pattern := range patterns {
-		sel := NewSelector(machine.Rules, ralloc.NewRegisterAllocator())
+		sel := NewSelector(machine.Rules)
 		instructions = append(instructions, sel.Select(pattern)...)
 	}
 
