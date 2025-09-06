@@ -1,4 +1,4 @@
-package dsl
+package parser
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ const (
 	TokOut
 	TokTemps
 	TokRule
-	TokAsm
+	TokEmit
 	TokCond
 	TokInt
 	TokString
@@ -31,6 +31,24 @@ const (
 	TokBang
 	TokDollar
 	TokHeader
+	TokOpcode
+	TokOperands
+	TokPercent
+	TokReloc
+	TokReg
+	TokMem
+	TokLabel
+	TokImm
+	TokBase
+	TokEqual
+	TokOffset
+	TokGPR
+	TokSPR
+	TokFPR
+	TokVirt
+	TokPhys
+	TokInstr
+	TokSub
 )
 
 type Token struct {
@@ -81,6 +99,9 @@ func (l *Lexer) NextToken() Token {
 	case '$':
 		l.next()
 		return Token{Kind: TokDollar, Value: "$"}
+	case '%':
+		l.next()
+		return Token{Kind: TokPercent, Value: "%"}
 	case '(':
 		l.next()
 		return Token{Kind: TokLParen, Value: "("}
@@ -110,6 +131,8 @@ func (l *Lexer) NextToken() Token {
 			l.pos += 2
 			return Token{Kind: TokArrow, Value: "=>"}
 		}
+		l.next()
+		return Token{Kind: TokEqual, Value: "="}
 	case '"':
 		l.next()
 		start := l.pos
@@ -150,12 +173,41 @@ func (l *Lexer) NextToken() Token {
 			return Token{Kind: TokTemps, Value: ident}
 		case "pattern":
 			return Token{Kind: TokPattern, Value: ident}
-		case "asm":
-			return Token{Kind: TokAsm, Value: ident}
 		case "cost":
 			return Token{Kind: TokCost, Value: ident}
 		case "cond":
 			return Token{Kind: TokCond, Value: ident}
+		case "opcode":
+			return Token{Kind: TokOpcode, Value: ident}
+		case "operands":
+			return Token{Kind: TokOperands, Value: ident}
+		case "instr":
+			return Token{Kind: TokInstr, Value: ident}
+		case "phys":
+			return Token{Kind: TokPhys, Value: ident}
+		case "reloc":
+			return Token{Kind: TokReloc, Value: ident}
+		case "emit":
+			return Token{Kind: TokEmit, Value: ident}
+		case "GPR":
+			return Token{Kind: TokGPR, Value: ident}
+		case "FPR":
+			return Token{Kind: TokFPR, Value: ident}
+		case "SPR":
+			return Token{Kind: TokSPR, Value: ident}
+		case "virt":
+			return Token{Kind: TokVirt, Value: ident}
+		case "imm":
+			return Token{Kind: TokImm, Value: ident}
+		case "mem":
+			return Token{Kind: TokMem, Value: ident}
+		case "base":
+			return Token{Kind: TokBase, Value: ident}
+		case "offset":
+			return Token{Kind: TokOffset, Value: ident}
+		case "label":
+			return Token{Kind: TokLabel, Value: ident}
+
 		}
 		return Token{Kind: TokIdent, Value: ident}
 	}

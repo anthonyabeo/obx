@@ -1,4 +1,4 @@
-# Instruction Selection DSL Reference
+# Bud - A DSL for Tree Pattern-Matching Instruction Selection
 
 ## Overview
 This DSL describes **tree-pattern matching rules** for instruction selection in an RV64IFMD backend.
