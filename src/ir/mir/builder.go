@@ -53,6 +53,8 @@ func (b *Builder) SetBlock(block *Block) {
 
 func (b *Builder) CreateBinary(op InstrOp, left, right Value) Value {
 	t := b.NewTemp()
+	left = b.ensureValue(left)
+	right = b.ensureValue(right)
 
 	if op.IsCmpCondCode() {
 		b.Emit(&CmpInst{Target: t, Op: op, Left: left, Right: right})
@@ -99,9 +101,17 @@ func (b *Builder) CreateAssign(target, value Value) {
 }
 
 func (b *Builder) CreateStore(target, value Value) {
+	val := value
+	switch value.(type) {
+	case *Global, *Mem:
+		val = b.ensureValue(value)
+	default:
+		panic(fmt.Sprintf("unsupported store src: %T", value))
+	}
+
 	b.Emit(&StoreInst{
 		Addr: target,
-		Val:  value,
+		Val:  val,
 	})
 }
 

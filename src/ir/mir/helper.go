@@ -1,6 +1,8 @@
 package mir
 
 import (
+	"fmt"
+
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/types"
 )
@@ -84,10 +86,29 @@ func (g *Generator) genOp(op token.Kind) InstrOp {
 	}
 }
 
-func isMem(value Value) *Mem {
+func isMem(value Value) Value {
 	if mem, isMem := value.(*Mem); isMem {
 		return mem
 	}
 
+	if global, isGlobal := value.(*Global); isGlobal {
+		return global
+	}
+
 	return nil
+}
+
+// ensure a value operand (Temp or Constant). If it's a Global/Mem/etc,
+// insert a load and return a new Temp holding the value.
+func (b *Builder) ensureValue(value Value) Value {
+	switch v := value.(type) {
+	case *Temp, Constant:
+		return v
+	case *Global, *Mem:
+		t := b.NewTemp()
+		b.Emit(&LoadInst{Target: t, Addr: v})
+		return t
+	default:
+		panic(fmt.Sprintf("unsupported operand type in ensureValue: %T", value))
+	}
 }

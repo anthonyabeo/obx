@@ -81,9 +81,9 @@ type (
 	}
 )
 
-func (m Mem) Name() string     { return fmt.Sprintf("%d(%s)", m.Offs, m.Addr.Name()) }
-func (m Mem) BaseName() string { return fmt.Sprintf("%d(%s)", m.Offs, m.Addr.Name()) }
-func (m Mem) String() string   { return fmt.Sprintf("%d(%s)", m.Offs, m.Addr.Name()) }
+func (m Mem) Name() string     { return fmt.Sprintf("[%s + %d]", m.Addr.Name(), m.Offs) }
+func (m Mem) BaseName() string { return fmt.Sprintf("[%s + %d]", m.Addr.Name(), m.Offs) }
+func (m Mem) String() string   { return fmt.Sprintf("[%s + %d]", m.Addr.Name(), m.Offs) }
 func (m Mem) Type() Type       { return m.Addr.Type() }
 
 func (o *Temp) Type() Type       { return o.Typ }
@@ -121,10 +121,10 @@ func (o StrConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }
 func (o StrConst) String() string   { return fmt.Sprintf("%s", o.Value) }
 
 func (o *Global) Type() Type          { return o.Typ }
-func (o *Global) Name() string        { return o.NameStr }
+func (o *Global) Name() string        { return "@" + o.NameStr }
 func (o *Global) BaseName() string    { return o.BName }
 func (o *Global) SetName(name string) { o.NameStr = name }
-func (o *Global) String() string      { return o.NameStr }
+func (o *Global) String() string      { return "@" + o.NameStr }
 
 func (a AddrOf) Type() Type       { return &PointerType{Ref: a.Obj.Type()} }
 func (a AddrOf) Name() string     { return "&" + a.Obj.Name() }

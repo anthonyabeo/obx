@@ -391,7 +391,7 @@ func (g *Generator) genIndexExpr(e *hir.IndexExpr) Value {
 	}
 
 	// 3) addr = baseAddr + acc
-	addr := g.build.CreateBinary(ADD, &AddrOf{arr}, acc)
+	addr := g.build.CreateBinary(ADD, arr, acc)
 	return &Mem{Addr: addr}
 }
 

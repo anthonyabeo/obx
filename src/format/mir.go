@@ -64,7 +64,7 @@ func FormatProgram(p *mir.Program) string {
 	for _, m := range p.Modules {
 		sb.WriteString(fmt.Sprintf("module %s:\n", m.Name))
 		for _, g := range m.Globals {
-			sb.WriteString(fmt.Sprintf("@%s = global %s %s", g.Name(), g.Kind, g.Typ))
+			sb.WriteString(fmt.Sprintf("%s = global %s %s", g.Name(), g.Kind, g.Typ))
 			if g.Value != nil {
 				sb.WriteString(fmt.Sprintf(" := %v", g.Value))
 			}

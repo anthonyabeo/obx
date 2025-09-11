@@ -2,7 +2,6 @@ package mir
 
 import (
 	"fmt"
-	"strings"
 )
 
 type Type interface {
@@ -37,17 +36,7 @@ func (a ArrayType) String() string {
 	if a.IsOpen() {
 		return fmt.Sprintf("[%s]", a.Elem.String())
 	}
-
-	dims := a.Dimensions()
-	var sb strings.Builder
-	for i := 0; i < len(dims); i++ {
-		sb.WriteString(fmt.Sprintf("[%d x ", dims[i]))
-	}
-	sb.WriteString(fmt.Sprintf("%s", a.Elem.String()))
-	sb.WriteString(strings.Repeat("]", len(dims)))
-
-	return sb.String()
-
+	return fmt.Sprintf("[%d x %s]", a.Len, a.Elem.String())
 }
 func (a ArrayType) Width() int {
 	if a.IsOpen() {
