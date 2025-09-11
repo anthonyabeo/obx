@@ -151,3 +151,110 @@ rule Br_bool {
 		fmt.Println(s)
 	}
 }
+
+func TestISelMovInstr(t *testing.T) {
+	src := `
+rule MOVrr {
+	in GPR:virt:$rd, GPR:virt:$rs;
+	pattern mov($rd, $rs);
+	emit {
+		instr { opcode: "addi", operands: GPR:virt:rd, GPR:virt:rs, imm:0 };
+	}
+	cost 1;
+}
+
+rule MOVri_SmallImm {
+	in GPR:virt:$rd, imm:$val;
+	pattern mov($rd, $val);
+	emit {
+		instr { opcode: "addi", operands: GPR:virt:$rd, GPR:phys:x0, imm:$val };
+	}
+	cost 1;
+	cond SImmFits12($val);
+}
+
+rule MOVri_LargeImm {
+	in GPR:virt:$rd, imm:$val;
+	pattern mov($rd, $val);
+	emit {
+		instr { opcode: "lui", operands: GPR:virt:$rd, reloc:hi($val) };
+		instr { opcode: "addi", operands: GPR:virt:$rd, GPR:virt:$rd, reloc:lo($val) };
+	}
+	cost 1;
+	cond !SImmFits12($val);
+}
+`
+
+	lexer := parser.NewLexer(src)
+	p := parser.NewParser(lexer)
+
+	machine := p.Parse()
+
+	//pattern := &bud.Node{
+	//	Op: "mov",
+	//	Args: []*bud.Node{
+	//		{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "t5"}}},
+	//		{Val: &bud.Value{Kind: bud.KindImm, Imm: 9}},
+	//	},
+	//}
+
+	pattern := &bud.Node{
+		Op: "mov",
+		Args: []*bud.Node{
+			{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "t5"}}},
+			{Val: &bud.Value{Kind: bud.KindImm, Imm: 5000}},
+		},
+	}
+
+	sel := NewSelector(machine.Rules)
+	instr := sel.Select(pattern)
+
+	for _, s := range instr {
+		fmt.Println(s)
+	}
+}
+
+func TestISelLoadGlobal(t *testing.T) {
+	src := `
+rule load_global_gp {
+  out   GPR:$rd
+  in    global:$sym 
+  cost  1
+  cond FitsGP($sym)
+  emit  { 
+	instr { opcode: "LW", operands: reg:$rd, mem:{base:gp, offset:reloc_gp:$sym} }
+  }
+}
+
+rule load_global_large {
+  out   GPR:$rd
+  in    global:$sym
+  cost  2
+  temps GPR:$tmp0
+  emit {
+    instr { opcode: "LUI",  operands: [reg:$tmp0, reloc_hi:$sym] }
+    instr { opcode: "ADDI", operands: [reg:$tmp0, reg:$tmp0, reloc_lo:$sym] }
+    instr { opcode: "LW",   operands: [reg:$rd,  mem:{base:$tmp0, offset:0}] }
+  }
+}
+`
+
+	lexer := parser.NewLexer(src)
+	p := parser.NewParser(lexer)
+
+	machine := p.Parse()
+
+	pattern := &bud.Node{
+		Op: "load",
+		Args: []*bud.Node{
+			{Val: &bud.Value{Kind: bud.KindSym, Sym: bud.Sym{}}},
+		},
+	}
+
+	sel := NewSelector(machine.Rules)
+	instr := sel.Select(pattern)
+
+	for _, s := range instr {
+		fmt.Println(s)
+	}
+}

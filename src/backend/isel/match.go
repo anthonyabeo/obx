@@ -185,6 +185,13 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 
 			}
 		case *ast.Imm:
+			if imm, ok := env[op.Name]; ok && imm.Kind == bud.KindImm {
+				op.Value = imm.Imm
+			}
+
+			asmOperands = append(asmOperands, &asm.Imm{
+				Value: op.Value,
+			})
 		case *ast.Label:
 			if v, ok := env[op.Name]; ok {
 				asmOperands = append(asmOperands, &asm.Label{Name: v.Label})

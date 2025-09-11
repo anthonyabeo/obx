@@ -12,7 +12,6 @@ type Rule struct {
 	Out          Operand
 	In           []Operand
 	Temps        []Operand
-	Phys         []Operand
 	Pattern      *Pattern
 	Instructions []Instr
 	Predicates   []*Predicate

@@ -25,6 +25,7 @@ const (
 	KindLabel
 	KindReloc
 	KindMem
+	KindSym
 )
 
 type Value struct {
@@ -34,6 +35,10 @@ type Value struct {
 	Label string
 	Reloc Reloc
 	Mem   Mem
+	Sym   Sym
+}
+
+type Sym struct {
 }
 
 type Reg struct {

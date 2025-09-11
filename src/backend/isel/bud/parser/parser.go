@@ -58,7 +58,7 @@ func (p *Parser) Parse() *ast.MachineDesc {
 	}
 
 	for p.cur.Kind != TokEOF {
-		md.Rules = append(md.Rules, p.parseRule2())
+		md.Rules = append(md.Rules, p.parseRule())
 	}
 
 	return md
@@ -87,7 +87,7 @@ func (p *Parser) parseHeader() *ast.Header {
 	return h
 }
 
-func (p *Parser) parseRule2() *ast.Rule {
+func (p *Parser) parseRule() *ast.Rule {
 	p.match(TokRule)
 	name := p.match(TokIdent)
 	p.match(TokLBrace)
