@@ -49,6 +49,7 @@ const (
 	TokPhys
 	TokInstr
 	TokSub
+	TokGlobal
 )
 
 type Token struct {
@@ -207,7 +208,8 @@ func (l *Lexer) NextToken() Token {
 			return Token{Kind: TokOffset, Value: ident}
 		case "label":
 			return Token{Kind: TokLabel, Value: ident}
-
+		case "global":
+			return Token{Kind: TokGlobal, Value: ident}
 		}
 		return Token{Kind: TokIdent, Value: ident}
 	}

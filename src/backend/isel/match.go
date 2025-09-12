@@ -119,6 +119,10 @@ func match(pt *ast.Pattern, ir *bud.Node, env map[string]*bud.Value, classes map
 					Symbol: offs.Symbol,
 				}
 			}
+		case ast.OKGlobal:
+			if ir.Val.Kind != bud.KindGlobal {
+				return false
+			}
 		default:
 			return false
 		}
@@ -176,6 +180,8 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 					symbol = strconv.Itoa(v.Imm)
 				} else if v.Kind == bud.KindLabel {
 					symbol = v.Label
+				} else if v.Kind == bud.KindGlobal {
+					symbol = v.Global.Name
 				}
 
 				asmOperands = append(asmOperands, &asm.RelocFunc{

@@ -25,20 +25,21 @@ const (
 	KindLabel
 	KindReloc
 	KindMem
-	KindSym
+	KindGlobal
 )
 
 type Value struct {
-	Kind  ValueKind
-	Reg   Reg
-	Imm   int
-	Label string
-	Reloc Reloc
-	Mem   Mem
-	Sym   Sym
+	Kind   ValueKind
+	Reg    Reg
+	Imm    int
+	Label  string
+	Reloc  Reloc
+	Mem    Mem
+	Global Global
 }
 
-type Sym struct {
+type Global struct {
+	Name string
 }
 
 type Reg struct {

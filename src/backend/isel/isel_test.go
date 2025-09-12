@@ -16,7 +16,7 @@ rule LDri {
 	in    GPR:virt:$rs1, imm:$offs;
 	pattern load(add($rs1, $offs));
 	emit {
-		instr { opcode: "ld", operands: GPR:virt:$rd, imm:$offs, GPR:virt:$rs1 };
+		instr { opcode: "ld", operands: GPR:virt:$rd, mem:{base=GPR:virt:$rs1, offset=imm:$offs};
   	}
 	cost 1;
   	cond ImmFits12($offs);
@@ -216,25 +216,16 @@ rule MOVri_LargeImm {
 
 func TestISelLoadGlobal(t *testing.T) {
 	src := `
-rule load_global_gp {
-  out   GPR:$rd
-  in    global:$sym 
-  cost  1
-  cond FitsGP($sym)
-  emit  { 
-	instr { opcode: "LW", operands: reg:$rd, mem:{base:gp, offset:reloc_gp:$sym} }
-  }
-}
-
-rule load_global_large {
-  out   GPR:$rd
-  in    global:$sym
-  cost  2
-  temps GPR:$tmp0
+rule LoadGlobal {
+  out   GPR:virt:$rd;
+  in    global:$sym;
+  temps GPR:virt:$tmp0;
+  cost  2;
+  pattern load($sym);
   emit {
-    instr { opcode: "LUI",  operands: [reg:$tmp0, reloc_hi:$sym] }
-    instr { opcode: "ADDI", operands: [reg:$tmp0, reg:$tmp0, reloc_lo:$sym] }
-    instr { opcode: "LW",   operands: [reg:$rd,  mem:{base:$tmp0, offset:0}] }
+    instr { opcode: "LUI",  operands: GPR:virt:$tmp0, reloc:hi($sym) };
+    instr { opcode: "ADDI", operands: GPR:virt:$tmp0, GPR:virt:$tmp0, reloc:lo($sym) };
+    instr { opcode: "LW",   operands: GPR:virt:$rd,  mem:{base=GPR:virt:$tmp0, offset=imm:0} };
   }
 }
 `
@@ -245,9 +236,10 @@ rule load_global_large {
 	machine := p.Parse()
 
 	pattern := &bud.Node{
-		Op: "load",
+		Dst: &bud.Node{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "ld.t"}}},
+		Op:  "load",
 		Args: []*bud.Node{
-			{Val: &bud.Value{Kind: bud.KindSym, Sym: bud.Sym{}}},
+			{Val: &bud.Value{Kind: bud.KindGlobal, Global: bud.Global{Name: "mat"}}},
 		},
 	}
 
