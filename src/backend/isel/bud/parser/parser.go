@@ -221,8 +221,6 @@ func (p *Parser) parseMem() *ast.Mem {
 		panic("unexpected token in mem: " + p.cur.Value)
 	}
 
-	//offs := p.parseImm()
-
 	p.match(TokRBrace)
 
 	return &ast.Mem{Base: base, Offs: offs}
@@ -334,7 +332,9 @@ func (p *Parser) parseInstr() ast.Instr {
 		p.match(TokColon)
 		opcode = p.match(TokString)
 
-		p.match(TokComma)
+		if p.cur.Kind == TokComma {
+			p.next()
+		}
 
 		if p.cur.Kind == TokOperands {
 			p.next()

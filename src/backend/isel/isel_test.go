@@ -216,6 +216,9 @@ rule MOVri_LargeImm {
 
 func TestISelLoadGlobal(t *testing.T) {
 	src := `
+////////////////////////////////////////
+// Load a global variable from memory //
+////////////////////////////////////////
 rule LoadGlobal {
   out   GPR:virt:$rd;
   in    global:$sym;
@@ -223,9 +226,9 @@ rule LoadGlobal {
   cost  2;
   pattern load($sym);
   emit {
-    instr { opcode: "LUI",  operands: GPR:virt:$tmp0, reloc:hi($sym) };
-    instr { opcode: "ADDI", operands: GPR:virt:$tmp0, GPR:virt:$tmp0, reloc:lo($sym) };
-    instr { opcode: "LW",   operands: GPR:virt:$rd,  mem:{base=GPR:virt:$tmp0, offset=imm:0} };
+    instr { opcode: "lui",  operands: GPR:virt:$tmp0, reloc:hi($sym) };
+    instr { opcode: "addi", operands: GPR:virt:$tmp0, GPR:virt:$tmp0, reloc:lo($sym) };
+    instr { opcode: "ld",   operands: GPR:virt:$rd,  mem:{base=GPR:virt:$tmp0, offset=imm:0} };
   }
 }
 `

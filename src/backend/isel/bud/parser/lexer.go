@@ -83,10 +83,61 @@ func (l *Lexer) next() rune {
 }
 
 func (l *Lexer) skipSpaces() {
-	for unicode.IsSpace(l.peek()) {
-		l.next()
+	for {
+		for unicode.IsSpace(l.peek()) {
+			l.next()
+		}
+		l.skipComments()
+		if !unicode.IsSpace(l.peek()) {
+			break
+		}
 	}
 }
+
+func (l *Lexer) skipComments() {
+	for {
+		// Single-line comment
+		if l.peek() == '/' && l.pos+1 < len(l.input) && l.input[l.pos+1] == '/' {
+			l.pos += 2
+			for l.peek() != '\n' && l.peek() != 0 {
+				l.next()
+			}
+			if l.peek() == '\n' {
+				l.next()
+			}
+			continue
+		}
+		// Multi-line comment
+		if l.peek() == '/' && l.pos+1 < len(l.input) && l.input[l.pos+1] == '*' {
+			l.pos += 2
+			for {
+				if l.peek() == 0 {
+					break
+				}
+				if l.peek() == '*' && l.pos+1 < len(l.input) && l.input[l.pos+1] == '/' {
+					l.pos += 2
+					break
+				}
+				l.next()
+			}
+			continue
+		}
+		break
+	}
+}
+
+// Update skipSpaces to call skipComments
+//func (l *Lexer) skipSpaces() {
+//	for {
+//		for unicode.IsSpace(l.peek()) {
+//			l.next()
+//		}
+//		l.skipComments()
+//		if !unicode.IsSpace(l.peek()) {
+//			break
+//		}
+//	}
+//}
 
 func (l *Lexer) NextToken() Token {
 	l.skipSpaces()
