@@ -88,7 +88,7 @@ func (b *Builder) CreateCallInst(callee string, args []Value) Value {
 }
 
 func (b *Builder) CreateReturn(value Value) {
-	ret := &ReturnInst{Result: value}
+	ret := &ReturnInst{Result: b.ensureValue(value)}
 	b.SetTerm(ret)
 	b.Emit(ret)
 }
@@ -101,17 +101,9 @@ func (b *Builder) CreateAssign(target, value Value) {
 }
 
 func (b *Builder) CreateStore(target, value Value) {
-	val := value
-	switch value.(type) {
-	case *Global, *Mem:
-		val = b.ensureValue(value)
-	default:
-		panic(fmt.Sprintf("unsupported store src: %T", value))
-	}
-
 	b.Emit(&StoreInst{
 		Addr: target,
-		Val:  val,
+		Val:  b.ensureValue(value),
 	})
 }
 

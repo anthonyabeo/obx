@@ -2,6 +2,7 @@ package mir
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/ir/asm"
 
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/types"
@@ -110,5 +111,49 @@ func (b *Builder) ensureValue(value Value) Value {
 		return t
 	default:
 		panic(fmt.Sprintf("unsupported operand type in ensureValue: %T", value))
+	}
+}
+
+func MirTypeToAsmType(ty Type) asm.Type {
+	switch ty := ty.(type) {
+	case *IntegerType:
+		if ty.Signed {
+			switch ty.Bits {
+			case 64:
+				return asm.I64
+			case 32:
+				return asm.I32
+			case 16:
+				return asm.I16
+			case 8:
+				return asm.I8
+			default:
+				panic("unsupported integer size")
+			}
+		} else {
+			switch ty.Bits {
+			case 64:
+				return asm.U64
+			case 32:
+				return asm.U32
+			case 16:
+				return asm.U16
+			case 8:
+				return asm.U8
+			default:
+				panic("unsupported integer size")
+			}
+		}
+	case *FloatType:
+		switch ty.Bits {
+		case 64:
+			return asm.F64
+		case 32:
+			return asm.F32
+		default:
+			panic("unsupported float size")
+		}
+	default:
+		panic("unsupported mir type to asm type conversion")
 	}
 }

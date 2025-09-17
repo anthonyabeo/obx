@@ -2,8 +2,9 @@ package mir
 
 import (
 	"fmt"
-	"sort"
 	"strings"
+
+	"github.com/anthonyabeo/obx/src/ir/asm"
 )
 
 // Program ...
@@ -18,6 +19,7 @@ type Module struct {
 	Globals map[string]*Global
 	Funcs   []*Function
 	Env     *SymbolTable
+	Asm     *asm.Module
 }
 
 type Function struct {
@@ -33,6 +35,8 @@ type Function struct {
 
 	Constants map[string]*Const
 	Env       *SymbolTable // symbol table for this function
+
+	Asm *asm.Function
 }
 
 func NewFunction(name string, ret Type, env *SymbolTable) *Function {
@@ -113,15 +117,9 @@ func (fn *Function) ReversePostOrder() []int {
 }
 
 func (fn *Function) OutputDOT() string {
-	var keys []int
-	for id := range fn.Blocks {
-		keys = append(keys, id)
-	}
-	sort.Ints(keys)
-
 	var sb strings.Builder
 	sb.WriteString("digraph CFG {\n")
-	for _, key := range keys {
+	for key := fn.Entry.ID; key <= len(fn.Blocks); key++ {
 		block := fn.Blocks[key]
 		label := fmt.Sprintf("%s:\\l", block.Label)
 		for _, instr := range block.Instrs {
