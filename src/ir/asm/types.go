@@ -4,45 +4,45 @@ type Type uint8
 
 const (
 	invalid Type = iota
-	i8
-	i16
-	i32
-	i64
-	u8
-	u16
-	u32
-	u64
-	f16
-	f32
-	f64
-	ptr
+	I8
+	I16
+	I32
+	I64
+	U8
+	U16
+	U32
+	U64
+	F16
+	F32
+	F64
+	Ptr
 )
 
 func (t Type) String() string {
 	switch t {
-	case i8:
+	case I8:
 		return "i8"
-	case i16:
+	case I16:
 		return "i16"
-	case i32:
+	case I32:
 		return "i32"
-	case i64:
+	case I64:
 		return "i64"
-	case u8:
+	case U8:
 		return "u8"
-	case u16:
+	case U16:
 		return "u16"
-	case u32:
+	case U32:
 		return "u32"
-	case u64:
+	case U64:
 		return "u64"
-	case f16:
+	case F16:
 		return "f16"
-	case f32:
+	case F32:
 		return "f32"
-	case f64:
+	case F64:
 		return "f64"
-	case ptr:
+	case Ptr:
 		return "ptr"
 	default:
 		return "invalid"

@@ -16,6 +16,8 @@ func (k RegKind) String() string {
 		return "FPR"
 	case SPR:
 		return "SPR"
+	case VEC:
+		return "VEC"
 	default:
 		panic("invalid register kind")
 	}
@@ -37,6 +39,7 @@ const (
 	GPR
 	FPR
 	SPR
+	VEC
 
 	Virt RegMode = iota
 	Phys

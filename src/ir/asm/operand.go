@@ -55,7 +55,7 @@ func (l Label) Type() Type {
 	panic("implement me")
 }
 
-func (g Global) String() string { panic("unimplemented") }
+func (g Global) String() string { return g.Name }
 func (g Global) Type() Type     { return g.Ty }
 
 func (r Register) String() string { return r.Name }

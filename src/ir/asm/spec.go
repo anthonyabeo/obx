@@ -7,11 +7,12 @@ type Module struct {
 }
 
 type Function struct {
-	Name   string
-	Result Type
-	Params map[string]Operand
-	Locals map[string]Operand
-	Blocks []*Block
+	Name     string
+	Result   Type
+	Exported bool
+	Params   map[string]Operand
+	Locals   map[string]Operand
+	Blocks   []*Block
 }
 
 type Block struct {
