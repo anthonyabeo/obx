@@ -1,6 +1,8 @@
 package isel
 
 import (
+	"fmt"
+
 	"github.com/anthonyabeo/obx/src/backend/isel/bud"
 	"github.com/anthonyabeo/obx/src/backend/isel/bud/ast"
 	"github.com/anthonyabeo/obx/src/ir/asm"
@@ -17,7 +19,7 @@ func NewSelector(rules []*ast.Rule) *Selector {
 func (s *Selector) Select(pat *bud.Node) []*asm.Instr {
 	res := s.selectBest(pat)
 	if res == nil {
-		panic("no match found")
+		panic(fmt.Sprintf("no match found for IR: %v", pat))
 	}
 
 	res.Binding(res.Bind)

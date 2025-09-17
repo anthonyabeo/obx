@@ -237,6 +237,12 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 				},
 				Offset: offset,
 			})
+		case *ast.Global:
+			if v, ok := env[op.Name]; ok && v.Kind == bud.KindGlobal {
+				asmOperands = append(asmOperands, &asm.Global{
+					Name: v.Global.Name,
+				})
+			}
 		default:
 			panic(fmt.Sprintf("invalid operand: %v", operand))
 		}
@@ -267,6 +273,8 @@ func RegKind(kind string) asm.RegKind {
 		return asm.FPR
 	case "SPR":
 		return asm.SPR
+	case "VEC":
+		return asm.VEC
 	default:
 		panic("invalid register kind")
 	}
