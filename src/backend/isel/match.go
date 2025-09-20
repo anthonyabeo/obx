@@ -241,6 +241,7 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 			if v, ok := env[op.Name]; ok && v.Kind == bud.KindGlobal {
 				asmOperands = append(asmOperands, &asm.Global{
 					Name: v.Global.Name,
+					Size: v.Global.Size,
 				})
 			}
 		default:

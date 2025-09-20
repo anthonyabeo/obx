@@ -1,9 +1,12 @@
 package riscv
 
 import (
+	"fmt"
+	"math"
+	"strings"
+
 	"github.com/anthonyabeo/obx/src/ir/asm"
 	"github.com/anthonyabeo/obx/src/ir/mir"
-	"strings"
 )
 
 type RV64IMAFD struct {
@@ -52,7 +55,7 @@ func (r RV64IMAFD) AllocRegs(function *asm.Function) {
 func (r RV64IMAFD) Emit(module *asm.Module) string {
 	var buf strings.Builder
 
-	buf.WriteString(".section .data\n")
+	buf.WriteString(".section .bss\n")
 	for _, global := range module.Globals {
 		buf.WriteString(r.formatGlobal(global))
 	}
@@ -78,6 +81,7 @@ func (r RV64IMAFD) formatFunc(fn *asm.Function) string {
 	var buf strings.Builder
 
 	buf.WriteString(".section .text\n")
+	buf.WriteString(".align 2\n\n")
 
 	fnName := fn.Name
 	if strings.HasPrefix(fnName, "__init_") {
@@ -107,8 +111,9 @@ func (r RV64IMAFD) formatFunc(fn *asm.Function) string {
 func (r RV64IMAFD) formatGlobal(g *asm.Global) string {
 	var buf strings.Builder
 
-	buf.WriteString(g.Name + ":\n")
-	buf.WriteString("  " + r.getType(g.Ty) + " " + "\n")
+	align := int(math.Log2(float64(g.Size)))
+	buf.WriteString(fmt.Sprintf(".align %d\n", align))
+	buf.WriteString(fmt.Sprintf("%s: .skip %d\n\n", g.Name, g.Size))
 
 	return buf.String()
 }

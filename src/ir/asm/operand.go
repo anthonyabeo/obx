@@ -37,9 +37,9 @@ type (
 	}
 
 	Global struct {
-		Name  string
-		Ty    Type
-		Value any // Optional initial value
+		Name string
+		Ty   Type
+		Size int // size in bytes
 	}
 )
 

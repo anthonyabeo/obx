@@ -39,7 +39,9 @@ type Value struct {
 }
 
 type Global struct {
-	Name string
+	Name  string
+	Size  int
+	Align int
 }
 
 type Reg struct {
@@ -153,7 +155,10 @@ func patMIRValue(value mir.Value) *Node {
 		}
 	case *mir.Global:
 		return &Node{
-			Val: &Value{Kind: KindGlobal, Global: Global{Name: val.NameStr}},
+			Val: &Value{Kind: KindGlobal, Global: Global{
+				Name: val.NameStr,
+				Size: val.Size,
+			}},
 		}
 	case *mir.Mem:
 		base := patMIRValue(val.Base)
