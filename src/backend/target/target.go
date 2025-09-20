@@ -15,5 +15,5 @@ type Machine interface {
 	SelectInstr(*mir.Function) *asm.Function
 	Legalize(*asm.Function)
 	AllocRegs(*asm.Function)
-	EmitCode(*asm.Function)
+	Emit(*asm.Module) string
 }
