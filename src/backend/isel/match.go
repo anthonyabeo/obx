@@ -9,6 +9,8 @@ import (
 	"github.com/anthonyabeo/obx/src/ir/asm"
 )
 
+var temp int
+
 type MatchResult struct {
 	Rule    *ast.Rule
 	Pattern *bud.Node
@@ -40,11 +42,12 @@ func (m *MatchResult) Binding(env map[string]*bud.Value) {
 		env[t.Name] = &bud.Value{
 			Kind: bud.KindGPR,
 			Reg: bud.Reg{
-				Name: t.Name,
+				Name: fmt.Sprintf("temp_%d", temp),
 				Mode: t.Mode,
 				Kind: t.Type,
 			},
 		}
+		temp++
 	}
 }
 
@@ -151,7 +154,12 @@ func match(pt *ast.Pattern, ir *bud.Node, env map[string]*bud.Value, classes map
 // //////////////////////////////////////////////////////////////////////////////
 
 func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
-	var asmOperands []asm.Operand
+	var (
+		asmOperands []asm.Operand
+		def         *asm.Register
+		uses        []*asm.Register
+	)
+
 	for _, operand := range inst.Operands {
 		switch op := operand.(type) {
 		case *ast.Register:
@@ -164,13 +172,11 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 
 			} else {
 				if v, ok := env[op.Name]; ok && v.Kind == bud.KindGPR || v.Kind == bud.KindFPR {
-					operand := &asm.Register{
+					asmOperands = append(asmOperands, &asm.Register{
 						Name: v.Reg.Name,
 						Mode: RegMode(op.Mode),
 						Kind: RegKind(op.Type),
-					}
-
-					asmOperands = append(asmOperands, operand)
+					})
 				}
 			}
 		case *ast.Reloc:
@@ -249,9 +255,37 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 		}
 	}
 
+	// Destination register
+	if inst.Def != nil && inst.Def.Mode == "virt" {
+		if v, ok := env[inst.Def.Name]; ok && v.Kind == bud.KindGPR || v.Kind == bud.KindFPR {
+			def = &asm.Register{
+				Name: v.Reg.Name,
+				Mode: RegMode(inst.Def.Mode),
+				Kind: RegKind(inst.Def.Type),
+			}
+		}
+	}
+
+	// Source registers
+	for _, use := range inst.Uses {
+		if use.Mode == "phys" {
+			continue
+		}
+
+		if v, ok := env[use.Name]; ok && (v.Kind == bud.KindGPR || v.Kind == bud.KindFPR) {
+			uses = append(uses, &asm.Register{
+				Name: v.Reg.Name,
+				Mode: RegMode(use.Mode),
+				Kind: RegKind(use.Type),
+			})
+		}
+	}
+
 	return &asm.Instr{
 		Opcode:   inst.Opcode,
 		Operands: asmOperands,
+		Def:      def,
+		Uses:     uses,
 	}
 }
 

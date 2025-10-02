@@ -50,6 +50,10 @@ const (
 	TokInstr
 	TokSub
 	TokGlobal
+	TokLBrack
+	TokRBrack
+	TokDef
+	TokUses
 )
 
 type Token struct {
@@ -126,19 +130,6 @@ func (l *Lexer) skipComments() {
 	}
 }
 
-// Update skipSpaces to call skipComments
-//func (l *Lexer) skipSpaces() {
-//	for {
-//		for unicode.IsSpace(l.peek()) {
-//			l.next()
-//		}
-//		l.skipComments()
-//		if !unicode.IsSpace(l.peek()) {
-//			break
-//		}
-//	}
-//}
-
 func (l *Lexer) NextToken() Token {
 	l.skipSpaces()
 	ch := l.peek()
@@ -148,6 +139,12 @@ func (l *Lexer) NextToken() Token {
 
 	// punctuation
 	switch ch {
+	case '[':
+		l.next()
+		return Token{Kind: TokLBrack, Value: "["}
+	case ']':
+		l.next()
+		return Token{Kind: TokRBrack, Value: "]"}
 	case '$':
 		l.next()
 		return Token{Kind: TokDollar, Value: "$"}
@@ -261,6 +258,10 @@ func (l *Lexer) NextToken() Token {
 			return Token{Kind: TokLabel, Value: ident}
 		case "global":
 			return Token{Kind: TokGlobal, Value: ident}
+		case "def":
+			return Token{Kind: TokDef, Value: ident}
+		case "uses":
+			return Token{Kind: TokUses, Value: ident}
 		}
 		return Token{Kind: TokIdent, Value: ident}
 	}

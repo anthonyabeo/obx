@@ -14,6 +14,8 @@ type Header struct {
 type Instr struct {
 	Opcode   string
 	Operands []Operand
+	Def      *Register
+	Uses     []*Register
 }
 
 // Pattern denotes Pattern tree (variables are leaves with Var != "")
