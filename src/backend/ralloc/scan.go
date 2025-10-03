@@ -135,44 +135,49 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, spills map[string]SpillSlo
 	before := []*asm.Instr{}
 	after := []*asm.Instr{}
 
-	newInstr := instr.Copy() // shallow copy
-
 	// Rewrite uses
-	for i, op := range instr.Uses {
+	for _, idx := range instr.UseIdx() {
+		op := instr.Operands[idx].(*asm.Register)
 		if preg, ok := alloc.RegMap[op.Name]; ok {
-			newInstr.Operands[i] = &asm.Register{
+			reg := &asm.Register{
 				Name: preg,
 				Mode: asm.Phys,
 				Kind: op.Kind,
 			}
+			instr.Operands[idx] = reg
+			instr.Uses = append(instr.Uses, reg)
 		} else if slot, ok := spills[op.Name]; ok {
 			temp := freshTemp(target.RegisterInfo().Temporaries) // pick a preg (like x10) reserved for spill reload
 			fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
-			mem := asm.MemAddr{Base: fp, Offset: asm.Imm{Value: -slot.Offset}}
+			mem := &asm.MemAddr{Base: fp, Offset: asm.Imm{Value: -slot.Offset}}
 			load := &asm.Instr{Opcode: "ld", Operands: []asm.Operand{temp, mem}, Def: temp, Uses: []*asm.Register{fp}}
 
 			before = append(before, load)
-			//newInstr.Operands[i] = temp
-			newInstr.Def = temp
+			instr.Uses = append(instr.Uses, temp)
+			instr.Operands[idx] = temp
 		}
 	}
 
 	// Rewrite defs
-	if preg, ok := alloc.RegMap[instr.Def.Name]; ok {
-		newInstr.Def = &asm.Register{
-			Name: preg,
-			Mode: asm.Phys,
-			Kind: asm.GPR,
-		}
-	} else if slot, ok := spills[instr.Def.Name]; ok {
-		temp := freshTemp(target.RegisterInfo().Temporaries)
-		fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
-		mem := asm.MemAddr{Base: fp, Offset: asm.Imm{Value: -slot.Offset}}
+	if instr.Def != nil {
+		if preg, ok := alloc.RegMap[instr.Def.Name]; ok {
+			instr.Def = &asm.Register{
+				Name: preg,
+				Mode: asm.Phys,
+				Kind: asm.GPR,
+			}
+			instr.Operands[0] = instr.Def // assuming def is always the first operand
+		} else if slot, ok := spills[instr.Def.Name]; ok {
+			temp := freshTemp(target.RegisterInfo().Temporaries)
+			fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
+			mem := &asm.MemAddr{Base: fp, Offset: asm.Imm{Value: -slot.Offset}}
 
-		newInstr.Def = temp
-		store := &asm.Instr{Opcode: "sw", Operands: []asm.Operand{temp, mem}, Uses: []*asm.Register{temp, fp}}
-		after = append(after, store)
+			instr.Def = temp
+			instr.Operands[0] = temp // assuming def is always the first operand
+			store := &asm.Instr{Opcode: "sd", Operands: []asm.Operand{temp, mem}, Uses: []*asm.Register{temp, fp}}
+			after = append(after, store)
+		}
 	}
 
-	return newInstr, Extra{Before: before, After: after}
+	return instr, Extra{Before: before, After: after}
 }

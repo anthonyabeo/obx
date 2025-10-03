@@ -7,13 +7,11 @@ type Module struct {
 }
 
 type Function struct {
-	Name       string
-	Result     Type
-	Exported   bool
-	FrameInfo  *FrameInfo
-	StackSlots map[string]StackSlot // map from temp ID to offset in frame
-	Blocks     []*Block
-	Entry      *Block
+	Name     string
+	Result   Type
+	Exported bool
+	Blocks   []*Block
+	Entry    *Block
 }
 
 // DFSOrder returns the blocks in depth-first order starting from entry.
@@ -67,19 +65,6 @@ func (fn *Function) ReversePostOrder() []*Block {
 	return order
 }
 
-type StackSlot struct {
-	ID     string
-	Size   int
-	Align  int
-	Offset int
-}
-
-type FrameInfo struct {
-	Size  int
-	Align int
-	Spill map[string]int // map from temp ID to offset in frame
-
-}
 type Block struct {
 	ID    int
 	Label string
@@ -87,28 +72,7 @@ type Block struct {
 	Term  *Instr
 	Succ  []*Block
 	Pred  []*Block
-
-	//Def     RegSet
-	//Use     RegSet
-	//LiveIn  RegSet
-	//LiveOut RegSet
 }
-
-//func (bb *Block) ComputeUseDef() {
-//	bb.Use = NewRegSet()
-//	bb.Def = NewRegSet()
-//
-//	for _, instr := range bb.Instr {
-//		if instr.Def != nil && !bb.Use.Contains(instr.Def.Name) {
-//			bb.Def.Add(instr.Def.Name)
-//		}
-//		for _, u := range instr.Uses {
-//			if !bb.Def.Contains(u.Name) {
-//				bb.Use.Add(u.Name)
-//			}
-//		}
-//	}
-//}
 
 func NewBlock(id int, label string) *Block {
 	return &Block{ID: id, Label: label}

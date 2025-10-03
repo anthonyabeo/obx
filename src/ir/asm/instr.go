@@ -24,6 +24,19 @@ func (i Instr) Defs() []string {
 	return []string{i.Def.Name}
 }
 
+func (i Instr) UseIdx() []int {
+	var uses []int
+	for idx, op := range i.Operands {
+		if reg, ok := op.(*Register); ok && reg.Mode == Virt {
+			if i.Def != nil && reg.Name == i.Def.Name {
+				continue
+			}
+			uses = append(uses, idx)
+		}
+	}
+	return uses
+}
+
 func (i Instr) String() string {
 	var operands []string
 	for _, op := range i.Operands {
@@ -39,18 +52,6 @@ func (i Instr) Copy() *Instr {
 		Operands: make([]Operand, len(i.Operands)),
 		Def:      i.Def,
 		Uses:     make([]*Register, len(i.Uses)),
-		LiveIn:   make(map[string]bool),
-		LiveOut:  make(map[string]bool),
-	}
-
-	copy(newInstr.Operands, i.Operands)
-	copy(newInstr.Uses, i.Uses)
-
-	for k, v := range i.LiveIn {
-		newInstr.LiveIn[k] = v
-	}
-	for k, v := range i.LiveOut {
-		newInstr.LiveOut[k] = v
 	}
 
 	return newInstr
