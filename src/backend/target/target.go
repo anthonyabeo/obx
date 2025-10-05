@@ -2,7 +2,6 @@ package target
 
 import (
 	"github.com/anthonyabeo/obx/src/ir/asm"
-	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
 type RegisterFile struct {
@@ -22,8 +21,8 @@ type RegisterFile struct {
 	Allocatable []string
 
 	// Register classification (caller-saved vs callee-saved).
-	CallerSaved []string
-	CalleeSaved []string
+	CallerSaved map[string]bool
+	CalleeSaved map[string]bool
 
 	// Registers used for passing arguments (in order).
 	ArgRegs []string
@@ -42,7 +41,7 @@ type RegisterFile struct {
 	// Number of arguments passed in registers before spilling to stack.
 	MaxArgRegs int
 
-	// Temporary registers used during instruction selection.
+	// Temporary registers
 	Temporaries []string
 }
 
@@ -71,13 +70,11 @@ type FrameInfo struct {
 
 type Machine interface {
 	Name() string
-	Triple() string
 	InstrInfo()                  // describe the machine instructions supported by the target.
 	RegisterInfo() *RegisterFile // describe the register file of the target and any interactions between the registers
-	FrameInfo()
+	FrameInfo() *FrameInfo
 
-	SelectInstr(*mir.Function) *asm.Function
 	Legalize(*asm.Function)
-	AllocRegs(*asm.Function)
 	Emit(*asm.Module) string
+	EmitPrologueEpilogue(*asm.Function, FrameLayout)
 }

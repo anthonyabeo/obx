@@ -7,7 +7,6 @@ import (
 
 	"github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/asm"
-	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
 type RV64IMAFD struct {
@@ -18,11 +17,6 @@ func NewRV64IMAFDTarget() *RV64IMAFD {
 }
 
 func (r RV64IMAFD) Name() string { return "rv64imafd" }
-
-func (r RV64IMAFD) Triple() string {
-	//TODO implement me
-	panic("implement me")
-}
 
 func (r RV64IMAFD) InstrInfo() {
 	//TODO implement me
@@ -149,38 +143,38 @@ func (r RV64IMAFD) RegisterInfo() *target.RegisterFile {
 			"s10", // x26
 			"s11", // x27
 		},
-		CallerSaved: []string{
-			"ra", // x1
-			"t0", // x5
-			"t1", // x6
-			"t2", // x7
-			"a0", // x10
-			"a1", // x11
-			"a2", // x12
-			"a3", // x13
-			"a4", // x14
-			"a5", // x15
-			"a6", // x16
-			"a7", // x17
-			"t3", // x28
-			"t4", // x29
-			"t5", // x30
-			"t6", // x31
+		CallerSaved: map[string]bool{
+			"ra": true, // x1
+			"t0": true, // x5
+			"t1": true, // x6
+			"t2": true, // x7
+			"a0": true, // x10
+			"a1": true, // x11
+			"a2": true, // x12
+			"a3": true, // x13
+			"a4": true, // x14
+			"a5": true, // x15
+			"a6": true, // x16
+			"a7": true, // x17
+			"t3": true, // x28
+			"t4": true, // x29
+			"t5": true, // x30
+			"t6": true, // x31
 		},
-		CalleeSaved: []string{
-			"sp",  //  x2
-			"fp",  // s0/x8
-			"s1",  //  x9
-			"s2",  //  x18
-			"s3",  //  x19
-			"s4",  //  x20
-			"s5",  //  x21
-			"s6",  //  x22
-			"s7",  //  x23
-			"s8",  //  x24
-			"s9",  //  x25
-			"s10", //  x26
-			"s11", //  x27
+		CalleeSaved: map[string]bool{
+			"sp":  true, //  x2
+			"fp":  true, // s0/x8
+			"s1":  true, //  x9
+			"s2":  true, //  x18
+			"s3":  true, //  x19
+			"s4":  true, //  x20
+			"s5":  true, //  x21
+			"s6":  true, //  x22
+			"s7":  true, //  x23
+			"s8":  true, //  x24
+			"s9":  true, //  x25
+			"s10": true, //  x26
+			"s11": true, //  x27
 		},
 		ArgRegs: []string{
 			"a0", // x10
@@ -218,23 +212,83 @@ func (r RV64IMAFD) RegisterInfo() *target.RegisterFile {
 	}
 }
 
-func (r RV64IMAFD) FrameInfo() {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (r RV64IMAFD) SelectInstr(function *mir.Function) *asm.Function {
-	//TODO implement me
-	panic("implement me")
+func (r RV64IMAFD) FrameInfo() *target.FrameInfo {
+	return &target.FrameInfo{
+		WordSize:    8,
+		PointerSize: 8,
+		FrameAlign:  16,
+	}
 }
 
 func (r RV64IMAFD) Legalize(fn *asm.Function) {
 
 }
 
-func (r RV64IMAFD) AllocRegs(function *asm.Function) {
-	//TODO implement me
-	panic("implement me")
+func (r RV64IMAFD) EmitPrologueEpilogue(fn *asm.Function, layout target.FrameLayout) {
+	fs := layout.FrameSize
+
+	sp := &asm.Register{Name: "sp", Mode: asm.Phys, Kind: asm.GPR}
+	fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
+
+	// Collect saved regs
+	var savedRegs []target.FrameObject
+	for _, obj := range layout.Objects {
+		if obj.Kind == target.SavedReg {
+			savedRegs = append(savedRegs, obj)
+		}
+	}
+
+	var (
+		prologue []*asm.Instr
+		epilogue []*asm.Instr
+	)
+
+	// ---------- PROLOGUE ----------
+	prologue = append(prologue, &asm.Instr{
+		Opcode:   "addi",
+		Operands: []asm.Operand{sp, sp, asm.Imm{Value: -fs}}},
+	)
+
+	for _, obj := range savedRegs {
+		spOffset := fs + obj.Offset
+
+		reg := &asm.Register{Name: obj.Name, Mode: asm.Phys, Kind: asm.GPR}
+		mem := &asm.MemAddr{Base: sp, Offset: asm.Imm{Value: spOffset}}
+		prologue = append(prologue, &asm.Instr{
+			Opcode:   "sd",
+			Operands: []asm.Operand{reg, mem},
+		})
+	}
+
+	// Set up frame pointer
+	prologue = append(prologue, &asm.Instr{
+		Opcode:   "addi",
+		Operands: []asm.Operand{fp, sp, asm.Imm{Value: fs}},
+	})
+	fn.Entry.Instr = append(prologue, fn.Entry.Instr...)
+
+	// ---------- EPILOGUE ----------
+	for i := len(savedRegs) - 1; i >= 0; i-- {
+		obj := savedRegs[i]
+		spOffset := fs + obj.Offset
+		reg := &asm.Register{Name: obj.Name, Mode: asm.Phys, Kind: asm.GPR}
+		mem := &asm.MemAddr{Base: sp, Offset: asm.Imm{Value: spOffset}}
+
+		epilogue = append(epilogue, &asm.Instr{
+			Opcode:   "ld",
+			Operands: []asm.Operand{reg, mem},
+		})
+	}
+
+	epilogue = append(epilogue,
+		&asm.Instr{
+			Opcode:   "addi",
+			Operands: []asm.Operand{sp, sp, asm.Imm{Value: fs}},
+		},
+		&asm.Instr{Opcode: "ret"},
+	)
+
+	fn.Exit.Instr = append(fn.Exit.Instr, epilogue...)
 }
 
 func (r RV64IMAFD) Emit(module *asm.Module) string {
