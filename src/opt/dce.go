@@ -100,6 +100,10 @@ func RemoveEmptyBlocks(f *mir.Function) bool {
 	for changed {
 		changed = false
 		for _, bi := range f.Blocks {
+			if bi.Label == "exit" {
+				continue
+			}
+
 			// Must have exactly one successor
 			if len(bi.Succs) != 1 {
 				continue
@@ -260,7 +264,7 @@ func HoistBranch(f *mir.Function) bool {
 		if trueTarget == nil || falseTarget == nil {
 			continue
 		}
-		
+
 		bi.Succs = map[int]*mir.Block{
 			trueTarget.ID:  trueTarget,
 			falseTarget.ID: falseTarget,
