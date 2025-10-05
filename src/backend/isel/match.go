@@ -205,8 +205,12 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 				Value: op.Value,
 			})
 		case *ast.Label:
-			if v, ok := env[op.Name]; ok {
-				asmOperands = append(asmOperands, &asm.Label{Name: v.Label})
+			if op.Value != "" {
+				asmOperands = append(asmOperands, &asm.Label{Name: op.Value})
+			} else {
+				if v, ok := env[op.Name]; ok {
+					asmOperands = append(asmOperands, &asm.Label{Name: v.Label})
+				}
 			}
 		case *ast.Mem:
 			var offset asm.Operand

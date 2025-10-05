@@ -191,10 +191,16 @@ func (p *Parser) parseReg() *ast.Register {
 }
 
 func (p *Parser) parseLabel() *ast.Label {
+	var value string
+
 	p.match(TokLabel)
 	p.match(TokColon)
 	name := p.matchIdent()
-	return &ast.Label{Name: name}
+	if p.cur.Kind == TokEqual {
+		p.next()
+		value = p.match(TokString)
+	}
+	return &ast.Label{Name: name, Value: value}
 }
 
 func (p *Parser) parseMem() *ast.Mem {

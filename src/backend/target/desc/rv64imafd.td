@@ -168,7 +168,7 @@ rule Br_bool {
 rule Ret_void {
     pattern ret;
     cost 1;
-    emit { instr { opcode: "ret" }; }
+    emit { instr { opcode: "j" operands: [label:$target="exit"] }; }
 }
 
 rule Ret_val {
@@ -177,7 +177,7 @@ rule Ret_val {
     cost 2;
     emit {
         instr { opcode: "mv", operands: [GPR:phys:a0, GPR:virt:$rs], def: GPR:phys:a0, uses: [GPR:virt:$rs] };
-        instr { opcode: "ret" };
+        instr { opcode: "j", operands: [label:$target="exit"], uses: [GPR:phys:a0] };
     }
 }
 

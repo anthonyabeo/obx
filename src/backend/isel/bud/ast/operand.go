@@ -57,7 +57,8 @@ func (m Mem) String() string    { return fmt.Sprintf("%d(%s)", m.Offs, m.Base) }
 /////////////////////////////////////////////////////////////////////////////////////////
 
 type Label struct {
-	Name string
+	Name  string
+	Value string
 }
 
 func (l Label) Desc() string      { return l.Name }
