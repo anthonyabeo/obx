@@ -14,7 +14,7 @@ type Allocation struct {
 }
 
 // LinearScan allocates registers using linear scan algorithm.
-func LinearScan(intervals []Interval /*physicalRegs []string,*/, target target.Machine) Allocation {
+func LinearScan(intervals []Interval, target target.Machine) Allocation {
 	// sort by start
 	sort.Slice(intervals, func(i, j int) bool {
 		return intervals[i].Start < intervals[j].Start

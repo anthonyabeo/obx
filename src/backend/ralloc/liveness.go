@@ -7,15 +7,14 @@ import (
 )
 
 func BuildCFG(fn *asm.Function) {
+	keys := make([]int, 0, len(fn.Blocks))
 	labelToBlock := map[string]*asm.Block{}
-	for _, blk := range fn.Blocks {
+
+	for id, blk := range fn.Blocks {
 		labelToBlock[blk.Label] = blk
+		keys = append(keys, id)
 	}
 
-	keys := make([]int, 0, len(fn.Blocks))
-	for k := range fn.Blocks {
-		keys = append(keys, k)
-	}
 	sort.Ints(keys)
 
 	for _, i := range keys {
