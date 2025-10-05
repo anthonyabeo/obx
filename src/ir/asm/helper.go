@@ -81,3 +81,15 @@ const (
 	Tprel_lo
 	Tprel_add
 )
+
+type SpillInfo struct {
+	Index  int
+	Size   int
+	Align  int
+	Offset int // offset from frame pointer
+}
+
+type LocalInfo struct {
+	Name string
+	Type Type
+}

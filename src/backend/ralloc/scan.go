@@ -8,9 +8,10 @@ import (
 )
 
 type Allocation struct {
-	RegMap    map[string]string // vreg -> preg
-	SpillMap  map[string]int    // vreg -> spill slot index
-	NumSpills int
+	TempRegMap      map[string]string // vreg -> preg
+	TempSpillMap    map[string]int    // vreg -> spill slot index
+	CalleeSavedUsed map[string]bool
+	NumSpills       int
 }
 
 // LinearScan allocates registers using linear scan algorithm.
@@ -21,8 +22,9 @@ func LinearScan(intervals []Interval, target target.Machine) Allocation {
 	})
 
 	alloc := Allocation{
-		RegMap:   make(map[string]string),
-		SpillMap: make(map[string]int),
+		TempRegMap:      make(map[string]string),
+		TempSpillMap:    make(map[string]int),
+		CalleeSavedUsed: map[string]bool{"ra": true, "fp": true}, // always save ra
 	}
 
 	type activeInterval struct {
@@ -31,7 +33,8 @@ func LinearScan(intervals []Interval, target target.Machine) Allocation {
 	}
 	active := []activeInterval{}
 
-	freeRegs := append([]string(nil), target.RegisterInfo().Allocatable...) // copy
+	registerFile := target.RegisterInfo()
+	freeRegs := append([]string(nil), registerFile.Allocatable...) // copy
 
 	for _, iv := range intervals {
 		// Expire old intervals
@@ -49,8 +52,12 @@ func LinearScan(intervals []Interval, target target.Machine) Allocation {
 			// Assign a free register
 			preg := freeRegs[len(freeRegs)-1]
 			freeRegs = freeRegs[:len(freeRegs)-1]
-			alloc.RegMap[iv.Reg] = preg
+			alloc.TempRegMap[iv.Reg] = preg
 			active = append(active, activeInterval{iv, preg})
+
+			if registerFile.CalleeSaved[preg] {
+				alloc.CalleeSavedUsed[preg] = true
+			}
 		} else {
 			// Spill: choose interval with the farthest end
 			spillIdx := -1
@@ -65,15 +72,15 @@ func LinearScan(intervals []Interval, target target.Machine) Allocation {
 			if spillIdx != -1 {
 				// Spill the active interval
 				spill := active[spillIdx]
-				alloc.SpillMap[spill.Reg] = alloc.NumSpills
+				alloc.TempSpillMap[spill.Reg] = alloc.NumSpills
 				alloc.NumSpills++
 
 				// Reuse its register for current interval
-				alloc.RegMap[iv.Reg] = spill.Preg
+				alloc.TempRegMap[iv.Reg] = spill.Preg
 				active[spillIdx] = activeInterval{iv, spill.Preg}
 			} else {
 				// Spill current interval
-				alloc.SpillMap[iv.Reg] = alloc.NumSpills
+				alloc.TempSpillMap[iv.Reg] = alloc.NumSpills
 				alloc.NumSpills++
 			}
 		}
@@ -81,37 +88,26 @@ func LinearScan(intervals []Interval, target target.Machine) Allocation {
 	return alloc
 }
 
-type SpillSlot struct {
+type Spill struct {
 	Index  int
 	Offset int // byte offset from stack frame base (e.g., fp - offset)
 }
 
-func Rewrite(fn *asm.Function, alloc Allocation, target target.Machine) *asm.Function {
-	newBlocks := []*asm.Block{}
-	spillSlots := map[string]SpillSlot{}
-
-	// assign offsets for each spilled register
-	slotSize := 8 // assuming 64-bit word
-	for vreg, slot := range alloc.SpillMap {
-		spillSlots[vreg] = SpillSlot{
-			Index:  slot,
-			Offset: slot * slotSize,
-		}
-	}
-
+func Rewrite(fn *asm.Function, alloc Allocation, target target.Machine, layout target.FrameLayout) /**asm.Function*/ {
 	for _, block := range fn.Blocks {
 		newInstrs := []*asm.Instr{}
 		for _, instr := range block.Instr {
-			rewritten, extra := rewriteInstr(instr, alloc, spillSlots, target)
+			rewritten, extra := rewriteInstr(instr, alloc, fn.Spills, target)
 			// extra holds loads before + stores after
 			newInstrs = append(newInstrs, extra.Before...)
 			newInstrs = append(newInstrs, rewritten)
 			newInstrs = append(newInstrs, extra.After...)
 		}
-		newBlocks = append(newBlocks, &asm.Block{Instr: newInstrs})
+		// newBlocks = append(newBlocks, &asm.Block{Instr: newInstrs})
+		block.Instr = newInstrs
 	}
 
-	return &asm.Function{Blocks: newBlocks}
+	target.EmitPrologueEpilogue(fn, layout)
 }
 
 type Extra struct {
@@ -131,14 +127,14 @@ func freshTemp(temps []string) *asm.Register {
 	}
 }
 
-func rewriteInstr(instr *asm.Instr, alloc Allocation, spills map[string]SpillSlot, target target.Machine) (*asm.Instr, Extra) {
+func rewriteInstr(instr *asm.Instr, alloc Allocation, spills map[string]asm.SpillInfo, target target.Machine) (*asm.Instr, Extra) {
 	before := []*asm.Instr{}
 	after := []*asm.Instr{}
 
 	// Rewrite uses
 	for _, idx := range instr.UseIdx() {
 		op := instr.Operands[idx].(*asm.Register)
-		if preg, ok := alloc.RegMap[op.Name]; ok {
+		if preg, ok := alloc.TempRegMap[op.Name]; ok {
 			reg := &asm.Register{
 				Name: preg,
 				Mode: asm.Phys,
@@ -160,7 +156,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, spills map[string]SpillSlo
 
 	// Rewrite defs
 	if instr.Def != nil {
-		if preg, ok := alloc.RegMap[instr.Def.Name]; ok {
+		if preg, ok := alloc.TempRegMap[instr.Def.Name]; ok {
 			instr.Def = &asm.Register{
 				Name: preg,
 				Mode: asm.Phys,

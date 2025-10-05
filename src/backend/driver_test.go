@@ -1,11 +1,11 @@
 package backend
 
 import (
-	"github.com/anthonyabeo/obx/modgraph"
 	"os"
 	"testing"
 
 	"github.com/anthonyabeo/obx/adt"
+	"github.com/anthonyabeo/obx/modgraph"
 	"github.com/anthonyabeo/obx/src/backend/target/riscv"
 	"github.com/anthonyabeo/obx/src/format"
 	"github.com/anthonyabeo/obx/src/report"
@@ -84,7 +84,7 @@ func TestCompile(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to find project root: %v", err)
 				}
-				
+
 				path := root + "/out/" + module.Name + ".s"
 				asmFile, err := os.Create(path)
 				if err != nil {

@@ -12,6 +12,12 @@ type Function struct {
 	Exported bool
 	Blocks   []*Block
 	Entry    *Block
+	Exit     *Block
+
+	CalleeRegsUed map[string]bool // caller-saved registers used in this function
+	Locals        map[string]LocalInfo
+	Spills        map[string]SpillInfo
+	HasCalls      bool // whether this function makes calls
 }
 
 // DFSOrder returns the blocks in depth-first order starting from entry.
