@@ -30,6 +30,7 @@ type Function struct {
 
 	Blocks  map[int]*Block // basic blocks (in order, but can build CFG)
 	Entry   *Block         // pointer to entry block
+	Exit    *Block
 	SSAInfo *SSAInfo
 	Dom     *DominatorTree
 

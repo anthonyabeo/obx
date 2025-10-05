@@ -138,6 +138,10 @@ func (g *Generator) genFunction(h *hir.Function, env *SymbolTable) *Function {
 
 	g.genCompoundStmt(h.Body)
 
+	exit := NewBlock("exit")
+	fn.Blocks[exit.ID] = exit
+	fn.Exit = exit
+
 	return fn
 }
 

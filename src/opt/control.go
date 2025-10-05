@@ -8,14 +8,13 @@ import (
 
 func BuildCFG(fn *mir.Function) {
 	labelToBlock := map[string]*mir.Block{}
-	for _, blk := range fn.Blocks {
+	keys := make([]int, 0, len(fn.Blocks))
+
+	for id, blk := range fn.Blocks {
 		labelToBlock[blk.Label] = blk
+		keys = append(keys, id)
 	}
 
-	keys := make([]int, 0, len(fn.Blocks))
-	for k := range fn.Blocks {
-		keys = append(keys, k)
-	}
 	sort.Ints(keys)
 
 	// determine succs and preds per block
@@ -35,7 +34,8 @@ func BuildCFG(fn *mir.Function) {
 					blk.Succs[b.ID] = b
 				}
 			case *mir.ReturnInst:
-				// no succs
+				blk.Succs[fn.Exit.ID] = fn.Exit
+				blk.Term = &mir.JumpInst{Target: fn.Exit.Label} // normalize return to jump to exit
 			default:
 				// unknown terminator: assume fallthrough
 				if i+1 < len(fn.Blocks) {
