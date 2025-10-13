@@ -206,7 +206,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 					panic("local variable not found")
 				}
 
-				fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
+				fp := &asm.Register{Name: target.RegisterInfo().FramePointer, Mode: asm.Phys, Kind: asm.GPR}
 				mem := &asm.MemAddr{Base: fp, Offset: &asm.Imm{Value: obj.Offset}}
 				temp := freshTemp(target.RegisterInfo().Temporaries)
 
@@ -215,7 +215,17 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				instr.Uses = append(instr.Uses, temp)
 				instr.Operands[i+1] = temp
 			case asm.GlobalSK:
+				temp := freshTemp(target.RegisterInfo().Temporaries)
+				sym := &asm.Symbol{Name: op.Name, Kind: asm.GlobalSK}
 
+				mem := &asm.MemAddr{Base: temp, Offset: &asm.Imm{Value: 0}}
+
+				before = append(before, &asm.Instr{
+					Opcode:   "la",
+					Operands: []asm.Operand{temp, sym},
+					Def:      temp,
+				})
+				instr.Operands[i+1] = mem
 			}
 		}
 	}
@@ -281,7 +291,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 					panic("local variable not found")
 				}
 
-				fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
+				fp := &asm.Register{Name: target.RegisterInfo().FramePointer, Mode: asm.Phys, Kind: asm.GPR}
 				mem := &asm.MemAddr{Base: fp, Offset: &asm.Imm{Value: obj.Offset}}
 				temp := freshTemp(target.RegisterInfo().Temporaries) // pick a preg (like x10) reserved for spill reload
 
@@ -291,6 +301,17 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				instr.Operands[0] = temp
 				after = append(after, store)
 			case asm.GlobalSK:
+				temp := freshTemp(target.RegisterInfo().Temporaries)
+				sym := &asm.Symbol{Name: op.Name, Kind: asm.GlobalSK}
+
+				mem := &asm.MemAddr{Base: temp, Offset: &asm.Imm{Value: 0}}
+
+				before = append(before, &asm.Instr{
+					Opcode:   "la",
+					Operands: []asm.Operand{temp, sym},
+					Def:      temp,
+				})
+				instr.Operands[0] = mem
 			}
 		case *asm.Argument:
 			if 0 <= op.Index && op.Index <= 7 {

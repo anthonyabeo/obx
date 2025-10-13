@@ -40,7 +40,8 @@ func BuildCFG(fn *asm.Function) {
 				}
 
 			case "ret":
-				// no succs
+				blk.Succ[fn.Exit.ID] = fn.Exit
+				blk.Term = &asm.Instr{Opcode: "j", Operands: []asm.Operand{asm.Label{Name: fn.Exit.Label}}}
 			default:
 				// unknown terminator: assume fallthrough
 				if i+1 <= fn.Exit.ID {
@@ -48,7 +49,6 @@ func BuildCFG(fn *asm.Function) {
 					blk.Instr = append(blk.Instr, jmp)
 					blk.Term = jmp
 					blk.Succ = append(blk.Succ, fn.Blocks[i+1])
-					//blk.Succ[i+1] = fn.Blocks[i+1]
 				}
 			}
 		}
