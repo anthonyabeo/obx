@@ -80,7 +80,11 @@ func (g *Generator) genModule(module *hir.Module) *Module {
 }
 
 func (g *Generator) genFunction(h *hir.Function, env *SymbolTable) *Function {
-	fn := NewFunction(h.Name, g.genType(h.Result), env)
+	name := h.Mangled
+	if h.Mangled == "" {
+		name = h.Name
+	}
+	fn := NewFunction(name, h.IsExport, g.genType(h.Result), env)
 
 	currentFn := g.build.Func
 	defer func() { g.build.Func = currentFn }()
@@ -89,15 +93,16 @@ func (g *Generator) genFunction(h *hir.Function, env *SymbolTable) *Function {
 
 	for _, param := range h.Params {
 		switch param.Kind {
-		case hir.ValueParam, hir.InParam:
-			t := &Temp{
+		case hir.ValueParam:
+			t := &Param{
 				ID:    param.Name,
 				BName: param.Name,
 				Typ:   g.genType(param.Typ),
 			}
 
-			fn.Params[param.Name] = t
+			fn.Params = append(fn.Params, t)
 			fn.Env.Define(t.ID, t)
+		case hir.InParam:
 		case hir.VarParam:
 		}
 	}
@@ -105,15 +110,15 @@ func (g *Generator) genFunction(h *hir.Function, env *SymbolTable) *Function {
 	for _, local := range h.Locals {
 		switch d := local.(type) {
 		case *hir.Variable:
-			t := &Temp{
+			lcl := &Local{
 				ID:     d.Name,
 				BName:  d.Name,
 				Typ:    g.genType(d.Type),
 				Offset: d.Offset,
 				Size:   d.Size,
 			}
-			fn.Locals = append(fn.Locals, t)
-			fn.Env.Define(t.ID, t)
+			fn.Locals = append(fn.Locals, lcl)
+			fn.Env.Define(lcl.ID, lcl)
 		case *hir.Constant:
 			c := &Const{
 				ID:     d.Name,
@@ -198,11 +203,13 @@ func (g *Generator) genCompoundStmt(s *hir.CompoundStmt) {
 
 func (g *Generator) genFuncCall(s *hir.FuncCall) Value {
 	var args []Value
-	for _, arg := range s.Args {
-		args = append(args, g.genValue(arg))
+	for idx, arg := range s.Args {
+		v := g.genValue(arg)
+		g.build.Emit(&Arg{Index: idx, Value: v})
+		args = append(args, v)
 	}
 
-	return g.build.CreateCallInst(s.Func.Name, args)
+	return g.build.CreateCallInst(s.Func, args)
 }
 
 func (g *Generator) genIfStmt(s *hir.IfStmt) {
@@ -300,7 +307,7 @@ func (g *Generator) genBinaryExpr(b *hir.BinaryExpr) Value {
 	rhs := g.genValue(b.Right)
 	op := g.genOp(b.Op)
 
-	return g.build.CreateBinary(op, lhs, rhs)
+	return g.build.CreateBinary(op, lhs, rhs, b.SemaType)
 }
 
 func (g *Generator) genUnaryExpr(u *hir.UnaryExpr) Value {
@@ -316,7 +323,7 @@ func (g *Generator) genUnaryExpr(u *hir.UnaryExpr) Value {
 
 	operand := g.genValue(u.Operand)
 
-	return g.build.CreateUnary(op, operand)
+	return g.build.CreateUnary(op, operand, u.SemaType)
 }
 
 func (g *Generator) genConst(c *hir.Literal) Value {
@@ -362,7 +369,10 @@ func (g *Generator) genConst(c *hir.Literal) Value {
 		v = False
 	}
 
-	return v
+	t := g.build.NewTemp(v.Type())
+	g.build.Emit(&MovInst{Target: t, Value: v})
+
+	return t
 }
 
 func (g *Generator) genIndexExpr(e *hir.IndexExpr) Value {
@@ -383,19 +393,19 @@ func (g *Generator) genIndexExpr(e *hir.IndexExpr) Value {
 
 	// acc = 0
 	var acc Value
-	acc = g.build.NewTemp()
+	acc = g.build.NewTemp(Int64Type)
 	g.build.CreateAssign(acc, &IntegerConst{Value: 0})
 
 	for k := 0; k < len(indices); k++ {
 		// term = indices[k] * strides[k]
-		tMul := g.build.CreateBinary(MUL, indices[k], &IntegerConst{Value: uint64(strides[k])})
+		tMul := g.build.CreateBinary(MUL, indices[k], &IntegerConst{Value: uint64(strides[k])}, Int64Type)
 
 		// acc = acc + term
-		acc = g.build.CreateBinary(ADD, acc, tMul)
+		acc = g.build.CreateBinary(ADD, acc, tMul, Int64Type)
 	}
 
 	// 3) addr = baseAddr + acc
-	addr := g.build.CreateBinary(ADD, arr, acc)
+	addr := g.build.CreateBinary(ADD, arr, acc, Int64Type)
 	return &Mem{Base: addr}
 }
 

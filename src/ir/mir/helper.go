@@ -2,8 +2,8 @@ package mir
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/ir/asm"
 
+	"github.com/anthonyabeo/obx/src/ir/asm"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/types"
 )
@@ -103,10 +103,10 @@ func isMem(value Value) Value {
 // insert a load and return a new Temp holding the value.
 func (b *Builder) ensureValue(value Value) Value {
 	switch v := value.(type) {
-	case *Temp, Constant:
+	case *Temp, *Local, *Param, Constant:
 		return v
 	case *Global, *Mem:
-		t := b.NewTemp()
+		t := b.NewTemp(v.Type())
 		b.Emit(&LoadInst{Target: t, Addr: v})
 		return t
 	default:

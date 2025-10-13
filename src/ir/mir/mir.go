@@ -23,10 +23,12 @@ type Module struct {
 }
 
 type Function struct {
-	Name   string
-	Result Type
-	Params map[string]Value // formal parameters
-	Locals []Value          // local variable, constant, procedure declarations
+	Name     string
+	Result   Type
+	Exported bool
+	Params   []Value // formal parameters
+	Locals   []Value // local variable, constant, procedure declarations
+	IsLeaf   bool
 
 	Blocks  map[int]*Block // basic blocks (in order, but can build CFG)
 	Entry   *Block         // pointer to entry block
@@ -40,13 +42,14 @@ type Function struct {
 	Asm *asm.Function
 }
 
-func NewFunction(name string, ret Type, env *SymbolTable) *Function {
+func NewFunction(name string, export bool, ret Type, env *SymbolTable) *Function {
 	return &Function{
 		Name:    name,
 		Result:  ret,
 		Env:     env,
+		IsLeaf:  true,
 		Blocks:  make(map[int]*Block),
-		Params:  make(map[string]Value),
+		Params:  make([]Value, 0),
 		Dom:     NewDominatorTree(),
 		SSAInfo: NewSSAInfo(),
 	}
@@ -120,7 +123,7 @@ func (fn *Function) ReversePostOrder() []int {
 func (fn *Function) OutputDOT() string {
 	var sb strings.Builder
 	sb.WriteString("digraph CFG {\n")
-	for key := fn.Entry.ID; key <= len(fn.Blocks); key++ {
+	for key := fn.Entry.ID; key <= fn.Exit.ID; key++ {
 		block := fn.Blocks[key]
 		label := fmt.Sprintf("%s:\\l", block.Label)
 		for _, instr := range block.Instrs {

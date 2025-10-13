@@ -84,11 +84,22 @@ type (
 		Block *Block // block where this value comes from
 		Value Value  // value from the block
 	}
+
+	Arg struct {
+		Index int
+		Value Value
+	}
 )
+
+func (a Arg) String() string                 { return fmt.Sprintf("arg(%s, %d)", a.Value, a.Index) }
+func (a Arg) Def() Value                     { panic("implement me") }
+func (a Arg) Uses() []Value                  { panic("implement me") }
+func (a Arg) ReplaceUses(m map[string]Value) { panic("implement me") }
+func (a Arg) ReplaceDef(value Value)         { panic("implement me") }
 
 func (a *MovInst) Def() Value     { return a.Target }
 func (a *MovInst) Uses() []Value  { return []Value{a.Value} }
-func (a *MovInst) String() string { return fmt.Sprintf("mov %v, %v", a.Value, a.Target) }
+func (a *MovInst) String() string { return fmt.Sprintf("mov %v, %v", a.Target, a.Value) }
 func (a *MovInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[a.Value.BaseName()]; ok {
 		a.Value = nv
@@ -263,7 +274,7 @@ func (c *CallInst) String() string {
 	for _, arg := range c.Args {
 		argNames = append(argNames, arg.Name())
 	}
-	callStr := fmt.Sprintf("call %s(%s)", c.Callee, strings.Join(argNames, ", "))
+	callStr := fmt.Sprintf("call @%s(%s)", c.Callee, strings.Join(argNames, ", "))
 	if c.Target == nil {
 		return callStr
 	}

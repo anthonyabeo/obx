@@ -3,6 +3,9 @@ package mir
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/anthonyabeo/obx/src/ir/hir"
+	"github.com/anthonyabeo/obx/src/types"
 )
 
 type Builder struct {
@@ -17,10 +20,10 @@ func NewBuilder() *Builder {
 	return &Builder{}
 }
 
-func (b *Builder) NewTemp() *Temp {
+func (b *Builder) NewTemp(ty Type) *Temp {
 	b.TempGen++
 	name := fmt.Sprintf("t%d", b.TempGen)
-	return &Temp{ID: name, BName: name}
+	return &Temp{ID: name, BName: name, Typ: ty}
 }
 
 func (b *Builder) NewLabel(prefix string) string {
@@ -51,8 +54,8 @@ func (b *Builder) SetBlock(block *Block) {
 	b.Block = block
 }
 
-func (b *Builder) CreateBinary(op InstrOp, left, right Value) Value {
-	t := b.NewTemp()
+func (b *Builder) CreateBinary(op InstrOp, left, right Value, ty Type) Value {
+	t := b.NewTemp(ty)
 	left = b.ensureValue(left)
 	right = b.ensureValue(right)
 
@@ -65,8 +68,8 @@ func (b *Builder) CreateBinary(op InstrOp, left, right Value) Value {
 	return t
 }
 
-func (b *Builder) CreateUnary(op InstrOp, operand Value) Value {
-	t := b.NewTemp()
+func (b *Builder) CreateUnary(op InstrOp, operand Value, ty Type) Value {
+	t := b.NewTemp(ty)
 	b.Emit(&UnaryInst{
 		Target:  t,
 		Op:      op,
@@ -76,13 +79,19 @@ func (b *Builder) CreateUnary(op InstrOp, operand Value) Value {
 	return t
 }
 
-func (b *Builder) CreateCallInst(callee string, args []Value) Value {
-	t := b.NewTemp()
+func (b *Builder) CreateCallInst(callee *hir.FunctionRef, args []Value) Value {
+	var t Value
+	if callee.SemaType != types.VoidType {
+		t = b.NewTemp(callee.SemaType)
+	}
+
 	b.Emit(&CallInst{
 		Target: t,
-		Callee: callee,
+		Callee: callee.Mangled,
 		Args:   args,
 	})
+
+	b.Func.IsLeaf = false
 
 	return t
 }

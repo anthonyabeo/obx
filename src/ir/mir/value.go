@@ -30,6 +30,22 @@ type (
 		Size   int
 	}
 
+	Local struct {
+		ID     string
+		BName  string
+		Typ    Type
+		Offset int
+		Size   int
+	}
+
+	Param struct {
+		ID     string
+		BName  string
+		Typ    Type
+		Offset int
+		Size   int
+	}
+
 	Const struct {
 		ID     string
 		Value  Value
@@ -90,6 +106,16 @@ func (o *Temp) Type() Type       { return o.Typ }
 func (o *Temp) Name() string     { return o.ID }
 func (o *Temp) BaseName() string { return o.BName }
 func (o *Temp) String() string   { return o.ID }
+
+func (o *Local) Type() Type       { return o.Typ }
+func (o *Local) Name() string     { return o.ID }
+func (o *Local) BaseName() string { return o.BName }
+func (o *Local) String() string   { return o.ID }
+
+func (o *Param) Type() Type       { return o.Typ }
+func (o *Param) Name() string     { return o.ID }
+func (o *Param) BaseName() string { return o.BName }
+func (o *Param) String() string   { return o.ID }
 
 func (o Const) Type() Type       { return o.Typ }
 func (o Const) Name() string     { return o.ID }
