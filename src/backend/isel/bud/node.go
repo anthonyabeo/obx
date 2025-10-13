@@ -25,7 +25,15 @@ const (
 	KindLabel
 	KindReloc
 	KindMem
-	KindGlobal
+	KindSymbol
+)
+
+type SymbolKind int
+
+const (
+	ParamSK SymbolKind = iota
+	GlobalSK
+	LocalSK
 )
 
 type Value struct {
@@ -35,11 +43,12 @@ type Value struct {
 	Label  string
 	Reloc  Reloc
 	Mem    Mem
-	Global Global
+	Symbol Symbol
 }
 
-type Global struct {
+type Symbol struct {
 	Name  string
+	Kind  SymbolKind
 	Size  int
 	Align int
 }
@@ -75,7 +84,8 @@ func PatMIRInst(ins mir.Instr) *Node {
 		right := patMIRValue(inst.Right)
 		op := patOp(inst.Op)
 
-		return &Node{Dst: dst,
+		return &Node{
+			Dst:  dst,
 			Op:   op,
 			Args: []*Node{left, right},
 		}
@@ -134,6 +144,29 @@ func PatMIRInst(ins mir.Instr) *Node {
 			Op:   "ret",
 			Args: args,
 		}
+	case *mir.MovInst:
+		return &Node{
+			Op:   "mov",
+			Args: []*Node{patMIRValue(inst.Target), patMIRValue(inst.Value)},
+		}
+	case *mir.CallInst:
+		var dst *Node
+		if inst.Target != nil {
+			dst = patMIRValue(inst.Target)
+		}
+		return &Node{
+			Dst:  dst,
+			Op:   "call",
+			Args: append([]*Node{{Val: &Value{Kind: KindLabel, Label: inst.Callee}}} /*, args...*/),
+		}
+	case *mir.Arg:
+		return &Node{
+			Op: "argument",
+			Args: []*Node{
+				patMIRValue(inst.Value),
+				{Val: &Value{Kind: KindImm, Imm: inst.Index}},
+			},
+		}
 	default:
 		panic(fmt.Sprintf("patMIRInst: unexpected inst type: %T", inst))
 	}
@@ -141,6 +174,18 @@ func PatMIRInst(ins mir.Instr) *Node {
 
 func patMIRValue(value mir.Value) *Node {
 	switch val := value.(type) {
+	case *mir.Local:
+		return &Node{Val: &Value{Kind: KindSymbol, Symbol: Symbol{
+			Name: val.BName,
+			Kind: LocalSK,
+			Size: val.Size,
+		}}}
+	case *mir.Param:
+		return &Node{Val: &Value{Kind: KindSymbol, Symbol: Symbol{
+			Name: val.BName,
+			Kind: ParamSK,
+			Size: val.Size,
+		}}}
 	case *mir.Temp:
 		switch val.Type().(type) {
 		case *mir.FloatType:
@@ -148,15 +193,15 @@ func patMIRValue(value mir.Value) *Node {
 		default:
 			return &Node{Val: &Value{Kind: KindGPR, Reg: Reg{Name: val.ID}}}
 		}
-
 	case *mir.IntegerConst:
 		return &Node{
 			Val: &Value{Kind: KindImm, Imm: int(val.Value)},
 		}
 	case *mir.Global:
 		return &Node{
-			Val: &Value{Kind: KindGlobal, Global: Global{
+			Val: &Value{Kind: KindSymbol, Symbol: Symbol{
 				Name: val.NameStr,
+				Kind: GlobalSK,
 				Size: val.Size,
 			}},
 		}

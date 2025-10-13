@@ -11,7 +11,8 @@ const (
 	OKLabel
 	OKImm
 	OKReloc
-	OKGlobal
+	OKSymbol
+	OKArg
 )
 
 type Operand interface {
@@ -91,14 +92,18 @@ func (r Reloc) Desc() string      { return r.String() }
 func (r Reloc) Kind() OperandKind { return OKReloc }
 func (r Reloc) String() string    { return fmt.Sprintf("%%%s($%s)", r.Fxn, r.Symbol) }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-// Global denotes a symbol declared outside of all functions
-/////////////////////////////////////////////////////////////////////////////////////////
-
-type Global struct {
+type Symbol struct {
 	Name string
 }
 
-func (g Global) Kind() OperandKind { return OKGlobal }
-func (g Global) Desc() string      { return g.Name }
-func (g Global) String() string    { return g.Name }
+func (l Symbol) Kind() OperandKind { return OKSymbol }
+func (l Symbol) Desc() string      { return l.Name }
+func (l Symbol) String() string    { return l.Name }
+
+type Arg struct {
+	Index *Imm
+}
+
+func (a Arg) Kind() OperandKind { return OKArg }
+func (a Arg) Desc() string      { return fmt.Sprintf("arg($%s)", a.Index) }
+func (a Arg) String() string    { return fmt.Sprintf("arg($%s)", a.Index) }

@@ -26,7 +26,6 @@ const (
 	TokRBrace
 	TokComma
 	TokColon
-	TokArrow
 	TokSemi
 	TokBang
 	TokDollar
@@ -35,7 +34,6 @@ const (
 	TokOperands
 	TokPercent
 	TokReloc
-	TokReg
 	TokMem
 	TokLabel
 	TokImm
@@ -49,11 +47,12 @@ const (
 	TokPhys
 	TokInstr
 	TokSub
-	TokGlobal
 	TokLBrack
 	TokRBrack
 	TokDef
 	TokUses
+	TokSymbol
+	TokArg
 )
 
 type Token struct {
@@ -176,10 +175,6 @@ func (l *Lexer) NextToken() Token {
 		l.next()
 		return Token{Kind: TokBang, Value: "!"}
 	case '=':
-		if l.pos+1 < len(l.input) && l.input[l.pos+1] == '>' {
-			l.pos += 2
-			return Token{Kind: TokArrow, Value: "=>"}
-		}
 		l.next()
 		return Token{Kind: TokEqual, Value: "="}
 	case '"':
@@ -256,12 +251,14 @@ func (l *Lexer) NextToken() Token {
 			return Token{Kind: TokOffset, Value: ident}
 		case "label":
 			return Token{Kind: TokLabel, Value: ident}
-		case "global":
-			return Token{Kind: TokGlobal, Value: ident}
 		case "def":
 			return Token{Kind: TokDef, Value: ident}
 		case "uses":
 			return Token{Kind: TokUses, Value: ident}
+		case "symbol":
+			return Token{Kind: TokSymbol, Value: ident}
+		case "arg":
+			return Token{Kind: TokArg, Value: ident}
 		}
 		return Token{Kind: TokIdent, Value: ident}
 	}

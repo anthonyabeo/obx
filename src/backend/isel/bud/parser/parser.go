@@ -152,19 +152,30 @@ func (p *Parser) parseOperand() ast.Operand {
 		operand = p.parseMem()
 	case TokLabel:
 		operand = p.parseLabel()
-	case TokGlobal:
-		operand = p.parseGlobal()
+	case TokSymbol:
+		operand = p.parseSymbol()
+	case TokArg:
+		operand = p.parseArg()
 	default:
 		panic("unexpected token in operand: " + p.cur.Value)
 	}
 
 	return operand
 }
-func (p *Parser) parseGlobal() *ast.Global {
-	p.match(TokGlobal)
+
+func (p *Parser) parseArg() *ast.Arg {
+	p.match(TokArg)
+	p.match(TokLBrace)
+	imm := p.parseImm()
+	p.match(TokRBrace)
+	return &ast.Arg{Index: imm}
+}
+
+func (p *Parser) parseSymbol() *ast.Symbol {
+	p.match(TokSymbol)
 	p.match(TokColon)
 	name := p.matchIdent()
-	return &ast.Global{Name: name}
+	return &ast.Symbol{Name: name}
 }
 
 func (p *Parser) parseImm() *ast.Imm {

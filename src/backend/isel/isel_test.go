@@ -16,24 +16,27 @@ rule LDri {
 	in    GPR:virt:$rs1, imm:$offs;
 	pattern load(add($rs1, $offs));
 	emit {
-		instr { opcode: "ld", operands: GPR:virt:$rd, mem:{base=GPR:virt:$rs1, offset=imm:$offs};
+		instr { 
+			opcode: "ld", 
+			operands: [GPR:virt:$rd, mem:{base=GPR:virt:$rs1, offset=imm:$offs}]
+		}
   	}
 	cost 1;
   	cond ImmFits12($offs);
 }
 
-rule LoadImm {
+rule LD_Large {
   out   GPR:virt:$rd;
   in    GPR:virt:$rs1, imm:$offs;
-  temps GPR:virt:$t0;
+  temps GPR:virt:$t0, GPR:virt:$t1;
+  cost 4;
   pattern load(add($rs1, $offs));
   emit {
-	instr { opcode: "lui", operands: GPR:virt:$t0, reloc:hi($offs) };
-	instr { opcode: "addi", operands: GPR:virt:$t0, GPR:virt:$t0, reloc:lo($offs) };
-	instr { opcode: "add", operands: GPR:virt:$t0, GPR:virt:$rs1, GPR:virt:$t0}
-	instr { opcode: "ld", operands: GPR:virt:$rd, mem:{base=GPR:virt:$t0, offset=imm:0} }
+	instr { opcode: "lui",  operands: [GPR:virt:$t0, reloc:hi($offs)], def: GPR:virt:$t0 };
+    instr { opcode: "addi", operands: [GPR:virt:$t0, GPR:virt:$t0, reloc:lo($offs)], def: GPR:virt:$t0, uses: [GPR:virt:$t0] };
+    instr { opcode: "add",  operands: [GPR:virt:$t1, GPR:virt:$rs1, GPR:virt:$t0], def: GPR:virt:$t1, uses: [GPR:virt:$rs1, GPR:virt:$t0] };
+    instr { opcode: "ld",   operands: [GPR:virt:$rd, mem:{base=GPR:virt:$t1, offset=imm:0}], def: GPR:virt:$rd, uses: [GPR:virt:$t1] };
   }
-  cost 2;
   cond !SImmFits12($offs);
 }
 `
@@ -68,10 +71,10 @@ func TestISelectUncondJump(t *testing.T) {
 rule JmpU {
     in label:$target;
     pattern jmp($target);
-    emit {
-		instr { opcode: "jal", operands: GPR:phys:$x0, label:$target }
-	}
     cost 1;
+    emit {
+      instr { opcode: "j", operands: [label:$target] }
+    }
 }
 `
 	lexer := parser.NewLexer(src)
@@ -99,21 +102,19 @@ func TestISelectCondBr(t *testing.T) {
 rule ICMP_gt {
     out GPR:virt:$rd;
     in  GPR:virt:$rs1, GPR:virt:$rs2;
-    pattern gt($rs1, rs2);
-    emit { 
-		instr { opcode: "slt", operands: GPR:virt:$rd, GPR:virt:$rs2, GPR:virt:$rs1 };
-	}
+    pattern gt($rs1, $rs2);
+    emit { instr { opcode: "slt", operands: [GPR:virt:$rd, GPR:virt:$rs2, GPR:virt:$rs1], def:GPR:virt:$rd, uses: [GPR:virt:$rs2, GPR:virt:$rs1]  }; }
     cost 1;
 }
 
 rule Br_bool {
     in  GPR:virt:$rs1, label:$true, label:$false;
     pattern br($rs1, $true, $false);
+    cost 1;
     emit {
-		instr { opcode: "bne", operands: GPR:virt:$rs1, GPR:phys:x0, label:$true };
-		instr { opcode: "jal", operands: GPR:phys:x0, label:$false };
+        instr { opcode: "bne", operands: [GPR:virt:$rs1, GPR:phys:x0, label:$true], uses: [GPR:virt:$rs1, GPR:phys:x0] };
+        instr { opcode: "j", operands: [label:$false] };
     }
-    cost 2;
 }
 `
 	lexer := parser.NewLexer(src)
@@ -155,32 +156,32 @@ rule Br_bool {
 func TestISelMovInstr(t *testing.T) {
 	src := `
 rule MOVrr {
-	in GPR:virt:$rd, GPR:virt:$rs;
-	pattern mov($rd, $rs);
-	emit {
-		instr { opcode: "addi", operands: GPR:virt:rd, GPR:virt:rs, imm:0 };
-	}
-	cost 1;
+    in GPR:virt:$rd, GPR:virt:$rs;
+    pattern mov($rd, $rs);
+    cost 1;
+    emit {
+        instr { opcode: "mv", operands: [GPR:virt:rd, GPR:virt:rs], def: GPR:virt:$rd, uses: [GPR:virt:$rs] };
+    }
 }
 
 rule MOVri_SmallImm {
 	in GPR:virt:$rd, imm:$val;
 	pattern mov($rd, $val);
-	emit {
-		instr { opcode: "addi", operands: GPR:virt:$rd, GPR:phys:x0, imm:$val };
-	}
 	cost 1;
+	emit {
+		instr { opcode: "li", operands: [GPR:virt:$rd, imm:$val], def: GPR:virt:$rd };
+	}
 	cond SImmFits12($val);
 }
 
 rule MOVri_LargeImm {
 	in GPR:virt:$rd, imm:$val;
 	pattern mov($rd, $val);
+	cost 2;
 	emit {
-		instr { opcode: "lui", operands: GPR:virt:$rd, reloc:hi($val) };
-		instr { opcode: "addi", operands: GPR:virt:$rd, GPR:virt:$rd, reloc:lo($val) };
+		instr { opcode: "lui", operands: [GPR:virt:$rd, reloc:hi($val)], def: GPR:virt:$rd };
+		instr { opcode: "addi", operands: [GPR:virt:$rd, GPR:virt:$rd, reloc:lo($val)], def: GPR:virt:$rd, uses: [GPR:virt:$rd] };
 	}
-	cost 1;
 	cond !SImmFits12($val);
 }
 `
@@ -221,14 +222,14 @@ func TestISelLoadGlobal(t *testing.T) {
 ////////////////////////////////////////
 rule LoadGlobal {
   out   GPR:virt:$rd;
-  in    global:$sym;
+  in    symbol:$sym;
   temps GPR:virt:$tmp0;
   cost  2;
   pattern load($sym);
   emit {
-    instr { opcode: "lui",  operands: GPR:virt:$tmp0, reloc:hi($sym) };
-    instr { opcode: "addi", operands: GPR:virt:$tmp0, GPR:virt:$tmp0, reloc:lo($sym) };
-    instr { opcode: "ld",   operands: GPR:virt:$rd,  mem:{base=GPR:virt:$tmp0, offset=imm:0} };
+    instr { opcode: "lui",  operands: [GPR:virt:$tmp0, reloc:hi($sym)] };
+    instr { opcode: "addi", operands: [GPR:virt:$tmp0, GPR:virt:$tmp0, reloc:lo($sym)] };
+    instr { opcode: "ld",   operands: [GPR:virt:$rd,  mem:{base=GPR:virt:$tmp0, offset=imm:0}] };
   }
 }
 `
@@ -242,7 +243,147 @@ rule LoadGlobal {
 		Dst: &bud.Node{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "ld.t"}}},
 		Op:  "load",
 		Args: []*bud.Node{
-			{Val: &bud.Value{Kind: bud.KindGlobal, Global: bud.Global{Name: "mat"}}},
+			{Val: &bud.Value{Kind: bud.KindSymbol, Symbol: bud.Symbol{Name: "mat"}}},
+		},
+	}
+
+	sel := NewSelector(machine.Rules)
+	instr := sel.Select(pattern)
+
+	for _, s := range instr {
+		fmt.Println(s)
+	}
+}
+
+func TestISelAssignLocal(t *testing.T) {
+	src := `
+rule Mov_sym_r {
+    in symbol:$sym, GPR:virt:$rs;
+    pattern mov($sym, $rs);
+    emit {
+        instr { opcode: "mv", operands: [symbol:$sym, GPR:virt:$rs], uses: [GPR:virt:$rs] };
+    }
+}
+`
+
+	lexer := parser.NewLexer(src)
+	p := parser.NewParser(lexer)
+
+	machine := p.Parse()
+
+	pattern := &bud.Node{
+		Op: "mov",
+		Args: []*bud.Node{
+			{Val: &bud.Value{Kind: bud.KindSymbol, Symbol: bud.Symbol{Name: "sum", Kind: bud.LocalSK}}},
+			{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "t5"}}},
+		},
+	}
+
+	sel := NewSelector(machine.Rules)
+	instr := sel.Select(pattern)
+
+	for _, s := range instr {
+		fmt.Println(s)
+	}
+}
+
+func TestISelMulLocalImm(t *testing.T) {
+	src := `
+rule MUL_Symbol_Imm {
+    out GPR:virt:$rd;
+    in symbol:$sym, imm:$val;
+	temps GPR:virt:$t0;
+    pattern mul($sym, $val);
+    cost 2;
+    emit {
+		instr { opcode: "li", operands: [GPR:virt:$t0, imm:$val], def: GPR:virt:$rd };
+        instr { opcode: "mul", operands: [GPR:virt:$rd, symbol:$sym, GPR:virt:$t0], def: GPR:virt:$rd, uses: [GPR:virt:$t0]};
+    }
+}
+`
+
+	lexer := parser.NewLexer(src)
+	p := parser.NewParser(lexer)
+
+	machine := p.Parse()
+
+	pattern := &bud.Node{
+		Dst: &bud.Node{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "t10"}}},
+		Op:  "mul",
+		Args: []*bud.Node{
+			{Val: &bud.Value{Kind: bud.KindSymbol, Symbol: bud.Symbol{Name: "sum"}}},
+			{Val: &bud.Value{Kind: bud.KindImm, Imm: 2}},
+		},
+	}
+
+	sel := NewSelector(machine.Rules)
+	instr := sel.Select(pattern)
+
+	for _, s := range instr {
+		fmt.Println(s)
+	}
+}
+
+func TestISelAddRegSymbol(t *testing.T) {
+	src := `
+rule ADDr_sym {
+  out GPR:virt:$rd;
+  in  GPR:virt:$rs1, symbol:$sym;
+  pattern add($rs1, $sym);
+  emit {
+      instr {
+        opcode: "add",
+        operands: [GPR:virt:$rd, GPR:virt:$rs1, symbol:$sym],
+        def: GPR:virt:$rd,
+        uses: [GPR:virt:$rs1]
+      };
+  }
+}
+`
+
+	lexer := parser.NewLexer(src)
+	p := parser.NewParser(lexer)
+
+	machine := p.Parse()
+
+	pattern := &bud.Node{
+		Dst: &bud.Node{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "t9"}}},
+		Op:  "add",
+		Args: []*bud.Node{
+			{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "t5"}}},
+			{Val: &bud.Value{Kind: bud.KindSymbol, Symbol: bud.Symbol{Name: "sum", Kind: bud.LocalSK}}},
+		},
+	}
+
+	sel := NewSelector(machine.Rules)
+	instr := sel.Select(pattern)
+
+	for _, s := range instr {
+		fmt.Println(s)
+	}
+}
+
+func TestISelArg(t *testing.T) {
+	src := `
+rule Arg {
+    in GPR:virt:$rs, imm:$idx;
+    pattern argument($rs, $idx);
+    emit {
+        instr { opcode: "mv", operands: [arg{imm:$idx}, GPR:virt:$rs] };
+    }
+}
+
+`
+	lexer := parser.NewLexer(src)
+	p := parser.NewParser(lexer)
+
+	machine := p.Parse()
+
+	pattern := &bud.Node{
+		Op: "argument",
+		Args: []*bud.Node{
+			{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "t5"}}},
+			{Val: &bud.Value{Kind: bud.KindImm, Imm: 2}},
 		},
 	}
 
