@@ -99,6 +99,7 @@ func (p *Parser) parseRule() *ast.Rule {
 		case TokComm:
 			p.next()
 			r.IsComm = true
+			p.match(TokSemi)
 		case TokOut:
 			p.next()
 			r.Out = p.parseOperand()

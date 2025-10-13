@@ -2,6 +2,8 @@ package cli
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/backend"
+	"github.com/anthonyabeo/obx/src/backend/target/riscv"
 	"log"
 	"os"
 	"path/filepath"
@@ -28,6 +30,8 @@ var buildArgs struct {
 	EnablePasses  string
 	DisablePasses string
 	Verbose       bool
+
+	Asm bool
 }
 
 var buildCmd = &cobra.Command{
@@ -41,6 +45,7 @@ var buildCmd = &cobra.Command{
 		enablePasses, _ := cmd.Flags().GetString("passes")
 		disablePasses, _ := cmd.Flags().GetString("disable-passes")
 		verbose, _ := cmd.Flags().GetBool("verbose")
+		asm, _ := cmd.Flags().GetBool("asm")
 
 		files, err := modgraph.DiscoverModuleFiles(path)
 		if err != nil {
@@ -131,13 +136,27 @@ var buildCmd = &cobra.Command{
 		pm.ConfigurePasses(config)
 
 		for _, module := range mirProgram.Modules {
-			for _, fn := range module.Funcs {
-				opt.SSAConstruct(fn)
+			root, err := modgraph.FindProjectRoot()
+			if err != nil {
+				log.Printf("failed to find project root: %v", err)
+				root = "."
+			}
 
-				// Run to fixed point
-				pm.RunFixedPoint(fn, 10)
+			path := root + "/out/" + module.Name + ".s"
+			asmFile, err := os.Create(path)
+			if err != nil {
+				log.Printf("failed to create assembly file: %v", err)
+			}
+			defer asmFile.Close()
+
+			ss := backend.Compile(module, riscv.NewRV64IMAFDTarget())
+			if asm {
+				fmt.Println(ss)
+			}
+
+			if _, err := asmFile.WriteString(ss + "\n\n"); err != nil {
+				log.Printf("failed to write to assembly file: %v", err)
 			}
 		}
-
 	},
 }

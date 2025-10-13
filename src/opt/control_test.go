@@ -186,6 +186,27 @@ end Main
 				END TestCall.`,
 			filename: "procedure_and_call.obx",
 		},
+		{
+			name: "TwoDIntArray",
+			input: `
+		  MODULE Array2DTest;
+		  VAR mat: ARRAY 3, 3 OF INTEGER;
+		  VAR i, j: INTEGER;
+		
+		  BEGIN
+		   i := 0;
+		   WHILE i < 3 DO
+		    j := 0;
+		    WHILE j < 3 DO
+		     mat[i, j] := i * j;
+		     j := j + 1
+		    END;
+		    i := i + 1
+		   END
+		  END Array2DTest.
+		 `,
+			filename: "array2d_test.obx",
+		},
 	}
 
 	for _, tc := range tests {

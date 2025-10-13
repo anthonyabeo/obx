@@ -12,6 +12,7 @@ func Run() error {
 	buildCmd.Flags().StringVarP(&buildArgs.EnablePasses, "passes", "P", "", "Comma-separated list of optimisation passes to enable (overrides -O)")
 	buildCmd.Flags().StringVarP(&buildArgs.DisablePasses, "disable-passes", "D", "", "Comma-separated list of optimisation passes to disable")
 	buildCmd.Flags().BoolVarP(&buildArgs.Verbose, "verbose", "V", false, "Output detailed optimization output")
+	buildCmd.Flags().BoolVarP(&buildArgs.Asm, "asm", "S", false, "Output the assembly code to a .s file")
 
 	var rootCmd = &cobra.Command{
 		Use:   "obx",

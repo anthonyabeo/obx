@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"github.com/anthonyabeo/obx/src/opt"
 	"os"
 	"testing"
 
@@ -80,6 +81,22 @@ func TestCompile(t *testing.T) {
 				END TestCall.`,
 			filename: "procedure_and_call.obx",
 		},
+		{
+			name: "MultipleStatementsAndLoop",
+			input: `
+			 MODULE LoopTest;
+			 VAR x, y: INTEGER;
+
+			 BEGIN
+			  x := 0;
+			  y := 10;
+			  WHILE x < y DO
+			   x := x + 1
+			  END
+			 END LoopTest.
+			`,
+			filename: "loop_test.obx",
+		},
 	}
 
 	for _, tc := range tests {
@@ -100,6 +117,11 @@ func TestCompile(t *testing.T) {
 			}
 
 			program := format.ParseSourceAndLowerToMIR(t, ctx)
+			for _, module := range program.Modules {
+				for _, function := range module.Funcs {
+					opt.BuildCFG(function)
+				}
+			}
 
 			for _, module := range program.Modules {
 				root, err := modgraph.FindProjectRoot()
