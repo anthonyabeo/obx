@@ -43,9 +43,12 @@ func BuildCFG(fn *asm.Function) {
 				// no succs
 			default:
 				// unknown terminator: assume fallthrough
-				if i+1 < len(fn.Blocks) {
-					blk.Instr = append(blk.Instr, &asm.Instr{Opcode: "j", Operands: []asm.Operand{asm.Label{Name: fn.Blocks[i+1].Label}}})
-					blk.Succ[i+1] = fn.Blocks[i+1]
+				if i+1 <= fn.Exit.ID {
+					jmp := &asm.Instr{Opcode: "j", Operands: []asm.Operand{asm.Label{Name: fn.Blocks[i+1].Label}}}
+					blk.Instr = append(blk.Instr, jmp)
+					blk.Term = jmp
+					blk.Succ = append(blk.Succ, fn.Blocks[i+1])
+					//blk.Succ[i+1] = fn.Blocks[i+1]
 				}
 			}
 		}

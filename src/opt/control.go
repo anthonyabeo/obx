@@ -38,15 +38,19 @@ func BuildCFG(fn *mir.Function) {
 				blk.Term = &mir.JumpInst{Target: fn.Exit.Label} // normalize return to jump to exit
 			default:
 				// unknown terminator: assume fallthrough
-				if i+1 < len(fn.Blocks) {
-					blk.Instrs = append(blk.Instrs, &mir.JumpInst{Target: fn.Blocks[i+1].Label})
+				if i+1 <= fn.Exit.ID {
+					jmp := &mir.JumpInst{Target: fn.Blocks[i+1].Label}
+					blk.Instrs = append(blk.Instrs, jmp)
+					blk.Term = jmp
 					blk.Succs[i+1] = fn.Blocks[i+1]
 				}
 			}
 		} else {
 			// no explicit terminator: fallthrough
-			if i+1 < len(fn.Blocks) {
-				blk.Instrs = append(blk.Instrs, &mir.JumpInst{Target: fn.Blocks[i+1].Label})
+			if i+1 <= fn.Exit.ID {
+				jmp := &mir.JumpInst{Target: fn.Blocks[i+1].Label}
+				blk.Instrs = append(blk.Instrs, jmp)
+				blk.Term = jmp
 				blk.Succs[i+1] = fn.Blocks[i+1]
 			}
 		}

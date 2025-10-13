@@ -38,14 +38,14 @@ func LinearScan(fn *asm.Function, intervals []Interval, target target.Machine) A
 		Interval
 		Preg string
 	}
-	active := []activeInterval{}
+	active := make([]activeInterval, 0)
 
 	registerFile := target.RegisterInfo()
 	freeRegs := append([]string(nil), registerFile.Allocatable...) // copy
 
 	for _, iv := range intervals {
 		// Expire old intervals
-		newActive := []activeInterval{}
+		newActive := make([]activeInterval, 0)
 		for _, a := range active {
 			if a.End >= iv.Start {
 				newActive = append(newActive, a)
@@ -97,12 +97,13 @@ func LinearScan(fn *asm.Function, intervals []Interval, target target.Machine) A
 			}
 		}
 	}
+
 	return alloc
 }
 
 func Rewrite(fn *asm.Function, alloc Allocation, target target.Machine, layout target.FrameStruct) {
 	for _, block := range fn.Blocks {
-		newInstrs := []*asm.Instr{}
+		newInstrs := make([]*asm.Instr, 0)
 		for _, instr := range block.Instr {
 			rewritten, extra := rewriteInstr(instr, alloc, layout, target)
 			// extra holds loads before + stores after
@@ -213,6 +214,8 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameStruct,
 				before = append(before, load)
 				instr.Uses = append(instr.Uses, temp)
 				instr.Operands[i+1] = temp
+			case asm.GlobalSK:
+
 			}
 		}
 	}
@@ -272,7 +275,6 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameStruct,
 					instr.Operands[0] = temp
 					after = append(after, store)
 				}
-
 			case asm.LocalSK:
 				obj := layout.GetLocalObjectByName(op.Name)
 				if obj == nil {
@@ -288,6 +290,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameStruct,
 				instr.Def = temp
 				instr.Operands[0] = temp
 				after = append(after, store)
+			case asm.GlobalSK:
 			}
 		case *asm.Arg:
 			if 0 <= op.Index && op.Index <= 7 {

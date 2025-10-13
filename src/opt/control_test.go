@@ -164,6 +164,28 @@ end Main
  `,
 			filename: "repeat_until_test.obx",
 		},
+		{
+			name: "ProcedureAndCall",
+			input: `
+				MODULE TestCall;
+				
+				VAR
+				  result: INTEGER;
+				
+				PROCEDURE AddMany(a, b, c, d, e, f, g, h, i, j: INTEGER): INTEGER;
+				VAR
+				  sum, temp: INTEGER;
+				BEGIN
+				  sum := a + b + c + d + e + f + g + h + i + j;
+				  temp := sum * 2;
+				  RETURN temp
+				END AddMany;
+				
+				BEGIN
+				  result := AddMany(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+				END TestCall.`,
+			filename: "procedure_and_call.obx",
+		},
 	}
 
 	for _, tc := range tests {
