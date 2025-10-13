@@ -74,6 +74,7 @@ rule MOVri_LargeImm {
 /////////////////////////////////////////////////////////////////
 
 rule ADD_sym_sym {
+  commutative;
   out GPR:virt:$rd;
   in  symbol:$sym1, symbol:$sym2;
   pattern add($sym1, $sym2);
@@ -87,6 +88,7 @@ rule ADD_sym_sym {
 }
 
 rule ADDr_sym {
+  commutative;
   out GPR:virt:$rd;
   in  GPR:virt:$rs1, symbol:$sym;
   pattern add($rs1, $sym);
@@ -101,6 +103,7 @@ rule ADDr_sym {
 }
 
 rule ADDri {
+  commutative;
   out GPR:virt:$rd;
   in  GPR:virt:$rs1, imm:$val;
   pattern add($rs1, $val);
@@ -117,6 +120,7 @@ rule ADDri {
 }
 
 rule ADDrr {
+  commutative;
   out GPR:virt:$rd;
   in  GPR:virt:$rs1, GPR:virt:$rs2;
   pattern add($rs1, $rs2);
@@ -150,6 +154,7 @@ rule JmpU {
 /////////////////////////////////////////////////////////////////
 
 rule ICMP_eq {
+    commutative;
     out GPR:virt:$rd;
     in  GPR:virt:$rs1, GPR:virt:$rs2;
     pattern eq($rs1, rs2);
@@ -161,6 +166,7 @@ rule ICMP_eq {
 }
 
 rule ICMP_ne {
+    commutative;
     out GPR:virt:$rd;
     in  GPR:virt:$rs1, GPR:virt:$rs2;
     pattern ne($rs1, rs2);
@@ -172,6 +178,7 @@ rule ICMP_ne {
 }
 
 rule ICMP_gt {
+    commutative;
     out GPR:virt:$rd;
     in  GPR:virt:$rs1, GPR:virt:$rs2;
     pattern gt($rs1, $rs2);
@@ -180,6 +187,7 @@ rule ICMP_gt {
 }
 
 rule ICMP_gt_imm {
+    commutative;
     out GPR:virt:$rd;
     in  GPR:virt:$rs1, imm:$val;
     temps GPR:virt:$t0;
@@ -193,6 +201,7 @@ rule ICMP_gt_imm {
 }
 
 rule ICmp_ge {
+    commutative;
     out GPR:virt:$rd;
     in  GPR:virt:$rs1, GPR:virt:$rs2;
     pattern ge($rs1, rs2);
@@ -204,6 +213,7 @@ rule ICmp_ge {
 }
 
 rule ICMP_lt {
+    commutative;
     out GPR:virt:$rd;
     in  GPR:virt:$rs1, GPR:virt:$rs2;
     pattern lt($rs1, rs2);
@@ -212,6 +222,7 @@ rule ICMP_lt {
 }
 
 rule ICMP_le {
+    commutative;
     out GPR:virt:$rd;
     in  GPR:virt:$rs1, GPR:virt:$rs2;
     pattern le($rs1, rs2);
@@ -260,6 +271,22 @@ rule Ret {
     emit {
         instr { opcode: "mv", operands: [GPR:phys:a0, symbol:$sym], def: GPR:phys:a0 };
         instr { opcode: "j", operands: [label:$target="exit"] };
+    }
+}
+
+
+rule Not {
+    out GPR:virt:$rd;
+    in  GPR:virt:$rs;
+    pattern not($rs);
+    cost 1;
+    emit {
+        instr {
+            opcode: "xori",
+            operands: [GPR:virt:$rd, GPR:virt:$rs, imm:-1],
+            def: GPR:virt:$rd,
+            uses: [GPR:virt:$rs]
+        };
     }
 }
 
@@ -317,6 +344,7 @@ rule SRLI {
 }
 
 rule MUL_Symbol_r {
+    commutative;
     out GPR:virt:$rd;
     in symbol:$sym, GPR:virt:$rs;
     pattern mul($sym, $rs);
@@ -332,6 +360,7 @@ rule MUL_Symbol_r {
 }
 
 rule MUL_Symbol_Imm {
+    commutative;
     out GPR:virt:$rd;
     in symbol:$sym, imm:$val;
 	temps GPR:virt:$t0;
@@ -344,6 +373,7 @@ rule MUL_Symbol_Imm {
 }
 
 rule MULrr {
+  commutative;
   out GPR:virt:$rd;
   in  GPR:virt:$rs1, GPR:virt:$rs2;
   pattern mul($rs1, $rs2);
@@ -354,11 +384,13 @@ rule MULrr {
 }
 
 rule Mulri {
+  commutative;
   out   GPR:virt:$rd;
   in    GPR:virt:$rs, imm:$val;
   pattern mul($rs, $val);
   cost  1;
   emit  {
+    instr { opcode: "li", operands: [GPR:virt:$t0, imm:$val], def: GPR:virt:$rd };
     instr { opcode: "muli", operands: [GPR:virt:$rd, GPR:virt:$rs, imm:$val], def:GPR:virt:$rd, uses: [GPR:virt:$rs]  };
   }
 }

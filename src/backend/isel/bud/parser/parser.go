@@ -96,6 +96,9 @@ func (p *Parser) parseRule() *ast.Rule {
 
 	for {
 		switch p.cur.Kind {
+		case TokComm:
+			p.next()
+			r.IsComm = true
 		case TokOut:
 			p.next()
 			r.Out = p.parseOperand()

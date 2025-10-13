@@ -46,11 +46,17 @@ func (s *Selector) selectBest(pat *bud.Node) *MatchResult {
 			classes[v.Desc()] = v
 		}
 
-		if match(rule.Pattern, pat, env, classes) && rule.CheckPredicates(env) {
-			if rule.Cost < bestCost {
+		if match(rule.Pattern, pat, env, classes) && rule.CheckPredicates(env) && rule.Cost < bestCost {
+			best = &MatchResult{Rule: rule, Pattern: pat, Bind: env}
+			bestCost = rule.Cost
+		} else if rule.IsComm && len(pat.Args) == 2 {
+			// try swapped children for commutative ops
+			pat.Args[0], pat.Args[1] = pat.Args[1], pat.Args[0]
+			if match(rule.Pattern, pat, env, classes) && rule.CheckPredicates(env) && rule.Cost < bestCost {
 				best = &MatchResult{Rule: rule, Pattern: pat, Bind: env}
 				bestCost = rule.Cost
 			}
+			pat.Args[0], pat.Args[1] = pat.Args[1], pat.Args[0]
 		}
 	}
 

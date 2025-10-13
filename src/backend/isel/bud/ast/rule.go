@@ -9,6 +9,7 @@ import (
 
 type Rule struct {
 	Name         string
+	IsComm       bool
 	Out          Operand
 	In           []Operand
 	Temps        []Operand

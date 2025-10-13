@@ -53,6 +53,7 @@ const (
 	TokUses
 	TokSymbol
 	TokArg
+	TokComm
 )
 
 type Token struct {
@@ -177,6 +178,9 @@ func (l *Lexer) NextToken() Token {
 	case '=':
 		l.next()
 		return Token{Kind: TokEqual, Value: "="}
+	case '-':
+		l.next()
+		return Token{Kind: TokSub, Value: "-"}
 	case '"':
 		l.next()
 		start := l.pos
@@ -259,6 +263,8 @@ func (l *Lexer) NextToken() Token {
 			return Token{Kind: TokSymbol, Value: ident}
 		case "arg":
 			return Token{Kind: TokArg, Value: ident}
+		case "commutative":
+			return Token{Kind: TokComm, Value: ident}
 		}
 		return Token{Kind: TokIdent, Value: ident}
 	}
