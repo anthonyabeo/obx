@@ -143,7 +143,7 @@ func (g *Generator) genFunction(h *hir.Function, env *SymbolTable) *Function {
 
 	g.genCompoundStmt(h.Body)
 
-	exit := NewBlock("exit")
+	exit := NewBlock(fn.Name + "_exit")
 	fn.Blocks[exit.ID] = exit
 	fn.Exit = exit
 
@@ -213,7 +213,7 @@ func (g *Generator) genFuncCall(s *hir.FuncCall) Value {
 }
 
 func (g *Generator) genIfStmt(s *hir.IfStmt) {
-	endLabel := g.build.NewLabel("if.end")
+	endLabel := g.build.NewLabel("if_end")
 
 	// Track all conditional branches (initial + elsif)
 	allConds := append([]*hir.ElseIfBranch{
@@ -224,8 +224,8 @@ func (g *Generator) genIfStmt(s *hir.IfStmt) {
 
 	for i, branch := range allConds {
 		cond := g.genValue(branch.Cond)
-		falseLabel = g.build.NewLabel(fmt.Sprintf("if.next.%d", i))
-		trueLabel = g.build.NewLabel(fmt.Sprintf("if.true.%d", i))
+		falseLabel = g.build.NewLabel(fmt.Sprintf("if_next_%d", i))
+		trueLabel = g.build.NewLabel(fmt.Sprintf("if_true_%d", i))
 
 		// set conditional branch as the terminator instruction for this block
 		// and add it to the list of instructions in the block
@@ -268,7 +268,7 @@ func (g *Generator) genIfStmt(s *hir.IfStmt) {
 
 func (g *Generator) genLoopStmt(s *hir.LoopStmt) {
 	loopLabel := g.build.NewLabel(s.Label)
-	exitLabel := g.build.NewLabel(s.Label + ".exit")
+	exitLabel := g.build.NewLabel(s.Label + "_exit")
 
 	// Register exit label for EXIT lowering
 	prevExit := g.currentExit

@@ -120,11 +120,20 @@ func (fn *Function) ReversePostOrder() []int {
 	return rpo
 }
 
+func (fn *Function) SortedBlocks() []*Block {
+	blocks := make([]*Block, 0, len(fn.Blocks))
+	for i := fn.Entry.ID; i <= fn.Exit.ID; i++ {
+		if blk, ok := fn.Blocks[i]; ok {
+			blocks = append(blocks, blk)
+		}
+	}
+	return blocks
+}
+
 func (fn *Function) OutputDOT() string {
 	var sb strings.Builder
 	sb.WriteString("digraph CFG {\n")
-	for key := fn.Entry.ID; key <= fn.Exit.ID; key++ {
-		block := fn.Blocks[key]
+	for _, block := range fn.SortedBlocks() {
 		label := fmt.Sprintf("%s:\\l", block.Label)
 		for _, instr := range block.Instrs {
 			label += instr.String() + "\\l"

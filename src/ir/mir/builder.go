@@ -28,7 +28,7 @@ func (b *Builder) NewTemp(ty Type) *Temp {
 
 func (b *Builder) NewLabel(prefix string) string {
 	b.labelCount++
-	return prefix + "." + strconv.Itoa(b.labelCount)
+	return prefix + "_" + strconv.Itoa(b.labelCount)
 }
 
 func (b *Builder) Emit(instr Instr) {

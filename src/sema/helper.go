@@ -8,7 +8,7 @@ import (
 )
 
 func (f *FlowChecker) newLoopLabel(loopKind string) string {
-	l := fmt.Sprintf("%s.loop.%d", loopKind, f.loopIDCounter)
+	l := fmt.Sprintf("%s_loop_%d", loopKind, f.loopIDCounter)
 	f.loopIDCounter++
 
 	return l

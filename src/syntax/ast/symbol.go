@@ -277,7 +277,7 @@ func Mangle(sym Symbol) string {
 		}
 	}
 	parts = append(parts, sym.Name())
-	return strings.Join(parts, "$")
+	return strings.Join(parts, "_")
 }
 
 func IsVarParam(dsg *Designator) bool {

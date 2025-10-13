@@ -153,6 +153,8 @@ func MirTypeToAsmType(ty Type) asm.Type {
 		default:
 			panic("unsupported float size")
 		}
+	case *ArrayType:
+		return asm.Ptr
 	default:
 		panic("unsupported mir type to asm type conversion")
 	}
