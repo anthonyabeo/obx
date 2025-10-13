@@ -122,14 +122,6 @@ func match(pt *ast.Pattern, ir *bud.Node, env map[string]*bud.Value, classes map
 					Symbol: offs.Symbol,
 				}
 			}
-		//case ast.OKGlobal:
-		//	if ir.Val.Kind != bud.KindGlobal {
-		//		return false
-		//	}
-		//case ast.OKLocal:
-		//	if ir.Val.Kind != bud.KindLocal {
-		//		return false
-		//	}
 		case ast.OKSymbol:
 			if ir.Val.Kind != bud.KindSymbol {
 				return false
@@ -255,19 +247,6 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 				},
 				Offset: offset,
 			})
-		//case *ast.Global:
-		//	if v, ok := env[op.Name]; ok && v.Kind == bud.KindGlobal {
-		//		asmOperands = append(asmOperands, &asm.Global{
-		//			Name: v.Global.Name,
-		//			Size: v.Global.Size,
-		//		})
-		//	}
-		//case *ast.Local:
-		//	if v, ok := env[op.Name]; ok && v.Kind == bud.KindLocal {
-		//		asmOperands = append(asmOperands, &asm.Local{
-		//			Name: v.Local.Name,
-		//		})
-		//	}
 		case *ast.Symbol:
 			if v, ok := env[op.Name]; ok && v.Kind == bud.KindSymbol {
 				asmOperands = append(asmOperands, &asm.Symbol{
@@ -279,11 +258,10 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 		case *ast.Arg:
 			if imm, ok := env[op.Index.Name]; ok && imm.Kind == bud.KindImm {
 				op.Index.Value = imm.Imm
-				asmOperands = append(asmOperands, &asm.Arg{
+				asmOperands = append(asmOperands, &asm.Argument{
 					Index: imm.Imm,
 				})
 			}
-
 		default:
 			panic(fmt.Sprintf("invalid operand: %v", operand))
 		}

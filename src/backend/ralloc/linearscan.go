@@ -101,7 +101,7 @@ func LinearScan(fn *asm.Function, intervals []Interval, target target.Machine) A
 	return alloc
 }
 
-func Rewrite(fn *asm.Function, alloc Allocation, target target.Machine, layout target.FrameStruct) {
+func Rewrite(fn *asm.Function, alloc Allocation, target target.Machine, layout target.FrameLayout) {
 	for _, block := range fn.Blocks {
 		newInstrs := make([]*asm.Instr, 0)
 		for _, instr := range block.Instr {
@@ -134,7 +134,7 @@ func freshTemp(temps []string) *asm.Register {
 	}
 }
 
-func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameStruct, target target.Machine) (instrOut *asm.Instr, extra *Extra) {
+func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout, target target.Machine) (instrOut *asm.Instr, extra *Extra) {
 	before := make([]*asm.Instr, 0)
 	after := make([]*asm.Instr, 0)
 
@@ -292,7 +292,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameStruct,
 				after = append(after, store)
 			case asm.GlobalSK:
 			}
-		case *asm.Arg:
+		case *asm.Argument:
 			if 0 <= op.Index && op.Index <= 7 {
 				instr.Operands[0] = &asm.Register{
 					Name: fmt.Sprintf("a%d", op.Index),
