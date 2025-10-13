@@ -19,6 +19,7 @@ const (
 	WCHAR
 	SET
 	NIL
+	VOID
 )
 
 var (
@@ -37,6 +38,8 @@ var (
 	BooleanType  = &BasicType{BOOLEAN, 1, 1}
 	NilType      = &BasicType{NIL, 8, 8}
 	SetType      = &BasicType{SET, 4, 4}
+
+	VoidType = &BasicType{VOID, 0, 0} // used for procedures that return no value
 
 	UnknownType = &BasicType{UNKNOWN, 0, 0}
 )
