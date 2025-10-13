@@ -7,7 +7,25 @@ type Operand interface {
 	Type() Type
 }
 
+type SymbolKind int
+
+const (
+	ParamSK SymbolKind = iota
+	LocalSK
+	GlobalSK
+)
+
 type (
+	Argument struct {
+		Index int
+	}
+	Symbol struct {
+		Name string
+		Kind SymbolKind
+		Size int
+		Ty   Type
+	}
+
 	MemAddr struct {
 		Base   Operand // Base address (e.g., a pointer or array)
 		Offset Operand // Offset from the base address
@@ -35,13 +53,13 @@ type (
 		Kind   RelocKind // %hi, %lo
 		Symbol string
 	}
-
-	Global struct {
-		Name string
-		Ty   Type
-		Size int // size in bytes
-	}
 )
+
+func (a Argument) String() string { return fmt.Sprintf("arg(#%d)", a.Index) }
+func (a Argument) Type() Type     { panic("implement me") }
+
+func (s Symbol) String() string { return s.Name }
+func (s Symbol) Type() Type     { return s.Ty }
 
 func (r RelocFunc) String() string { return fmt.Sprintf("%s(%s)", r.Kind, r.Symbol) }
 func (r RelocFunc) Type() Type {
@@ -54,9 +72,6 @@ func (l Label) Type() Type {
 	//TODO implement me
 	panic("implement me")
 }
-
-func (g Global) String() string { return g.Name }
-func (g Global) Type() Type     { return g.Ty }
 
 func (r Register) String() string { return r.Name }
 func (r Register) Type() Type     { return r.Ty }
