@@ -55,17 +55,6 @@ type FrameInfo struct {
 
 	// Stack grows down (true) or up (false).
 	StackGrowsDown bool
-
-	// Size of local variables area in bytes
-	LocalSize int
-	// Size of arguments area in bytes
-	ArgSize int
-	// Offset of the return address from the frame pointer
-	RetAddrOffset int
-	// Offset of the first local variable from the frame pointer
-	FirstLocalOffset int
-	// Offset of the first argument from the frame pointer
-	FirstArgOffset int
 }
 
 type Machine interface {
@@ -74,6 +63,7 @@ type Machine interface {
 	RegisterInfo() *RegisterFile // describe the register file of the target and any interactions between the registers
 	FrameInfo() *FrameInfo
 
+	AssignParams(int) []Location
 	Legalize(*asm.Function)
 	Emit(*asm.Module) string
 	EmitPrologueEpilogue(*asm.Function, FrameLayout)

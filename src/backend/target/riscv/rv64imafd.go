@@ -115,22 +115,22 @@ func (r RV64IMAFD) RegisterInfo() *target.RegisterFile {
 			"f31": 63,
 		},
 		Allocatable: []string{
-			"t0",  // x5
-			"t1",  // x6
-			"t2",  // x7
-			"a0",  // x10
-			"a1",  // x11
-			"a2",  // x12
-			"a3",  // x13
-			"a4",  // x14
-			"a5",  // x15
-			"a6",  // x16
-			"a7",  // x17
-			"t3",  // x28
-			"t4",  // x29
-			"t5",  // x30
-			"t6",  // x31
-			"s0",  // x8/fp
+			"t0", // x5
+			"t1", // x6
+			"t2", // x7
+			"a0", // x10
+			"a1", // x11
+			"a2", // x12
+			"a3", // x13
+			"a4", // x14
+			"a5", // x15
+			"a6", // x16
+			"a7", // x17
+			"t3", // x28
+			"t4", // x29
+			"t5", // x30
+			"t6", // x31
+
 			"s1",  // x9
 			"s2",  // x18
 			"s3",  // x19
@@ -209,6 +209,7 @@ func (r RV64IMAFD) RegisterInfo() *target.RegisterFile {
 			"t5", //  x30
 			"t6", //  x31
 		},
+		MaxArgRegs: 8,
 	}
 }
 
@@ -230,14 +231,6 @@ func (r RV64IMAFD) EmitPrologueEpilogue(fn *asm.Function, layout target.FrameLay
 	sp := &asm.Register{Name: "sp", Mode: asm.Phys, Kind: asm.GPR}
 	fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
 
-	// Collect saved regs
-	var savedRegs []target.FrameObject
-	for _, obj := range layout.Objects {
-		if obj.Kind == target.SavedReg {
-			savedRegs = append(savedRegs, obj)
-		}
-	}
-
 	var (
 		prologue []*asm.Instr
 		epilogue []*asm.Instr
@@ -249,7 +242,7 @@ func (r RV64IMAFD) EmitPrologueEpilogue(fn *asm.Function, layout target.FrameLay
 		Operands: []asm.Operand{sp, sp, asm.Imm{Value: -fs}}},
 	)
 
-	for _, obj := range savedRegs {
+	for _, obj := range layout.Saves {
 		spOffset := fs + obj.Offset
 
 		reg := &asm.Register{Name: obj.Name, Mode: asm.Phys, Kind: asm.GPR}
@@ -268,8 +261,8 @@ func (r RV64IMAFD) EmitPrologueEpilogue(fn *asm.Function, layout target.FrameLay
 	fn.Entry.Instr = append(prologue, fn.Entry.Instr...)
 
 	// ---------- EPILOGUE ----------
-	for i := len(savedRegs) - 1; i >= 0; i-- {
-		obj := savedRegs[i]
+	for i := len(layout.Saves) - 1; i >= 0; i-- {
+		obj := layout.Saves[i]
 		spOffset := fs + obj.Offset
 		reg := &asm.Register{Name: obj.Name, Mode: asm.Phys, Kind: asm.GPR}
 		mem := &asm.MemAddr{Base: sp, Offset: asm.Imm{Value: spOffset}}
@@ -347,7 +340,7 @@ func (r RV64IMAFD) formatFunc(fn *asm.Function) string {
 	return buf.String()
 }
 
-func (r RV64IMAFD) formatGlobal(g *asm.Global) string {
+func (r RV64IMAFD) formatGlobal(g *asm.Symbol) string {
 	var buf strings.Builder
 
 	align := int(math.Log2(float64(g.Size)))
@@ -355,4 +348,41 @@ func (r RV64IMAFD) formatGlobal(g *asm.Global) string {
 	buf.WriteString(fmt.Sprintf("%s: .skip %d\n\n", g.Name, g.Size))
 
 	return buf.String()
+}
+
+func (r RV64IMAFD) AssignParams(paramCount int) []target.Location {
+	intRegIdx, stackOff := 0, 0
+
+	locs := make([]target.Location, paramCount)
+	wordSize := r.FrameInfo().WordSize
+
+	for i := 0; i < paramCount; i++ {
+		if intRegIdx < r.RegisterInfo().MaxArgRegs {
+			locs[i] = target.Location{
+				Kind:     target.InRegister,
+				Register: fmt.Sprintf("a%d", intRegIdx),
+				Size:     wordSize,
+				Align:    wordSize,
+			}
+			intRegIdx++
+		} else {
+			// Align stack offset to 8 bytes
+			stackOff = alignTo(stackOff, wordSize)
+			locs[i] = target.Location{
+				Kind:   target.OnStack,
+				Offset: stackOff,
+				Size:   wordSize,
+				Align:  wordSize,
+			}
+			stackOff += wordSize
+		}
+	}
+	return locs
+}
+
+func alignTo(x, align int) int {
+	if x%align == 0 {
+		return x
+	}
+	return ((x / align) + 1) * align
 }

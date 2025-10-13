@@ -1,3 +1,44 @@
+rule Arg {
+    in GPR:virt:$rs, imm:$idx;
+    pattern argument($rs, $idx);
+    emit {
+        instr {
+            opcode: "mv",
+            operands: [arg{imm:$idx}, GPR:virt:$rs],
+            uses: [GPR:virt:$rs]
+        };
+    }
+}
+
+rule Call_direct {
+    out GPR:virt:$rd;
+    in  label:$target;
+    pattern call($target);
+    cost 2;
+    emit {
+        instr { opcode: "jal", operands: [GPR:phys:ra, label:$target] };
+        instr { opcode: "mv", operands: [GPR:virt:$rd, GPR:phys:a0], def: GPR:virt:$rd };
+    }
+}
+
+rule Call_direct {
+    out GPR:virt:$rd;
+    in  label:$target;
+    pattern call($target);
+    cost 2;
+    emit {
+        instr { opcode: "jal", operands: [GPR:phys:ra, label:$target] };
+    }
+}
+
+rule Mov_sym_r {
+    in symbol:$sym, GPR:virt:$rs;
+    pattern mov($sym, $rs);
+    emit {
+        instr { opcode: "mv", operands: [symbol:$sym, GPR:virt:$rs], uses: [GPR:virt:$rs] };
+    }
+}
+
 rule MOVrr {
     in GPR:virt:$rd, GPR:virt:$rs;
     pattern mov($rd, $rs);
@@ -12,7 +53,7 @@ rule MOVri_SmallImm {
 	pattern mov($rd, $val);
 	cost 1;
 	emit {
-		instr { opcode: "addi", operands: [GPR:virt:$rd, GPR:phys:x0, imm:$val], def: GPR:virt:$rd, uses: [GPR:phys:x0] };
+		instr { opcode: "li", operands: [GPR:virt:$rd, imm:$val], def: GPR:virt:$rd };
 	}
 	cond SImmFits12($val);
 }
@@ -26,6 +67,37 @@ rule MOVri_LargeImm {
 		instr { opcode: "addi", operands: [GPR:virt:$rd, GPR:virt:$rd, reloc:lo($val)], def: GPR:virt:$rd, uses: [GPR:virt:$rd] };
 	}
 	cond !SImmFits12($val);
+}
+
+/////////////////////////////////////////////////////////////////
+// Addition Jump Rules
+/////////////////////////////////////////////////////////////////
+
+rule ADD_sym_sym {
+  out GPR:virt:$rd;
+  in  symbol:$sym1, symbol:$sym2;
+  pattern add($sym1, $sym2);
+  emit {
+      instr {
+        opcode: "add",
+        operands: [GPR:virt:$rd, symbol:$sym1, symbol:$sym2],
+        def: GPR:virt:$rd
+      };
+  }
+}
+
+rule ADDr_sym {
+  out GPR:virt:$rd;
+  in  GPR:virt:$rs1, symbol:$sym;
+  pattern add($rs1, $sym);
+  emit {
+      instr {
+        opcode: "add",
+        operands: [GPR:virt:$rd, GPR:virt:$rs1, symbol:$sym],
+        def: GPR:virt:$rd,
+        uses: [GPR:virt:$rs1]
+      };
+  }
 }
 
 rule ADDri {
@@ -181,6 +253,16 @@ rule Ret_val {
     }
 }
 
+rule Ret {
+    in symbol:$sym;
+    pattern ret($sym);
+    cost 2;
+    emit {
+        instr { opcode: "mv", operands: [GPR:phys:a0, symbol:$sym], def: GPR:phys:a0 };
+        instr { opcode: "j", operands: [label:$target="exit"] };
+    }
+}
+
 rule NegImm {
     out GPR:virt:$rd;
     in  imm:$val;
@@ -234,6 +316,33 @@ rule SRLI {
   cond ShamtFits6($sh);
 }
 
+rule MUL_Symbol_r {
+    out GPR:virt:$rd;
+    in symbol:$sym, GPR:virt:$rs;
+    pattern mul($sym, $rs);
+    cost 2;
+    emit {
+        instr {
+            opcode: "mul",
+            operands: [GPR:virt:$rd, symbol:$sym, GPR:virt:$rs],
+            def: GPR:virt:$rd,
+            uses: [GPR:virt:$rs]
+        };
+    }
+}
+
+rule MUL_Symbol_Imm {
+    out GPR:virt:$rd;
+    in symbol:$sym, imm:$val;
+	temps GPR:virt:$t0;
+    pattern mul($sym, $val);
+    cost 2;
+    emit {
+		instr { opcode: "li", operands: [GPR:virt:$t0, imm:$val], def: GPR:virt:$rd };
+        instr { opcode: "mul", operands: [GPR:virt:$rd, symbol:$sym, GPR:virt:$t0], def: GPR:virt:$rd, uses: [GPR:virt:$t0]};
+    }
+}
+
 rule MULrr {
   out GPR:virt:$rd;
   in  GPR:virt:$rs1, GPR:virt:$rs2;
@@ -270,11 +379,11 @@ rule DIVrr {
 
 rule LoadGlobal {
   out   GPR:virt:$rd;
-  in    global:$sym;
+  in    symbol:$sym;
   cost  2;
   pattern load($sym);
   emit {
-      instr {   opcode: "ld", operands: [GPR:virt:$rd, global:$sym], def: GPR:virt:$rd };
+      instr {   opcode: "ld", operands: [GPR:virt:$rd, symbol:$sym], def: GPR:virt:$rd };
   }
 }
 
@@ -320,21 +429,21 @@ rule STri {
 }
 
 rule STImmGlobalMem {
-    in imm:$c, global:$sym;
+    in imm:$c, symbol:$sym;
     temps GPR:virt:$t0;
     pattern store($c, $sym);
     cost 3;
     emit {
         instr { opcode: "li", operands: [GPR:virt:$t0, imm:$c], def: GPR:virt:$t0 };
-        instr { opcode: "sd", operands: [GPR:virt:$t0, global:$sym], uses: [GPR:virt:$t0] };
+        instr { opcode: "sd", operands: [GPR:virt:$t0, symbol:$sym], uses: [GPR:virt:$t0] };
     }
 }
 
 rule STRegGlobalMem {
-    in GPR:virt:$rs1, global:$sym;
+    in GPR:virt:$rs1, symbol:$sym;
     pattern store($rs1, $sym);
     cost 3;
     emit {
-        instr { opcode: "sd", operands: [GPR:virt:$rs1, global:$sym], uses: [GPR:virt:$rs1] };
+        instr { opcode: "sd", operands: [GPR:virt:$rs1, symbol:$sym], uses: [GPR:virt:$rs1] };
     }
 }
