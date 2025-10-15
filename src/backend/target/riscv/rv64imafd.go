@@ -287,11 +287,10 @@ func (r RV64IMAFD) EmitPrologueEpilogue(fn *asm.Function, layout target.FrameLay
 func (r RV64IMAFD) Emit(module *asm.Module) string {
 	var buf strings.Builder
 
-	buf.WriteString(".section .bss\n")
+	buf.WriteString("\t.section .bss\n")
 	for _, global := range module.Globals {
 		buf.WriteString(r.formatGlobal(global))
 	}
-	buf.WriteString("\n")
 
 	var funcNames []string
 	funcMap := make(map[string]*asm.Function)
@@ -312,18 +311,19 @@ func (r RV64IMAFD) Emit(module *asm.Module) string {
 func (r RV64IMAFD) formatFunc(fn *asm.Function) string {
 	var buf strings.Builder
 
-	buf.WriteString(".section .text\n")
-	buf.WriteString(".align 2\n\n")
+	buf.WriteString("\t.section .text\n")
+	buf.WriteString("\t.align 2\n")
 
 	fnName := fn.Name
 	if strings.HasPrefix(fnName, "__init_") {
-		fnName = "start"
+		fnName = "main"
 		fn.Exported = true
 	}
 
 	if fn.Exported {
-		buf.WriteString(".globl " + fnName + "\n")
+		buf.WriteString("\t.globl " + fnName + "\n")
 	}
+	buf.WriteString("\t.type " + fnName + ", @function\n")
 
 	buf.WriteString(fnName + ":\n")
 	for _, block := range fn.Blocks {
@@ -332,8 +332,13 @@ func (r RV64IMAFD) formatFunc(fn *asm.Function) string {
 		}
 
 		for _, inst := range block.Instr {
-			buf.WriteString("  " + inst.String() + "\n")
+			buf.WriteString("\t" + inst.String() + "\n")
 		}
+
+		if strings.HasSuffix(block.Label, "exit") {
+			buf.WriteString("\t.size " + fnName + ", .-" + fnName + "\n")
+		}
+
 		buf.WriteString("\n")
 	}
 
@@ -344,7 +349,7 @@ func (r RV64IMAFD) formatGlobal(g *asm.Symbol) string {
 	var buf strings.Builder
 
 	align := int(math.Log2(float64(g.Size)))
-	buf.WriteString(fmt.Sprintf(".align %d\n", align))
+	buf.WriteString(fmt.Sprintf("\t.align %d\n", align))
 	buf.WriteString(fmt.Sprintf("%s: .skip %d\n\n", g.Name, g.Size))
 
 	return buf.String()
