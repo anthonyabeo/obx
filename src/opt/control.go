@@ -35,7 +35,10 @@ func BuildCFG(fn *mir.Function) {
 				}
 			case *mir.ReturnInst:
 				blk.Succs[fn.Exit.ID] = fn.Exit
-				blk.Term = &mir.JumpInst{Target: fn.Exit.Label} // normalize return to jump to exit
+
+				jmp := &mir.JumpInst{Target: fn.Exit.Label}
+				blk.Instrs = append(blk.Instrs, jmp)
+				blk.Term = jmp // normalize return to jump to exit
 			default:
 				// unknown terminator: assume fallthrough
 				if i+1 <= fn.Exit.ID {

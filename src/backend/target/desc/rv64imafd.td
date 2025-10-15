@@ -259,8 +259,7 @@ rule Ret_val {
     pattern ret($rs);
     cost 2;
     emit {
-        instr { opcode: "mv", operands: [GPR:phys:a0, GPR:virt:$rs], def: GPR:phys:a0, uses: [GPR:virt:$rs] };
-        instr { opcode: "j", operands: [label:$target="exit"], uses: [GPR:phys:a0] };
+        instr { opcode: "mv", operands: [GPR:phys:a0, GPR:virt:$rs], uses: [GPR:virt:$rs] };
     }
 }
 
@@ -269,8 +268,7 @@ rule Ret {
     pattern ret($sym);
     cost 2;
     emit {
-        instr { opcode: "mv", operands: [GPR:phys:a0, symbol:$sym], def: GPR:phys:a0 };
-        instr { opcode: "j", operands: [label:$target="exit"] };
+        instr { opcode: "mv", operands: [GPR:phys:a0, symbol:$sym] };
     }
 }
 

@@ -40,7 +40,7 @@ func BuildCFG(fn *asm.Function) {
 				}
 
 			case "ret":
-				blk.Succ[fn.Exit.ID] = fn.Exit
+				blk.Succ = append(blk.Succ, fn.Exit)
 				blk.Term = &asm.Instr{Opcode: "j", Operands: []asm.Operand{asm.Label{Name: fn.Exit.Label}}}
 			default:
 				// unknown terminator: assume fallthrough
