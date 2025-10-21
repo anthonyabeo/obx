@@ -114,32 +114,32 @@ func (b *Builder) ensureValue(value Value) Value {
 	}
 }
 
-func MirTypeToAsmType(ty Type) asm.Type {
+func ToAsmType(ty Type) asm.Type {
 	switch ty := ty.(type) {
 	case *IntegerType:
 		if ty.Signed {
 			switch ty.Bits {
 			case 64:
-				return asm.I64
+				return &asm.BasicType{Kind: asm.I64, Width: ty.Width()}
 			case 32:
-				return asm.I32
+				return &asm.BasicType{Kind: asm.I32, Width: ty.Width()}
 			case 16:
-				return asm.I16
+				return &asm.BasicType{Kind: asm.I16, Width: ty.Width()}
 			case 8:
-				return asm.I8
+				return &asm.BasicType{Kind: asm.I8, Width: ty.Width()}
 			default:
 				panic("unsupported integer size")
 			}
 		} else {
 			switch ty.Bits {
 			case 64:
-				return asm.U64
+				return &asm.BasicType{Kind: asm.U64, Width: ty.Width()}
 			case 32:
-				return asm.U32
+				return &asm.BasicType{Kind: asm.U32, Width: ty.Width()}
 			case 16:
-				return asm.U16
+				return &asm.BasicType{Kind: asm.U16, Width: ty.Width()}
 			case 8:
-				return asm.U8
+				return &asm.BasicType{Kind: asm.U8, Width: ty.Width()}
 			default:
 				panic("unsupported integer size")
 			}
@@ -147,14 +147,14 @@ func MirTypeToAsmType(ty Type) asm.Type {
 	case *FloatType:
 		switch ty.Bits {
 		case 64:
-			return asm.F64
+			return &asm.BasicType{Kind: asm.F64, Width: ty.Width()}
 		case 32:
-			return asm.F32
+			return &asm.BasicType{Kind: asm.F32, Width: ty.Width()}
 		default:
 			panic("unsupported float size")
 		}
 	case *ArrayType:
-		return asm.Ptr
+		return &asm.ArrayType{Element: ToAsmType(ty.Elem), Width: ty.Width()}
 	default:
 		panic("unsupported mir type to asm type conversion")
 	}

@@ -63,6 +63,8 @@ type Machine interface {
 	RegisterInfo() *RegisterFile // describe the register file of the target and any interactions between the registers
 	FrameInfo() *FrameInfo
 
+	Alignment(asm.Type) int
+
 	AssignParams(int) []Location
 	Legalize(*asm.Function)
 	Emit(*asm.Module) string

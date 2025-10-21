@@ -19,8 +19,9 @@ func Compile(module *mir.Module, mach target.Machine) string {
 	for name, global := range module.Globals {
 		asmModule.Globals[name] = &asm.Symbol{
 			Name: name,
+			Kind: asm.GlobalSK,
 			Size: global.Size,
-			Ty:   mir.MirTypeToAsmType(global.Typ)}
+			Ty:   mir.ToAsmType(global.Typ)}
 	}
 
 	// Instruction Selection
@@ -35,7 +36,7 @@ func Compile(module *mir.Module, mach target.Machine) string {
 
 			fn.Asm.Locals[local.Name()] = asm.Symbol{
 				Name: local.Name(),
-				Ty:   mir.MirTypeToAsmType(local.Type()),
+				Ty:   mir.ToAsmType(local.Type()),
 			}
 		}
 
@@ -43,7 +44,7 @@ func Compile(module *mir.Module, mach target.Machine) string {
 			fn.Asm.Params = append(fn.Asm.Params, &asm.Symbol{
 				Name: value.Name(),
 				Kind: asm.ParamSK,
-				Ty:   mir.MirTypeToAsmType(value.Type()),
+				Ty:   mir.ToAsmType(value.Type()),
 			})
 		}
 	}

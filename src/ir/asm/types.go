@@ -1,9 +1,16 @@
 package asm
 
-type Type uint8
+import "fmt"
+
+type Type interface {
+	fmt.Stringer
+	Size() int
+}
+
+type TypeKind int
 
 const (
-	invalid Type = iota
+	invalid TypeKind = iota
 	I8
 	I16
 	I32
@@ -18,8 +25,14 @@ const (
 	Ptr
 )
 
-func (t Type) String() string {
-	switch t {
+type BasicType struct {
+	Kind  TypeKind
+	Width int
+}
+
+func (t BasicType) Size() int { return t.Width }
+func (t BasicType) String() string {
+	switch t.Kind {
 	case I8:
 		return "i8"
 	case I16:
@@ -48,3 +61,14 @@ func (t Type) String() string {
 		return "invalid"
 	}
 }
+
+type ArrayType struct {
+	Element Type
+	Width   int
+}
+
+func (a ArrayType) String() string {
+	return fmt.Sprintf("[%d x %s]", a.Width, a.Element.String())
+}
+
+func (a ArrayType) Size() int { return a.Width }
