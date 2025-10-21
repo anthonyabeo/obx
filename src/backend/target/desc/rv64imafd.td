@@ -365,7 +365,7 @@ rule MUL_Symbol_Imm {
     pattern mul($sym, $val);
     cost 2;
     emit {
-		instr { opcode: "li", operands: [GPR:virt:$t0, imm:$val], def: GPR:virt:$rd };
+		instr { opcode: "li", operands: [GPR:virt:$t0, imm:$val], def: GPR:virt:$t0 };
         instr { opcode: "mul", operands: [GPR:virt:$rd, symbol:$sym, GPR:virt:$t0], def: GPR:virt:$rd, uses: [GPR:virt:$t0]};
     }
 }
@@ -385,11 +385,12 @@ rule Mulri {
   commutative;
   out   GPR:virt:$rd;
   in    GPR:virt:$rs, imm:$val;
+  temps GPR:virt:$t0;
   pattern mul($rs, $val);
   cost  1;
   emit  {
-    instr { opcode: "li", operands: [GPR:virt:$t0, imm:$val], def: GPR:virt:$rd };
-    instr { opcode: "muli", operands: [GPR:virt:$rd, GPR:virt:$rs, imm:$val], def:GPR:virt:$rd, uses: [GPR:virt:$rs]  };
+    instr { opcode: "li", operands: [GPR:virt:$t0, imm:$val], def: GPR:virt:$t0 };
+    instr { opcode: "mul", operands: [GPR:virt:$rd, GPR:virt:$rs, GPR:virt:$t0], def:GPR:virt:$rd, uses: [GPR:virt:$rs, GPR:virt:$t0]  };
   }
 }
 
@@ -449,11 +450,11 @@ rule LD_Large {
 /////////////////////////////////////////////////////////////////
 
 rule STri {
-  in GPR:virt:$rs1, imm:$offs, GPR:virt:$rs2;
-  pattern store($rs1, $offs, $rs2);
+  in GPR:virt:$rs1, GPR:virt:$rs2, imm:$offs;
+  pattern store($rs1, add($rs2, $offs));
   cost 1;
   emit {
-    instr { opcode: "sd", operands: [GPR:virt:$rs2, mem:{base=GPR:virt:$rs1, offset=imm:$offs}], uses: [GPR:virt:$rs1, GPR:virt:$rs2] };
+    instr { opcode: "sd", operands: [GPR:virt:$rs1, mem:{base=GPR:virt:$rs2, offset=imm:$offs}], uses: [GPR:virt:$rs1, GPR:virt:$rs2] };
   }
   cond SImmFits12($offs);
 }

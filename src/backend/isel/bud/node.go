@@ -209,12 +209,10 @@ func patMIRValue(value mir.Value) *Node {
 		base := patMIRValue(val.Base)
 
 		return &Node{
-			Val: &Value{
-				Kind: KindMem,
-				Mem: Mem{
-					Base: base.Val.Reg,
-					Offs: val.Offs,
-				},
+			Op: "add",
+			Args: []*Node{
+				base,
+				{Val: &Value{Kind: KindImm, Imm: val.Offs}},
 			},
 		}
 	default:

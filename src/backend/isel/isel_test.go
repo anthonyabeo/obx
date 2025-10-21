@@ -394,3 +394,38 @@ rule Arg {
 		fmt.Println(s)
 	}
 }
+
+func TestISelStoreMem(t *testing.T) {
+	src := `rule STri {
+  in GPR:virt:$rs1, GPR:virt:$rs2, imm:$offs;
+  pattern store($rs1, add($rs2, $offs));
+  cost 1;
+  emit {
+    instr { opcode: "sd", operands: [GPR:virt:$rs1, mem:{base=GPR:virt:$rs2, offset=imm:$offs}], uses: [GPR:virt:$rs1, GPR:virt:$rs2] };
+  }
+  cond SImmFits12($offs);
+}`
+
+	lexer := parser.NewLexer(src)
+	p := parser.NewParser(lexer)
+	machine := p.Parse()
+	pattern := &bud.Node{
+		Op: "store",
+		Args: []*bud.Node{
+			{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "t5"}}},
+			{
+				Op: "add",
+				Args: []*bud.Node{
+					{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "t6"}}},
+					{Val: &bud.Value{Kind: bud.KindImm, Imm: 8}},
+				},
+			},
+		},
+	}
+
+	sel := NewSelector(machine.Rules)
+	instr := sel.Select(pattern)
+	for _, s := range instr {
+		fmt.Println(s)
+	}
+}

@@ -218,6 +218,10 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 			switch op.Offs.Kind() {
 			case ast.OKImm:
 				imm := op.Offs.(*ast.Imm)
+				if v, ok := env[imm.Name]; ok {
+					imm.Value = v.Imm
+				}
+
 				offset = &asm.Imm{Value: imm.Value}
 			case ast.OKReloc:
 				var symbol string
@@ -237,6 +241,10 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 				}
 			default:
 				panic("unreachable")
+			}
+
+			if v, ok := env[op.Base.Name]; ok && (v.Kind == bud.KindGPR || v.Kind == bud.KindFPR) {
+				op.Base.Name = v.Reg.Name
 			}
 
 			asmOperands = append(asmOperands, &asm.MemAddr{
