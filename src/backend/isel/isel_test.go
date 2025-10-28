@@ -429,3 +429,36 @@ func TestISelStoreMem(t *testing.T) {
 		fmt.Println(s)
 	}
 }
+
+func TestISelAssignRegLocal(t *testing.T) {
+	src := `
+rule Mov_r_str_const {
+    in str:$name, GPR:virt:$rs;
+    pattern mov($rs, $name);
+    cost 1;
+    emit {
+        instr { opcode: "la", operands: [GPR:virt:$rs, str:$name], def: GPR:virt:$rs };
+    }
+}
+`
+
+	lexer := parser.NewLexer(src)
+	p := parser.NewParser(lexer)
+
+	machine := p.Parse()
+
+	pattern := &bud.Node{
+		Op: "mov",
+		Args: []*bud.Node{
+			{Val: &bud.Value{Kind: bud.KindGPR, Reg: bud.Reg{Name: "t10"}}},
+			{Val: &bud.Value{Kind: bud.KindString, Str: bud.String{Name: "str.const.0"}}},
+		},
+	}
+
+	sel := NewSelector(machine.Rules)
+	instr := sel.Select(pattern)
+
+	for _, s := range instr {
+		fmt.Println(s)
+	}
+}

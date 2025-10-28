@@ -26,6 +26,7 @@ const (
 	KindReloc
 	KindMem
 	KindSymbol
+	KindString
 )
 
 type SymbolKind int
@@ -34,6 +35,7 @@ const (
 	ParamSK SymbolKind = iota
 	GlobalSK
 	LocalSK
+	ConstSK
 )
 
 type Value struct {
@@ -44,13 +46,19 @@ type Value struct {
 	Reloc  Reloc
 	Mem    Mem
 	Symbol Symbol
+	Str    String
+}
+
+type String struct {
+	Name  string
+	Value string
 }
 
 type Symbol struct {
-	Name  string
-	Kind  SymbolKind
-	Size  int
-	Align int
+	Name string
+	Kind SymbolKind
+	Size int
+	Ty   mir.Type
 }
 
 type Reg struct {
@@ -174,6 +182,12 @@ func PatMIRInst(ins mir.Instr) *Node {
 
 func patMIRValue(value mir.Value) *Node {
 	switch val := value.(type) {
+	case *mir.NamedConst:
+		return &Node{Val: &Value{Kind: KindSymbol, Symbol: Symbol{
+			Name: val.ID,
+			Kind: ConstSK,
+			Size: val.Size,
+		}}}
 	case *mir.Local:
 		return &Node{Val: &Value{Kind: KindSymbol, Symbol: Symbol{
 			Name: val.BName,
@@ -193,16 +207,22 @@ func patMIRValue(value mir.Value) *Node {
 		default:
 			return &Node{Val: &Value{Kind: KindGPR, Reg: Reg{Name: val.ID}}}
 		}
-	case *mir.IntegerConst:
+	case *mir.IntegerLit:
 		return &Node{
-			Val: &Value{Kind: KindImm, Imm: int(val.Value)},
+			Val: &Value{Kind: KindImm, Imm: int(val.LitValue)},
 		}
+	case *mir.StrLit:
+		return &Node{Val: &Value{Kind: KindString, Str: String{
+			Name:  val.LitName,
+			Value: val.LitValue,
+		}}}
 	case *mir.Global:
 		return &Node{
 			Val: &Value{Kind: KindSymbol, Symbol: Symbol{
 				Name: val.NameStr,
 				Kind: GlobalSK,
 				Size: val.Size,
+				Ty:   val.Typ,
 			}},
 		}
 	case *mir.Mem:

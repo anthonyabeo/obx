@@ -13,6 +13,7 @@ const (
 	OKReloc
 	OKSymbol
 	OKArg
+	OKString
 )
 
 type Operand interface {
@@ -77,7 +78,12 @@ type Imm struct {
 
 func (i Imm) Desc() string      { return i.Name }
 func (i Imm) Kind() OperandKind { return OKImm }
-func (i Imm) String() string    { return i.Value.(string) }
+func (i Imm) String() string {
+	if i.Value != nil {
+		return fmt.Sprintf("%v", i.Value)
+	}
+	return i.Name
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // Reloc
@@ -107,3 +113,12 @@ type Arg struct {
 func (a Arg) Kind() OperandKind { return OKArg }
 func (a Arg) Desc() string      { return fmt.Sprintf("arg($%s)", a.Index) }
 func (a Arg) String() string    { return fmt.Sprintf("arg($%s)", a.Index) }
+
+type String struct {
+	Name  string
+	Value string
+}
+
+func (s String) Kind() OperandKind { return OKString }
+func (s String) Desc() string      { return s.Name }
+func (s String) String() string    { return s.Value }

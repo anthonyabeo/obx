@@ -54,6 +54,7 @@ const (
 	TokSymbol
 	TokArg
 	TokComm
+	TokStr
 )
 
 type Token struct {
@@ -265,6 +266,8 @@ func (l *Lexer) NextToken() Token {
 			return Token{Kind: TokArg, Value: ident}
 		case "commutative":
 			return Token{Kind: TokComm, Value: ident}
+		case "str":
+			return Token{Kind: TokStr, Value: ident}
 		}
 		return Token{Kind: TokIdent, Value: ident}
 	}

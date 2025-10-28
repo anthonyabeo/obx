@@ -160,11 +160,20 @@ func (p *Parser) parseOperand() ast.Operand {
 		operand = p.parseSymbol()
 	case TokArg:
 		operand = p.parseArg()
+	case TokStr:
+		operand = p.parseString()
 	default:
 		panic("unexpected token in operand: " + p.cur.Value)
 	}
 
 	return operand
+}
+
+func (p *Parser) parseString() *ast.String {
+	p.match(TokStr)
+	p.match(TokColon)
+	name := p.matchIdent()
+	return &ast.String{Name: name}
 }
 
 func (p *Parser) parseArg() *ast.Arg {

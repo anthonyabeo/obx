@@ -7,6 +7,7 @@ import (
 	"github.com/anthonyabeo/obx/src/backend/isel/bud"
 	"github.com/anthonyabeo/obx/src/backend/isel/bud/ast"
 	"github.com/anthonyabeo/obx/src/ir/asm"
+	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
 var temp int
@@ -124,6 +125,10 @@ func match(pt *ast.Pattern, ir *bud.Node, env map[string]*bud.Value, classes map
 			}
 		case ast.OKSymbol:
 			if ir.Val.Kind != bud.KindSymbol {
+				return false
+			}
+		case ast.OKString:
+			if ir.Val.Kind != bud.KindString {
 				return false
 			}
 		default:
@@ -261,6 +266,7 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 					Name: v.Symbol.Name,
 					Kind: SymbolKind(v.Symbol.Kind),
 					Size: v.Symbol.Size,
+					Ty:   mir.ToAsmType(v.Symbol.Ty),
 				})
 			}
 		case *ast.Arg:
@@ -268,6 +274,13 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 				op.Index.Value = imm.Imm
 				asmOperands = append(asmOperands, &asm.Argument{
 					Index: imm.Imm,
+				})
+			}
+		case *ast.String:
+			if v, ok := env[op.Name]; ok && v.Kind == bud.KindString {
+				asmOperands = append(asmOperands, &asm.String{
+					Name:  v.Str.Name,
+					Value: v.Str.Value,
 				})
 			}
 		default:
@@ -317,6 +330,8 @@ func SymbolKind(kind bud.SymbolKind) asm.SymbolKind {
 		return asm.LocalSK
 	case bud.GlobalSK:
 		return asm.GlobalSK
+	case bud.ConstSK:
+		return asm.ConstSK
 	default:
 		panic("invalid register kind")
 	}
