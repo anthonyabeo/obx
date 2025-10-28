@@ -78,6 +78,7 @@ func TestCompile(t *testing.T) {
 				
 				BEGIN
 				  result := AddMany(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+ 					printf("Final x: %d\n", result)
 				END TestCall.`,
 			filename: "procedure_and_call.obx",
 		},
@@ -89,10 +90,11 @@ func TestCompile(t *testing.T) {
 
 			 BEGIN
 			  x := 0;
-			  y := 10;
+			  y := 20;
 			  WHILE x < y DO
 			   x := x + 1
 			  END
+		       printf("Final x: %d\n", x)
 			 END LoopTest.
 			`,
 			filename: "loop_test.obx",

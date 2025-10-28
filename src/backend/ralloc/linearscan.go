@@ -226,6 +226,16 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 					Def:      temp,
 				})
 				instr.Operands[i+1] = mem
+			case asm.ConstSK:
+				temp := freshTemp(target.RegisterInfo().Temporaries)
+				sym := &asm.Symbol{Name: op.Name, Kind: asm.ConstSK}
+
+				before = append(before, &asm.Instr{
+					Opcode:   "la",
+					Operands: []asm.Operand{temp, sym},
+					Def:      temp,
+				})
+				instr.Operands[i+1] = temp
 			}
 		}
 	}
@@ -312,6 +322,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 					Def:      temp,
 				})
 				instr.Operands[0] = mem
+			case asm.ConstSK:
 			}
 		case *asm.Argument:
 			if 0 <= op.Index && op.Index <= 7 {

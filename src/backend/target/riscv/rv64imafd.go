@@ -3,6 +3,7 @@ package riscv
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/backend/target"
@@ -223,7 +224,58 @@ func (r RV64IMAFD) RegisterInfo() *target.RegisterFile { return r.Register }
 func (r RV64IMAFD) FrameInfo() *target.FrameInfo { return r.Frame }
 
 func (r RV64IMAFD) Legalize(fn *asm.Function) {
+	for _, block := range fn.Blocks {
+		for _, instr := range block.Instr {
+			switch instr.Opcode {
+			case "store":
+				if len(instr.Operands) != 2 {
+					panic("store instruction must have exactly 2 operands")
+				}
 
+				dst := instr.Operands[1]
+				switch addr := dst.(type) {
+				case *asm.MemAddr:
+				case *asm.Symbol:
+					switch r.Alignment(addr.Ty) {
+					case 1:
+						instr.Opcode = "sb"
+					case 2:
+						instr.Opcode = "sh"
+					case 4:
+						instr.Opcode = "sw"
+					case 8:
+						instr.Opcode = "sd"
+					default:
+						panic("unsupported alignment for store symbol")
+					}
+				}
+			case "load":
+				if len(instr.Operands) != 2 {
+					panic("load instruction must have exactly 2 operands")
+				}
+
+				src := instr.Operands[1]
+				switch addr := src.(type) {
+				case *asm.MemAddr:
+				case *asm.Symbol:
+					switch r.Alignment(addr.Ty) {
+					case 1:
+						instr.Opcode = "lb"
+					case 2:
+						instr.Opcode = "lh"
+					case 4:
+						instr.Opcode = "lw"
+					case 8:
+						instr.Opcode = "ld"
+					default:
+						panic("unsupported alignment for load symbol")
+					}
+				}
+			default:
+				continue
+			}
+		}
+	}
 }
 
 func (r RV64IMAFD) Alignment(ty asm.Type) int {
@@ -333,8 +385,24 @@ func (r RV64IMAFD) Emit(module *asm.Module) string {
 	return buf.String()
 }
 
+func resolve(c asm.Constant) string {
+	switch c.Type.(type) {
+	case *asm.StringType:
+		return c.Value.(string)
+	default:
+		panic("unknown type for constant")
+	}
+}
+
 func (r RV64IMAFD) formatFunc(fn *asm.Function) string {
 	var buf strings.Builder
+
+	buf.WriteString("\t.section .rodata\n")
+	for _, c := range fn.Constant {
+		value := resolve(c)
+		buf.WriteString(fmt.Sprintf("%s: %s \"%s\"\n", c.Name, r.toType(c.Type), strings.Trim(strconv.Quote(value), `"`)))
+	}
+	buf.WriteString("\n")
 
 	buf.WriteString("\t.section .text\n")
 	buf.WriteString("\t.align 2\n")
@@ -417,4 +485,13 @@ func alignTo(x, align int) int {
 		return x
 	}
 	return ((x / align) + 1) * align
+}
+
+func (r RV64IMAFD) toType(ty asm.Type) string {
+	switch ty.(type) {
+	case *asm.StringType:
+		return ".string"
+	default:
+		panic("unsupported type conversion")
+	}
 }

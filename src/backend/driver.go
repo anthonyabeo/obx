@@ -28,6 +28,7 @@ func Compile(module *mir.Module, mach target.Machine) string {
 	for _, fn := range module.Funcs {
 		iSel(fn, mach)
 		asmModule.Funcs = append(asmModule.Funcs, fn.Asm)
+		mach.Legalize(fn.Asm)
 
 		for _, local := range fn.Locals {
 			if fn.Asm.Locals == nil {
@@ -45,6 +46,14 @@ func Compile(module *mir.Module, mach target.Machine) string {
 				Name: value.Name(),
 				Kind: asm.ParamSK,
 				Ty:   mir.ToAsmType(value.Type()),
+			})
+		}
+
+		for _, c := range fn.Constants {
+			fn.Asm.Constant = append(fn.Asm.Constant, asm.Constant{
+				Name:  c.Name(),
+				Value: c.Value(),
+				Type:  mir.ToAsmType(c.Type()),
 			})
 		}
 	}
@@ -110,7 +119,6 @@ func iSel(fn *mir.Function, target target.Machine) {
 		}
 	}
 
-	target.Legalize(asmFn)
 	fn.Asm = asmFn
 }
 

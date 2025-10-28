@@ -10,6 +10,16 @@ rule Arg {
     }
 }
 
+rule Arg_sym {
+    in symbol:$sym, imm:$idx;
+    pattern argument($sym, $idx);
+    temps GPR:virt:$t0;
+    emit {
+        instr { opcode: "load", operands: [GPR:virt:$t0, symbol:$sym], def: GPR:virt:$t0 };
+        instr { opcode: "mv", operands: [arg{imm:$idx}, GPR:virt:$t0], uses: [GPR:virt:$t0] };
+    }
+}
+
 rule Call_direct {
     out GPR:virt:$rd;
     in  label:$target;
@@ -22,7 +32,6 @@ rule Call_direct {
 }
 
 rule Call_direct {
-    out GPR:virt:$rd;
     in  label:$target;
     pattern call($target);
     cost 2;
@@ -31,7 +40,17 @@ rule Call_direct {
     }
 }
 
+rule Mov_r_str_const {
+    in str:$name, GPR:virt:$rs;
+    pattern mov($rs, $name);
+    cost 1;
+    emit {
+        instr { opcode: "la", operands: [GPR:virt:$rs, str:$name], def: GPR:virt:$rs };
+    }
+}
+
 rule Mov_sym_r {
+    commutative;
     in symbol:$sym, GPR:virt:$rs;
     pattern mov($sym, $rs);
     emit {
@@ -216,7 +235,7 @@ rule ICMP_lt {
     commutative;
     out GPR:virt:$rd;
     in  GPR:virt:$rs1, GPR:virt:$rs2;
-    pattern lt($rs1, rs2);
+    pattern lt($rs1, $rs2);
     cost 1;
     emit { instr { opcode: "slt",  operands: [GPR:virt:$rd, GPR:virt:$rs1, GPR:virt:$rs2], def: GPR:virt:$rd, uses: [GPR:virt:$rs1, GPR:virt:$rs2]  }; }
 }
@@ -279,12 +298,13 @@ rule Not {
     pattern not($rs);
     cost 1;
     emit {
-        instr {
-            opcode: "xori",
-            operands: [GPR:virt:$rd, GPR:virt:$rs, imm:-1],
-            def: GPR:virt:$rd,
-            uses: [GPR:virt:$rs]
-        };
+        //instr {
+        //    opcode: "xori",
+        //    operands: [GPR:virt:$rd, GPR:virt:$rs, imm:-1],
+        //    def: GPR:virt:$rd,
+        //    uses: [GPR:virt:$rs]
+        //};
+        instr { opcode: "seqz", operands: [GPR:virt:$rd, GPR:virt:$rs], def: GPR:virt:$rd, uses: [GPR:virt:$rs] };
     }
 }
 
@@ -414,7 +434,7 @@ rule LoadGlobal {
   cost  2;
   pattern load($sym);
   emit {
-      instr {   opcode: "ld", operands: [GPR:virt:$rd, symbol:$sym], def: GPR:virt:$rd };
+      instr {   opcode: "load", operands: [GPR:virt:$rd, symbol:$sym], def: GPR:virt:$rd };
   }
 }
 
@@ -424,7 +444,7 @@ rule LDri {
 	pattern load(add($rs1, $offs));
 	cost 1;
 	emit {
-		instr { opcode: "ld", operands: [GPR:virt:$rd, mem:{base=GPR:virt:$rs1, offset=imm:$offs}], def: GPR:virt:$rd, uses: [GPR:virt:$rs1] };
+		instr { opcode: "load", operands: [GPR:virt:$rd, mem:{base=GPR:virt:$rs1, offset=imm:$offs}], def: GPR:virt:$rd, uses: [GPR:virt:$rs1] };
   	}
   	cond SImmFits12($offs);
 }
@@ -439,7 +459,7 @@ rule LD_Large {
 	instr { opcode: "lui",  operands: [GPR:virt:$t0, reloc:hi($offs)], def: GPR:virt:$t0 };
     instr { opcode: "addi", operands: [GPR:virt:$t0, GPR:virt:$t0, reloc:lo($offs)], def: GPR:virt:$t0, uses: [GPR:virt:$t0] };
     instr { opcode: "add",  operands: [GPR:virt:$t1, GPR:virt:$rs1, GPR:virt:$t0], def: GPR:virt:$t1, uses: [GPR:virt:$rs1, GPR:virt:$t0] };
-    instr { opcode: "ld",   operands: [GPR:virt:$rd, mem:{base=GPR:virt:$t1, offset=imm:0}], def: GPR:virt:$rd, uses: [GPR:virt:$t1] };
+    instr { opcode: "load",   operands: [GPR:virt:$rd, mem:{base=GPR:virt:$t1, offset=imm:0}], def: GPR:virt:$rd, uses: [GPR:virt:$t1] };
   }
   cond !SImmFits12($offs);
 }
@@ -454,7 +474,7 @@ rule STri {
   pattern store($rs1, add($rs2, $offs));
   cost 1;
   emit {
-    instr { opcode: "sd", operands: [GPR:virt:$rs1, mem:{base=GPR:virt:$rs2, offset=imm:$offs}], uses: [GPR:virt:$rs1, GPR:virt:$rs2] };
+    instr { opcode: "store", operands: [GPR:virt:$rs1, mem:{base=GPR:virt:$rs2, offset=imm:$offs}], uses: [GPR:virt:$rs1, GPR:virt:$rs2] };
   }
   cond SImmFits12($offs);
 }
@@ -466,7 +486,7 @@ rule STImmGlobalMem {
     cost 3;
     emit {
         instr { opcode: "li", operands: [GPR:virt:$t0, imm:$c], def: GPR:virt:$t0 };
-        instr { opcode: "sd", operands: [GPR:virt:$t0, symbol:$sym], uses: [GPR:virt:$t0] };
+        instr { opcode: "store", operands: [GPR:virt:$t0, symbol:$sym], uses: [GPR:virt:$t0] };
     }
 }
 
@@ -475,6 +495,6 @@ rule STRegGlobalMem {
     pattern store($rs1, $sym);
     cost 3;
     emit {
-        instr { opcode: "sd", operands: [GPR:virt:$rs1, symbol:$sym], uses: [GPR:virt:$rs1] };
+        instr { opcode: "store", operands: [GPR:virt:$rs1, symbol:$sym], uses: [GPR:virt:$rs1] };
     }
 }
