@@ -138,7 +138,7 @@ func TestCompile(t *testing.T) {
 				}
 				defer asmFile.Close()
 
-				asm := Compile(module, riscv.NewRV64IMAFDTarget())
+				asm := Compile(module, riscv.NewRV64IMAFDTarget(), root+"/src/backend/target/desc")
 				if _, err := asmFile.WriteString(asm + "\n\n"); err != nil {
 					t.Errorf("failed to write to assembly file: %v", err)
 				}

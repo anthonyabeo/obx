@@ -13,7 +13,7 @@ import (
 	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
-func Compile(module *mir.Module, mach target.Machine) string {
+func Compile(module *mir.Module, mach target.Machine, targetDescPath string) string {
 	asmModule := &asm.Module{Name: module.Name, Globals: make(map[string]*asm.Symbol)}
 
 	for name, global := range module.Globals {
@@ -26,7 +26,7 @@ func Compile(module *mir.Module, mach target.Machine) string {
 
 	// Instruction Selection
 	for _, fn := range module.Funcs {
-		iSel(fn, mach)
+		iSel(fn, mach, targetDescPath)
 		asmModule.Funcs = append(asmModule.Funcs, fn.Asm)
 		mach.Legalize(fn.Asm)
 
@@ -92,8 +92,8 @@ func Compile(module *mir.Module, mach target.Machine) string {
 	return emit(module, mach)
 }
 
-func iSel(fn *mir.Function, target target.Machine) {
-	tdFile := fmt.Sprintf("./target/desc/%s.td", target.Name())
+func iSel(fn *mir.Function, target target.Machine, targetDescPath string) {
+	tdFile := fmt.Sprintf(targetDescPath+"/%s.td", target.Name())
 	tdContent, err := os.ReadFile(tdFile)
 	if err != nil {
 		panic(err)

@@ -2,18 +2,19 @@ package cli
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/backend"
-	"github.com/anthonyabeo/obx/src/backend/target/riscv"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
+
+	"github.com/anthonyabeo/obx/adt"
+	"github.com/anthonyabeo/obx/modgraph"
+	"github.com/anthonyabeo/obx/src/backend"
+	"github.com/anthonyabeo/obx/src/backend/target/riscv"
 	"github.com/anthonyabeo/obx/src/ir/hir"
 	"github.com/anthonyabeo/obx/src/ir/mir"
 	"github.com/anthonyabeo/obx/src/opt"
-	"github.com/spf13/cobra"
-
-	"github.com/anthonyabeo/obx/modgraph"
 	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -87,10 +88,12 @@ var buildCmd = &cobra.Command{
 		})
 
 		ctx := &report.Context{
-			Source:   srcMgr,
-			Reporter: reporter,
-			TabWidth: tabWidth,
-			Env:      ast.NewEnv(),
+			Source:    srcMgr,
+			Reporter:  reporter,
+			TabWidth:  tabWidth,
+			Env:       ast.NewEnv(),
+			Names:     adt.NewStack[string](),
+			ExprLists: adt.NewStack[[]ast.Expression](),
 		}
 
 		for _, header := range sorted {
@@ -124,6 +127,12 @@ var buildCmd = &cobra.Command{
 		mirGen := mir.NewGenerator(ctx)
 		mirProgram := mirGen.Generate(hirProgram)
 
+		for _, module := range mirProgram.Modules {
+			for _, function := range module.Funcs {
+				opt.BuildCFG(function)
+			}
+		}
+
 		// Optimization
 		config := map[string]any{
 			"verbose":       verbose,
@@ -149,7 +158,8 @@ var buildCmd = &cobra.Command{
 			}
 			defer asmFile.Close()
 
-			ss := backend.Compile(module, riscv.NewRV64IMAFDTarget())
+			targetDesc := root + "/src/backend/target/desc"
+			ss := backend.Compile(module, riscv.NewRV64IMAFDTarget(), targetDesc)
 			if asm {
 				fmt.Println(ss)
 			}

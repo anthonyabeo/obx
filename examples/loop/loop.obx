@@ -1,0 +1,11 @@
+MODULE LoopTest;
+    VAR x, y: INTEGER;
+
+    BEGIN
+        x := 0;
+        y := 20;
+        WHILE x < y DO
+            x := x + 1
+        END
+        printf("Final x: %d\n", x)
+END LoopTest.
