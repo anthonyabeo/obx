@@ -189,61 +189,61 @@ func (b *BinaryInst) CanFold() bool {
 func (b *BinaryInst) Fold() Value {
 	switch b.Op {
 	case ADD:
-		leftConst, okLeft := b.Left.(*IntegerConst)
-		rightConst, okRight := b.Right.(*IntegerConst)
+		leftConst, okLeft := b.Left.(*IntegerLit)
+		rightConst, okRight := b.Right.(*IntegerLit)
 		if okLeft && okRight {
-			sum := leftConst.Value + rightConst.Value
-			return &IntegerConst{
-				Value:  sum,
-				Signed: leftConst.Signed,
-				Bits:   leftConst.Bits,
-				Typ:    leftConst.Typ,
+			sum := leftConst.LitValue + rightConst.LitValue
+			return &IntegerLit{
+				LitValue: sum,
+				Signed:   leftConst.Signed,
+				Bits:     leftConst.Bits,
+				Typ:      leftConst.Typ,
 			}
 		}
 
-		sl, okLeft := b.Left.(*StrConst)
-		sr, okRight := b.Right.(*StrConst)
+		sl, okLeft := b.Left.(*StrLit)
+		sr, okRight := b.Right.(*StrLit)
 		if okLeft && okRight {
-			concat := sl.Value + sr.Value
-			return &StrConst{
-				Value: concat,
-				Typ:   sr.Typ,
+			concat := sl.LitValue + sr.LitValue
+			return &StrLit{
+				LitValue: concat,
+				Typ:      sr.Typ,
 			}
 		}
 	case SUB:
-		leftConst, okLeft := b.Left.(*IntegerConst)
-		rightConst, okRight := b.Right.(*IntegerConst)
+		leftConst, okLeft := b.Left.(*IntegerLit)
+		rightConst, okRight := b.Right.(*IntegerLit)
 		if okLeft && okRight {
-			diff := leftConst.Value - rightConst.Value
-			return &IntegerConst{
-				Value:  diff,
-				Signed: leftConst.Signed,
-				Bits:   leftConst.Bits,
-				Typ:    leftConst.Typ,
+			diff := leftConst.LitValue - rightConst.LitValue
+			return &IntegerLit{
+				LitValue: diff,
+				Signed:   leftConst.Signed,
+				Bits:     leftConst.Bits,
+				Typ:      leftConst.Typ,
 			}
 		}
 	case MUL:
-		leftConst, okLeft := b.Left.(*IntegerConst)
-		rightConst, okRight := b.Right.(*IntegerConst)
+		leftConst, okLeft := b.Left.(*IntegerLit)
+		rightConst, okRight := b.Right.(*IntegerLit)
 		if okLeft && okRight {
-			product := leftConst.Value * rightConst.Value
-			return &IntegerConst{
-				Value:  product,
-				Signed: leftConst.Signed,
-				Bits:   leftConst.Bits,
-				Typ:    leftConst.Typ,
+			product := leftConst.LitValue * rightConst.LitValue
+			return &IntegerLit{
+				LitValue: product,
+				Signed:   leftConst.Signed,
+				Bits:     leftConst.Bits,
+				Typ:      leftConst.Typ,
 			}
 		}
 	case DIV:
-		leftConst, okLeft := b.Left.(*IntegerConst)
-		rightConst, okRight := b.Right.(*IntegerConst)
-		if okLeft && okRight && rightConst.Value != 0 {
-			div := leftConst.Value / rightConst.Value
-			return &IntegerConst{
-				Value:  div,
-				Signed: leftConst.Signed,
-				Bits:   leftConst.Bits,
-				Typ:    leftConst.Typ,
+		leftConst, okLeft := b.Left.(*IntegerLit)
+		rightConst, okRight := b.Right.(*IntegerLit)
+		if okLeft && okRight && rightConst.LitValue != 0 {
+			div := leftConst.LitValue / rightConst.LitValue
+			return &IntegerLit{
+				LitValue: div,
+				Signed:   leftConst.Signed,
+				Bits:     leftConst.Bits,
+				Typ:      leftConst.Typ,
 			}
 		}
 	default:

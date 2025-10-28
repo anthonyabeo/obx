@@ -13,9 +13,15 @@ const (
 	ParamSK SymbolKind = iota
 	LocalSK
 	GlobalSK
+	ConstSK
 )
 
 type (
+	String struct {
+		Name  string
+		Value string
+	}
+
 	Argument struct {
 		Index int
 	}
@@ -54,6 +60,9 @@ type (
 		Symbol string
 	}
 )
+
+func (s String) String() string { return s.Name }
+func (s String) Type() Type     { panic("implement me") }
 
 func (a Argument) String() string { return fmt.Sprintf("arg(#%d)", a.Index) }
 func (a Argument) Type() Type     { panic("implement me") }

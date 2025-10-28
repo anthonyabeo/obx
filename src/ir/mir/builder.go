@@ -3,9 +3,6 @@ package mir
 import (
 	"fmt"
 	"strconv"
-
-	"github.com/anthonyabeo/obx/src/ir/hir"
-	"github.com/anthonyabeo/obx/src/types"
 )
 
 type Builder struct {
@@ -75,23 +72,6 @@ func (b *Builder) CreateUnary(op InstrOp, operand Value, ty Type) Value {
 		Op:      op,
 		Operand: operand,
 	})
-
-	return t
-}
-
-func (b *Builder) CreateCallInst(callee *hir.FunctionRef, args []Value) Value {
-	var t Value
-	if callee.SemaType != types.VoidType {
-		t = b.NewTemp(callee.SemaType)
-	}
-
-	b.Emit(&CallInst{
-		Target: t,
-		Callee: callee.Mangled,
-		Args:   args,
-	})
-
-	b.Func.IsLeaf = false
 
 	return t
 }

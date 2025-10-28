@@ -1404,6 +1404,34 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 
 		call.SemaType = types.Int32Type
+	case "printf":
+		if len(call.ActualParams) == 0 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects at least one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		formatArg := call.ActualParams[0]
+		formatArg.Accept(t)
+		formatType := formatArg.Type()
+		if !types.IsCharArrayOrString(formatType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects a string literal as the first argument, got %s",
+					pre.Name(), formatType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, formatArg.Pos(), formatArg.End()),
+			})
+			return
+		}
+
+		for _, arg := range call.ActualParams[1:] {
+			arg.Accept(t)
+		}
+
+		call.SemaType = types.Int32Type
 	default:
 		t.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,
@@ -2046,6 +2074,35 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			})
 			return
 		}
+	case "printf":
+		if len(call.ActualParams) == 0 {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message:  fmt.Sprintf("predeclared procedure '%s' expects at least one argument", pre.Name()),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
+			})
+			return
+		}
+
+		formatArg := call.ActualParams[0]
+		formatArg.Accept(t)
+		formatType := formatArg.Type()
+		if !types.IsCharArrayOrString(formatType) {
+			t.ctx.Reporter.Report(report.Diagnostic{
+				Severity: report.Error,
+				Message: fmt.Sprintf("predeclared procedure '%s' expects a string literal as the first argument, got %s",
+					pre.Name(), formatType),
+				Range: t.ctx.Source.Span(t.ctx.FileName, formatArg.Pos(), formatArg.End()),
+			})
+			return
+		}
+
+		for _, arg := range call.ActualParams[1:] {
+			arg.Accept(t)
+		}
+
+		call.SemaType = types.Int32Type
+
 	default:
 		t.ctx.Reporter.Report(report.Diagnostic{
 			Severity: report.Error,

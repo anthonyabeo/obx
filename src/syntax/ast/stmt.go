@@ -45,6 +45,7 @@ type (
 	ProcedureCall struct {
 		Callee       *Designator
 		ActualParams []Expression
+		SemaType     types.Type
 		StartOffset  int
 		EndOffset    int
 	}

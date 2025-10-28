@@ -36,7 +36,7 @@ type Function struct {
 	SSAInfo *SSAInfo
 	Dom     *DominatorTree
 
-	Constants map[string]*Const
+	Constants map[string]Constant
 	Env       *SymbolTable // symbol table for this function
 
 	Asm *asm.Function
@@ -44,14 +44,15 @@ type Function struct {
 
 func NewFunction(name string, export bool, ret Type, env *SymbolTable) *Function {
 	return &Function{
-		Name:    name,
-		Result:  ret,
-		Env:     env,
-		IsLeaf:  true,
-		Blocks:  make(map[int]*Block),
-		Params:  make([]Value, 0),
-		Dom:     NewDominatorTree(),
-		SSAInfo: NewSSAInfo(),
+		Name:      name,
+		Result:    ret,
+		Env:       env,
+		IsLeaf:    true,
+		Blocks:    make(map[int]*Block),
+		Params:    make([]Value, 0),
+		Constants: make(map[string]Constant),
+		Dom:       NewDominatorTree(),
+		SSAInfo:   NewSSAInfo(),
 	}
 }
 

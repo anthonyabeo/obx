@@ -29,7 +29,19 @@ type (
 	}
 
 	VoidType string
+
+	StringType struct {
+		Length int // Length of the string, -1 for dynamic length
+	}
 )
+
+func (s StringType) String() string { return fmt.Sprintf("string(%d)", s.Length) }
+func (s StringType) Width() int {
+	if s.Length == -1 {
+		return 16 // Assuming dynamic strings are represented by a pointer and length (8 bytes each)
+	}
+	return s.Length
+}
 
 func (a ArrayType) IsOpen() bool { return a.Len == -1 }
 func (a ArrayType) String() string {

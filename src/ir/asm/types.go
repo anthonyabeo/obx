@@ -70,5 +70,11 @@ type ArrayType struct {
 func (a ArrayType) String() string {
 	return fmt.Sprintf("[%d x %s]", a.Width, a.Element.String())
 }
-
 func (a ArrayType) Size() int { return a.Width }
+
+type StringType struct {
+	Width int
+}
+
+func (s StringType) String() string { return fmt.Sprintf("string(%d)", s.Width) }
+func (s StringType) Size() int      { return s.Width }

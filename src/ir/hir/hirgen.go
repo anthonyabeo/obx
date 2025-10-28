@@ -262,8 +262,9 @@ func (g Generator) VisitProcedureCall(call *ast.ProcedureCall) any {
 	callee := call.Callee.Accept(g).(*FunctionRef)
 
 	return &FuncCall{
-		Func: callee,
-		Args: g.visitExprList(call.ActualParams),
+		Func:    callee,
+		Args:    g.visitExprList(call.ActualParams),
+		RetType: call.SemaType,
 	}
 }
 

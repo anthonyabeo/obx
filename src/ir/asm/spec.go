@@ -15,9 +15,16 @@ type Module struct {
 	Globals map[string]*Symbol
 }
 
+type Constant struct {
+	Name  string
+	Value any
+	Type  Type
+}
+
 type Function struct {
 	Name     string
 	Params   []*Symbol
+	Constant []Constant
 	Result   Type
 	Exported bool
 	IsLeaf   bool

@@ -120,12 +120,12 @@ func (g *Generator) genFunction(h *hir.Function, env *SymbolTable) *Function {
 			fn.Locals = append(fn.Locals, lcl)
 			fn.Env.Define(lcl.ID, lcl)
 		case *hir.Constant:
-			c := &Const{
-				ID:     d.Name,
-				Value:  g.genValue(d.Value),
-				Typ:    g.genType(d.Type),
-				Offset: d.Offset,
-				Size:   d.Size,
+			c := &NamedConst{
+				ID:         d.Name,
+				ConstValue: g.genValue(d.Value),
+				Typ:        g.genType(d.Type),
+				Offset:     d.Offset,
+				Size:       d.Size,
 			}
 			fn.Constants[d.Mangled] = c
 			fn.Env.Define(c.ID, c)
@@ -209,7 +209,25 @@ func (g *Generator) genFuncCall(s *hir.FuncCall) Value {
 		args = append(args, v)
 	}
 
-	return g.build.CreateCallInst(s.Func, args)
+	var t Value
+	if s.RetType != nil {
+		t = g.build.NewTemp(s.RetType)
+	}
+
+	name := s.Func.Mangled
+	if name == "" {
+		name = s.Func.Name
+	}
+
+	g.build.Emit(&CallInst{
+		Target: t,
+		Callee: name,
+		Args:   args,
+	})
+
+	g.build.Func.IsLeaf = false
+
+	return t
 }
 
 func (g *Generator) genIfStmt(s *hir.IfStmt) {
@@ -332,7 +350,7 @@ func (g *Generator) genConst(c *hir.Literal) Value {
 	switch c.Kind {
 	case token.BYTE_LIT:
 		value, _ := strconv.ParseUint(c.Value, 10, 8)
-		v = &IntegerConst{Value: value, Bits: 8, Signed: false, Typ: g.genType(c.SemaType)}
+		v = &IntegerLit{LitValue: value, Bits: 8, Signed: false, Typ: g.genType(c.SemaType)}
 	case token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
 		value, _ := strconv.ParseUint(c.Value, 10, 64)
 
@@ -347,7 +365,7 @@ func (g *Generator) genConst(c *hir.Literal) Value {
 			bits = 64
 		}
 
-		v = &IntegerConst{Value: value, Bits: bits, Signed: true, Typ: g.genType(c.SemaType)}
+		v = &IntegerLit{LitValue: value, Bits: bits, Signed: true, Typ: g.genType(c.SemaType)}
 	case token.REAL_LIT, token.LONGREAL_LIT:
 		value, _ := strconv.ParseFloat(c.Value, 64)
 
@@ -358,11 +376,15 @@ func (g *Generator) genConst(c *hir.Literal) Value {
 			bits = 64
 		}
 
-		v = &FloatConst{Value: value, Bits: bits, Typ: g.genType(c.SemaType)}
+		v = &FloatLit{LitValue: value, Bits: bits, Typ: g.genType(c.SemaType)}
 	case token.CHAR_LIT, token.WCHAR_LIT:
-		v = &CharConst{Value: []rune(c.Value), Typ: g.genType(c.SemaType) /* additional info? */}
+		v = &CharLit{LitValue: []rune(c.Value), Typ: g.genType(c.SemaType) /* additional info? */}
 	case token.HEX_STR_LIT, token.STR_LIT:
-		v = &StrConst{Value: c.Value, Typ: g.genType(c.SemaType)}
+		name := "str_const_" + strconv.Itoa(len(g.build.Func.Constants))
+		str := &StrLit{LitName: name, LitValue: c.Value, Typ: g.genType(c.SemaType)}
+
+		g.build.Func.Constants[name] = str
+		v = str
 	case token.TRUE:
 		v = True
 	case token.FALSE:
@@ -394,11 +416,11 @@ func (g *Generator) genIndexExpr(e *hir.IndexExpr) Value {
 	// acc = 0
 	var acc Value
 	acc = g.build.NewTemp(Int64Type)
-	g.build.CreateAssign(acc, &IntegerConst{Value: 0})
+	g.build.CreateAssign(acc, &IntegerLit{LitValue: 0})
 
 	for k := 0; k < len(indices); k++ {
 		// term = indices[k] * strides[k]
-		tMul := g.build.CreateBinary(MUL, indices[k], &IntegerConst{Value: uint64(strides[k])}, Int64Type)
+		tMul := g.build.CreateBinary(MUL, indices[k], &IntegerLit{LitValue: uint64(strides[k])}, Int64Type)
 
 		// acc = acc + term
 		acc = g.build.CreateBinary(ADD, acc, tMul, Int64Type)
@@ -428,7 +450,7 @@ func (g *Generator) genValue(e hir.Expr) Value {
 
 		panic(fmt.Sprintf("undefined variable: '%s'", e.Name))
 	case *hir.ConstantRef:
-		return g.build.Func.Constants[e.Mangled].Value
+		return g.build.Func.Constants[e.Mangled]
 	case *hir.Param:
 		if v, found := g.build.Func.Env.Lookup(e.Name); found {
 			return v

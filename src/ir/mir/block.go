@@ -47,7 +47,7 @@ func (r *SSAInfo) NewValue(v Value) Value {
 			Offset:  value.Offset,
 			Size:    value.Size,
 		}
-	case *IntegerConst, *FloatConst, *CharConst, *StrConst, *Const:
+	case *IntegerLit, *FloatLit, *CharLit, *StrLit, *NamedConst:
 		return value
 	case *AddrOf:
 		panic("not implemented: Addr in SSA")

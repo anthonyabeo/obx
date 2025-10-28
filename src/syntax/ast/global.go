@@ -63,6 +63,8 @@ const (
 	Entier_
 	Lsl_
 	Ror_
+
+	Printf_ // C standard library function
 )
 
 var PredeclaredProcedures = [...]struct {
@@ -123,6 +125,8 @@ var PredeclaredFunctions = [...]struct {
 	Entier_: {[]string{"entier", "ENTIER"}},
 	Lsl_:    {[]string{"lsl", "LSL"}},
 	Ror_:    {[]string{"ror", "ROR"}},
+
+	Printf_: {[]string{"printf", "PRINTF"}},
 }
 
 func defPredeclaredFunctions() {

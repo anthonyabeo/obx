@@ -75,6 +75,7 @@ end Main
 			  WHILE x < y DO
 			   x := x + 1
 			  END
+              printf("Final x: %d\n", x)
 			 END LoopTest.
 			`,
 			filename: "loop_test.obx",

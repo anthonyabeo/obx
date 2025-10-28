@@ -21,13 +21,13 @@ func TestConstantFold(t *testing.T) {
 	connect(j, exit)
 
 	a0 := &mir.Temp{ID: "a.0"}
-	c := &mir.IntegerConst{Value: 1}
+	c := &mir.IntegerLit{LitValue: 1}
 	x1 := &mir.Temp{ID: "x.1"}
 	x2 := &mir.Temp{ID: "x.2"}
 	y0 := &mir.Temp{ID: "y.0"}
 
 	entry.Instrs = []mir.Instr{
-		&mir.BinaryInst{Op: mir.ADD, Target: a0, Left: &mir.IntegerConst{Value: 2}, Right: &mir.IntegerConst{Value: 3}},
+		&mir.BinaryInst{Op: mir.ADD, Target: a0, Left: &mir.IntegerLit{LitValue: 2}, Right: &mir.IntegerLit{LitValue: 3}},
 		&mir.CondBrInst{Cond: c, TrueLabel: tt.Label, FalseLabel: f.Label},
 	}
 	tt.Instrs = []mir.Instr{
@@ -35,7 +35,7 @@ func TestConstantFold(t *testing.T) {
 		&mir.JumpInst{Target: j.Label},
 	}
 	f.Instrs = []mir.Instr{
-		&mir.BinaryInst{Op: mir.ADD, Target: x2, Left: a0, Right: &mir.IntegerConst{Value: 2}},
+		&mir.BinaryInst{Op: mir.ADD, Target: x2, Left: a0, Right: &mir.IntegerLit{LitValue: 2}},
 		&mir.JumpInst{Target: j.Label},
 	}
 	j.Instrs = []mir.Instr{

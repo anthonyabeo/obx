@@ -35,7 +35,7 @@ func FormatFunction(fn *mir.Function) string {
 
 	// Print constants
 	for _, c := range fn.Constants {
-		sb.WriteString(fmt.Sprintf("  const %s: %s = %v\n", c.ID, c.Typ, c.Value))
+		sb.WriteString(fmt.Sprintf("  const %s: %s = %v\n", c.Name(), c.Type(), c.Value()))
 	}
 
 	// Print local variables

@@ -14,11 +14,12 @@ type Value interface {
 type Constant interface {
 	Value
 	Const()
+	Value() any
 }
 
 var (
-	True  = &IntegerConst{Value: 1, Signed: true, Bits: 1, Typ: Int1Type}
-	False = &IntegerConst{Value: 0, Signed: true, Bits: 1, Typ: Int1Type}
+	True  = &IntegerLit{LitValue: 1, Signed: true, Bits: 1, Typ: Int1Type}
+	False = &IntegerLit{LitValue: 0, Signed: true, Bits: 1, Typ: Int1Type}
 )
 
 type (
@@ -46,35 +47,36 @@ type (
 		Size   int
 	}
 
-	Const struct {
-		ID     string
-		Value  Value
-		Typ    Type
-		Offset int
-		Size   int
+	NamedConst struct {
+		ID         string
+		ConstValue Value
+		Typ        Type
+		Offset     int
+		Size       int
 	}
 
-	IntegerConst struct {
-		Value  uint64
-		Signed bool
-		Bits   uint
-		Typ    Type
+	IntegerLit struct {
+		LitValue uint64
+		Signed   bool
+		Bits     uint
+		Typ      Type
 	}
 
-	FloatConst struct {
-		Value float64
-		Bits  uint
-		Typ   Type
+	FloatLit struct {
+		LitValue float64
+		Bits     uint
+		Typ      Type
 	}
 
-	CharConst struct {
-		Value []rune
-		Typ   Type
+	CharLit struct {
+		LitValue []rune
+		Typ      Type
 	}
 
-	StrConst struct {
-		Value string
-		Typ   Type
+	StrLit struct {
+		LitName  string
+		LitValue string
+		Typ      Type
 	}
 
 	Global struct {
@@ -117,34 +119,40 @@ func (o *Param) Name() string     { return o.ID }
 func (o *Param) BaseName() string { return o.BName }
 func (o *Param) String() string   { return o.ID }
 
-func (o Const) Type() Type       { return o.Typ }
-func (o Const) Name() string     { return o.ID }
-func (o Const) BaseName() string { return o.ID }
-func (o Const) String() string   { return o.ID }
+func (o NamedConst) Type() Type       { return o.Typ }
+func (o NamedConst) Name() string     { return o.ID }
+func (o NamedConst) BaseName() string { return o.ID }
+func (o NamedConst) String() string   { return o.ID }
+func (o NamedConst) Const()           {}
+func (o NamedConst) Value() any       { return o.ConstValue }
 
-func (o IntegerConst) Const()           {}
-func (o IntegerConst) Type() Type       { return o.Typ }
-func (o IntegerConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
-func (o IntegerConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }
-func (o IntegerConst) String() string   { return fmt.Sprintf("%d", o.Value) }
+func (o IntegerLit) Const()           {}
+func (o IntegerLit) Type() Type       { return o.Typ }
+func (o IntegerLit) Name() string     { return fmt.Sprintf("%v", o.LitValue) }
+func (o IntegerLit) BaseName() string { return fmt.Sprintf("%v", o.LitValue) }
+func (o IntegerLit) String() string   { return fmt.Sprintf("%d", o.LitValue) }
+func (o IntegerLit) Value() any       { return o.LitValue }
 
-func (o FloatConst) Const()           {}
-func (o FloatConst) Type() Type       { return o.Typ }
-func (o FloatConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
-func (o FloatConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }
-func (o FloatConst) String() string   { return fmt.Sprintf("%f", o.Value) }
+func (o FloatLit) Const()           {}
+func (o FloatLit) Type() Type       { return o.Typ }
+func (o FloatLit) Name() string     { return fmt.Sprintf("%v", o.LitValue) }
+func (o FloatLit) BaseName() string { return fmt.Sprintf("%v", o.LitValue) }
+func (o FloatLit) String() string   { return fmt.Sprintf("%f", o.LitValue) }
+func (o FloatLit) Value() any       { return o.LitValue }
 
-func (o CharConst) Const()           {}
-func (o CharConst) Type() Type       { return o.Typ }
-func (o CharConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
-func (o CharConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }
-func (o CharConst) String() string   { return fmt.Sprintf("%v", o.Value) }
+func (o CharLit) Const()           {}
+func (o CharLit) Type() Type       { return o.Typ }
+func (o CharLit) Name() string     { return fmt.Sprintf("%v", o.LitValue) }
+func (o CharLit) BaseName() string { return fmt.Sprintf("%v", o.LitValue) }
+func (o CharLit) String() string   { return fmt.Sprintf("%v", o.LitValue) }
+func (o CharLit) Value() any       { return o.LitValue }
 
-func (StrConst) Const()             {}
-func (o StrConst) Type() Type       { return o.Typ }
-func (o StrConst) Name() string     { return fmt.Sprintf("%v", o.Value) }
-func (o StrConst) BaseName() string { return fmt.Sprintf("%v", o.Value) }
-func (o StrConst) String() string   { return fmt.Sprintf("%s", o.Value) }
+func (StrLit) Const()             {}
+func (o StrLit) Type() Type       { return o.Typ }
+func (o StrLit) Name() string     { return o.LitName }
+func (o StrLit) BaseName() string { return o.LitName }
+func (o StrLit) String() string   { return o.LitName }
+func (o StrLit) Value() any       { return o.LitValue }
 
 func (o *Global) Type() Type          { return o.Typ }
 func (o *Global) Name() string        { return "@" + o.NameStr }

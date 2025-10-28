@@ -42,7 +42,8 @@ func (g *Generator) genType(ty types.Type) Type {
 			Len:  ty.Length,
 			Elem: g.genType(ty.Elem),
 		}
-	case types.StringType:
+	case *types.StringType:
+		return &StringType{Length: ty.Length}
 	case types.EnumType:
 	case *types.RecordType:
 	case *types.ProcedureType:
@@ -155,6 +156,10 @@ func ToAsmType(ty Type) asm.Type {
 		}
 	case *ArrayType:
 		return &asm.ArrayType{Element: ToAsmType(ty.Elem), Width: ty.Width()}
+	case *VoidType:
+		return nil
+	case *StringType:
+		return &asm.StringType{Width: ty.Width()}
 	default:
 		panic("unsupported mir type to asm type conversion")
 	}
