@@ -395,6 +395,43 @@ rule Arg {
 	}
 }
 
+func TestISelArgSym(t *testing.T) {
+	src := `
+rule Arg_sym {
+    in symbol:$sym, imm:$idx, str:$kind;
+    pattern argument($sym, $idx, $kind);
+    temps GPR:virt:$t0;
+    emit {
+        instr { opcode: "load", operands: [GPR:virt:$t0, symbol:$sym], def: GPR:virt:$t0 };
+        instr { opcode: "mv", operands: [arg{imm:$idx, str:$kind}, GPR:virt:$t0], uses: [GPR:virt:$t0] };
+    }
+}
+`
+	lexer := parser.NewLexer(src)
+	p := parser.NewParser(lexer)
+
+	machine := p.Parse()
+
+	pattern := &bud.Node{
+		Op: "argument",
+		Args: []*bud.Node{
+			{Val: &bud.Value{Kind: bud.KindSymbol, Symbol: bud.Symbol{Name: "x", Kind: bud.GlobalSK}}},
+			{Val: &bud.Value{Kind: bud.KindImm, Imm: 2}},
+			{Val: &bud.Value{Kind: bud.KindString, Str: bud.String{
+				Name:  "kind",
+				Value: "VAR",
+			}}},
+		},
+	}
+
+	sel := NewSelector(machine.Rules)
+	instr := sel.Select(pattern)
+
+	for _, s := range instr {
+		fmt.Println(s)
+	}
+}
+
 func TestISelStoreMem(t *testing.T) {
 	src := `rule STri {
   in GPR:virt:$rs1, GPR:virt:$rs2, imm:$offs;

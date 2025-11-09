@@ -55,10 +55,11 @@ type String struct {
 }
 
 type Symbol struct {
-	Name string
-	Kind SymbolKind
-	Size int
-	Ty   mir.Type
+	Name      string
+	Kind      SymbolKind
+	Size      int
+	Ty        mir.Type
+	ParamKind string // if symbol is param, VAR/IN/VALUE
 }
 
 type Reg struct {
@@ -152,7 +153,7 @@ func PatMIRInst(ins mir.Instr) *Node {
 			Op:   "ret",
 			Args: args,
 		}
-	case *mir.MovInst:
+	case *mir.MoveInst:
 		return &Node{
 			Op:   "mov",
 			Args: []*Node{patMIRValue(inst.Target), patMIRValue(inst.Value)},
@@ -175,6 +176,12 @@ func PatMIRInst(ins mir.Instr) *Node {
 				{Val: &Value{Kind: KindImm, Imm: inst.Index}},
 			},
 		}
+	case *mir.AddrOf:
+		return &Node{
+			Op:   "addr",
+			Dst:  patMIRValue(inst.Target),
+			Args: []*Node{patMIRValue(inst.Addr)},
+		}
 	default:
 		panic(fmt.Sprintf("patMIRInst: unexpected inst type: %T", inst))
 	}
@@ -187,18 +194,22 @@ func patMIRValue(value mir.Value) *Node {
 			Name: val.ID,
 			Kind: ConstSK,
 			Size: val.Size,
+			Ty:   val.Typ,
 		}}}
 	case *mir.Local:
 		return &Node{Val: &Value{Kind: KindSymbol, Symbol: Symbol{
 			Name: val.BName,
 			Kind: LocalSK,
 			Size: val.Size,
+			Ty:   val.Typ,
 		}}}
 	case *mir.Param:
 		return &Node{Val: &Value{Kind: KindSymbol, Symbol: Symbol{
-			Name: val.BName,
-			Kind: ParamSK,
-			Size: val.Size,
+			Name:      val.BName,
+			Kind:      ParamSK,
+			Size:      val.Size,
+			Ty:        val.Typ,
+			ParamKind: val.Kind,
 		}}}
 	case *mir.Temp:
 		switch val.Type().(type) {

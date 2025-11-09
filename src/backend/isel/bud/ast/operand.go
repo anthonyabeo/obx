@@ -107,7 +107,8 @@ func (l Symbol) Desc() string      { return l.Name }
 func (l Symbol) String() string    { return l.Name }
 
 type Arg struct {
-	Index *Imm
+	Index   *Imm
+	ArgKind *String
 }
 
 func (a Arg) Kind() OperandKind { return OKArg }

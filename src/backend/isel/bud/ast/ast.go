@@ -13,6 +13,7 @@ type Header struct {
 
 type Instr struct {
 	Opcode   string
+	Dst      Operand
 	Operands []Operand
 	Def      *Register
 	Uses     []*Register

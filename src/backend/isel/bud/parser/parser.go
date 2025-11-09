@@ -348,10 +348,11 @@ func (p *Parser) parseInstr() ast.Instr {
 	p.match(TokLBrace)
 
 	var (
-		opcode   string
-		operands []ast.Operand
-		def      *ast.Register
-		uses     []*ast.Register
+		opcode string
+		dst    ast.Operand
+		src    []ast.Operand
+		def    *ast.Register
+		uses   []*ast.Register
 	)
 
 	for {
@@ -368,12 +369,22 @@ func (p *Parser) parseInstr() ast.Instr {
 			p.next()
 		}
 
-		if p.cur.Kind == TokOperands {
+		if p.cur.Kind == TokDst {
+			p.next()
+			p.match(TokColon)
+			dst = p.parseOperand()
+		}
+
+		if p.cur.Kind == TokComma {
+			p.next()
+		}
+
+		if p.cur.Kind == TokSrc {
 			p.next()
 			p.match(TokColon)
 			p.match(TokLBrack)
 
-			operands = p.parseOperandList()
+			src = p.parseOperandList()
 			p.match(TokRBrack)
 		}
 
@@ -411,7 +422,8 @@ func (p *Parser) parseInstr() ast.Instr {
 
 	return ast.Instr{
 		Opcode:   opcode,
-		Operands: operands,
+		Dst:      dst,
+		Operands: src,
 		Def:      def,
 		Uses:     uses,
 	}

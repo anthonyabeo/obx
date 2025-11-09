@@ -31,7 +31,6 @@ const (
 	TokDollar
 	TokHeader
 	TokOpcode
-	TokOperands
 	TokPercent
 	TokReloc
 	TokMem
@@ -55,6 +54,8 @@ const (
 	TokArg
 	TokComm
 	TokStr
+	TokDst
+	TokSrc
 )
 
 type Token struct {
@@ -228,8 +229,10 @@ func (l *Lexer) NextToken() Token {
 			return Token{Kind: TokCond, Value: ident}
 		case "opcode":
 			return Token{Kind: TokOpcode, Value: ident}
-		case "operands":
-			return Token{Kind: TokOperands, Value: ident}
+		case "dst":
+			return Token{Kind: TokDst, Value: ident}
+		case "src":
+			return Token{Kind: TokSrc, Value: ident}
 		case "instr":
 			return Token{Kind: TokInstr, Value: ident}
 		case "phys":

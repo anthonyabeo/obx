@@ -2,12 +2,12 @@ package isel
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/ir/mir"
 	"strconv"
 
 	"github.com/anthonyabeo/obx/src/backend/isel/bud"
 	"github.com/anthonyabeo/obx/src/backend/isel/bud/ast"
 	"github.com/anthonyabeo/obx/src/ir/asm"
-	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
 var temp int
@@ -158,134 +158,151 @@ func match(pt *ast.Pattern, ir *bud.Node, env map[string]*bud.Value, classes map
 // values in env
 // //////////////////////////////////////////////////////////////////////////////
 
-func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
-	var (
-		asmOperands []asm.Operand
-		def         *asm.Register
-		uses        []*asm.Register
-	)
+func subst(operand ast.Operand, env map[string]*bud.Value) asm.Operand {
+	var asmOp asm.Operand
 
-	for _, operand := range inst.Operands {
-		switch op := operand.(type) {
-		case *ast.Register:
-			if op.Mode == "phys" {
-				asmOperands = append(asmOperands, &asm.Register{
-					Name: op.Name,
+	switch op := operand.(type) {
+	case *ast.Register:
+		if op.Mode == "phys" {
+			asmOp = &asm.Register{
+				Name: op.Name,
+				Mode: RegMode(op.Mode),
+				Kind: RegKind(op.Type),
+			}
+
+		} else {
+			if v, ok := env[op.Name]; ok && v.Kind == bud.KindGPR || v.Kind == bud.KindFPR {
+				asmOp = &asm.Register{
+					Name: v.Reg.Name,
 					Mode: RegMode(op.Mode),
 					Kind: RegKind(op.Type),
-				})
-
-			} else {
-				if v, ok := env[op.Name]; ok && v.Kind == bud.KindGPR || v.Kind == bud.KindFPR {
-					asmOperands = append(asmOperands, &asm.Register{
-						Name: v.Reg.Name,
-						Mode: RegMode(op.Mode),
-						Kind: RegKind(op.Type),
-					})
 				}
 			}
-		case *ast.Reloc:
-			if v, ok := env[op.Symbol]; ok {
-				var symbol string
+		}
+	case *ast.Reloc:
+		if v, ok := env[op.Symbol]; ok {
+			var symbol string
+			if v.Kind == bud.KindImm {
+				symbol = strconv.Itoa(v.Imm)
+			} else if v.Kind == bud.KindLabel {
+				symbol = v.Label
+			} else if v.Kind == bud.KindSymbol {
+				symbol = v.Symbol.Name
+			}
+
+			asmOp = &asm.RelocFunc{
+				Kind:   RelocFxn(op.Fxn),
+				Symbol: symbol,
+			}
+		}
+	case *ast.Imm:
+		if imm, ok := env[op.Name]; ok && imm.Kind == bud.KindImm {
+			op.Value = imm.Imm
+		}
+
+		asmOp = &asm.Imm{Value: op.Value}
+	case *ast.Label:
+		if op.Value != "" {
+			asmOp = &asm.Label{Name: op.Value}
+		} else {
+			if v, ok := env[op.Name]; ok {
+				asmOp = &asm.Label{Name: v.Label}
+			}
+		}
+	case *ast.Mem:
+		var offset asm.Operand
+
+		switch op.Offs.Kind() {
+		case ast.OKImm:
+			imm := op.Offs.(*ast.Imm)
+			if v, ok := env[imm.Name]; ok {
+				imm.Value = v.Imm
+			}
+
+			offset = &asm.Imm{Value: imm.Value}
+		case ast.OKReloc:
+			var symbol string
+			rel := op.Offs.(*ast.Reloc)
+			if v, ok := env[rel.Symbol]; ok {
+
 				if v.Kind == bud.KindImm {
 					symbol = strconv.Itoa(v.Imm)
 				} else if v.Kind == bud.KindLabel {
 					symbol = v.Label
-				} else if v.Kind == bud.KindSymbol {
-					symbol = v.Symbol.Name
-				}
-
-				asmOperands = append(asmOperands, &asm.RelocFunc{
-					Kind:   RelocFxn(op.Fxn),
-					Symbol: symbol,
-				})
-
-			}
-		case *ast.Imm:
-			if imm, ok := env[op.Name]; ok && imm.Kind == bud.KindImm {
-				op.Value = imm.Imm
-			}
-
-			asmOperands = append(asmOperands, &asm.Imm{
-				Value: op.Value,
-			})
-		case *ast.Label:
-			if op.Value != "" {
-				asmOperands = append(asmOperands, &asm.Label{Name: op.Value})
-			} else {
-				if v, ok := env[op.Name]; ok {
-					asmOperands = append(asmOperands, &asm.Label{Name: v.Label})
 				}
 			}
-		case *ast.Mem:
-			var offset asm.Operand
 
-			switch op.Offs.Kind() {
-			case ast.OKImm:
-				imm := op.Offs.(*ast.Imm)
-				if v, ok := env[imm.Name]; ok {
-					imm.Value = v.Imm
-				}
-
-				offset = &asm.Imm{Value: imm.Value}
-			case ast.OKReloc:
-				var symbol string
-				rel := op.Offs.(*ast.Reloc)
-				if v, ok := env[rel.Symbol]; ok {
-
-					if v.Kind == bud.KindImm {
-						symbol = strconv.Itoa(v.Imm)
-					} else if v.Kind == bud.KindLabel {
-						symbol = v.Label
-					}
-				}
-
-				offset = &asm.RelocFunc{
-					Kind:   RelocFxn(rel.Fxn),
-					Symbol: symbol,
-				}
-			default:
-				panic("unreachable")
-			}
-
-			if v, ok := env[op.Base.Name]; ok && (v.Kind == bud.KindGPR || v.Kind == bud.KindFPR) {
-				op.Base.Name = v.Reg.Name
-			}
-
-			asmOperands = append(asmOperands, &asm.MemAddr{
-				Base: &asm.Register{
-					Name: op.Base.Name,
-					Mode: RegMode(op.Base.Mode),
-					Kind: RegKind(op.Base.Type),
-				},
-				Offset: offset,
-			})
-		case *ast.Symbol:
-			if v, ok := env[op.Name]; ok && v.Kind == bud.KindSymbol {
-				asmOperands = append(asmOperands, &asm.Symbol{
-					Name: v.Symbol.Name,
-					Kind: SymbolKind(v.Symbol.Kind),
-					Size: v.Symbol.Size,
-					Ty:   mir.ToAsmType(v.Symbol.Ty),
-				})
-			}
-		case *ast.Arg:
-			if imm, ok := env[op.Index.Name]; ok && imm.Kind == bud.KindImm {
-				op.Index.Value = imm.Imm
-				asmOperands = append(asmOperands, &asm.Argument{
-					Index: imm.Imm,
-				})
-			}
-		case *ast.String:
-			if v, ok := env[op.Name]; ok && v.Kind == bud.KindString {
-				asmOperands = append(asmOperands, &asm.String{
-					Name:  v.Str.Name,
-					Value: v.Str.Value,
-				})
+			offset = &asm.RelocFunc{
+				Kind:   RelocFxn(rel.Fxn),
+				Symbol: symbol,
 			}
 		default:
-			panic(fmt.Sprintf("invalid operand: %v", operand))
+			panic("unreachable")
 		}
+
+		if v, ok := env[op.Base.Name]; ok && (v.Kind == bud.KindGPR || v.Kind == bud.KindFPR) {
+			op.Base.Name = v.Reg.Name
+		}
+
+		asmOp = &asm.MemAddr{
+			Base: &asm.Register{
+				Name: op.Base.Name,
+				Mode: RegMode(op.Base.Mode),
+				Kind: RegKind(op.Base.Type),
+			},
+			Offset: offset,
+		}
+	case *ast.Symbol:
+		if v, ok := env[op.Name]; ok && v.Kind == bud.KindSymbol {
+			var paramKind string
+			if v.Symbol.Kind == bud.ParamSK {
+				paramKind = v.Symbol.ParamKind
+			}
+
+			asmOp = &asm.Symbol{
+				Name:      v.Symbol.Name,
+				Kind:      SymbolKind(v.Symbol.Kind),
+				Size:      v.Symbol.Size,
+				Ty:        mir.ToAsmType(v.Symbol.Ty),
+				ParamKind: paramKind,
+			}
+		}
+	case *ast.Arg:
+		if imm, ok := env[op.Index.Name]; ok && imm.Kind == bud.KindImm {
+			op.Index.Value = imm.Imm
+			asmOp = &asm.Argument{
+				Index: imm.Imm,
+			}
+		}
+	case *ast.String:
+		if v, ok := env[op.Name]; ok && v.Kind == bud.KindString {
+			asmOp = &asm.String{
+				Name:  v.Str.Name,
+				Value: v.Str.Value,
+			}
+		}
+	default:
+		panic(fmt.Sprintf("invalid operand: %v", operand))
+	}
+
+	return asmOp
+}
+
+func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
+	var (
+		asmDstOperand  asm.Operand
+		asmSrcOperands []asm.Operand
+		def            *asm.Register
+		uses           []*asm.Register
+	)
+
+	// Destination operand
+	if inst.Dst != nil {
+		asmDstOperand = subst(inst.Dst, env)
+	}
+	
+	for _, operand := range inst.Operands {
+		asmSrcOperands = append(asmSrcOperands, subst(operand, env))
 	}
 
 	// Destination register
@@ -315,10 +332,11 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 	}
 
 	return &asm.Instr{
-		Opcode:   inst.Opcode,
-		Operands: asmOperands,
-		Def:      def,
-		Uses:     uses,
+		Opcode:      inst.Opcode,
+		DstOperand:  asmDstOperand,
+		SrcOperands: asmSrcOperands,
+		Def:         def,
+		Uses:        uses,
 	}
 }
 
