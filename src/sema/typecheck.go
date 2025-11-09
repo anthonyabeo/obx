@@ -3017,8 +3017,8 @@ func (t *TypeChecker) VisitFormalParams(params *ast.FormalParams) any {
 
 	var p []*types.FormalParam
 	for _, sec := range params.Params {
-		p = t.VisitFPSection(sec).([]*types.FormalParam)
-		//p = append(p, fp)
+		fp := t.VisitFPSection(sec).([]*types.FormalParam)
+		p = append(p, fp...)
 	}
 	procType.Params = p
 

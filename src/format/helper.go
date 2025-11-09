@@ -103,6 +103,8 @@ func ParseSourceAndLowerToMIR(t *testing.T, ctx *report.Context) *mir.Program {
 	gen := hir.NewGenerator(ctx, obx)
 	HIRProgram := gen.Generate()
 
-	mirgen := mir.NewGenerator(ctx)
-	return mirgen.Generate(HIRProgram)
+	builder := mir.NewIRBuilder()
+	return builder.Build(HIRProgram)
+	//mirgen := mir.NewGenerator(ctx)
+	//return mirgen.Generate(HIRProgram)
 }

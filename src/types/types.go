@@ -389,7 +389,7 @@ func Identical(a, b Type) bool {
 	switch a := a.(type) {
 	case *BasicType:
 		bb, ok := b.(*BasicType)
-		return ok && a.Kind == bb.Kind
+		return ok && TypeIncludes(a, bb) || TypeIncludes(bb, a)
 	case *ArrayType:
 		ab, ok := b.(*ArrayType)
 		return ok && !a.IsOpen() && !ab.IsOpen() && a.Length == ab.Length && Identical(a.Elem, ab.Elem)
