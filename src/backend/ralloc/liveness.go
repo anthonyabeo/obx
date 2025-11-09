@@ -22,7 +22,7 @@ func BuildCFG(fn *asm.Function) {
 		if blk.Term != nil {
 			switch blk.Term.Opcode {
 			case "j", "jal":
-				label := blk.Term.Operands[0].(*asm.Label)
+				label := blk.Term.SrcOperands[0].(*asm.Label)
 				if b := labelToBlock[label.Name]; b != nil {
 					blk.Succ = append(blk.Succ, b)
 				}
@@ -33,7 +33,7 @@ func BuildCFG(fn *asm.Function) {
 				}
 
 				if prev != nil && (prev.Opcode == "beq" || prev.Opcode == "bne") {
-					truePath := prev.Operands[2].(*asm.Label)
+					truePath := prev.SrcOperands[2].(*asm.Label)
 					if b := labelToBlock[truePath.Name]; b != nil {
 						blk.Succ = append(blk.Succ, b)
 					}
@@ -41,11 +41,11 @@ func BuildCFG(fn *asm.Function) {
 
 			case "ret":
 				blk.Succ = append(blk.Succ, fn.Exit)
-				blk.Term = &asm.Instr{Opcode: "j", Operands: []asm.Operand{asm.Label{Name: fn.Exit.Label}}}
+				blk.Term = &asm.Instr{Opcode: "j", SrcOperands: []asm.Operand{asm.Label{Name: fn.Exit.Label}}}
 			default:
 				// unknown terminator: assume fallthrough
 				if i+1 <= fn.Exit.ID {
-					jmp := &asm.Instr{Opcode: "j", Operands: []asm.Operand{asm.Label{Name: fn.Blocks[i+1].Label}}}
+					jmp := &asm.Instr{Opcode: "j", SrcOperands: []asm.Operand{asm.Label{Name: fn.Blocks[i+1].Label}}}
 					blk.Instr = append(blk.Instr, jmp)
 					blk.Term = jmp
 					blk.Succ = append(blk.Succ, fn.Blocks[i+1])

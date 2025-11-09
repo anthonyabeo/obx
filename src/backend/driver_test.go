@@ -99,6 +99,27 @@ func TestCompile(t *testing.T) {
 			`,
 			filename: "loop_test.obx",
 		},
+		{
+			name: "VarInValueParams",
+			input: `
+				MODULE ParamTest;
+				VAR x, y: INTEGER;
+				
+				PROCEDURE Foo(VAR a: INTEGER; IN b: INTEGER; c: INTEGER; d: INTEGER);
+				BEGIN
+					a := a + b + c + d
+				END Foo;
+				
+				BEGIN
+					x := 1;
+					y := 2;
+					Foo(x, y, 3, x)
+		       		printf("Final x: %d\n", x)
+
+				END ParamTest.
+				`,
+			filename: "param_test.obx",
+		},
 	}
 
 	for _, tc := range tests {

@@ -2,12 +2,12 @@ package backend
 
 import (
 	"fmt"
+	"github.com/anthonyabeo/obx/src/backend/ralloc"
 	"os"
 
 	"github.com/anthonyabeo/obx/src/backend/isel"
 	"github.com/anthonyabeo/obx/src/backend/isel/bud"
 	"github.com/anthonyabeo/obx/src/backend/isel/bud/parser"
-	"github.com/anthonyabeo/obx/src/backend/ralloc"
 	"github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/asm"
 	"github.com/anthonyabeo/obx/src/ir/mir"
@@ -100,7 +100,7 @@ func iSel(fn *mir.Function, target target.Machine, targetDescPath string) {
 	}
 	machine := parser.NewParser(parser.NewLexer(string(tdContent))).Parse()
 	selector := isel.NewSelector(machine.Rules)
-	asmFn := &asm.Function{Name: fn.Name, Exported: fn.Exported, IsLeaf: fn.IsLeaf}
+	asmFn := &asm.Function{Name: fn.FnName, Exported: fn.Exported, IsLeaf: fn.IsLeaf}
 
 	for _, block := range fn.SortedBlocks() {
 		asmBlock := asm.NewBlock(block.ID, block.Label)

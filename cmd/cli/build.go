@@ -124,10 +124,10 @@ var buildCmd = &cobra.Command{
 		hirGen := hir.NewGenerator(ctx, obx)
 		hirProgram := hirGen.Generate()
 
-		mirGen := mir.NewGenerator(ctx)
-		mirProgram := mirGen.Generate(hirProgram)
+		Builder := mir.NewIRBuilder(ctx)
+		MIRProgram := Builder.Build(hirProgram)
 
-		for _, module := range mirProgram.Modules {
+		for _, module := range MIRProgram.Modules {
 			for _, function := range module.Funcs {
 				opt.BuildCFG(function)
 			}
@@ -144,7 +144,7 @@ var buildCmd = &cobra.Command{
 		pm := opt.NewPassManager()
 		pm.ConfigurePasses(config)
 
-		for _, module := range mirProgram.Modules {
+		for _, module := range MIRProgram.Modules {
 			root, err := modgraph.FindProjectRoot()
 			if err != nil {
 				log.Printf("failed to find project root: %v", err)

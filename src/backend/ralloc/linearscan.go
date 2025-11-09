@@ -138,17 +138,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 	before := make([]*asm.Instr, 0)
 	after := make([]*asm.Instr, 0)
 
-	var (
-		dst asm.Operand
-		src []asm.Operand
-	)
-
-	if len(instr.Operands) > 0 {
-		dst = instr.Operands[0]
-		src = instr.Operands[1:]
-	}
-
-	for i, operand := range src {
+	for i, operand := range instr.SrcOperands {
 		switch op := operand.(type) {
 		case *asm.Register:
 			if op.Mode == asm.Phys {
@@ -161,7 +151,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 					Mode: asm.Phys,
 					Kind: op.Kind,
 				}
-				instr.Operands[i+1] = reg
+				instr.SrcOperands[i] = reg
 
 				continue
 			}
@@ -173,11 +163,11 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 			// Write to spill slot
 			temp := freshTemp(target.RegisterInfo().Temporaries) // pick a preg (like x10) reserved for spill reload
 			instr.Def = temp
-			instr.Operands[0] = temp
+			instr.DstOperand = temp
 			instr.Uses = append(instr.Uses, temp)
 			fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
 			mem := &asm.MemAddr{Base: fp, Offset: asm.Imm{Value: obj.Offset}}
-			store := &asm.Instr{Opcode: "sd", Operands: []asm.Operand{temp, mem}, Uses: []*asm.Register{temp, fp}}
+			store := &asm.Instr{Opcode: "sd", DstOperand: mem, SrcOperands: []asm.Operand{temp}, Uses: []*asm.Register{temp, fp}}
 			after = append(after, store)
 		case *asm.Symbol:
 			switch op.Kind {
@@ -188,17 +178,23 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				}
 
 				if obj.InRegister {
-					instr.Operands[i+1] = &asm.Register{Name: obj.Reg, Mode: asm.Phys, Kind: asm.GPR}
+					dstReg := &asm.Register{Name: obj.Reg, Mode: asm.Phys, Kind: asm.GPR}
+					if op.ParamKind == "VAR" || op.ParamKind == "IN" {
+						mem := &asm.MemAddr{Base: dstReg, Offset: &asm.Imm{Value: 0}}
+						instr.SrcOperands[i] = mem
+					} else {
+						instr.SrcOperands[i] = dstReg
+					}
 				} else {
 					fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
 					mem := &asm.MemAddr{Base: fp, Offset: &asm.Imm{Value: obj.Offset}}
 					temp := freshTemp(target.RegisterInfo().Temporaries)
 
-					load := &asm.Instr{Opcode: "ld", Operands: []asm.Operand{temp, mem}, Def: temp, Uses: []*asm.Register{fp}}
+					load := &asm.Instr{Opcode: "ld", DstOperand: temp, SrcOperands: []asm.Operand{mem}, Def: temp, Uses: []*asm.Register{fp}}
 
 					before = append(before, load)
 					instr.Uses = append(instr.Uses, temp)
-					instr.Operands[i+1] = temp
+					instr.SrcOperands[i] = temp
 				}
 			case asm.LocalSK:
 				obj := layout.GetLocalObjectByName(op.Name)
@@ -210,10 +206,10 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				mem := &asm.MemAddr{Base: fp, Offset: &asm.Imm{Value: obj.Offset}}
 				temp := freshTemp(target.RegisterInfo().Temporaries)
 
-				load := &asm.Instr{Opcode: "ld", Operands: []asm.Operand{temp, mem}, Def: temp, Uses: []*asm.Register{fp}}
+				load := &asm.Instr{Opcode: "ld", DstOperand: temp, SrcOperands: []asm.Operand{mem}, Def: temp, Uses: []*asm.Register{fp}}
 				before = append(before, load)
 				instr.Uses = append(instr.Uses, temp)
-				instr.Operands[i+1] = temp
+				instr.SrcOperands[i] = temp
 			case asm.GlobalSK:
 				temp := freshTemp(target.RegisterInfo().Temporaries)
 				sym := &asm.Symbol{Name: op.Name, Kind: asm.GlobalSK}
@@ -221,28 +217,35 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				mem := &asm.MemAddr{Base: temp, Offset: &asm.Imm{Value: 0}}
 
 				before = append(before, &asm.Instr{
-					Opcode:   "la",
-					Operands: []asm.Operand{temp, sym},
-					Def:      temp,
+					Opcode:      "la",
+					DstOperand:  temp,
+					SrcOperands: []asm.Operand{sym},
+					Def:         temp,
 				})
-				instr.Operands[i+1] = mem
+
+				if instr.Opcode == "ld" || instr.Opcode == "lw" || instr.Opcode == "lb" {
+					instr.SrcOperands[i] = mem
+				} else {
+					instr.SrcOperands[i] = temp
+				}
 			case asm.ConstSK:
 				temp := freshTemp(target.RegisterInfo().Temporaries)
 				sym := &asm.Symbol{Name: op.Name, Kind: asm.ConstSK}
 
 				before = append(before, &asm.Instr{
-					Opcode:   "la",
-					Operands: []asm.Operand{temp, sym},
-					Def:      temp,
+					Opcode:      "la",
+					DstOperand:  temp,
+					SrcOperands: []asm.Operand{sym},
+					Def:         temp,
 				})
-				instr.Operands[i+1] = temp
+				instr.SrcOperands[i] = temp
 			}
 		}
 	}
 
 	// Rewrite dst (def)
-	if dst != nil {
-		switch op := dst.(type) {
+	if instr.DstOperand != nil {
+		switch op := instr.DstOperand.(type) {
 		case *asm.Register:
 			if op.Mode == asm.Phys {
 				break
@@ -255,7 +258,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 					Kind: asm.GPR,
 				}
 				instr.Def = reg
-				instr.Operands[0] = reg
+				instr.DstOperand = reg
 				break
 			}
 
@@ -267,12 +270,12 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 			// Write to spill slot
 			temp := freshTemp(target.RegisterInfo().Temporaries) // pick a preg (like x10) reserved for spill reload
 			instr.Def = temp
-			instr.Operands[0] = temp
+			instr.DstOperand = temp
 			instr.Uses = append(instr.Uses, temp)
 			fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
 			mem := &asm.MemAddr{Base: fp, Offset: asm.Imm{Value: obj.Offset}}
 
-			store := &asm.Instr{Opcode: "sd", Operands: []asm.Operand{temp, mem}, Uses: []*asm.Register{temp, fp}}
+			store := &asm.Instr{Opcode: "sd", DstOperand: mem, SrcOperands: []asm.Operand{temp}, Uses: []*asm.Register{temp, fp}}
 			after = append(after, store)
 		case *asm.Symbol:
 			switch op.Kind {
@@ -283,16 +286,22 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				}
 
 				if obj.InRegister {
-					instr.Operands[0] = &asm.Register{Name: obj.Reg, Mode: asm.Phys, Kind: asm.GPR}
+					dstReg := &asm.Register{Name: obj.Reg, Mode: asm.Phys, Kind: asm.GPR}
+					if op.ParamKind == "VALUE" {
+						instr.DstOperand = dstReg
+					} else {
+						mem := &asm.MemAddr{Base: dstReg, Offset: &asm.Imm{Value: 0}}
+						instr.DstOperand = mem
+					}
 				} else {
 					fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
 					mem := &asm.MemAddr{Base: fp, Offset: &asm.Imm{Value: obj.Offset}}
 					temp := freshTemp(target.RegisterInfo().Temporaries) // pick a preg (like x10) reserved for spill reload
 
-					store := &asm.Instr{Opcode: "sd", Operands: []asm.Operand{temp, mem}, Uses: []*asm.Register{temp, fp}}
+					store := &asm.Instr{Opcode: "sd", DstOperand: mem, SrcOperands: []asm.Operand{temp}, Uses: []*asm.Register{temp, fp}}
 
 					instr.Def = temp
-					instr.Operands[0] = temp
+					instr.DstOperand = temp
 					after = append(after, store)
 				}
 			case asm.LocalSK:
@@ -305,10 +314,15 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				mem := &asm.MemAddr{Base: fp, Offset: &asm.Imm{Value: obj.Offset}}
 				temp := freshTemp(target.RegisterInfo().Temporaries) // pick a preg (like x10) reserved for spill reload
 
-				store := &asm.Instr{Opcode: "sd", Operands: []asm.Operand{temp, mem}, Uses: []*asm.Register{temp, fp}}
+				store := &asm.Instr{
+					Opcode:      "sd",
+					DstOperand:  mem,
+					SrcOperands: []asm.Operand{temp},
+					Uses:        []*asm.Register{temp, fp},
+				}
 
 				instr.Def = temp
-				instr.Operands[0] = temp
+				instr.DstOperand = temp
 				after = append(after, store)
 			case asm.GlobalSK:
 				temp := freshTemp(target.RegisterInfo().Temporaries)
@@ -317,16 +331,17 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				mem := &asm.MemAddr{Base: temp, Offset: &asm.Imm{Value: 0}}
 
 				before = append(before, &asm.Instr{
-					Opcode:   "la",
-					Operands: []asm.Operand{temp, sym},
-					Def:      temp,
+					Opcode:      "la",
+					DstOperand:  temp,
+					SrcOperands: []asm.Operand{sym},
+					Def:         temp,
 				})
-				instr.Operands[0] = mem
+				instr.DstOperand = mem
 			case asm.ConstSK:
 			}
 		case *asm.Argument:
 			if 0 <= op.Index && op.Index <= 7 {
-				instr.Operands[0] = &asm.Register{
+				instr.DstOperand = &asm.Register{
 					Name: fmt.Sprintf("a%d", op.Index),
 					Mode: asm.Phys,
 					Kind: asm.GPR,
@@ -336,9 +351,9 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 
 				sp := &asm.Register{Name: "sp", Mode: asm.Phys, Kind: asm.GPR}
 				mem := &asm.MemAddr{Base: sp, Offset: &asm.Imm{Value: offset}}
-				temp := src[0]
+				temp := instr.SrcOperands[0]
 
-				instr = &asm.Instr{Opcode: "sd", Operands: []asm.Operand{temp, mem}}
+				instr = &asm.Instr{Opcode: "sd", DstOperand: mem, SrcOperands: []asm.Operand{temp}}
 			}
 		}
 	}

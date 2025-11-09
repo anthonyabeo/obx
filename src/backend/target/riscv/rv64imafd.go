@@ -228,11 +228,11 @@ func (r RV64IMAFD) Legalize(fn *asm.Function) {
 		for _, instr := range block.Instr {
 			switch instr.Opcode {
 			case "store":
-				if len(instr.Operands) != 2 {
+				if len(instr.SrcOperands)+1 != 2 {
 					panic("store instruction must have exactly 2 operands")
 				}
 
-				dst := instr.Operands[1]
+				dst := instr.DstOperand
 				switch addr := dst.(type) {
 				case *asm.MemAddr:
 				case *asm.Symbol:
@@ -250,11 +250,11 @@ func (r RV64IMAFD) Legalize(fn *asm.Function) {
 					}
 				}
 			case "load":
-				if len(instr.Operands) != 2 {
+				if 1+len(instr.SrcOperands) != 2 {
 					panic("load instruction must have exactly 2 operands")
 				}
 
-				src := instr.Operands[1]
+				src := instr.SrcOperands[0]
 				switch addr := src.(type) {
 				case *asm.MemAddr:
 				case *asm.Symbol:
@@ -315,8 +315,9 @@ func (r RV64IMAFD) EmitPrologueEpilogue(fn *asm.Function, layout target.FrameLay
 
 	// ---------- PROLOGUE ----------
 	prologue = append(prologue, &asm.Instr{
-		Opcode:   "addi",
-		Operands: []asm.Operand{sp, sp, asm.Imm{Value: -fs}}},
+		Opcode:      "addi",
+		DstOperand:  sp,
+		SrcOperands: []asm.Operand{sp, asm.Imm{Value: -fs}}},
 	)
 
 	for _, obj := range layout.Saves {
@@ -325,15 +326,17 @@ func (r RV64IMAFD) EmitPrologueEpilogue(fn *asm.Function, layout target.FrameLay
 		reg := &asm.Register{Name: obj.Name, Mode: asm.Phys, Kind: asm.GPR}
 		mem := &asm.MemAddr{Base: sp, Offset: asm.Imm{Value: spOffset}}
 		prologue = append(prologue, &asm.Instr{
-			Opcode:   "sd",
-			Operands: []asm.Operand{reg, mem},
+			Opcode:      "sd",
+			DstOperand:  mem,
+			SrcOperands: []asm.Operand{reg},
 		})
 	}
 
 	// Set up frame pointer
 	prologue = append(prologue, &asm.Instr{
-		Opcode:   "addi",
-		Operands: []asm.Operand{fp, sp, asm.Imm{Value: fs}},
+		Opcode:      "addi",
+		DstOperand:  fp,
+		SrcOperands: []asm.Operand{sp, asm.Imm{Value: fs}},
 	})
 	fn.Entry.Instr = append(prologue, fn.Entry.Instr...)
 
@@ -345,15 +348,17 @@ func (r RV64IMAFD) EmitPrologueEpilogue(fn *asm.Function, layout target.FrameLay
 		mem := &asm.MemAddr{Base: sp, Offset: asm.Imm{Value: spOffset}}
 
 		epilogue = append(epilogue, &asm.Instr{
-			Opcode:   "ld",
-			Operands: []asm.Operand{reg, mem},
+			Opcode:      "ld",
+			DstOperand:  reg,
+			SrcOperands: []asm.Operand{mem},
 		})
 	}
 
 	epilogue = append(epilogue,
 		&asm.Instr{
-			Opcode:   "addi",
-			Operands: []asm.Operand{sp, sp, asm.Imm{Value: fs}},
+			Opcode:      "addi",
+			DstOperand:  sp,
+			SrcOperands: []asm.Operand{sp, asm.Imm{Value: fs}},
 		},
 		&asm.Instr{Opcode: "ret"},
 	)
@@ -425,7 +430,7 @@ func (r RV64IMAFD) formatFunc(fn *asm.Function) string {
 		}
 
 		for _, inst := range block.Instr {
-			buf.WriteString("\t" + inst.String() + "\n")
+			buf.WriteString("\t" + r.formatInstr(inst) + "\n")
 		}
 
 		if strings.HasSuffix(block.Label, "exit") {
@@ -436,6 +441,25 @@ func (r RV64IMAFD) formatFunc(fn *asm.Function) string {
 	}
 
 	return buf.String()
+}
+
+func (r RV64IMAFD) formatInstr(ins *asm.Instr) string {
+	switch ins.Opcode {
+	case "sw", "sd", "sb", "sh":
+		return fmt.Sprintf("%s %s, %s", ins.Opcode, ins.SrcOperands[0], ins.DstOperand)
+	case "lw", "ld", "lb", "lh":
+		return fmt.Sprintf("%s %s, %s", ins.Opcode, ins.DstOperand, ins.SrcOperands[0])
+	case "j":
+		return fmt.Sprintf("%s %s", ins.Opcode, ins.SrcOperands[0])
+	case "ret":
+		return "ret"
+	default:
+		var operands []string
+		for _, op := range ins.SrcOperands {
+			operands = append(operands, op.String())
+		}
+		return fmt.Sprintf("%s %s, %s", ins.Opcode, ins.DstOperand, strings.Join(operands, ", "))
+	}
 }
 
 func (r RV64IMAFD) formatGlobal(g *asm.Symbol) string {
