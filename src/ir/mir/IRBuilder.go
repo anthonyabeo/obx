@@ -251,6 +251,7 @@ func (b *IRBuilder) ensureValue(expr hir.Expr) Value {
 	case *hir.BinaryExpr:
 		return b.lowerBinary(e)
 	case *hir.UnaryExpr:
+		return b.lowerUnaryExpr(e)
 	case *hir.VariableRef:
 		v, found := b.Func.Env.Lookup(e.Name)
 		if !found {
@@ -523,6 +524,22 @@ func (b *IRBuilder) lowerBinary(expr *hir.BinaryExpr) Value {
 	return b.CreateBinary(op, left, right, expr.SemaType)
 }
 
+func (b *IRBuilder) lowerUnaryExpr(u *hir.UnaryExpr) Value {
+	var op InstrOp
+	switch u.Op {
+	case token.PLUS:
+		op = ADD
+	case token.MINUS:
+		op = NEG
+	case token.NOT:
+		op = NOT
+	}
+
+	operand := b.ensureValue(u.Operand)
+
+	return b.CreateUnary(op, operand, u.SemaType)
+}
+
 func (b *IRBuilder) lowerConst(c *hir.Literal) Value {
 	var v Value
 
@@ -580,7 +597,7 @@ func (b *IRBuilder) lowerConst(c *hir.Literal) Value {
 
 func (b *IRBuilder) lowerIndexExpr(e *hir.IndexExpr) Value {
 	// Generate the base array or pointer value
-	arr := b.ensureValue(e.Array)
+	arr := b.ensureAddr(e.Array)
 	arrayType := arr.Type().(*ArrayType)
 
 	var indices []Value
@@ -620,6 +637,17 @@ func (b *IRBuilder) CreateBinary(op InstrOp, left, right Value, ty Type) Value {
 	} else {
 		b.Emit(&BinaryInst{Target: t, Op: op, Left: left, Right: right})
 	}
+
+	return t
+}
+
+func (b *IRBuilder) CreateUnary(op InstrOp, operand Value, ty Type) Value {
+	t := b.NewTemp(ty)
+	b.Emit(&UnaryInst{
+		Target:  t,
+		Op:      op,
+		Operand: operand,
+	})
 
 	return t
 }

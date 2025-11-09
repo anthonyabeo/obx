@@ -2,14 +2,14 @@ package format
 
 import (
 	"encoding/json"
-	"github.com/anthonyabeo/obx/src/ir/hir"
-	"github.com/anthonyabeo/obx/src/ir/mir"
-	"github.com/anthonyabeo/obx/src/sema"
-	"github.com/anthonyabeo/obx/src/syntax/parser"
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/ir/hir"
+	"github.com/anthonyabeo/obx/src/ir/mir"
 	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
 
 func formatPosition(pos *report.Position) any {
