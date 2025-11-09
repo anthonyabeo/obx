@@ -2,6 +2,7 @@ package mir
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/anthonyabeo/obx/src/ir/hir"
@@ -34,16 +35,18 @@ func (g *Generator) Generate(prog *hir.Program) *Program {
 }
 
 func (g *Generator) genModule(module *hir.Module) *Module {
-	env := NewSymbolTable(nil)
+	env := NewSymbolTable(GlobalEnv)
 	functions := make([]*Function, 0)
 	globals := make(map[string]*Global)
 
 	for _, decl := range module.Decls {
 		switch d := decl.(type) {
 		case *hir.Function:
-			functions = append(functions, g.genFunction(d, NewSymbolTable(env)))
+			fn := g.genFunction(d, NewSymbolTable(env))
+			functions = append(functions)
+			env.Define(d.Name, fn)
 		case *hir.Constant:
-			g := &Global{
+			global := &Global{
 				NameStr: d.Name,
 				BName:   d.Name,
 				Kind:    "CONST",
@@ -52,10 +55,10 @@ func (g *Generator) genModule(module *hir.Module) *Module {
 				Offset:  d.Offset,
 				Size:    d.Size,
 			}
-			globals[d.Name] = g
-			env.Define(g.NameStr, g)
+			globals[d.Name] = global
+			env.Define(global.NameStr, global)
 		case *hir.Variable:
-			g := &Global{
+			global := &Global{
 				NameStr: d.Name,
 				BName:   d.Name,
 				Kind:    "VAR",
@@ -63,8 +66,8 @@ func (g *Generator) genModule(module *hir.Module) *Module {
 				Offset:  d.Offset,
 				Size:    d.Size,
 			}
-			globals[d.Name] = g
-			env.Define(g.NameStr, g)
+			globals[d.Name] = global
+			env.Define(global.NameStr, global)
 		}
 	}
 
@@ -92,19 +95,23 @@ func (g *Generator) genFunction(h *hir.Function, env *SymbolTable) *Function {
 	g.build.Func = fn
 
 	for _, param := range h.Params {
+		t := &Param{
+			ID:    param.Name,
+			BName: param.Name,
+			Typ:   g.genType(param.Typ),
+		}
+
 		switch param.Kind {
 		case hir.ValueParam:
-			t := &Param{
-				ID:    param.Name,
-				BName: param.Name,
-				Typ:   g.genType(param.Typ),
-			}
-
-			fn.Params = append(fn.Params, t)
-			fn.Env.Define(t.ID, t)
+			t.Kind = "VALUE"
 		case hir.InParam:
+			t.Kind = "IN"
 		case hir.VarParam:
+			t.Kind = "VAR"
 		}
+
+		fn.Params = append(fn.Params, t)
+		fn.Env.Define(t.ID, t)
 	}
 
 	for _, local := range h.Locals {
@@ -143,7 +150,7 @@ func (g *Generator) genFunction(h *hir.Function, env *SymbolTable) *Function {
 
 	g.genCompoundStmt(h.Body)
 
-	exit := NewBlock(fn.Name + "_exit")
+	exit := NewBlock(fn.FnName + "_exit")
 	fn.Blocks[exit.ID] = exit
 	fn.Exit = exit
 
@@ -151,21 +158,21 @@ func (g *Generator) genFunction(h *hir.Function, env *SymbolTable) *Function {
 }
 
 func (g *Generator) genAssignStmt(s *hir.AssignStmt) {
-	target := g.genValue(s.Left)
 	value := g.genValue(s.Right)
+	target := g.genValue(s.Left)
 
-	if mem := isMem(target); mem != nil {
+	if mem := g.isMem(target); mem != nil {
 		g.build.CreateStore(mem, value)
 		return
 	}
 
-	if mem := isMem(value); mem != nil {
+	if mem := g.isMem(value); mem != nil {
 		g.build.CreateLoad(target, value)
 		return
 	}
 
 	// Emit the assignment instruction
-	g.build.Emit(&MovInst{Target: target, Value: value})
+	g.build.Emit(&MoveInst{Target: target, Value: value})
 }
 
 func (g *Generator) genReturnStmt(s *hir.ReturnStmt) {
@@ -203,8 +210,29 @@ func (g *Generator) genCompoundStmt(s *hir.CompoundStmt) {
 
 func (g *Generator) genFuncCall(s *hir.FuncCall) Value {
 	var args []Value
+	fxn, ok := g.build.Func.Env.Lookup(s.Func.Name)
+	if !ok {
+		log.Printf("function %s not found", s.Func.Name)
+		//panic("undefined function: " + s.Func.Name)
+	}
+
+	fn, ok := fxn.(*Function)
+	if !ok {
+		panic("symbol is not a function: " + s.Func.Name)
+	}
+
 	for idx, arg := range s.Args {
+		param := fn.Params[idx].(*Param)
+
 		v := g.genValue(arg)
+
+		switch param.Kind {
+		case "VAR", "IN":
+			// pass address
+			v = g.build.CreateAddrOf(v)
+		default:
+		}
+
 		g.build.Emit(&Arg{Index: idx, Value: v})
 		args = append(args, v)
 	}
@@ -212,6 +240,8 @@ func (g *Generator) genFuncCall(s *hir.FuncCall) Value {
 	var t Value
 	if s.RetType != nil {
 		t = g.build.NewTemp(s.RetType)
+	} else {
+		t = g.build.NewTemp(Void)
 	}
 
 	name := s.Func.Mangled
@@ -257,7 +287,7 @@ func (g *Generator) genIfStmt(s *hir.IfStmt) {
 
 		g.genCompoundStmt(branch.Body)
 
-		if !g.build.BlockTermSet() {
+		if !g.build.BlockTermIsSet() {
 			jmp := &JumpInst{Target: endLabel}
 			g.build.SetTerm(jmp)
 			g.build.Emit(jmp)
@@ -272,8 +302,8 @@ func (g *Generator) genIfStmt(s *hir.IfStmt) {
 	if s.Else != nil {
 		g.genCompoundStmt(s.Else)
 	}
-	//g.build.Emit(&JumpInst{Target: endLabel})
-	if !g.build.BlockTermSet() {
+
+	if !g.build.BlockTermIsSet() {
 		jmp := &JumpInst{Target: endLabel}
 		g.build.SetTerm(jmp)
 		g.build.Emit(jmp)
@@ -392,7 +422,7 @@ func (g *Generator) genConst(c *hir.Literal) Value {
 	}
 
 	t := g.build.NewTemp(v.Type())
-	g.build.Emit(&MovInst{Target: t, Value: v})
+	g.build.Emit(&MoveInst{Target: t, Value: v})
 
 	return t
 }
@@ -444,18 +474,26 @@ func (g *Generator) genValue(e hir.Expr) Value {
 	case *hir.SetExpr:
 	case *hir.RangeExpr:
 	case *hir.VariableRef:
-		if v, found := g.build.Func.Env.Lookup(e.Name); found {
-			return v
+		v, found := g.build.Func.Env.Lookup(e.Name)
+		if !found {
+			panic(fmt.Sprintf("undefined variable: '%s'", e.Name))
 		}
 
-		panic(fmt.Sprintf("undefined variable: '%s'", e.Name))
+		return v
 	case *hir.ConstantRef:
 		return g.build.Func.Constants[e.Mangled]
 	case *hir.Param:
-		if v, found := g.build.Func.Env.Lookup(e.Name); found {
-			return v
+		v, found := g.build.Func.Env.Lookup(e.Name)
+		if !found {
+			panic(fmt.Sprintf("undefined parameter: '%s'", e.Name))
 		}
-		panic(fmt.Sprintf("undefined parameter: '%s'", e.Name))
+
+		param, ok := v.(*Param)
+		if !ok {
+			panic(fmt.Sprintf("symbol '%s' is not a parameter", e.Name))
+		}
+
+		return param
 	case *hir.FunctionRef:
 	case *hir.TypeRef:
 	case *hir.FieldAccess:

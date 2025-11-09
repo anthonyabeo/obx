@@ -88,16 +88,19 @@ func (g *Generator) genOp(op token.Kind) InstrOp {
 	}
 }
 
-func isMem(value Value) Value {
-	if mem, isMem := value.(*Mem); isMem {
-		return mem
+func (g *Generator) isMem(value Value) Value {
+	switch v := value.(type) {
+	case *Mem, *Global:
+		return v
+	case *Param:
+		if v.Kind == "VAR" || v.Kind == "IN" {
+			return v
+		} else {
+			return nil
+		}
+	default:
+		return nil
 	}
-
-	if global, isGlobal := value.(*Global); isGlobal {
-		return global
-	}
-
-	return nil
 }
 
 // ensure a value operand (Temp or Constant). If it's a Global/Mem/etc,

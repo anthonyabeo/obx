@@ -49,12 +49,22 @@ type (
 	}
 )
 
-func (*Variable) decl() {}
-func (*Constant) decl() {}
-func (*Type) decl()     {}
-func (*Function) decl() {}
-
+func (*Variable) decl()            {}
 func (d *Variable) String() string { return fmt.Sprintf("%s: %s", d.Name, d.Type) }
+
+func (*Constant) decl()            {}
 func (d *Constant) String() string { return fmt.Sprintf("%s = %s", d.Name, d.Value) }
-func (d *Type) String() string     { return fmt.Sprintf("%s = %s", d.Name, d.Type) }
-func (d *Function) String() string { panic("not implemented") }
+
+func (*Type) decl()            {}
+func (d *Type) String() string { return fmt.Sprintf("%s = %s", d.Name, d.Type) }
+
+func (*Function) decl()            {}
+func (f *Function) String() string { panic("not implemented") }
+func (f *Function) FnName() string {
+	name := f.Mangled
+	if f.Mangled == "" {
+		name = f.Name
+	}
+
+	return name
+}

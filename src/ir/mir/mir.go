@@ -23,7 +23,7 @@ type Module struct {
 }
 
 type Function struct {
-	Name     string
+	FnName   string
 	Result   Type
 	Exported bool
 	Params   []Value // formal parameters
@@ -42,9 +42,15 @@ type Function struct {
 	Asm *asm.Function
 }
 
+func (fn *Function) Name() string     { return fn.FnName }
+func (fn *Function) BaseName() string { return fn.FnName }
+func (fn *Function) String() string   { return "" }
+func (fn *Function) Type() Type       { panic("implement me") }
+func (fn *Function) IsMem() bool      { return false }
+
 func NewFunction(name string, export bool, ret Type, env *SymbolTable) *Function {
 	return &Function{
-		Name:      name,
+		FnName:    name,
 		Result:    ret,
 		Env:       env,
 		IsLeaf:    true,
@@ -146,6 +152,25 @@ func (fn *Function) OutputDOT() string {
 	}
 	sb.WriteString("}\n")
 	return sb.String()
+}
+
+var GlobalEnv = &SymbolTable{
+	Parent:  nil,
+	Symbols: make(map[string]Value),
+}
+
+func init() {
+	// Initialize built-in functions
+
+	GlobalEnv.Define("printf", &Function{
+		FnName:   "printf",
+		Result:   Int32Type,
+		Exported: true,
+		Params: []Value{
+			&Param{ID: "format", Typ: StringType{}},
+			&Param{ID: "args", Typ: Int32Type},
+		},
+	})
 }
 
 type SymbolTable struct {

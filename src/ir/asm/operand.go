@@ -25,11 +25,13 @@ type (
 	Argument struct {
 		Index int
 	}
+
 	Symbol struct {
-		Name string
-		Kind SymbolKind
-		Size int
-		Ty   Type
+		Name      string
+		Kind      SymbolKind
+		Size      int
+		Ty        Type
+		ParamKind string // VAR/IN/VALUE, if symbol is a param
 	}
 
 	MemAddr struct {

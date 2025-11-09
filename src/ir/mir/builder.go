@@ -36,7 +36,7 @@ func (b *Builder) SetTerm(term Instr) {
 	b.Block.Term = term
 }
 
-func (b *Builder) BlockTermSet() bool {
+func (b *Builder) BlockTermIsSet() bool {
 	return b.Block.Term != nil
 }
 
@@ -83,7 +83,7 @@ func (b *Builder) CreateReturn(value Value) {
 }
 
 func (b *Builder) CreateAssign(target, value Value) {
-	b.Emit(&MovInst{
+	b.Emit(&MoveInst{
 		Target: target,
 		Value:  value,
 	})
@@ -101,4 +101,14 @@ func (b *Builder) CreateLoad(dst, src Value) {
 		Target: dst,
 		Addr:   src,
 	})
+}
+
+func (b *Builder) CreateAddrOf(addr Value) Value {
+	t := b.NewTemp(addr.Type())
+	b.Emit(&AddrOf{
+		Target: t,
+		Addr:   addr,
+	})
+
+	return t
 }

@@ -27,7 +27,7 @@ type (
 		Right  Value
 	}
 
-	MovInst struct {
+	MoveInst struct {
 		Target Value
 		Value  Value
 	}
@@ -75,6 +75,11 @@ type (
 		Val  Value
 	}
 
+	AddrOf struct {
+		Target Value
+		Addr   Value
+	}
+
 	PhiInst struct {
 		Target Value
 		Args   []*PHIArg
@@ -92,20 +97,20 @@ type (
 )
 
 func (a Arg) String() string                 { return fmt.Sprintf("arg(%s, %d)", a.Value, a.Index) }
-func (a Arg) Def() Value                     { panic("implement me") }
-func (a Arg) Uses() []Value                  { panic("implement me") }
-func (a Arg) ReplaceUses(m map[string]Value) { panic("implement me") }
-func (a Arg) ReplaceDef(value Value)         { panic("implement me") }
+func (a Arg) Def() Value                     { return nil }
+func (a Arg) Uses() []Value                  { return []Value{a.Value} }
+func (a Arg) ReplaceUses(m map[string]Value) {}
+func (a Arg) ReplaceDef(Value)               {}
 
-func (a *MovInst) Def() Value     { return a.Target }
-func (a *MovInst) Uses() []Value  { return []Value{a.Value} }
-func (a *MovInst) String() string { return fmt.Sprintf("mov %v, %v", a.Target, a.Value) }
-func (a *MovInst) ReplaceUses(m map[string]Value) {
+func (a *MoveInst) Def() Value     { return a.Target }
+func (a *MoveInst) Uses() []Value  { return []Value{a.Value} }
+func (a *MoveInst) String() string { return fmt.Sprintf("mov %v, %v", a.Target, a.Value) }
+func (a *MoveInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[a.Value.BaseName()]; ok {
 		a.Value = nv
 	}
 }
-func (a *MovInst) ReplaceDef(t Value) { a.Target = t }
+func (a *MoveInst) ReplaceDef(t Value) { a.Target = t }
 
 func (*JumpInst) Def() Value                     { return nil }
 func (*JumpInst) Uses() []Value                  { return nil }
@@ -316,6 +321,18 @@ func (s *StoreInst) ReplaceUses(m map[string]Value) {
 	}
 }
 func (s *StoreInst) ReplaceDef(Value) {}
+
+func (a *AddrOf) Def() Value    { return a.Target }
+func (a *AddrOf) Uses() []Value { return []Value{a.Addr} }
+func (a *AddrOf) String() string {
+	return fmt.Sprintf("%s := addr %s", a.Target.Name(), a.Addr.Name())
+}
+func (a *AddrOf) ReplaceUses(m map[string]Value) {
+	if nv, ok := m[a.Addr.BaseName()]; ok {
+		a.Addr = nv
+	}
+}
+func (a *AddrOf) ReplaceDef(t Value) { a.Target = t }
 
 func (phi *PhiInst) Def() Value { return phi.Target }
 func (phi *PhiInst) Uses() []Value {

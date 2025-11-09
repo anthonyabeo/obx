@@ -44,7 +44,7 @@ func TestConstantFold(t *testing.T) {
 	}
 
 	fn := &mir.Function{
-		Name:   "demo",
+		FnName: "demo",
 		Entry:  entry,
 		Blocks: map[int]*mir.Block{entry.ID: entry, tt.ID: tt, f.ID: f, j.ID: j, exit.ID: exit},
 	}

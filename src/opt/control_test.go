@@ -208,6 +208,25 @@ end Main
 		 `,
 			filename: "array2d_test.obx",
 		},
+		{
+			name: "VarInValueParams",
+			input: `
+				MODULE ParamTest;
+				VAR x, y: INTEGER;
+				
+				PROCEDURE Foo(VAR a: INTEGER; IN b: INTEGER; c: INTEGER; d: INTEGER);
+				BEGIN
+					a := a + b + c + d
+				END Foo;
+				
+				BEGIN
+					x := 1;
+					y := 2;
+					Foo(x, y, 3, x)
+				END ParamTest.
+				`,
+			filename: "param_test.obx",
+		},
 	}
 
 	for _, tc := range tests {
@@ -241,8 +260,8 @@ end Main
 						continue
 					}
 
-					dotFile := fmt.Sprintf("%s/out/%s.cfg.dot", Root, function.Name)
-					pngFile := fmt.Sprintf("%s/out/%s.cfg.png", Root, function.Name)
+					dotFile := fmt.Sprintf("%s/out/%s.cfg.dot", Root, function.FnName)
+					pngFile := fmt.Sprintf("%s/out/%s.cfg.png", Root, function.FnName)
 
 					if err := os.WriteFile(dotFile, []byte(dot), 0644); err != nil {
 						t.Errorf("failed to write dot: %s", err)
@@ -296,7 +315,7 @@ func CFGAlpha() *mir.Function {
 	blk8.Preds = map[int]*mir.Block{blk5.ID: blk5}
 
 	fn := &mir.Function{
-		Name: "Bar",
+		FnName: "Bar",
 		Blocks: map[int]*mir.Block{
 			blk0.ID: blk0,
 			blk1.ID: blk1,
@@ -343,7 +362,7 @@ func CFGBravo() *mir.Function {
 	blocks[exit.ID] = exit
 
 	fn := &mir.Function{
-		Name:   "Foo",
+		FnName: "Foo",
 		Blocks: blocks,
 		Entry:  entry,
 	}
@@ -430,7 +449,7 @@ func TestDominatorTree(t *testing.T) {
 	blocks[exit.ID] = exit
 
 	fn := &mir.Function{
-		Name:   "Foo",
+		FnName: "Foo",
 		Blocks: blocks,
 		Entry:  entry,
 	}

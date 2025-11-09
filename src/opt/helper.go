@@ -115,8 +115,8 @@ func VizCFG(fn *mir.Function) error {
 		}
 	}
 
-	dotFile := fmt.Sprintf("%s/%s.ssa.cfg.dot", outDir, fn.Name)
-	pngFile := fmt.Sprintf("%s/%s.ssa.cfg.png", outDir, fn.Name)
+	dotFile := fmt.Sprintf("%s/%s.ssa.cfg.dot", outDir, fn.FnName)
+	pngFile := fmt.Sprintf("%s/%s.ssa.cfg.png", outDir, fn.FnName)
 
 	if err := os.WriteFile(dotFile, []byte(dot), 0644); err != nil {
 		return err
@@ -147,8 +147,8 @@ func VizSSA(fn *mir.Function) error {
 		}
 	}
 
-	dotFile := fmt.Sprintf("%s/%s.ssa.cfg.dot", outDir, fn.Name)
-	pngFile := fmt.Sprintf("%s/%s.ssa.cfg.png", outDir, fn.Name)
+	dotFile := fmt.Sprintf("%s/%s.ssa.cfg.dot", outDir, fn.FnName)
+	pngFile := fmt.Sprintf("%s/%s.ssa.cfg.png", outDir, fn.FnName)
 
 	if err := os.WriteFile(dotFile, []byte(dot), 0644); err != nil {
 		return err
