@@ -246,6 +246,21 @@ end Main
 				`,
 			filename: "record_field_access.obx",
 		},
+		{
+			name: "DerefLowering",
+			input: `
+				MODULE DerefTest;
+				VAR p: POINTER TO RECORD x, y: INTEGER END;
+				VAR x: INTEGER;
+				BEGIN
+					//NEW(p);
+					x := 42;
+					p^.x := x;
+					x := p^.y
+				END DerefTest.
+			`,
+			filename: "deref_test.obx",
+		},
 	}
 
 	for _, tc := range tests {

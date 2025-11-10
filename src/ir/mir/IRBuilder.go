@@ -231,6 +231,9 @@ func (b *IRBuilder) lowerType(ty types.Type) Type {
 		}
 	case *types.ProcedureType:
 	case *types.PointerType:
+		return &PointerType{
+			Ref: b.lowerType(ty.Base),
+		}
 	case *types.NamedType:
 		return b.lowerType(ty.Def)
 	default:
@@ -309,8 +312,13 @@ func (b *IRBuilder) ensureValue(expr hir.Expr) Value {
 		b.Emit(&LoadInst{Addr: addr, Target: t})
 
 		return t
-
 	case *hir.DerefExpr:
+		addr := b.lowerDerefExpr(e)
+
+		t := b.NewTemp(addr.Type())
+		b.Emit(&LoadInst{Addr: &Mem{Base: addr}, Target: t})
+
+		return t
 	case *hir.TypeGuardExpr:
 	default:
 		panic("unhandled expr: " + fmt.Sprintf("%T", e))
@@ -343,6 +351,8 @@ func (b *IRBuilder) ensureAddr(expr hir.Expr) Value {
 	case *hir.IndexExpr:
 		return b.lowerIndexExpr(e)
 	case *hir.DerefExpr:
+		addr := b.lowerDerefExpr(e)
+		return &Mem{Base: addr}
 	default:
 		panic("ensureAddr: expr is not addressable: " + fmt.Sprintf("%T", expr))
 	}
@@ -651,8 +661,16 @@ func (b *IRBuilder) lowerFieldAccess(e *hir.FieldAccess) Value {
 	recordAddr := b.ensureAddr(e.Record)
 
 	// 2. Look up the field offset from the record’s type
-	recordType, ok := recordAddr.Type().(*RecordType)
-	if !ok {
+	var recordType *RecordType
+	switch ty := recordAddr.Type().(type) {
+	case *RecordType:
+	case *PointerType:
+		rec, ok := ty.Ref.(*RecordType)
+		if !ok {
+			panic("lowerFieldAccess: record type does not match")
+		}
+		recordType = rec
+	default:
 		panic("lowerFieldAccess: base is not a record type")
 	}
 
@@ -666,6 +684,10 @@ func (b *IRBuilder) lowerFieldAccess(e *hir.FieldAccess) Value {
 	fieldAddr := b.CreateBinary(ADD, recordAddr, offsetValue, Int64Type)
 
 	return &Mem{Base: fieldAddr}
+}
+
+func (b *IRBuilder) lowerDerefExpr(e *hir.DerefExpr) Value {
+	return b.ensureValue(e.Pointer)
 }
 
 func (b *IRBuilder) CreateBinary(op InstrOp, left, right Value, ty Type) Value {
