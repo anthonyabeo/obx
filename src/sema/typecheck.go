@@ -14,8 +14,6 @@ import (
 
 type TypeChecker struct {
 	ctx *report.Context
-
-	varOffset int
 }
 
 func NewTypeChecker(ctx *report.Context) *TypeChecker {
@@ -214,6 +212,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 			}
 
 			typ = field.Type
+			s.Symbol.SetType(field.Type)
 		case *ast.PtrDeref:
 			switch ty := typ.(type) {
 			case *types.PointerType:
@@ -2822,11 +2821,8 @@ func (t *TypeChecker) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 func (t *TypeChecker) VisitVariableDecl(decl *ast.VariableDecl) any {
 	ty := decl.Type.Accept(t).(types.Type)
 	for _, id := range decl.IdentList {
-		id.Symbol.SetOffset(t.varOffset)
 		id.Symbol.SetType(ty)
 		id.SemaType = ty
-
-		t.varOffset += alignTo(ty.Width(), ty.Alignment())
 	}
 
 	return decl
@@ -3133,7 +3129,7 @@ func (t *TypeChecker) VisitProcedureType(ty *ast.ProcedureType) any {
 }
 
 func (t *TypeChecker) VisitRecordType(ty *ast.RecordType) any {
-	recTy := &types.RecordType{Fields: make(map[string]*types.Field)}
+	recTy := &types.RecordType{Fields: make([]*types.Field, 0)}
 	if ty.Base != nil {
 		baseTy := types.Underlying(ty.Base.Accept(t).(types.Type)).(*types.RecordType)
 		if baseTy == nil {
@@ -3151,22 +3147,20 @@ func (t *TypeChecker) VisitRecordType(ty *ast.RecordType) any {
 
 	for _, field := range ty.Fields {
 		field.Env = ty.Env
-		f := field.Accept(t).([]types.Field)
-		for _, ff := range f {
-			recTy.Fields[ff.Name] = &ff
-		}
+		f := field.Accept(t).([]*types.Field)
+		recTy.Fields = append(recTy.Fields, f...)
 	}
 
 	for name, sym := range ty.Env.Elems() {
-		if recTy.Fields[name] != nil {
+		if recTy.GetField(name) != nil {
 			continue
 		}
 
-		recTy.Fields[name] = &types.Field{
+		recTy.Fields = append(recTy.Fields, &types.Field{
 			Name:       name,
 			Type:       sym.AstType().Accept(t).(types.Type),
 			IsExported: sym.Props() == ast.Exported,
-		}
+		})
 	}
 
 	return recTy
@@ -3175,7 +3169,7 @@ func (t *TypeChecker) VisitRecordType(ty *ast.RecordType) any {
 func (t *TypeChecker) VisitFieldList(list *ast.FieldList) any {
 	typ := list.Type.Accept(t).(types.Type)
 
-	fields := make([]types.Field, 0)
+	fields := make([]*types.Field, 0)
 	for _, def := range list.List {
 		sym := list.Env.Lookup(def.Name)
 		if sym == nil || sym.Kind() != ast.FieldSymbolKind {
@@ -3187,7 +3181,7 @@ func (t *TypeChecker) VisitFieldList(list *ast.FieldList) any {
 			continue
 		}
 
-		fields = append(fields, types.Field{
+		fields = append(fields, &types.Field{
 			Name:       def.Name,
 			Type:       typ,
 			IsExported: sym.Props() == ast.Exported,
@@ -3738,10 +3732,6 @@ func (t *TypeChecker) assertConst(expr ast.Expression) {
 }
 
 func (t *TypeChecker) checkTypeBoundRedefinition(proc *ast.ProcedureDecl) {
-	offset := t.varOffset
-	t.varOffset = 0
-	defer func() { t.varOffset = offset }()
-
 	if proc.Kind != ast.TypeBoundProcedureKind || proc.Head.Rcv == nil {
 		return // not a type-bound procedure
 	}

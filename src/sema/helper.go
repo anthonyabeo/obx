@@ -146,9 +146,9 @@ func IsValidGuardExpr(expr ast.Expression) bool {
 	return false
 }
 
-// alignTo rounds `offset` up to the nearest multiple of `alignment`.
+// AlignTo rounds `offset` up to the nearest multiple of `alignment`.
 // alignment must be a power of two.
-func alignTo(offset, alignment int) int {
+func AlignTo(offset, alignment int) int {
 	if alignment <= 0 {
 		panic("alignment must be > 0")
 	}

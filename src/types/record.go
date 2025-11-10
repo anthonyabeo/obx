@@ -12,7 +12,7 @@ type Field struct {
 }
 
 type RecordType struct {
-	Fields map[string]*Field
+	Fields []*Field
 	Base   *RecordType
 }
 
@@ -25,10 +25,32 @@ func (r *RecordType) String() string {
 }
 
 func (r *RecordType) Alignment() int {
-	return 8 /* yet to be implemented*/
+	maxAlign := 1
+	for _, f := range r.Fields {
+		align := f.Type.Alignment()
+		if align > maxAlign {
+			maxAlign = align
+		}
+	}
+	if r.Base != nil {
+		baseAlign := r.Base.Alignment()
+		if baseAlign > maxAlign {
+			maxAlign = baseAlign
+		}
+	}
+	return maxAlign
 }
 
-func (r *RecordType) Width() int { return 8 /* yet to be implemented*/ }
+func (r *RecordType) Width() int {
+	width := 0
+	for _, f := range r.Fields {
+		width += f.Type.Width()
+	}
+	if r.Base != nil {
+		width += r.Base.Width()
+	}
+	return width
+}
 
 func (r *RecordType) Equals(other Type) bool {
 	o, ok := other.(*RecordType)
@@ -44,12 +66,17 @@ func (r *RecordType) Equals(other Type) bool {
 }
 
 func (r *RecordType) GetField(name string) *Field {
-	f, ok := r.Fields[name]
-	if !ok && r.Base != nil {
+	for _, f := range r.Fields {
+		if f.Name == name {
+			return f
+		}
+	}
+
+	if r.Base != nil {
 		return r.Base.GetField(name)
 	}
 
-	return f
+	return nil
 }
 
 var AnyRec *RecordType
