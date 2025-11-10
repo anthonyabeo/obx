@@ -25,35 +25,32 @@ var (
 
 type (
 	Temp struct {
-		ID     string
-		BName  string
-		Typ    Type
-		Offset int
-		Size   int
+		Ident    string
+		OrigName string
+		Typ      Type
+		Size     int
 	}
 
 	Local struct {
-		ID     string
-		BName  string
-		Typ    Type
-		Offset int
-		Size   int
+		Ident    string
+		OrigName string
+		Typ      Type
+		Size     int
 	}
 
 	Param struct {
-		ID     string
-		BName  string
-		Kind   string
-		Typ    Type
-		Offset int
-		Size   int
+		Ident    string
+		OrigName string
+		Kind     string
+		Typ      Type
+		Size     int
 	}
 
 	NamedConst struct {
-		ID         string
+		Ident      string
+		OrigName   string
 		ConstValue Value
 		Typ        Type
-		Offset     int
 		Size       int
 	}
 
@@ -81,14 +78,11 @@ type (
 		Typ      Type
 	}
 
-	Global struct {
-		NameStr string
-		BName   string
-		Kind    string
-		Typ     Type
-		Value   any
-		Offset  int
-		Size    int
+	GlobalVariable struct {
+		OrigName string
+		Ident    string
+		Typ      Type
+		Size     int
 	}
 
 	Mem struct {
@@ -104,21 +98,21 @@ func (m Mem) Type() Type       { return m.Base.Type() }
 func (m Mem) IsMem() bool      { return true }
 
 func (o *Temp) Type() Type       { return o.Typ }
-func (o *Temp) Name() string     { return o.ID }
-func (o *Temp) BaseName() string { return o.BName }
-func (o *Temp) String() string   { return o.ID }
+func (o *Temp) Name() string     { return o.Ident }
+func (o *Temp) BaseName() string { return o.OrigName }
+func (o *Temp) String() string   { return o.Ident }
 func (o *Temp) IsMem() bool      { return false }
 
 func (o *Local) Type() Type       { return o.Typ }
-func (o *Local) Name() string     { return o.ID }
-func (o *Local) BaseName() string { return o.BName }
-func (o *Local) String() string   { return o.ID }
+func (o *Local) Name() string     { return o.Ident }
+func (o *Local) BaseName() string { return o.OrigName }
+func (o *Local) String() string   { return o.Ident }
 func (o *Local) IsMem() bool      { return true }
 
 func (o *Param) Type() Type       { return o.Typ }
-func (o *Param) Name() string     { return o.ID }
-func (o *Param) BaseName() string { return o.BName }
-func (o *Param) String() string   { return o.ID }
+func (o *Param) Name() string     { return o.Ident }
+func (o *Param) BaseName() string { return o.OrigName }
+func (o *Param) String() string   { return o.Ident }
 func (o *Param) IsMem() bool {
 	if o.Kind == "VAR" {
 		return true
@@ -127,9 +121,9 @@ func (o *Param) IsMem() bool {
 }
 
 func (o NamedConst) Type() Type       { return o.Typ }
-func (o NamedConst) Name() string     { return o.ID }
-func (o NamedConst) BaseName() string { return o.ID }
-func (o NamedConst) String() string   { return o.ID }
+func (o NamedConst) Name() string     { return o.Ident }
+func (o NamedConst) BaseName() string { return o.OrigName }
+func (o NamedConst) String() string   { return o.Ident }
 func (o NamedConst) Const()           {}
 func (o NamedConst) Value() any       { return o.ConstValue }
 func (o NamedConst) IsMem() bool      { return false }
@@ -166,9 +160,9 @@ func (o StrLit) String() string   { return o.LitName }
 func (o StrLit) Value() any       { return o.LitValue }
 func (o StrLit) IsMem() bool      { return false }
 
-func (o *Global) Type() Type          { return o.Typ }
-func (o *Global) Name() string        { return "@" + o.NameStr }
-func (o *Global) BaseName() string    { return o.BName }
-func (o *Global) SetName(name string) { o.NameStr = name }
-func (o *Global) String() string      { return "@" + o.NameStr }
-func (o *Global) IsMem() bool         { return true }
+func (v *GlobalVariable) Type() Type          { return v.Typ }
+func (v *GlobalVariable) Name() string        { return "@" + v.Ident }
+func (v *GlobalVariable) BaseName() string    { return v.OrigName }
+func (v *GlobalVariable) SetName(name string) { v.Ident = name }
+func (v *GlobalVariable) String() string      { return "@" + v.Ident }
+func (v *GlobalVariable) IsMem() bool         { return true }

@@ -127,7 +127,6 @@ func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 			Module:     ident.Prefix,
 			IsExported: ident.Symbol.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
 			IsReadOnly: ident.Symbol.Props() == ast.ReadOnly,
-			Offset:     ident.Symbol.Offset(),
 			Size:       ident.SemaType.Width(),
 		}
 	case ast.ConstantSymbolKind:
@@ -205,14 +204,6 @@ func (g Generator) VisitExprRange(r *ast.ExprRange) any {
 	high := r.High.Accept(g).(Expr)
 	return &RangeExpr{Low: low, High: high}
 }
-
-//func (g Generator) VisitNil(n *ast.Nil) any {
-//	return &Literal{
-//		Kind:     token.NIL,
-//		Value:    "nil",
-//		SemaType: n.SemaType,
-//	}
-//}
 
 func (g Generator) VisitIfStmt(stmt *ast.IfStmt) any {
 	// Convert the main IF condition and THEN block
@@ -563,8 +554,7 @@ func (g Generator) VisitVariableDecl(decl *ast.VariableDecl) any {
 			Mangled:    id.Symbol.MangledName(),
 			Type:       id.SemaType,
 			Size:       id.SemaType.Width(),
-			Offset:     id.Symbol.Offset(),
-			IsExport:   id.Props == ast.Exported,
+			IsExport:   id.Props == ast.Exported || id.Props == ast.ExportedReadOnly,
 			IsReadOnly: id.Props == ast.ReadOnly,
 		})
 	}
@@ -581,7 +571,6 @@ func (g Generator) VisitConstantDecl(decl *ast.ConstantDecl) any {
 		Type:       decl.Name.SemaType,
 		Value:      decl.Value.Accept(g).(Expr),
 		Size:       decl.Name.SemaType.Width(),
-		Offset:     decl.Name.Symbol.Offset(),
 		IsExport:   decl.Name.Props == ast.Exported || decl.Name.Props == ast.ExportedReadOnly,
 		IsReadOnly: decl.Name.Props == ast.ReadOnly,
 	})

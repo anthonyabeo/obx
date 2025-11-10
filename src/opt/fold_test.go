@@ -20,11 +20,11 @@ func TestConstantFold(t *testing.T) {
 	connect(f, j)
 	connect(j, exit)
 
-	a0 := &mir.Temp{ID: "a.0"}
+	a0 := &mir.Temp{Ident: "a.0"}
 	c := &mir.IntegerLit{LitValue: 1}
-	x1 := &mir.Temp{ID: "x.1"}
-	x2 := &mir.Temp{ID: "x.2"}
-	y0 := &mir.Temp{ID: "y.0"}
+	x1 := &mir.Temp{Ident: "x.1"}
+	x2 := &mir.Temp{Ident: "x.2"}
+	y0 := &mir.Temp{Ident: "y.0"}
 
 	entry.Instrs = []mir.Instr{
 		&mir.BinaryInst{Op: mir.ADD, Target: a0, Left: &mir.IntegerLit{LitValue: 2}, Right: &mir.IntegerLit{LitValue: 3}},

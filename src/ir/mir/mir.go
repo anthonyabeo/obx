@@ -16,7 +16,8 @@ type Program struct {
 type Module struct {
 	Name    string
 	IsEntry bool
-	Globals map[string]*Global
+	Globals map[string]*GlobalVariable
+	Consts  map[string]Constant
 	Funcs   []*Function
 	Env     *SymbolTable
 	Asm     *asm.Module
@@ -167,8 +168,8 @@ func init() {
 		Result:   Int32Type,
 		Exported: true,
 		Params: []Value{
-			&Param{ID: "format", Typ: StringType{}},
-			&Param{ID: "args", Typ: Int32Type},
+			&Param{Ident: "format", Typ: StringType{}},
+			&Param{Ident: "args", Typ: Int32Type},
 		},
 	})
 }

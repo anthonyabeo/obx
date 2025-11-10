@@ -24,6 +24,17 @@ type (
 		Elem Type // Element type of the array
 	}
 
+	RecordType struct {
+		Fields map[string]RecordField
+		Size   int
+	}
+
+	RecordField struct {
+		Name   string
+		Offset int
+		Type   Type
+	}
+
 	PointerType struct {
 		Ref Type
 	}
@@ -96,6 +107,13 @@ func (a ArrayType) BaseElemSize() int {
 	}
 
 	return a.Elem.Width()
+}
+
+func (r RecordType) String() string { panic("implement me") }
+func (r RecordType) Width() int     { return r.Size }
+func (r RecordType) Field(name string) (RecordField, bool) {
+	f, ok := r.Fields[name]
+	return f, ok
 }
 
 func (t *IntegerType) String() string {

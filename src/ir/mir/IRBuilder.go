@@ -6,6 +6,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/ir/hir"
 	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/types"
 )
@@ -39,7 +40,8 @@ func (b *IRBuilder) Build(MIRProgram *hir.Program) *Program {
 func (b *IRBuilder) lowerModule(HIRModule *hir.Module) *Module {
 	env := NewSymbolTable(GlobalEnv)
 	functions := make([]*Function, 0)
-	globals := make(map[string]*Global)
+	globals := make(map[string]*GlobalVariable)
+	constants := make(map[string]Constant, 0)
 
 	for _, decl := range HIRModule.Decls {
 		switch d := decl.(type) {
@@ -48,28 +50,24 @@ func (b *IRBuilder) lowerModule(HIRModule *hir.Module) *Module {
 			functions = append(functions, fn)
 			env.Define(d.Name, fn)
 		case *hir.Constant:
-			global := &Global{
-				NameStr: d.Name,
-				BName:   d.Name,
-				Kind:    "CONST",
-				Typ:     b.lowerType(d.Type),
-				Value:   b.ensureValue(d.Value),
-				Offset:  d.Offset,
-				Size:    d.Size,
+			nameConst := &NamedConst{
+				OrigName:   d.Name,
+				Ident:      d.Mangled,
+				Typ:        b.lowerType(d.Type),
+				ConstValue: b.ensureValue(d.Value),
+				Size:       d.Size,
 			}
-			globals[d.Name] = global
-			env.Define(global.NameStr, global)
+			constants[d.Mangled] = nameConst
+			env.Define(nameConst.Ident, nameConst)
 		case *hir.Variable:
-			global := &Global{
-				NameStr: d.Name,
-				BName:   d.Name,
-				Kind:    "VAR",
-				Typ:     b.lowerType(d.Type),
-				Offset:  d.Offset,
-				Size:    d.Size,
+			global := &GlobalVariable{
+				Ident:    d.Mangled,
+				OrigName: d.Name,
+				Typ:      b.lowerType(d.Type),
+				Size:     d.Size,
 			}
-			globals[d.Name] = global
-			env.Define(global.NameStr, global)
+			globals[global.Ident] = global
+			env.Define(global.OrigName, global)
 		}
 	}
 
@@ -79,61 +77,57 @@ func (b *IRBuilder) lowerModule(HIRModule *hir.Module) *Module {
 		Name:    HIRModule.Name,
 		IsEntry: HIRModule.IsEntry,
 		Globals: globals,
+		Consts:  constants,
 		Funcs:   functions,
 		Env:     env,
 	}
 }
 
-func (b *IRBuilder) lowerFunction(fxn *hir.Function, env *SymbolTable) *Function {
-	fn := NewFunction(fxn.FnName(), fxn.IsExport, b.lowerType(fxn.Result), env)
+func (b *IRBuilder) lowerFunction(HIRFxn *hir.Function, env *SymbolTable) *Function {
+	fn := NewFunction(HIRFxn.FnName(), HIRFxn.IsExport, b.lowerType(HIRFxn.Result), env)
 
 	currentFn := b.Func
 	defer func() { b.Func = currentFn }()
 
 	b.Func = fn
 
-	for _, param := range fxn.Params {
-		t := &Param{
-			ID:    param.Name,
-			BName: param.Name,
-			Typ:   b.lowerType(param.Typ),
-		}
-
+	for _, param := range HIRFxn.Params {
+		var kind string
 		switch param.Kind {
 		case hir.ValueParam:
-			t.Kind = "VALUE"
+			kind = "VALUE"
 		case hir.InParam:
-			t.Kind = "IN"
+			kind = "IN"
 		case hir.VarParam:
-			t.Kind = "VAR"
+			kind = "VAR"
 		}
 
-		fn.Params = append(fn.Params, t)
-		fn.Env.Define(t.ID, t)
+		p := &Param{Ident: param.Name, OrigName: param.Name, Typ: b.lowerType(param.Typ), Kind: kind}
+
+		fn.Params = append(fn.Params, p)
+		fn.Env.Define(p.Ident, p)
 	}
 
-	for _, local := range fxn.Locals {
+	for _, local := range HIRFxn.Locals {
 		switch d := local.(type) {
 		case *hir.Variable:
 			lcl := &Local{
-				ID:     d.Name,
-				BName:  d.Name,
-				Typ:    b.lowerType(d.Type),
-				Offset: d.Offset,
-				Size:   d.Size,
+				Ident:    d.Mangled,
+				OrigName: d.Name,
+				Typ:      b.lowerType(d.Type),
+				Size:     d.Size,
 			}
 			fn.Locals = append(fn.Locals, lcl)
-			fn.Env.Define(lcl.ID, lcl)
+			fn.Env.Define(lcl.Ident, lcl)
 		case *hir.Constant:
 			c := &NamedConst{
-				ID:         d.Name,
+				Ident:      d.Name,
 				ConstValue: b.ensureValue(d.Value),
 				Typ:        b.lowerType(d.Type),
-				Offset:     d.Offset,
 				Size:       d.Size,
 			}
 			fn.Constants[d.Mangled] = c
-			fn.Env.Define(c.ID, c)
+			fn.Env.Define(d.Mangled, c)
 		case *hir.Function:
 		}
 	}
@@ -146,7 +140,7 @@ func (b *IRBuilder) lowerFunction(fxn *hir.Function, env *SymbolTable) *Function
 	// mark "entry" as currently active block for inserting instructions
 	b.SetBlock(entry)
 
-	b.lowerCompoundStmt(fxn.Body)
+	b.lowerCompoundStmt(HIRFxn.Body)
 
 	exit := NewBlock(fn.FnName + "_exit")
 	fn.Blocks[exit.ID] = exit
@@ -217,11 +211,28 @@ func (b *IRBuilder) lowerType(ty types.Type) Type {
 		}
 	case *types.StringType:
 		return &StringType{Length: ty.Length}
-	case types.EnumType:
+	case *types.EnumType:
 	case *types.RecordType:
+		fields := make(map[string]RecordField)
+		offset := 0
+		for _, f := range ty.Fields {
+			fieldType := b.lowerType(f.Type)
+			fields[f.Name] = RecordField{
+				Name:   f.Name,
+				Type:   fieldType,
+				Offset: offset,
+			}
+			offset += sema.AlignTo(f.Type.Width(), f.Type.Alignment())
+		}
+
+		return &RecordType{
+			Fields: fields,
+			Size:   offset,
+		}
 	case *types.ProcedureType:
 	case *types.PointerType:
 	case *types.NamedType:
+		return b.lowerType(ty.Def)
 	default:
 		panic("unhandled type: " + fmt.Sprintf("%T", ty))
 	}
@@ -286,6 +297,11 @@ func (b *IRBuilder) ensureValue(expr hir.Expr) Value {
 	case *hir.SetExpr:
 	case *hir.RangeExpr:
 	case *hir.FieldAccess:
+		addr := b.lowerFieldAccess(e)
+		t := b.NewTemp(addr.Type())
+		b.Emit(&LoadInst{Addr: addr, Target: t})
+
+		return t
 	case *hir.IndexExpr:
 		addr := b.lowerIndexExpr(e)
 
@@ -323,6 +339,7 @@ func (b *IRBuilder) ensureAddr(expr hir.Expr) Value {
 		}
 		return v
 	case *hir.FieldAccess:
+		return b.lowerFieldAccess(e)
 	case *hir.IndexExpr:
 		return b.lowerIndexExpr(e)
 	case *hir.DerefExpr:
@@ -629,6 +646,28 @@ func (b *IRBuilder) lowerIndexExpr(e *hir.IndexExpr) Value {
 	return &Mem{Base: addr}
 }
 
+func (b *IRBuilder) lowerFieldAccess(e *hir.FieldAccess) Value {
+	// 1. Get the base record address
+	recordAddr := b.ensureAddr(e.Record)
+
+	// 2. Look up the field offset from the record’s type
+	recordType, ok := recordAddr.Type().(*RecordType)
+	if !ok {
+		panic("lowerFieldAccess: base is not a record type")
+	}
+
+	field, exists := recordType.Field(e.Field)
+	if !exists {
+		panic("lowerFieldAccess: field does not exist in record type")
+	}
+
+	// 3. Compute the field address by adding the offset to the base address
+	offsetValue := UInt64Lit(uint64(field.Offset))
+	fieldAddr := b.CreateBinary(ADD, recordAddr, offsetValue, Int64Type)
+
+	return &Mem{Base: fieldAddr}
+}
+
 func (b *IRBuilder) CreateBinary(op InstrOp, left, right Value, ty Type) Value {
 	t := b.NewTemp(ty)
 
@@ -675,7 +714,7 @@ func (b *IRBuilder) Emit(instr Instr) {
 func (b *IRBuilder) NewTemp(ty Type) *Temp {
 	b.TempGen++
 	name := fmt.Sprintf("t%d", b.TempGen)
-	return &Temp{ID: name, BName: name, Typ: ty}
+	return &Temp{Ident: name, OrigName: name, Typ: ty, Size: ty.Width()}
 }
 
 func (b *IRBuilder) NewLabel(prefix string) string {

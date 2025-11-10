@@ -31,21 +31,17 @@ func (r *SSAInfo) NewValue(v Value) Value {
 	switch value := v.(type) {
 	case *Temp:
 		return &Temp{
-			ID:     r.Current(value.BName),
-			BName:  value.BName,
-			Typ:    value.Typ,
-			Offset: value.Offset,
-			Size:   value.Size,
+			Ident:    r.Current(value.OrigName),
+			OrigName: value.OrigName,
+			Typ:      value.Typ,
+			Size:     value.Size,
 		}
-	case *Global:
-		return &Global{
-			NameStr: r.Current(value.BName),
-			BName:   value.BName,
-			Kind:    value.Kind,
-			Typ:     value.Typ,
-			Value:   value.Value,
-			Offset:  value.Offset,
-			Size:    value.Size,
+	case *GlobalVariable:
+		return &GlobalVariable{
+			Ident:    r.Current(value.OrigName),
+			OrigName: value.OrigName,
+			Typ:      value.Typ,
+			Size:     value.Size,
 		}
 	case *IntegerLit, *FloatLit, *CharLit, *StrLit, *NamedConst:
 		return value

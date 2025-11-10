@@ -12,7 +12,6 @@ type (
 		Mangled    string
 		Type       types.Type
 		Size       int
-		Offset     int
 		IsExport   bool
 		IsReadOnly bool
 	}
@@ -23,7 +22,6 @@ type (
 		Type       types.Type
 		Value      Expr
 		Size       int
-		Offset     int
 		IsExport   bool
 		IsReadOnly bool
 	}
