@@ -458,7 +458,12 @@ func (r RV64IMAFD) formatInstr(ins *asm.Instr) string {
 		for _, op := range ins.SrcOperands {
 			operands = append(operands, op.String())
 		}
-		return fmt.Sprintf("%s %s, %s", ins.Opcode, ins.DstOperand, strings.Join(operands, ", "))
+
+		if ins.DstOperand != nil {
+			return fmt.Sprintf("%s %s, %s", ins.Opcode, ins.DstOperand, strings.Join(operands, ", "))
+		}
+
+		return fmt.Sprintf("%s %s", ins.Opcode, strings.Join(operands, ", "))
 	}
 }
 

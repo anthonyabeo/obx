@@ -57,7 +57,7 @@ func (b *IRBuilder) lowerModule(HIRModule *hir.Module) *Module {
 				ConstValue: b.ensureValue(d.Value),
 				Size:       d.Size,
 			}
-			constants[d.Mangled] = nameConst
+			constants[nameConst.Ident] = nameConst
 			env.Define(nameConst.Ident, nameConst)
 		case *hir.Variable:
 			global := &GlobalVariable{
@@ -67,7 +67,7 @@ func (b *IRBuilder) lowerModule(HIRModule *hir.Module) *Module {
 				Size:     d.Size,
 			}
 			globals[global.Ident] = global
-			env.Define(global.OrigName, global)
+			env.Define(global.Ident, global)
 		}
 	}
 
@@ -264,7 +264,7 @@ func (b *IRBuilder) ensureValue(expr hir.Expr) Value {
 	case *hir.UnaryExpr:
 		return b.lowerUnaryExpr(e)
 	case *hir.VariableRef:
-		v, found := b.Func.Env.Lookup(e.Name)
+		v, found := b.Func.Env.Lookup(e.Mangled)
 		if !found {
 			panic(fmt.Sprintf("undefined variable: '%s'", e.Name))
 		}
@@ -333,7 +333,7 @@ func (b *IRBuilder) ensureAddr(expr hir.Expr) Value {
 
 		return param
 	case *hir.VariableRef:
-		v, found := b.Func.Env.Lookup(e.Name)
+		v, found := b.Func.Env.Lookup(e.Mangled)
 		if !found {
 			panic(fmt.Sprintf("undefined variable: '%s'", e.Name))
 		}

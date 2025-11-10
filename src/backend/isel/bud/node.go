@@ -191,21 +191,21 @@ func patMIRValue(value mir.Value) *Node {
 	switch val := value.(type) {
 	case *mir.NamedConst:
 		return &Node{Val: &Value{Kind: KindSymbol, Symbol: Symbol{
-			Name: val.ID,
+			Name: val.Ident,
 			Kind: ConstSK,
 			Size: val.Size,
 			Ty:   val.Typ,
 		}}}
 	case *mir.Local:
 		return &Node{Val: &Value{Kind: KindSymbol, Symbol: Symbol{
-			Name: val.BName,
+			Name: val.Ident,
 			Kind: LocalSK,
 			Size: val.Size,
 			Ty:   val.Typ,
 		}}}
 	case *mir.Param:
 		return &Node{Val: &Value{Kind: KindSymbol, Symbol: Symbol{
-			Name:      val.BName,
+			Name:      val.Ident,
 			Kind:      ParamSK,
 			Size:      val.Size,
 			Ty:        val.Typ,
@@ -214,9 +214,9 @@ func patMIRValue(value mir.Value) *Node {
 	case *mir.Temp:
 		switch val.Type().(type) {
 		case *mir.FloatType:
-			return &Node{Val: &Value{Kind: KindFPR, Reg: Reg{Name: val.ID}}}
+			return &Node{Val: &Value{Kind: KindFPR, Reg: Reg{Name: val.Ident}}}
 		default:
-			return &Node{Val: &Value{Kind: KindGPR, Reg: Reg{Name: val.ID}}}
+			return &Node{Val: &Value{Kind: KindGPR, Reg: Reg{Name: val.Ident}}}
 		}
 	case *mir.IntegerLit:
 		return &Node{
@@ -227,10 +227,10 @@ func patMIRValue(value mir.Value) *Node {
 			Name:  val.LitName,
 			Value: val.LitValue,
 		}}}
-	case *mir.Global:
+	case *mir.GlobalVariable:
 		return &Node{
 			Val: &Value{Kind: KindSymbol, Symbol: Symbol{
-				Name: val.NameStr,
+				Name: val.Ident,
 				Kind: GlobalSK,
 				Size: val.Size,
 				Ty:   val.Typ,
