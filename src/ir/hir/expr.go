@@ -84,8 +84,6 @@ type (
 		Module     string // name of the module in which it declared/used
 		IsExported bool
 		IsReadOnly bool
-		Offset     int
-		Size       int
 	}
 
 	TypeRef struct {

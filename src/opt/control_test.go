@@ -241,7 +241,7 @@ end Main
 					p.x := 10;
 					p.y := 20;
 					p.z := p.x + p.y;
-					printf("Point Z: %d\n", p.z)
+					printf("Points: (%d, %d, %d)\n", p.x, p.y, p.z)
 				END RecordTest.
 				`,
 			filename: "record_field_access.obx",

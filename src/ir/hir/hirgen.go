@@ -153,8 +153,6 @@ func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 			SemaType:   ident.SemaType,
 			IsExported: sym.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
 			IsReadOnly: sym.Props() == ast.ReadOnly,
-			Offset:     sym.Offset(),
-			//Size:       ident.SemaType.Width(),
 		}
 	//case ast.TypeSymbolKind:
 	//case ast.ModuleSymbolKind:
@@ -163,6 +161,7 @@ func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 	case ast.ParamSymbolKind:
 		sym := ident.Symbol.(*ast.ParamSymbol)
 		var mod ParamKind
+
 		switch sym.Mod {
 		case token.IN:
 			mod = InParam

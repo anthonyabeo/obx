@@ -27,6 +27,7 @@ type Function struct {
 	FnName   string
 	Result   Type
 	Exported bool
+	Variadic bool
 	Params   []Value // formal parameters
 	Locals   []Value // local variable, constant, procedure declarations
 	IsLeaf   bool
@@ -167,10 +168,8 @@ func init() {
 		FnName:   "printf",
 		Result:   Int32Type,
 		Exported: true,
-		Params: []Value{
-			&Param{Ident: "format", Typ: StringType{}},
-			&Param{Ident: "args", Typ: Int32Type},
-		},
+		Variadic: true,
+		Params:   []Value{&Param{Ident: "format", Typ: ArrayType{Len: -1, Elem: UInt8Type}}},
 	})
 }
 

@@ -449,6 +449,36 @@ func (b *IRBuilder) LoopStmt(s *hir.LoopStmt) {
 	b.SetBlock(exitBlk)
 }
 
+func (b *IRBuilder) lowerArgs(fn *Function, Args []hir.Expr, startIdx, endIdx int, args *[]Value) {
+	for idx := startIdx; idx < endIdx; idx++ {
+		param := fn.Params[idx].(*Param)
+		arg := Args[idx]
+
+		var v Value
+
+		switch param.Kind {
+		case "VAR", "IN":
+			v = b.ensureAddr(arg)
+		default:
+			v = b.ensureValue(arg)
+		}
+
+		b.Emit(&Arg{Index: idx, Value: v})
+		*args = append(*args, v)
+	}
+}
+
+func (b *IRBuilder) lowerVarArgs(Args []hir.Expr, startIdx, endIdx int, args *[]Value) {
+	for idx := startIdx; idx < endIdx; idx++ {
+		arg := Args[idx]
+
+		v := b.ensureValue(arg)
+
+		b.Emit(&Arg{Index: idx, Value: v})
+		*args = append(*args, v)
+	}
+}
+
 func (b *IRBuilder) FuncCall(s *hir.FuncCall) Value {
 	var args []Value
 	fxn, ok := b.Func.Env.Lookup(s.Func.Name)
@@ -461,20 +491,9 @@ func (b *IRBuilder) FuncCall(s *hir.FuncCall) Value {
 		panic("symbol is not a function: " + s.Func.Name)
 	}
 
-	for idx, arg := range s.Args {
-		param := fn.Params[idx].(*Param)
-
-		var v Value
-
-		switch param.Kind {
-		case "VAR", "IN":
-			v = b.ensureAddr(arg)
-		default:
-			v = b.ensureValue(arg)
-		}
-
-		b.Emit(&Arg{Index: idx, Value: v})
-		args = append(args, v)
+	b.lowerArgs(fn, s.Args, 0, len(fn.Params), &args)
+	if fn.Variadic {
+		b.lowerVarArgs(s.Args, len(fn.Params), len(s.Args), &args)
 	}
 
 	var t Value
@@ -664,6 +683,7 @@ func (b *IRBuilder) lowerFieldAccess(e *hir.FieldAccess) Value {
 	var recordType *RecordType
 	switch ty := recordAddr.Type().(type) {
 	case *RecordType:
+		recordType = ty
 	case *PointerType:
 		rec, ok := ty.Ref.(*RecordType)
 		if !ok {
@@ -744,10 +764,14 @@ func (b *IRBuilder) NewLabel(prefix string) string {
 	return prefix + "_" + strconv.Itoa(b.labelCount)
 }
 
+// SetTerm updates the terminating instruction field of the currently active
+// basic block with 'term'.
 func (b *IRBuilder) SetTerm(term Instr) {
 	b.Block.Term = term
 }
 
+// BlockTermIsSet returns true if the terminating instruction of the currently
+// active basic block is set, i.e. not nil
 func (b *IRBuilder) BlockTermIsSet() bool {
 	return b.Block.Term != nil
 }
@@ -759,6 +783,8 @@ func (b *IRBuilder) NewBlock(label string) *Block {
 	return blk
 }
 
+// SetBlock make 'block' the currently active basic block, ensuring that
+// subsequent instructions created will be added to this block.
 func (b *IRBuilder) SetBlock(block *Block) {
 	b.Block = block
 }
