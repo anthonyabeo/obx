@@ -701,7 +701,11 @@ func (b *IRBuilder) lowerFieldAccess(e *hir.FieldAccess) Value {
 
 	// 3. Compute the field address by adding the offset to the base address
 	offsetValue := UInt64Lit(uint64(field.Offset))
-	fieldAddr := b.CreateBinary(ADD, recordAddr, offsetValue, Int64Type)
+
+	t := b.NewTemp(Int64Type)
+	b.Emit(&MoveInst{Target: t, Value: offsetValue})
+
+	fieldAddr := b.CreateBinary(ADD, recordAddr, t, Int64Type)
 
 	return &Mem{Base: fieldAddr}
 }

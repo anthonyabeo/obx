@@ -120,6 +120,25 @@ func TestCompile(t *testing.T) {
 				`,
 			filename: "param_test.obx",
 		},
+		{
+			name: "RecordFieldAccess",
+			input: `
+				MODULE RecordTest;
+				TYPE Point = RECORD 
+						x, y: INTEGER;
+						z: INT64
+				END;
+				VAR p: Point;
+				
+				BEGIN
+					p.x := 10;
+					p.y := 20;
+					p.z := p.x + p.y;
+					printf("Points: (%d, %d, %d)\n", p.x, p.y, p.z)
+				END RecordTest.
+				`,
+			filename: "record_field_access.obx",
+		},
 	}
 
 	for _, tc := range tests {
