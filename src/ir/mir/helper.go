@@ -104,6 +104,17 @@ func ToAsmType(ty Type) asm.Type {
 		return nil
 	case *StringType:
 		return &asm.StringType{Width: ty.Width()}
+	case *RecordType:
+		fields := make([]asm.Field, 0)
+		for _, field := range ty.Fields {
+			fields = append(fields, asm.Field{
+				Offset: field.Offset,
+				Type:   ToAsmType(field.Type),
+			})
+		}
+		return &asm.RecordType{Fields: fields, Width: ty.Width()}
+	case *PointerType:
+		return &asm.PointerType{Ref: ToAsmType(ty.Ref)}
 	default:
 		panic("unsupported mir type to asm type conversion")
 	}

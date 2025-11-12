@@ -78,3 +78,23 @@ type StringType struct {
 
 func (s StringType) String() string { return fmt.Sprintf("string(%d)", s.Width) }
 func (s StringType) Size() int      { return s.Width }
+
+type PointerType struct {
+	Ref Type
+}
+
+func (p PointerType) String() string { panic("implement me") }
+func (p PointerType) Size() int      { return 8 }
+
+type RecordType struct {
+	Fields []Field
+	Width  int
+}
+
+type Field struct {
+	Offset int
+	Type   Type
+}
+
+func (r RecordType) String() string { panic("implement me") }
+func (r RecordType) Size() int      { return r.Width }

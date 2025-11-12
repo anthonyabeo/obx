@@ -233,6 +233,7 @@ func (r RV64IMAFD) Legalize(fn *asm.Function) {
 				dst := instr.DstOperand
 				switch addr := dst.(type) {
 				case *asm.MemAddr:
+					instr.Opcode = "sd"
 				case *asm.Symbol:
 					switch r.Alignment(addr.Ty) {
 					case 1:
@@ -255,6 +256,7 @@ func (r RV64IMAFD) Legalize(fn *asm.Function) {
 				src := instr.SrcOperands[0]
 				switch addr := src.(type) {
 				case *asm.MemAddr:
+					instr.Opcode = "ld"
 				case *asm.Symbol:
 					switch r.Alignment(addr.Ty) {
 					case 1:
@@ -295,6 +297,17 @@ func (r RV64IMAFD) Alignment(ty asm.Type) int {
 		}
 	case *asm.ArrayType:
 		return r.Alignment(t.Element)
+	case *asm.PointerType:
+		return r.FrameInfo().PointerSize
+	case *asm.RecordType:
+		maxAlign := 1
+		for _, field := range t.Fields {
+			fieldAlign := r.Alignment(field.Type)
+			if fieldAlign > maxAlign {
+				maxAlign = fieldAlign
+			}
+		}
+		return maxAlign
 	default:
 		panic("unknown type for alignment")
 	}
