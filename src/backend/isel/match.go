@@ -240,13 +240,14 @@ func subst(operand ast.Operand, env map[string]*bud.Value) asm.Operand {
 			panic("unreachable")
 		}
 
+		var baseName string
 		if v, ok := env[op.Base.Name]; ok && (v.Kind == bud.KindGPR || v.Kind == bud.KindFPR) {
-			op.Base.Name = v.Reg.Name
+			baseName = v.Reg.Name
 		}
 
 		asmOp = &asm.MemAddr{
 			Base: &asm.Register{
-				Name: op.Base.Name,
+				Name: baseName,
 				Mode: RegMode(op.Base.Mode),
 				Kind: RegKind(op.Base.Type),
 			},
@@ -270,9 +271,7 @@ func subst(operand ast.Operand, env map[string]*bud.Value) asm.Operand {
 	case *ast.Arg:
 		if imm, ok := env[op.Index.Name]; ok && imm.Kind == bud.KindImm {
 			op.Index.Value = imm.Imm
-			asmOp = &asm.Argument{
-				Index: imm.Imm,
-			}
+			asmOp = &asm.Argument{Index: imm.Imm}
 		}
 	case *ast.String:
 		if v, ok := env[op.Name]; ok && v.Kind == bud.KindString {
@@ -300,7 +299,7 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 	if inst.Dst != nil {
 		asmDstOperand = subst(inst.Dst, env)
 	}
-	
+
 	for _, operand := range inst.Operands {
 		asmSrcOperands = append(asmSrcOperands, subst(operand, env))
 	}

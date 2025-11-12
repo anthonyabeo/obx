@@ -240,6 +240,23 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				})
 				instr.SrcOperands[i] = temp
 			}
+		case *asm.MemAddr:
+			switch base := op.Base.(type) {
+			case *asm.Register:
+				if base.Mode == asm.Phys {
+					continue
+				}
+
+				if preg, ok := alloc.TempRegMap[base.Name]; ok {
+					reg := &asm.Register{
+						Name: preg,
+						Mode: asm.Phys,
+						Kind: base.Kind,
+					}
+
+					op.Base = reg
+				}
+			}
 		}
 	}
 
@@ -354,6 +371,23 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				temp := instr.SrcOperands[0]
 
 				instr = &asm.Instr{Opcode: "sd", DstOperand: mem, SrcOperands: []asm.Operand{temp}}
+			}
+		case *asm.MemAddr:
+			switch base := op.Base.(type) {
+			case *asm.Register:
+				if base.Mode == asm.Phys {
+					break
+				}
+
+				if preg, ok := alloc.TempRegMap[base.Name]; ok {
+					reg := &asm.Register{
+						Name: preg,
+						Mode: asm.Phys,
+						Kind: base.Kind,
+					}
+
+					op.Base = reg
+				}
 			}
 		}
 	}
