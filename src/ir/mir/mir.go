@@ -2,9 +2,8 @@ package mir
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/anthonyabeo/obx/src/ir/asm"
+	"strings"
 )
 
 // Program ...
@@ -24,13 +23,14 @@ type Module struct {
 }
 
 type Function struct {
-	FnName   string
-	Result   Type
-	Exported bool
-	Variadic bool
-	Params   []Value // formal parameters
-	Locals   []Value // local variable, constant, procedure declarations
-	IsLeaf   bool
+	FnName    string
+	Result    Type
+	Exported  bool
+	Variadic  bool
+	IsBuiltin bool
+	Params    []Value // formal parameters
+	Locals    []Value // local variable, constant, procedure declarations
+	IsLeaf    bool
 
 	Blocks  map[int]*Block // basic blocks (in order, but can build CFG)
 	Entry   *Block         // pointer to entry block
@@ -142,6 +142,7 @@ func (fn *Function) SortedBlocks() []*Block {
 func (fn *Function) OutputDOT() string {
 	var sb strings.Builder
 	sb.WriteString("digraph CFG {\n")
+	sb.WriteString("  node [fontname=\"Helvetica\"];\n")
 	for _, block := range fn.SortedBlocks() {
 		label := fmt.Sprintf("%s:\\l", block.Label)
 		for _, instr := range block.Instrs {
@@ -165,11 +166,21 @@ func init() {
 	// Initialize built-in functions
 
 	GlobalEnv.Define("printf", &Function{
-		FnName:   "printf",
-		Result:   Int32Type,
-		Exported: true,
-		Variadic: true,
-		Params:   []Value{&Param{Ident: "format", Typ: ArrayType{Len: -1, Elem: UInt8Type}}},
+		FnName:    "printf",
+		Result:    Int32Type,
+		Exported:  true,
+		Variadic:  true,
+		IsBuiltin: true,
+		Params:    []Value{&Param{Ident: "format", Typ: ArrayType{Len: -1, Elem: UInt8Type}}},
+	})
+
+	GlobalEnv.Define("new", &Function{
+		FnName:    "new",
+		Result:    PointerTo(UInt8Type),
+		Exported:  true,
+		Variadic:  false,
+		IsBuiltin: true,
+		Params:    []Value{&Param{Ident: "size", Typ: Int64Type}},
 	})
 }
 

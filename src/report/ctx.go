@@ -23,4 +23,6 @@ type Context struct {
 
 	SymbolOverrides map[string]ast.Symbol // temporary binding of name to new type
 	TypeOverrides   map[string]types.Type // temporary types
+
+	TargetMachineWordSize uint64 // in bytes
 }

@@ -125,6 +125,9 @@ func (t *IntegerType) String() string {
 }
 func (t *IntegerType) Width() int { return t.Bits / 8 }
 
+func PointerTo(t Type) *PointerType {
+	return &PointerType{Ref: t}
+}
 func (t *PointerType) String() string { return fmt.Sprintf("*%s", t.Ref) }
 func (t *PointerType) Width() int {
 	if t.Ref == nil {
