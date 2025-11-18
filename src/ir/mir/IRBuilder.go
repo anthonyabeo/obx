@@ -3,6 +3,7 @@ package mir
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/anthonyabeo/obx/src/ir/hir"
 	"github.com/anthonyabeo/obx/src/report"
@@ -479,33 +480,42 @@ func (b *IRBuilder) lowerVarArgs(Args []hir.Expr, startIdx, endIdx int, args *[]
 	}
 }
 
-func (b *IRBuilder) FuncCall(s *hir.FuncCall) Value {
-	var args []Value
-	fxn, ok := b.Func.Env.Lookup(s.Func.Name)
+func (b *IRBuilder) FuncCall(call *hir.FuncCall) Value {
+	fxn, ok := b.Func.Env.Lookup(strings.ToLower(call.Func.Name))
 	if !ok {
-		panic("undefined function: " + s.Func.Name)
+		panic("undefined function: " + call.Func.Name)
 	}
 
 	fn, ok := fxn.(*Function)
 	if !ok {
-		panic("symbol is not a function: " + s.Func.Name)
+		panic("symbol is not a function: " + call.Func.Name)
 	}
 
-	b.lowerArgs(fn, s.Args, 0, len(fn.Params), &args)
+	// the currently active function make a function call. The callee function exists
+	// and is a valid, hence the active function is not a leaf
+	b.Func.IsLeaf = false
+
+	if fn.IsBuiltin {
+		f := builtinLowering[fn.FnName]
+		return f(b, fn, call)
+	}
+
+	var args []Value
+	b.lowerArgs(fn, call.Args, 0, len(fn.Params), &args)
 	if fn.Variadic {
-		b.lowerVarArgs(s.Args, len(fn.Params), len(s.Args), &args)
+		b.lowerVarArgs(call.Args, len(fn.Params), len(call.Args), &args)
 	}
 
 	var t Value
-	if s.RetType != nil {
-		t = b.NewTemp(s.RetType)
+	if call.RetType != nil {
+		t = b.NewTemp(call.RetType)
 	} else {
 		t = b.NewTemp(Void)
 	}
 
-	name := s.Func.Mangled
+	name := call.Func.Mangled
 	if name == "" {
-		name = s.Func.Name
+		name = call.Func.Name
 	}
 
 	b.Emit(&CallInst{
@@ -513,8 +523,6 @@ func (b *IRBuilder) FuncCall(s *hir.FuncCall) Value {
 		Callee: name,
 		Args:   args,
 	})
-
-	b.Func.IsLeaf = false
 
 	return t
 }
@@ -641,54 +649,182 @@ func (b *IRBuilder) lowerConst(c *hir.Literal) Value {
 	return t
 }
 
-func (b *IRBuilder) lowerIndexExpr(e *hir.IndexExpr) Value {
-	// Generate the base array or pointer value
-	arr := b.ensureAddr(e.Array)
-	arrayType := arr.Type().(*ArrayType)
+func (b *IRBuilder) lowerOpenArrayIndex(arr Value, indices []Value, elemSize uint64, wordSize uint64) Value {
 
-	var indices []Value
-	for _, idx := range e.Index {
-		indices = append(indices, b.ensureValue(idx))
+	n := len(indices)
+
+	// -------------------------------------------------------------------------
+	// 1. Load dimension lengths from the header: arr[0], arr[1], ..., arr[n-1]
+	// -------------------------------------------------------------------------
+	lengths := make([]Value, n)
+	for k := 0; k < n; k++ {
+		// compute address = arr + k*wordSize
+		addr := b.NewTemp(Int64Type)
+		b.Emit(&BinaryInst{
+			Target: addr,
+			Op:     ADD,
+			Left:   arr,
+			Right:  Int64Lit(uint64(k) * wordSize),
+		})
+
+		// load len(k)
+		lval := b.NewTemp(Int64Type)
+		b.Emit(&LoadInst{
+			Target: lval,
+			Addr:   &Mem{Base: addr},
+		})
+		lengths[k] = lval
 	}
 
-	// 2) Compute offset in BYTES using strides
+	// -------------------------------------------------------------------------
+	// 2. Compute dynamic strides
+	//
+	// stride[n-1] = 1
+	// stride[k] = product(len[k+1] .. len[n-1])
+	// -------------------------------------------------------------------------
+	strides := make([]Value, n)
+	one := UInt64Lit(1)
+
+	// last stride = 1
+	strides[n-1] = one
+
+	// fill backwards
+	for k := n - 2; k >= 0; k-- {
+		acc := b.NewTemp(UInt64Type)
+		b.Emit(&MoveInst{Target: acc, Value: one})
+		for j := k + 1; j < n; j++ {
+			tmp := b.NewTemp(UInt64Type)
+			b.Emit(&BinaryInst{
+				Target: tmp,
+				Op:     MUL,
+				Left:   acc,
+				Right:  lengths[j],
+			})
+			acc = tmp
+		}
+		strides[k] = acc
+	}
+
+	// -------------------------------------------------------------------------
+	// 3. Compute linear index = Σ (indices[k] * strides[k])
+	// -------------------------------------------------------------------------
+	linear := b.NewTemp(UInt64Type)
+	b.Emit(&MoveInst{Target: linear, Value: UInt64Lit(0)})
+
+	for k := 0; k < n; k++ {
+		mul := b.NewTemp(UInt64Type)
+		b.Emit(&BinaryInst{
+			Target: mul,
+			Op:     MUL,
+			Left:   indices[k],
+			Right:  strides[k],
+		})
+
+		sum := b.NewTemp(UInt64Type)
+		b.Emit(&BinaryInst{
+			Target: sum,
+			Op:     ADD,
+			Left:   linear,
+			Right:  mul,
+		})
+		linear = sum
+	}
+
+	// -------------------------------------------------------------------------
+	// 4. Multiply by element size: byteOffset = linear * elemSize
+	// -------------------------------------------------------------------------
+	byteOffset := b.NewTemp(UInt64Type)
+	b.Emit(&BinaryInst{
+		Target: byteOffset,
+		Op:     MUL,
+		Left:   linear,
+		Right:  UInt64Lit(elemSize),
+	})
+
+	// -------------------------------------------------------------------------
+	// 5. Add header size = n * wordSize
+	// -------------------------------------------------------------------------
+	withHeader := b.NewTemp(UInt64Type)
+	b.Emit(&BinaryInst{
+		Target: withHeader,
+		Op:     ADD,
+		Left:   byteOffset,
+		Right:  UInt64Lit(uint64(n) * wordSize),
+	})
+
+	// -------------------------------------------------------------------------
+	// 6. Add array base pointer → final address
+	// -------------------------------------------------------------------------
+	addr := b.NewTemp(UInt64Type)
+	b.Emit(&BinaryInst{
+		Target: addr,
+		Op:     ADD,
+		Left:   arr,
+		Right:  withHeader,
+	})
+
+	return &Mem{Base: addr}
+}
+
+func (b *IRBuilder) lowerIndexExpr(e *hir.IndexExpr) Value {
+	arr := b.ensureAddr(e.Array)
+
+	var arrayType *ArrayType
+	switch at := arr.Type().(type) {
+	case *PointerType:
+		t := b.NewTemp(UInt64Type)
+		b.Emit(&LoadInst{Target: t, Addr: arr})
+		arr = t
+		arrayType = at.Ref.(*ArrayType)
+	case *ArrayType:
+		arrayType = at
+	default:
+		panic("lowerIndexExpr: base is not array or pointer type")
+	}
+
+	indices := make([]Value, len(e.Index))
+	for i, idx := range e.Index {
+		indices[i] = b.ensureValue(idx)
+	}
+
+	if arrayType.IsOpen() {
+		wordSize := b.ctx.TargetMachineWordSize
+		width := uint64(arrayType.Elem.Width())
+		return b.lowerOpenArrayIndex(arr, indices, width, wordSize)
+	}
+
 	strides := arrayType.Strides()
 	if len(strides) != len(indices) {
-		panic("LowerArrayIndexAddr: index count does not match array rank")
+		panic("lowerIndexExpr: index count does not match array rank")
 	}
 
-	// acc = 0
-	var acc Value
-	acc = b.NewTemp(Int64Type)
-	b.emitAssign(acc, &IntegerLit{LitValue: 0})
+	acc := b.NewTemp(Int64Type)
+	b.emitAssign(acc, Int64Lit(0))
 
-	for k := 0; k < len(indices); k++ {
-		// term = indices[k] * strides[k]
-		tMul := b.CreateBinary(MUL, indices[k], &IntegerLit{LitValue: uint64(strides[k])}, Int64Type)
-
-		// acc = acc + term
+	for k, idx := range indices {
+		stride := uint64(strides[k])
+		tMul := b.CreateBinary(MUL, idx, Int64Lit(stride), Int64Type)
 		acc = b.CreateBinary(ADD, acc, tMul, Int64Type)
 	}
 
-	// 3) addr = baseAddr + acc
 	addr := b.CreateBinary(ADD, arr, acc, Int64Type)
 	return &Mem{Base: addr}
 }
 
 func (b *IRBuilder) lowerFieldAccess(e *hir.FieldAccess) Value {
-	// 1. Get the base record address
+	// Get the base record address
 	recordAddr := b.ensureAddr(e.Record)
 
-	// 2. Look up the field offset from the record’s type
+	// Look up the field offset from the record’s type
 	var recordType *RecordType
 	switch ty := recordAddr.Type().(type) {
 	case *RecordType:
 		recordType = ty
 	case *PointerType:
-		rec, ok := ty.Ref.(*RecordType)
-		if !ok {
-			panic("lowerFieldAccess: record type does not match")
-		}
+		rec := ty.Ref.(*RecordType)
+		tmp := b.NewTemp(UInt64Type)
+		b.Emit(&LoadInst{Target: tmp, Addr: recordAddr})
+		recordAddr = tmp
 		recordType = rec
 	default:
 		panic("lowerFieldAccess: base is not a record type")
@@ -699,13 +835,11 @@ func (b *IRBuilder) lowerFieldAccess(e *hir.FieldAccess) Value {
 		panic("lowerFieldAccess: field does not exist in record type")
 	}
 
-	// 3. Compute the field address by adding the offset to the base address
-	offsetValue := UInt64Lit(uint64(field.Offset))
-
-	t := b.NewTemp(Int64Type)
-	b.Emit(&MoveInst{Target: t, Value: offsetValue})
-
-	fieldAddr := b.CreateBinary(ADD, recordAddr, t, Int64Type)
+	// Compute the field address by adding the offset to the base address
+	offset := UInt64Lit(uint64(field.Offset))
+	tmp := b.NewTemp(Int64Type)
+	b.Emit(&MoveInst{Target: tmp, Value: offset})
+	fieldAddr := b.CreateBinary(ADD, recordAddr, tmp, Int64Type)
 
 	return &Mem{Base: fieldAddr}
 }
@@ -714,7 +848,7 @@ func (b *IRBuilder) lowerDerefExpr(e *hir.DerefExpr) Value {
 	return b.ensureValue(e.Pointer)
 }
 
-func (b *IRBuilder) CreateBinary(op InstrOp, left, right Value, ty Type) Value {
+func (b *IRBuilder) CreateBinary(op InstrOp, left, right Value, ty Type) *Temp {
 	t := b.NewTemp(ty)
 
 	if op.IsCmpCondCode() {
