@@ -138,6 +138,18 @@ rule ADDr_sym {
   }
 }
 
+rule ADD_Imm_sym {
+  commutative;
+  out GPR:virt:$rd;
+  in  imm:$val, symbol:$sym;
+  temps GPR:virt:$t0;
+  pattern add($val, $sym);
+  emit {
+      instr { opcode: "li", dst: GPR:virt:$t0, src: [imm:$val], def: GPR:virt:$t0 };
+      instr { opcode: "add", dst: GPR:virt:$rd, src: [GPR:virt:$t0, symbol:$sym], def: GPR:virt:$rd, uses: [GPR:virt:$t0] };
+  }
+}
+
 rule ADDri {
   commutative;
   out GPR:virt:$rd;
