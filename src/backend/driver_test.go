@@ -139,6 +139,50 @@ func TestCompile(t *testing.T) {
 				`,
 			filename: "record_field_access.obx",
 		},
+		{
+			name: "DerefLowering",
+			input: `
+				MODULE DerefTest;
+				VAR p: POINTER TO RECORD x, y: INTEGER END;
+				VAR x: INTEGER;
+				BEGIN
+					NEW(p);
+					x := 42;
+					p^.x := x;
+					x := p^.y
+				END DerefTest.
+			`,
+			filename: "deref_test.obx",
+		},
+		{
+			name: "PointerToFixedArray",
+			input: `
+				MODULE PtrArrTest;
+				VAR p: ARRAY 5 OF INTEGER;
+				BEGIN
+					NEW(p)
+					p[0] := 999
+					printf("p[0] x: %d\n", p[0])
+				END PtrArrTest.
+			`,
+			filename: "ptr_arr_test.obx",
+		},
+		{
+			name: "NewOnOpenArray",
+			input: `
+				MODULE NewOpenArrayTest;
+				VAR arr: POINTER TO ARRAY OF INTEGER;
+		
+				BEGIN
+					NEW(arr, 10)
+					arr[0] := 42
+					arr[1] := 84
+					arr[2] := 126
+					printf("arr: [%d, %d, %d]\n", arr[0], arr[1], arr[2])
+				END NewOpenArrayTest.
+			`,
+			filename: "new_open_array_test.obx",
+		},
 	}
 
 	for _, tc := range tests {

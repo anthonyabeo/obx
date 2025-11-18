@@ -253,13 +253,39 @@ end Main
 				VAR p: POINTER TO RECORD x, y: INTEGER END;
 				VAR x: INTEGER;
 				BEGIN
-					//NEW(p);
+					NEW(p);
 					x := 42;
 					p^.x := x;
 					x := p^.y
 				END DerefTest.
 			`,
 			filename: "deref_test.obx",
+		},
+		{
+			name: "PointerToFixedArray",
+			input: `
+				MODULE PtrArrTest;
+				VAR p: ARRAY 5 OF INTEGER;
+				BEGIN
+					NEW(p)
+					p[0] := 42
+				END PtrArrTest.
+			`,
+			filename: "ptr_arr_test.obx",
+		},
+		{
+			name: "NewOnOpenArray",
+			input: `
+				MODULE NewOpenArrayTest;
+				VAR arr: POINTER TO ARRAY OF INTEGER;
+		
+				BEGIN
+					NEW(arr, 10)
+					arr[0] := 42
+					printf("arr[0] x: %d\n", arr[0])
+				END NewOpenArrayTest.
+			`,
+			filename: "new_open_array_test.obx",
 		},
 	}
 
@@ -275,9 +301,10 @@ end Main
 					Source: mgr,
 					Writer: os.Stdout,
 				}),
-				TabWidth:  4,
-				Names:     adt.NewStack[string](),
-				ExprLists: adt.NewStack[[]ast.Expression](),
+				TabWidth:              4,
+				Names:                 adt.NewStack[string](),
+				ExprLists:             adt.NewStack[[]ast.Expression](),
+				TargetMachineWordSize: 8,
 			}
 
 			program := format.ParseSourceAndLowerToMIR(t, ctx)
