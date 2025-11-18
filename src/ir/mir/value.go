@@ -87,7 +87,7 @@ type (
 
 	Mem struct {
 		Base Value // Address of the memory location
-		Offs int
+		Offs int64
 	}
 )
 

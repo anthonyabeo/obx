@@ -41,7 +41,7 @@ const (
 type Value struct {
 	Kind   ValueKind
 	Reg    Reg
-	Imm    int
+	Imm    int64
 	Label  string
 	Reloc  Reloc
 	Mem    Mem
@@ -173,7 +173,7 @@ func PatMIRInst(ins mir.Instr) *Node {
 			Op: "argument",
 			Args: []*Node{
 				patMIRValue(inst.Value),
-				{Val: &Value{Kind: KindImm, Imm: inst.Index}},
+				{Val: &Value{Kind: KindImm, Imm: int64(inst.Index)}},
 			},
 		}
 	case *mir.AddrOf:
@@ -220,7 +220,7 @@ func patMIRValue(value mir.Value) *Node {
 		}
 	case *mir.IntegerLit:
 		return &Node{
-			Val: &Value{Kind: KindImm, Imm: int(val.LitValue)},
+			Val: &Value{Kind: KindImm, Imm: int64(val.LitValue)},
 		}
 	case *mir.StrLit:
 		return &Node{Val: &Value{Kind: KindString, Str: String{

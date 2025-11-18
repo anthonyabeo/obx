@@ -1794,7 +1794,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 				})
 				return
 			}
-
+			call.SemaType = &types.PointerType{Base: types.ByteType}
 			return
 		} else {
 			call.ActualParams[0].Accept(t)
@@ -1833,6 +1833,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 					return
 				}
 			}
+			
+			call.SemaType = &types.PointerType{Base: types.ByteType}
 
 			return
 		}

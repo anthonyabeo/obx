@@ -23,7 +23,7 @@ type (
 	}
 
 	Argument struct {
-		Index int
+		Index int64
 	}
 
 	Symbol struct {

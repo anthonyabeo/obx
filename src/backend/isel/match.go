@@ -2,12 +2,11 @@ package isel
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/ir/mir"
-	"strconv"
-
+	
 	"github.com/anthonyabeo/obx/src/backend/isel/bud"
 	"github.com/anthonyabeo/obx/src/backend/isel/bud/ast"
 	"github.com/anthonyabeo/obx/src/ir/asm"
+	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
 var temp int
@@ -183,7 +182,7 @@ func subst(operand ast.Operand, env map[string]*bud.Value) asm.Operand {
 		if v, ok := env[op.Symbol]; ok {
 			var symbol string
 			if v.Kind == bud.KindImm {
-				symbol = strconv.Itoa(v.Imm)
+				symbol = fmt.Sprintf("%d", v.Imm)
 			} else if v.Kind == bud.KindLabel {
 				symbol = v.Label
 			} else if v.Kind == bud.KindSymbol {
@@ -226,7 +225,7 @@ func subst(operand ast.Operand, env map[string]*bud.Value) asm.Operand {
 			if v, ok := env[rel.Symbol]; ok {
 
 				if v.Kind == bud.KindImm {
-					symbol = strconv.Itoa(v.Imm)
+					symbol = fmt.Sprintf("%d", v.Imm)
 				} else if v.Kind == bud.KindLabel {
 					symbol = v.Label
 				}

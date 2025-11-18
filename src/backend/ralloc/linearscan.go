@@ -364,7 +364,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 					Kind: asm.GPR,
 				}
 			} else {
-				offset := (op.Index - target.RegisterInfo().MaxArgRegs) * target.FrameInfo().WordSize
+				offset := (int(op.Index) - target.RegisterInfo().MaxArgRegs) * target.FrameInfo().WordSize
 
 				sp := &asm.Register{Name: "sp", Mode: asm.Phys, Kind: asm.GPR}
 				mem := &asm.MemAddr{Base: sp, Offset: &asm.Imm{Value: offset}}
