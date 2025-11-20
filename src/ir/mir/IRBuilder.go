@@ -42,7 +42,7 @@ func (b *IRBuilder) lowerModule(HIRModule *hir.Module) *Module {
 	env := NewSymbolTable(GlobalEnv)
 	functions := make([]*Function, 0)
 	globals := make(map[string]*GlobalVariable)
-	constants := make(map[string]Constant, 0)
+	constants := make(map[string]Constant)
 
 	for _, decl := range HIRModule.Decls {
 		switch d := decl.(type) {
@@ -141,7 +141,7 @@ func (b *IRBuilder) lowerFunction(HIRFxn *hir.Function, env *SymbolTable) *Funct
 	// mark "entry" as currently active block for inserting instructions
 	b.SetBlock(entry)
 
-	b.lowerCompoundStmt(HIRFxn.Body)
+	b.CompoundStmt(HIRFxn.Body)
 
 	exit := NewBlock(fn.FnName + "_exit")
 	fn.Blocks[exit.ID] = exit
@@ -150,7 +150,7 @@ func (b *IRBuilder) lowerFunction(HIRFxn *hir.Function, env *SymbolTable) *Funct
 	return fn
 }
 
-func (b *IRBuilder) lowerCompoundStmt(stmt *hir.CompoundStmt) {
+func (b *IRBuilder) CompoundStmt(stmt *hir.CompoundStmt) {
 	for _, st := range stmt.Stmts {
 		switch s := st.(type) {
 		case *hir.AssignStmt:
@@ -164,11 +164,13 @@ func (b *IRBuilder) lowerCompoundStmt(stmt *hir.CompoundStmt) {
 		case *hir.ExitStmt:
 			b.ExitStmt()
 		case *hir.CompoundStmt:
-			b.lowerCompoundStmt(s)
+			b.CompoundStmt(s)
 		case *hir.FuncCall:
 			b.FuncCall(s)
 		case *hir.CaseStmt:
+			b.CaseStmt(s)
 		case *hir.WithStmt:
+			b.WithStmt(s)
 		default:
 		}
 	}
@@ -360,6 +362,119 @@ func (b *IRBuilder) ensureAddr(expr hir.Expr) Value {
 	return nil
 }
 
+func (b *IRBuilder) CaseStmt(stmt *hir.CaseStmt) {
+	endLabel := b.NewLabel("case_end")
+	elseLabel := endLabel
+	if stmt.Else != nil {
+		elseLabel = b.NewLabel("case_else")
+	}
+
+	type test struct {
+		testLabel  string
+		bodyLabel  string
+		labelRange *hir.LabelRange
+		body       *hir.CompoundStmt
+	}
+
+	var tests []test
+	testCount := 0
+	for bodyCount, c := range stmt.Cases {
+		for i := 0; i < len(c.Labels); i++ {
+			tests = append(tests, test{
+				testLabel:  b.NewLabel(fmt.Sprintf("case_test_%d", testCount)),
+				bodyLabel:  b.NewLabel(fmt.Sprintf("case_body_%d", bodyCount)),
+				labelRange: c.Labels[i],
+				body:       c.Body,
+			})
+			testCount++
+		}
+	}
+
+	tSel := b.ensureValue(stmt.Expr)
+
+	jmp := &JumpInst{Target: tests[0].testLabel}
+	b.SetTerm(jmp)
+	b.Emit(jmp)
+
+	// Emit all test blocks
+	for i, t := range tests {
+		block := b.NewBlock(t.testLabel)
+		b.SetBlock(block)
+
+		nextTestLabel := elseLabel
+		if i+1 < len(tests) {
+			nextTestLabel = tests[i+1].testLabel
+		}
+
+		b.lowerCaseTest(t.labelRange, tSel, t.bodyLabel, nextTestLabel)
+	}
+
+	// Emit all body blocks
+	for _, t := range tests {
+		block := b.NewBlock(t.bodyLabel)
+		b.SetBlock(block)
+
+		b.CompoundStmt(t.body)
+
+		if !b.BlockTermIsSet() {
+			j := &JumpInst{Target: endLabel}
+			b.SetTerm(j)
+			b.Emit(j)
+		}
+	}
+
+	// ELSE block
+	if stmt.Else != nil {
+		elseBlk := b.NewBlock(elseLabel)
+		b.SetBlock(elseBlk)
+
+		b.CompoundStmt(stmt.Else)
+
+		if !b.BlockTermIsSet() {
+			j := &JumpInst{Target: endLabel}
+			b.SetTerm(j)
+			b.Emit(j)
+		}
+	}
+
+	// Final end block
+	endBlk := b.NewBlock(endLabel)
+	b.SetBlock(endBlk)
+}
+func (b *IRBuilder) lowerCaseTest(r *hir.LabelRange, tSel Value, bodyLabel, nextTestLabel string) {
+	tLow := b.ensureValue(r.Low)
+
+	if r.High == nil || r.Low == r.High {
+		// Singleton case label
+		tmp := b.NewTemp(Int1Type)
+		b.Emit(&CmpInst{Target: tmp, Op: EQ, Left: tSel, Right: tLow})
+
+		br := &CondBrInst{Cond: tmp, TrueLabel: bodyLabel, FalseLabel: nextTestLabel}
+		b.SetTerm(br)
+		b.Emit(br)
+		return
+	}
+
+	// Range: Low <= x <= High
+	tHigh := b.ensureValue(r.High)
+
+	cmpLo := b.NewTemp(Int1Type)
+	cmpHi := b.NewTemp(Int1Type)
+	both := b.NewTemp(Int1Type)
+
+	b.Emit(&CmpInst{Target: cmpLo, Op: GE, Left: tSel, Right: tLow})
+	b.Emit(&CmpInst{Target: cmpHi, Op: LE, Left: tSel, Right: tHigh})
+	b.Emit(&BinaryInst{Target: both, Op: AND, Left: cmpLo, Right: cmpHi})
+
+	br := &CondBrInst{Cond: both, TrueLabel: bodyLabel, FalseLabel: nextTestLabel}
+	b.SetTerm(br)
+	b.Emit(br)
+}
+
+func (b *IRBuilder) WithStmt(stmt *hir.WithStmt) {
+
+}
+
 func (b *IRBuilder) ExitStmt() {
 	if b.curExit == "" {
 		panic("EXIT used outside loop")
@@ -370,13 +485,13 @@ func (b *IRBuilder) ExitStmt() {
 	b.Emit(jmp)
 }
 
-func (b *IRBuilder) IfStmt(s *hir.IfStmt) {
+func (b *IRBuilder) IfStmt(stmt *hir.IfStmt) {
 	endLabel := b.NewLabel("if_end")
 
 	// Track all conditional branches (initial + elsif)
 	allConds := append([]*hir.ElseIfBranch{
-		{Cond: s.Cond, Body: s.Then},
-	}, s.ElseIfs...)
+		{Cond: stmt.Cond, Body: stmt.Then},
+	}, stmt.ElseIfs...)
 
 	var trueLabel, falseLabel string
 
@@ -395,7 +510,7 @@ func (b *IRBuilder) IfStmt(s *hir.IfStmt) {
 		nextBlk := b.NewBlock(trueLabel)
 		b.SetBlock(nextBlk)
 
-		b.lowerCompoundStmt(branch.Body)
+		b.CompoundStmt(branch.Body)
 
 		if !b.BlockTermIsSet() {
 			jmp := &JumpInst{Target: endLabel}
@@ -409,8 +524,8 @@ func (b *IRBuilder) IfStmt(s *hir.IfStmt) {
 	}
 
 	// ELSE branch or fallthrough
-	if s.Else != nil {
-		b.lowerCompoundStmt(s.Else)
+	if stmt.Else != nil {
+		b.CompoundStmt(stmt.Else)
 	}
 
 	if !b.BlockTermIsSet() {
@@ -424,9 +539,9 @@ func (b *IRBuilder) IfStmt(s *hir.IfStmt) {
 	b.SetBlock(endBlk)
 }
 
-func (b *IRBuilder) LoopStmt(s *hir.LoopStmt) {
-	loopLabel := b.NewLabel(s.Label)
-	exitLabel := b.NewLabel(s.Label + "_exit")
+func (b *IRBuilder) LoopStmt(stmt *hir.LoopStmt) {
+	loopLabel := b.NewLabel(stmt.Label)
+	exitLabel := b.NewLabel(stmt.Label + "_exit")
 
 	// Register exit label for EXIT lowering
 	prevExit := b.curExit
@@ -438,7 +553,7 @@ func (b *IRBuilder) LoopStmt(s *hir.LoopStmt) {
 	b.SetBlock(loopBlk)
 
 	// Emit loop body
-	b.lowerCompoundStmt(s.Body)
+	b.CompoundStmt(stmt.Body)
 
 	// Jump back to loop
 	jmp := &JumpInst{Target: loopLabel}
@@ -579,16 +694,7 @@ func (b *IRBuilder) lowerBinary(expr *hir.BinaryExpr) Value {
 }
 
 func (b *IRBuilder) lowerUnaryExpr(u *hir.UnaryExpr) Value {
-	var op InstrOp
-	switch u.Op {
-	case token.PLUS:
-		op = ADD
-	case token.MINUS:
-		op = NEG
-	case token.NOT:
-		op = NOT
-	}
-
+	op := b.lowerOp(u.Op)
 	operand := b.ensureValue(u.Operand)
 
 	return b.CreateUnary(op, operand, u.SemaType)
@@ -639,6 +745,8 @@ func (b *IRBuilder) lowerConst(c *hir.Literal) Value {
 		v = True
 	case token.FALSE:
 		v = False
+	case token.SET:
+
 	default:
 		panic("unhandled literal kind: " + c.Kind.String())
 	}
@@ -668,12 +776,12 @@ func (b *IRBuilder) lowerOpenArrayIndex(arr Value, indices []Value, elemSize uin
 		})
 
 		// load len(k)
-		lval := b.NewTemp(Int64Type)
+		LVal := b.NewTemp(Int64Type)
 		b.Emit(&LoadInst{
-			Target: lval,
+			Target: LVal,
 			Addr:   &Mem{Base: addr},
 		})
-		lengths[k] = lval
+		lengths[k] = LVal
 	}
 
 	// -------------------------------------------------------------------------

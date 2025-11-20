@@ -287,6 +287,23 @@ end Main
 			`,
 			filename: "new_open_array_test.obx",
 		},
+		{
+			name: "SimpleCaseStatement",
+			input: `
+				MODULE CaseTest;
+				VAR x, a: INTEGER;
+				BEGIN
+					x := 3;
+					CASE x OF
+						1, 3: a := 1 |
+						5 .. 7: a := 2
+					ELSE
+						a := 0
+					END
+				END CaseTest.
+			`,
+			filename: "case_test.obx",
+		},
 	}
 
 	for _, tc := range tests {
