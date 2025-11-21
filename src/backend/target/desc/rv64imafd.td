@@ -104,7 +104,7 @@ rule MOVri_LargeImm {
 }
 
 /////////////////////////////////////////////////////////////////
-// Addition Jump Rules
+// Addition Rules
 /////////////////////////////////////////////////////////////////
 
 rule ADD_sym_sym {
@@ -177,6 +177,26 @@ rule ADDrr {
   emit {
     instr {
         opcode: "add",
+        dst: GPR:virt:$rd,
+        src: [GPR:virt:$rs1, GPR:virt:$rs2],
+        def: GPR:virt:$rd,
+        uses: [GPR:virt:$rs1, GPR:virt:$rs2]
+    };
+  }
+}
+
+/////////////////////////////////////////////////////////////////
+// Substration Rules
+/////////////////////////////////////////////////////////////////
+
+rule SUBrr {
+  out GPR:virt:$rd;
+  in  GPR:virt:$rs1, GPR:virt:$rs2;
+  pattern sub($rs1, $rs2);
+  cost 1;
+  emit {
+    instr {
+        opcode: "sub",
         dst: GPR:virt:$rd,
         src: [GPR:virt:$rs1, GPR:virt:$rs2],
         def: GPR:virt:$rd,
@@ -337,6 +357,104 @@ rule Ret {
     }
 }
 
+rule OR {
+    commutative;
+    out GPR:virt:$rd;
+    in  GPR:virt:$rs1, GPR:virt:$rs2;
+    pattern or($rs1, $rs2);
+    cost 1;
+    emit {
+        instr {
+            opcode: "or",
+            dst: GPR:virt:$rd,
+            src: [GPR:virt:$rs1, GPR:virt:$rs2],
+            def: GPR:virt:$rd,
+            uses: [GPR:virt:$rs1, GPR:virt:$rs2]
+        };
+    }
+}
+
+
+rule ORI {
+    commutative;
+    out GPR:virt:$rd;
+    in  GPR:virt:$rs, imm:$val;
+    pattern or($rs, $val);
+    cost 1;
+    emit {
+        instr {
+            opcode: "ori",
+            dst: GPR:virt:$rd,
+            src: [GPR:virt:$rs, imm:$val],
+            def: GPR:virt:$rd,
+            uses: [GPR:virt:$rs]
+        };
+    }
+    cond SImmFits12($val);
+}
+
+rule ORI_LargeImm {
+    commutative;
+    out GPR:virt:$rd;
+    in  GPR:virt:$rs, imm:$val;
+    temps GPR:virt:$t0;
+    pattern or($rs, $val);
+    cost 2;
+    emit {
+        instr { opcode: "li", dst: GPR:virt:$t0, src: [imm:$val], def: GPR:virt:$t0 };
+        instr { opcode: "or", dst: GPR:virt:$rd, src: [GPR:virt:$rs, GPR:virt:$t0], def: GPR:virt:$rd, uses: [GPR:virt:$rs, GPR:virt:$t0] };
+    }
+    cond !SImmFits12($val);
+}
+
+rule AND {
+    commutative;
+    out GPR:virt:$rd;
+    in  GPR:virt:$rs1, GPR:virt:$rs2;
+    pattern and($rs1, $rs2);
+    cost 1;
+    emit {
+        instr {
+            opcode: "and",
+            dst: GPR:virt:$rd,
+            src: [GPR:virt:$rs1, GPR:virt:$rs2],
+            def: GPR:virt:$rd,
+            uses: [GPR:virt:$rs1, GPR:virt:$rs2]
+        };
+    }
+}
+
+rule ANDI {
+    commutative;
+    out GPR:virt:$rd;
+    in  GPR:virt:$rs, imm:$val;
+    pattern and($rs, $val);
+    cost 1;
+    emit {
+        instr {
+            opcode: "andi",
+            dst: GPR:virt:$rd,
+            src: [GPR:virt:$rs, imm:$val],
+            def: GPR:virt:$rd,
+            uses: [GPR:virt:$rs]
+        };
+    }
+    cond SImmFits12($val);
+}
+
+rule AND_LargeImm {
+    commutative;
+    out GPR:virt:$rd;
+    in  GPR:virt:$rs, imm:$val;
+    temps GPR:virt:$t0;
+    pattern and($rs, $val);
+    cost 2;
+    emit {
+        instr { opcode: "li", dst: GPR:virt:$t0, src: [imm:$val], def: GPR:virt:$t0 };
+        instr { opcode: "and", dst: GPR:virt:$rd, src: [GPR:virt:$rs, GPR:virt:$t0], def: GPR:virt:$rd, uses: [GPR:virt:$rs, GPR:virt:$t0] };
+    }
+    cond !SImmFits12($val);
+}
 
 rule Not {
     out GPR:virt:$rd;
@@ -380,11 +498,62 @@ rule NegReg {
     }
 }
 
+rule SLLrr {
+  commutative;
+  out GPR:virt:$rd;
+  in  GPR:virt:$rs1, GPR:virt:$rs2;
+  pattern lshl($rs1, $rs2);
+  emit {
+    instr {
+        opcode: "sll",
+        dst: GPR:virt:$rd,
+        src: [GPR:virt:$rs1, GPR:virt:$rs2],
+        def: GPR:virt:$rd,
+        uses: [GPR:virt:$rs1, GPR:virt:$rs2]
+    };
+  }
+  cost 1;
+}
+
+rule SRLrr {
+  commutative;
+  out GPR:virt:$rd;
+  in  GPR:virt:$rs1, GPR:virt:$rs2;
+  pattern lshr($rs1, $rs2);
+  emit {
+    instr {
+        opcode: "srl",
+        dst: GPR:virt:$rd,
+        src: [GPR:virt:$rs1, GPR:virt:$rs2],
+        def: GPR:virt:$rd,
+        uses: [GPR:virt:$rs1, GPR:virt:$rs2]
+    };
+  }
+  cost 1;
+}
+
+rule SRArr {
+  commutative;
+  out GPR:virt:$rd;
+  in  GPR:virt:$rs1, GPR:virt:$rs2;
+  pattern ashr($rs1, $rs2);
+  emit {
+    instr {
+        opcode: "sra",
+        dst: GPR:virt:$rd,
+        src: [GPR:virt:$rs1, GPR:virt:$rs2],
+        def: GPR:virt:$rd,
+        uses: [GPR:virt:$rs1, GPR:virt:$rs2]
+    };
+  }
+  cost 1;
+}
 
 rule SLLI {
+  commutative;
   out GPR:virt:$rd;
   in  GPR:virt:$rs1, imm:$sh;
-  pattern shl($rs1, $sh);
+  pattern lshl($rs1, $sh);
   emit {
     instr {
         opcode: "slli",
