@@ -954,7 +954,6 @@ func (p *Parser) parseFactor() ast.Expression {
 		}
 
 		return dsg
-
 	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
 		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.WCHAR_LIT, token.NIL, token.TRUE, token.FALSE, token.LBRACE:
 		return p.parseLiteral()

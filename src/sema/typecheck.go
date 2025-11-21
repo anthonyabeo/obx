@@ -1833,7 +1833,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 					return
 				}
 			}
-			
+
 			call.SemaType = &types.PointerType{Base: types.ByteType}
 
 			return
@@ -2412,7 +2412,7 @@ func (t *TypeChecker) VisitBasicLit(lit *ast.BasicLit) any {
 		lit.SemaType = types.UnknownType
 	}
 
-	return lit
+	return lit.SemaType
 }
 
 func (t *TypeChecker) VisitExprRange(n *ast.ExprRange) any {
