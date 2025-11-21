@@ -15,9 +15,13 @@ const (
 
 	NEG
 	NOT
+	LSHL // Shift Left Logical
+	LSHR // Shift Right Logical
+	ASHR // Shift Right Arithmetic
 
 	OR
 	AND
+	IN
 
 	cmp_begin
 	EQ
@@ -35,38 +39,43 @@ func (op InstrOp) IsCmpCondCode() bool { return cmp_begin < op && op < cmp_end }
 func (op InstrOp) String() string {
 	switch op {
 	case ADD:
-		return "add"
+		return "ADD"
 	case SUB:
-		return "sub"
+		return "SUB"
 	case MUL:
-		return "mul"
+		return "MUL"
 	case DIV:
-		return "div"
+		return "DIV"
 	case REM:
-		return "rem"
+		return "REM"
 	case NOT:
-		return "not"
+		return "NOT"
 	case NEG:
-		return "neg"
+		return "NEG"
 	case EQ:
-		return "eq"
+		return "EQ"
 	case NE:
-		return "ne"
+		return "NE"
 	case LT:
-		return "lt"
+		return "LT"
 	case LE:
-		return "le"
+		return "LE"
 	case GT:
-		return "gt"
+		return "GT"
 	case GE:
-		return "ge"
+		return "GE"
 	case OR:
-		return "or"
+		return "OR"
 	case AND:
-		return "and"
+		return "AND"
 	case LD:
-		return "ld"
-
+		return "LD"
+	case LSHL:
+		return "LSHL"
+	case LSHR:
+		return "LSHR"
+	case ASHR:
+		return "ASHR"
 	default:
 		return "unknown"
 	}

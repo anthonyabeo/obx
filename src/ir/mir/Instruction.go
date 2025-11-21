@@ -96,7 +96,7 @@ type (
 	}
 )
 
-func (a Arg) String() string                 { return fmt.Sprintf("arg(%s, %d)", a.Value, a.Index) }
+func (a Arg) String() string                 { return fmt.Sprintf("ARG(%s, %d)", a.Value, a.Index) }
 func (a Arg) Def() Value                     { return nil }
 func (a Arg) Uses() []Value                  { return []Value{a.Value} }
 func (a Arg) ReplaceUses(m map[string]Value) {}
@@ -104,7 +104,7 @@ func (a Arg) ReplaceDef(Value)               {}
 
 func (a *MoveInst) Def() Value     { return a.Target }
 func (a *MoveInst) Uses() []Value  { return []Value{a.Value} }
-func (a *MoveInst) String() string { return fmt.Sprintf("mov %v, %v", a.Target, a.Value) }
+func (a *MoveInst) String() string { return fmt.Sprintf("MOV %v, %v", a.Target, a.Value) }
 func (a *MoveInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[a.Value.BaseName()]; ok {
 		a.Value = nv
@@ -114,14 +114,14 @@ func (a *MoveInst) ReplaceDef(t Value) { a.Target = t }
 
 func (*JumpInst) Def() Value                     { return nil }
 func (*JumpInst) Uses() []Value                  { return nil }
-func (j *JumpInst) String() string               { return fmt.Sprintf("jmp %s", j.Target) }
+func (j *JumpInst) String() string               { return fmt.Sprintf("JMP %s", j.Target) }
 func (j *JumpInst) ReplaceUses(map[string]Value) {}
 func (j *JumpInst) ReplaceDef(Value)             {}
 
 func (b *CondBrInst) Def() Value    { return nil }
 func (b *CondBrInst) Uses() []Value { return []Value{b.Cond} }
 func (b *CondBrInst) String() string {
-	return fmt.Sprintf("br %s, %s, %s", b.Cond.Name(), b.TrueLabel, b.FalseLabel)
+	return fmt.Sprintf("BR %s, %s, %s", b.Cond.Name(), b.TrueLabel, b.FalseLabel)
 }
 func (b *CondBrInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[b.Cond.BaseName()]; ok {
@@ -139,7 +139,7 @@ func (r *ReturnInst) Uses() []Value {
 }
 func (r *ReturnInst) String() string {
 	if r.Result != nil {
-		return fmt.Sprintf("ret %v", r.Result.Name())
+		return fmt.Sprintf("RET %v", r.Result.Name())
 	}
 
 	return "ret"
@@ -158,7 +158,7 @@ func (r *ReturnInst) ReplaceDef(Value) {}
 func (c *CmpInst) Def() Value    { return c.Target }
 func (c *CmpInst) Uses() []Value { return []Value{c.Left, c.Right} }
 func (c *CmpInst) String() string {
-	return fmt.Sprintf("%s := icmp %s %s, %s", c.Target.Name(), c.Op, c.Left.Name(), c.Right.Name())
+	return fmt.Sprintf("%s := ICMP.%s %s, %s", c.Target.Name(), c.Op, c.Left.Name(), c.Right.Name())
 }
 func (c *CmpInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[c.Left.BaseName()]; ok {
@@ -279,7 +279,7 @@ func (c *CallInst) String() string {
 	for _, arg := range c.Args {
 		argNames = append(argNames, arg.Name())
 	}
-	callStr := fmt.Sprintf("call @%s(%s)", c.Callee, strings.Join(argNames, ", "))
+	callStr := fmt.Sprintf("CALL @%s(%s)", c.Callee, strings.Join(argNames, ", "))
 	if c.Target == nil {
 		return callStr
 	}
@@ -297,7 +297,7 @@ func (c *CallInst) ReplaceDef(t Value) { c.Target = t }
 func (l *LoadInst) Def() Value    { return l.Target }
 func (l *LoadInst) Uses() []Value { return []Value{l.Addr} }
 func (l *LoadInst) String() string {
-	return fmt.Sprintf("%s := load %s", l.Target.Name(), l.Addr.Name())
+	return fmt.Sprintf("%s := LOAD %s", l.Target.Name(), l.Addr.Name())
 }
 func (l *LoadInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[l.Addr.BaseName()]; ok {
@@ -309,7 +309,7 @@ func (l *LoadInst) ReplaceDef(t Value) { l.Target = t }
 func (s *StoreInst) Def() Value    { return nil }
 func (s *StoreInst) Uses() []Value { return []Value{s.Addr, s.Val} }
 func (s *StoreInst) String() string {
-	return fmt.Sprintf("store %s, %s", s.Val.Name(), s.Addr.Name())
+	return fmt.Sprintf("STORE %s, %s", s.Val.Name(), s.Addr.Name())
 }
 func (s *StoreInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[s.Addr.BaseName()]; ok {
@@ -325,7 +325,7 @@ func (s *StoreInst) ReplaceDef(Value) {}
 func (a *AddrOf) Def() Value    { return a.Target }
 func (a *AddrOf) Uses() []Value { return []Value{a.Addr} }
 func (a *AddrOf) String() string {
-	return fmt.Sprintf("%s := addr %s", a.Target.Name(), a.Addr.Name())
+	return fmt.Sprintf("%s := ADDR %s", a.Target.Name(), a.Addr.Name())
 }
 func (a *AddrOf) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[a.Addr.BaseName()]; ok {
@@ -347,7 +347,7 @@ func (phi *PhiInst) String() string {
 	for _, arg := range phi.Args {
 		argNames = append(argNames, fmt.Sprintf("[%s %s]", arg.Block.Label, arg.Value.Name()))
 	}
-	return fmt.Sprintf("%s = phi %s", phi.Target, strings.Join(argNames, ", "))
+	return fmt.Sprintf("%s = PHI %s", phi.Target, strings.Join(argNames, ", "))
 }
 func (phi *PhiInst) ReplaceUses(m map[string]Value) {
 	for _, arg := range phi.Args {

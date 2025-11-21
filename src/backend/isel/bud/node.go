@@ -279,6 +279,17 @@ func patOp(op mir.InstrOp) string {
 		return "neg"
 	case mir.NOT:
 		return "not"
+	case mir.LSHL:
+		return "lshl"
+	case mir.LSHR:
+		return "lshr"
+	case mir.ASHR:
+		return "ashr"
+	case mir.AND:
+		return "and"
+	case mir.OR:
+		return "or"
+
 	default:
 		panic(fmt.Sprintf("invalid mir.InstrOp: '%s'", op))
 
