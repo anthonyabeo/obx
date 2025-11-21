@@ -167,4 +167,6 @@ var (
 	Float64Type = &FloatType{Bits: 64}
 
 	Void = VoidType("void")
+
+	SetType = &IntegerType{Bits: 32, Signed: false}
 )

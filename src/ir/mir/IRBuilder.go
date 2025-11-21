@@ -203,7 +203,7 @@ func (b *IRBuilder) lowerType(ty types.Type) Type {
 		case types.BOOLEAN:
 			return Int1Type
 		case types.SET:
-			return UInt32Type
+			return SetType
 		default:
 			panic("unhandled basic type: " + fmt.Sprintf("%v", ty.Kind))
 		}
@@ -301,7 +301,9 @@ func (b *IRBuilder) ensureValue(expr hir.Expr) Value {
 
 		return t
 	case *hir.SetExpr:
+		return b.lowerSetExpr(e)
 	case *hir.RangeExpr:
+		return b.lowerRangeExpr(e)
 	case *hir.FieldAccess:
 		addr := b.lowerFieldAccess(e)
 		t := b.NewTemp(addr.Type())
@@ -441,6 +443,7 @@ func (b *IRBuilder) CaseStmt(stmt *hir.CaseStmt) {
 	endBlk := b.NewBlock(endLabel)
 	b.SetBlock(endBlk)
 }
+
 func (b *IRBuilder) lowerCaseTest(r *hir.LabelRange, tSel Value, bodyLabel, nextTestLabel string) {
 	tLow := b.ensureValue(r.Low)
 
@@ -679,7 +682,8 @@ func (b *IRBuilder) lowerOp(op token.Kind) InstrOp {
 		return GE
 	case token.OR:
 		return OR
-
+	case token.IN:
+		return IN
 	default:
 		panic("unknown operator " + op.String())
 	}
@@ -691,6 +695,63 @@ func (b *IRBuilder) lowerBinary(expr *hir.BinaryExpr) Value {
 	op := b.lowerOp(expr.Op)
 
 	return b.CreateBinary(op, left, right, expr.SemaType)
+}
+
+func (b *IRBuilder) lowerSetExpr(s *hir.SetExpr) Value {
+	// Initialize set to zero
+	setTemp := b.NewPrefixTemp("set", UInt32Type)
+	b.Emit(&MoveInst{Target: setTemp, Value: UInt32Lit(0)})
+
+	for _, elem := range s.Elems {
+		var mask Value
+
+		switch elem := elem.(type) {
+		case *hir.RangeExpr:
+			mask = b.lowerRangeExpr(elem)
+		default:
+			idx := b.ensureValue(elem)
+
+			mask = b.NewPrefixTemp("mask", UInt32Type)
+			t := b.NewTemp(UInt32Type)
+			b.Emit(&MoveInst{Target: t, Value: UInt32Lit(1)})
+			b.Emit(&BinaryInst{Target: mask, Op: LSHL, Left: t, Right: idx})
+		}
+
+		tmp := b.NewTemp(UInt32Type)
+		b.Emit(&BinaryInst{Target: tmp, Op: OR, Left: setTemp, Right: mask})
+		b.Emit(&MoveInst{Target: setTemp, Value: tmp})
+	}
+
+	return setTemp
+}
+
+func (b *IRBuilder) lowerRangeExpr(e *hir.RangeExpr) Value {
+	low := b.ensureValue(e.Low)
+	var high Value
+	if e.High != nil {
+		high = b.ensureValue(e.High)
+	} else {
+		high = low
+	}
+
+	length := b.NewPrefixTemp("len", UInt32Type)
+	b.Emit(&BinaryInst{Target: length, Op: ADD, Left: high, Right: UInt32Lit(1)})
+	b.Emit(&BinaryInst{Target: length, Op: SUB, Left: length, Right: low}) // len = b - a + 1
+
+	// if len == 32: ones = 0xFFFFFFFF
+	// else ones = (1 << len) - 1
+	ones := b.NewPrefixTemp("ones", UInt32Type)
+	t := b.NewTemp(UInt32Type)
+	b.Emit(&MoveInst{Target: t, Value: UInt32Lit(1)})
+
+	b.Emit(&BinaryInst{Target: ones, Op: LSHL, Left: t, Right: length})
+	b.Emit(&BinaryInst{Target: ones, Op: SUB, Left: ones, Right: t})
+
+	// mask = ones << a
+	mask := b.NewPrefixTemp("mask", UInt32Type)
+	b.Emit(&BinaryInst{Target: mask, Op: LSHL, Left: ones, Right: low})
+
+	return mask
 }
 
 func (b *IRBuilder) lowerUnaryExpr(u *hir.UnaryExpr) Value {
@@ -745,8 +806,6 @@ func (b *IRBuilder) lowerConst(c *hir.Literal) Value {
 		v = True
 	case token.FALSE:
 		v = False
-	case token.SET:
-
 	default:
 		panic("unhandled literal kind: " + c.Kind.String())
 	}
@@ -956,7 +1015,37 @@ func (b *IRBuilder) lowerDerefExpr(e *hir.DerefExpr) Value {
 	return b.ensureValue(e.Pointer)
 }
 
+func (b *IRBuilder) lowerSet(op InstrOp, left, right Value) *Temp {
+	switch op {
+	case IN:
+		mask := b.NewPrefixTemp("mask", UInt32Type)
+		t := b.NewTemp(UInt32Type)
+		b.Emit(&MoveInst{Target: t, Value: UInt32Lit(1)})
+		b.Emit(&BinaryInst{Target: mask, Op: LSHL, Left: t, Right: left})
+
+		tmp := b.NewTemp(UInt32Type)
+		b.Emit(&BinaryInst{Target: tmp, Op: AND, Left: right, Right: mask}) // tmp = setv & mask
+
+		cond := b.NewTemp(UInt32Type)
+		t = b.NewTemp(UInt32Type)
+		b.Emit(&MoveInst{Target: t, Value: UInt32Lit(0)})
+		b.Emit(&CmpInst{Target: cond, Op: NE, Left: tmp, Right: t}) // cond = tmp != 0
+
+		return cond
+	//case ADD:
+	//case SUB:
+	//case MUL:
+	//case DIV:
+	default:
+		panic("lowerSet: unhandled set operation")
+	}
+}
+
 func (b *IRBuilder) CreateBinary(op InstrOp, left, right Value, ty Type) *Temp {
+	if op == IN {
+		return b.lowerSet(op, left, right)
+	}
+
 	t := b.NewTemp(ty)
 
 	if op.IsCmpCondCode() {
@@ -1002,6 +1091,12 @@ func (b *IRBuilder) Emit(instr Instr) {
 func (b *IRBuilder) NewTemp(ty Type) *Temp {
 	b.TempGen++
 	name := fmt.Sprintf("t%d", b.TempGen)
+	return &Temp{Ident: name, OrigName: name, Typ: ty, Size: ty.Width()}
+}
+
+func (b *IRBuilder) NewPrefixTemp(prefix string, ty Type) *Temp {
+	b.TempGen++
+	name := fmt.Sprintf("%s.t%d", prefix, b.TempGen)
 	return &Temp{Ident: name, OrigName: name, Typ: ty, Size: ty.Width()}
 }
 
