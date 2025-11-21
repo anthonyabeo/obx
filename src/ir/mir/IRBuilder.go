@@ -1032,17 +1032,33 @@ func (b *IRBuilder) lowerSet(op InstrOp, left, right Value) *Temp {
 		b.Emit(&CmpInst{Target: cond, Op: NE, Left: tmp, Right: t}) // cond = tmp != 0
 
 		return cond
-	//case ADD:
-	//case SUB:
-	//case MUL:
-	//case DIV:
+	case ADD:
+		res := b.NewTemp(SetType)
+		b.Emit(&BinaryInst{Target: res, Op: OR, Left: left, Right: right})
+		return res
+	case MUL:
+		res := b.NewTemp(SetType)
+		b.Emit(&BinaryInst{Target: res, Op: AND, Left: left, Right: right})
+		return res
+	case SUB:
+		// seta - setb  == seta & (~setb)
+		notSetB := b.NewTemp(SetType)
+		b.Emit(&UnaryInst{Target: notSetB, Op: NOT, Operand: right})
+		res := b.NewTemp(SetType)
+		b.Emit(&BinaryInst{Target: res, Op: AND, Left: left, Right: notSetB})
+		return res
+	case DIV:
+		// seta / setb  == seta ^ setb
+		res := b.NewTemp(SetType)
+		b.Emit(&BinaryInst{Target: res, Op: XOR, Left: left, Right: right})
+		return res
 	default:
 		panic("lowerSet: unhandled set operation")
 	}
 }
 
 func (b *IRBuilder) CreateBinary(op InstrOp, left, right Value, ty Type) *Temp {
-	if op == IN {
+	if right.Type() == SetType || left.Type() == SetType {
 		return b.lowerSet(op, left, right)
 	}
 

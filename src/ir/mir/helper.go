@@ -115,6 +115,8 @@ func ToAsmType(ty Type) asm.Type {
 		return &asm.RecordType{Fields: fields, Width: ty.Width()}
 	case *PointerType:
 		return &asm.PointerType{Ref: ToAsmType(ty.Ref)}
+	case *Set:
+		return &asm.BasicType{Kind: asm.U32, Width: ty.Width()}
 	default:
 		panic("unsupported mir type to asm type conversion")
 	}

@@ -44,6 +44,9 @@ type (
 	StringType struct {
 		Length int // Length of the string, -1 for dynamic length
 	}
+
+	Set struct {
+	}
 )
 
 func (s StringType) String() string { return fmt.Sprintf("string(%d)", s.Length) }
@@ -151,6 +154,9 @@ func (t *FloatType) Width() int {
 func (t VoidType) String() string { return "void" }
 func (t VoidType) Width() int     { return 0 /* Void type has no width*/ }
 
+func (t Set) String() string { return "set" }
+func (t Set) Width() int     { return 4 }
+
 var (
 	Int1Type = &IntegerType{Bits: 1, Signed: true}
 
@@ -168,5 +174,5 @@ var (
 
 	Void = VoidType("void")
 
-	SetType = &IntegerType{Bits: 32, Signed: false}
+	SetType = &Set{}
 )

@@ -22,6 +22,7 @@ const (
 	OR
 	AND
 	IN
+	XOR
 
 	cmp_begin
 	EQ
@@ -76,6 +77,8 @@ func (op InstrOp) String() string {
 		return "LSHR"
 	case ASHR:
 		return "ASHR"
+	case XOR:
+		return "XOR"
 	default:
 		return "unknown"
 	}

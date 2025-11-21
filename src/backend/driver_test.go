@@ -201,6 +201,31 @@ func TestCompile(t *testing.T) {
 	`,
 			filename: "set_in_test.obx",
 		},
+		{
+			name: "SetArithOperations",
+			input: `
+				MODULE SetOpsTest;
+				VAR A, B, C: SET;
+				VAR x: INTEGER;
+				BEGIN
+					A := {1,2,3,5 .. 7};
+					B := {3,4,5,8};
+					(* union *)
+					C := A + B;
+					(* intersection *)
+					C := A * B; 
+					(* difference 
+					(* C := A - B; *)
+					IF 1 IN C THEN
+						x := 100
+					ELSE
+						x := 0
+					END
+					printf("x: %d\n", x)
+				END SetOpsTest.
+				`,
+			filename: "set_ops_test.obx",
+		},
 	}
 
 	for _, tc := range tests {
