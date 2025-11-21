@@ -183,6 +183,24 @@ func TestCompile(t *testing.T) {
 			`,
 			filename: "new_open_array_test.obx",
 		},
+		{
+			name: "SetInOperation",
+			input: `
+		MODULE SetInTest;
+		VAR s: SET;
+		VAR x: INTEGER;
+		BEGIN
+			s := {1, 3, 5, 7, 9 .. 15};
+			IF 16 IN s THEN
+				x := 42
+			ELSE
+				x := 0
+			END
+			printf("x: %d\n", x)
+		END SetInTest.
+	`,
+			filename: "set_in_test.obx",
+		},
 	}
 
 	for _, tc := range tests {

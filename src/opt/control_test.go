@@ -304,6 +304,23 @@ end Main
 			`,
 			filename: "case_test.obx",
 		},
+		{
+			name: "SetInOperation",
+			input: `
+		MODULE SetInTest;
+		VAR s: SET;
+		VAR x: INTEGER;
+		BEGIN
+			s := {1, 3, 5, 7, 9 .. 15};
+			IF 10 IN s THEN
+				x := 42
+			ELSE
+				x := 0
+			END
+		END SetInTest.
+	`,
+			filename: "set_in_test.obx",
+		},
 	}
 
 	for _, tc := range tests {
