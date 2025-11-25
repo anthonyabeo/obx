@@ -59,6 +59,22 @@ func UInt32Lit(val uint64) *IntegerLit {
 	}
 }
 
+func Float64Lit(val float64) *FloatLit {
+	return &FloatLit{
+		LitValue: val,
+		Bits:     64,
+		Typ:      Float64Type,
+	}
+}
+
+func Float32Lit(val float64) *FloatLit {
+	return &FloatLit{
+		LitValue: val,
+		Bits:     32,
+		Typ:      Float32Type,
+	}
+}
+
 func ToAsmType(ty Type) asm.Type {
 	switch ty := ty.(type) {
 	case *IntegerType:

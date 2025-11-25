@@ -20,7 +20,14 @@ type Foldable interface {
 }
 
 type (
-	CmpInst struct {
+	ICmpInst struct {
+		Target Value
+		Op     InstrOp
+		Left   Value
+		Right  Value
+	}
+
+	FCmpInst struct {
 		Target Value
 		Op     InstrOp
 		Left   Value
@@ -155,12 +162,12 @@ func (r *ReturnInst) ReplaceUses(m map[string]Value) {
 }
 func (r *ReturnInst) ReplaceDef(Value) {}
 
-func (c *CmpInst) Def() Value    { return c.Target }
-func (c *CmpInst) Uses() []Value { return []Value{c.Left, c.Right} }
-func (c *CmpInst) String() string {
+func (c *ICmpInst) Def() Value    { return c.Target }
+func (c *ICmpInst) Uses() []Value { return []Value{c.Left, c.Right} }
+func (c *ICmpInst) String() string {
 	return fmt.Sprintf("%s := ICMP.%s %s, %s", c.Target.Name(), c.Op, c.Left.Name(), c.Right.Name())
 }
-func (c *CmpInst) ReplaceUses(m map[string]Value) {
+func (c *ICmpInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[c.Left.BaseName()]; ok {
 		c.Left = nv
 	}
@@ -169,7 +176,23 @@ func (c *CmpInst) ReplaceUses(m map[string]Value) {
 		c.Right = nv
 	}
 }
-func (c *CmpInst) ReplaceDef(t Value) { c.Target = t }
+func (c *ICmpInst) ReplaceDef(t Value) { c.Target = t }
+
+func (c *FCmpInst) Def() Value    { return c.Target }
+func (c *FCmpInst) Uses() []Value { return []Value{c.Left, c.Right} }
+func (c *FCmpInst) String() string {
+	return fmt.Sprintf("%s := FCMP.%s %s, %s", c.Target.Name(), c.Op, c.Left.Name(), c.Right.Name())
+}
+func (c *FCmpInst) ReplaceUses(m map[string]Value) {
+	if nv, ok := m[c.Left.BaseName()]; ok {
+		c.Left = nv
+	}
+
+	if nv, ok := m[c.Right.BaseName()]; ok {
+		c.Right = nv
+	}
+}
+func (c *FCmpInst) ReplaceDef(t Value) { c.Target = t }
 
 func (b *BinaryInst) Def() Value    { return b.Target }
 func (b *BinaryInst) Uses() []Value { return []Value{b.Left, b.Right} }
@@ -239,7 +262,7 @@ func (b *BinaryInst) Fold() Value {
 				Typ:      leftConst.Typ,
 			}
 		}
-	case DIV:
+	case IDIV:
 		leftConst, okLeft := b.Left.(*IntegerLit)
 		rightConst, okRight := b.Right.(*IntegerLit)
 		if okLeft && okRight && rightConst.LitValue != 0 {

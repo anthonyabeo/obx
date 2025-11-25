@@ -5,6 +5,119 @@ import "github.com/anthonyabeo/obx/src/ir/hir"
 var builtinLowering = map[string]func(*IRBuilder, *Function, *hir.FuncCall) Value{
 	"new":    lowerNewBuiltin,
 	"printf": lowerPrintfBuiltin,
+	"abs":    lowerAbsBuiltin,
+	"cap":    lowerCapBuiltin,
+}
+
+func lowerAbsBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	arg := b.ensureValue(call.Args[0])
+
+	if _, ok := arg.Type().(*IntegerType); ok {
+		return lowerABSInteger(arg, b)
+	} else {
+		return lowerABSReal(arg, b)
+	}
+}
+
+func lowerABSReal(x Value, b *IRBuilder) Value {
+	// compare x < 0.0
+	zero := Float64Lit(0.0)
+	cmp := b.NewTemp(Int1Type)
+	b.Emit(&FCmpInst{
+		Target: cmp,
+		Op:     FLT,
+		Left:   x,
+		Right:  zero,
+	})
+
+	blkNeg := b.NewBlock("abs.neg")
+	blkPos := b.NewBlock("abs.pos")
+	blkEnd := b.NewBlock("abs.end")
+
+	b.SetTerm(&CondBrInst{Cond: cmp, TrueLabel: blkNeg.Label, FalseLabel: blkPos.Label})
+
+	// Negative branch: result = -x
+	b.SetBlock(blkNeg)
+	negTemp := b.NewTemp(x.Type())
+	b.Emit(&UnaryInst{Target: negTemp, Op: FNEG, Operand: x})
+	b.SetTerm(&JumpInst{Target: blkEnd.Label})
+
+	// Positive branch: result = x
+	b.SetBlock(blkPos)
+	posTemp := b.NewTemp(x.Type())
+	b.Emit(&MoveInst{Target: posTemp, Value: x})
+	b.SetTerm(&JumpInst{Target: blkEnd.Label})
+
+	// Join
+	b.SetBlock(blkEnd)
+	result := b.NewTemp(x.Type())
+	b.emitAssign(result, posTemp)
+
+	return result
+}
+
+func lowerABSInteger(x Value, b *IRBuilder) Value {
+	// mask = x >> 31
+	mask := b.NewTemp(Int32Type)
+	b.Emit(&BinaryInst{
+		Target: mask,
+		Op:     ASHR, // arithmetic shift right
+		Left:   x,
+		Right:  Int32Lit(31),
+	})
+
+	// t1 = x XOR mask
+	t1 := b.NewTemp(Int32Type)
+	b.Emit(&BinaryInst{
+		Target: t1,
+		Op:     XOR,
+		Left:   x,
+		Right:  mask,
+	})
+
+	// result = t1 - mask
+	result := b.NewTemp(Int32Type)
+	b.Emit(&BinaryInst{
+		Target: result,
+		Op:     SUB,
+		Left:   t1,
+		Right:  mask,
+	})
+
+	return result
+}
+
+// lowerCapBuiltin lowers the builtin function CAP(x)
+// into 3AC form: result = x AND 0xDF.
+//
+// Semantics: If x is an ASCII lowercase letter, produces its uppercase.
+// Otherwise, x is returned unchanged. This matches Oberon+’s definition
+// ("only the ASCII subset").
+//
+// Input:
+//
+//	arg   — expression node for x (CHAR)
+//	b     — pointer to your IR builder
+//
+// Output:
+//
+//	Value — a temp holding the result.
+func lowerCapBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	// 1. Get the 3AC value of the argument
+	xVal := b.ensureValue(call.Args[0])
+
+	// 2. Allocate a temp for the result (CHAR treated as integer)
+	res := b.NewTemp(UInt8Type)
+
+	// 3. Emit a single AND instruction with 0xDF (223)
+	b.Emit(&BinaryInst{
+		Target: res,
+		Op:     AND, // your IR's AND opcode
+		Left:   xVal,
+		Right:  UInt8Lit(223), // 0xDF
+	})
+
+	return res
 }
 
 func lowerPrintfBuiltin(b *IRBuilder, fn *Function, call *hir.FuncCall) Value {

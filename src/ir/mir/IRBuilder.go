@@ -394,9 +394,7 @@ func (b *IRBuilder) CaseStmt(stmt *hir.CaseStmt) {
 
 	tSel := b.ensureValue(stmt.Expr)
 
-	jmp := &JumpInst{Target: tests[0].testLabel}
-	b.SetTerm(jmp)
-	b.Emit(jmp)
+	b.SetTerm(&JumpInst{Target: tests[0].testLabel})
 
 	// Emit all test blocks
 	for i, t := range tests {
@@ -419,9 +417,7 @@ func (b *IRBuilder) CaseStmt(stmt *hir.CaseStmt) {
 		b.CompoundStmt(t.body)
 
 		if !b.BlockTermIsSet() {
-			j := &JumpInst{Target: endLabel}
-			b.SetTerm(j)
-			b.Emit(j)
+			b.SetTerm(&JumpInst{Target: endLabel})
 		}
 	}
 
@@ -433,9 +429,7 @@ func (b *IRBuilder) CaseStmt(stmt *hir.CaseStmt) {
 		b.CompoundStmt(stmt.Else)
 
 		if !b.BlockTermIsSet() {
-			j := &JumpInst{Target: endLabel}
-			b.SetTerm(j)
-			b.Emit(j)
+			b.SetTerm(&JumpInst{Target: endLabel})
 		}
 	}
 
@@ -450,11 +444,9 @@ func (b *IRBuilder) lowerCaseTest(r *hir.LabelRange, tSel Value, bodyLabel, next
 	if r.High == nil || r.Low == r.High {
 		// Singleton case label
 		tmp := b.NewTemp(Int1Type)
-		b.Emit(&CmpInst{Target: tmp, Op: EQ, Left: tSel, Right: tLow})
+		b.Emit(&ICmpInst{Target: tmp, Op: EQ, Left: tSel, Right: tLow})
 
-		br := &CondBrInst{Cond: tmp, TrueLabel: bodyLabel, FalseLabel: nextTestLabel}
-		b.SetTerm(br)
-		b.Emit(br)
+		b.SetTerm(&CondBrInst{Cond: tmp, TrueLabel: bodyLabel, FalseLabel: nextTestLabel})
 		return
 	}
 
@@ -465,13 +457,11 @@ func (b *IRBuilder) lowerCaseTest(r *hir.LabelRange, tSel Value, bodyLabel, next
 	cmpHi := b.NewTemp(Int1Type)
 	both := b.NewTemp(Int1Type)
 
-	b.Emit(&CmpInst{Target: cmpLo, Op: GE, Left: tSel, Right: tLow})
-	b.Emit(&CmpInst{Target: cmpHi, Op: LE, Left: tSel, Right: tHigh})
+	b.Emit(&ICmpInst{Target: cmpLo, Op: GE, Left: tSel, Right: tLow})
+	b.Emit(&ICmpInst{Target: cmpHi, Op: LE, Left: tSel, Right: tHigh})
 	b.Emit(&BinaryInst{Target: both, Op: AND, Left: cmpLo, Right: cmpHi})
-
-	br := &CondBrInst{Cond: both, TrueLabel: bodyLabel, FalseLabel: nextTestLabel}
-	b.SetTerm(br)
-	b.Emit(br)
+	
+	b.SetTerm(&CondBrInst{Cond: both, TrueLabel: bodyLabel, FalseLabel: nextTestLabel})
 }
 
 func (b *IRBuilder) WithStmt(stmt *hir.WithStmt) {
@@ -483,9 +473,7 @@ func (b *IRBuilder) ExitStmt() {
 		panic("EXIT used outside loop")
 	}
 
-	jmp := &JumpInst{Target: b.curExit}
-	b.SetTerm(jmp)
-	b.Emit(jmp)
+	b.SetTerm(&JumpInst{Target: b.curExit})
 }
 
 func (b *IRBuilder) IfStmt(stmt *hir.IfStmt) {
@@ -505,9 +493,7 @@ func (b *IRBuilder) IfStmt(stmt *hir.IfStmt) {
 
 		// set conditional branch as the terminator instruction for this block
 		// and add it to the list of instructions in the block
-		br := &CondBrInst{Cond: cond, TrueLabel: trueLabel, FalseLabel: falseLabel}
-		b.SetTerm(br)
-		b.Emit(br)
+		b.SetTerm(&CondBrInst{Cond: cond, TrueLabel: trueLabel, FalseLabel: falseLabel})
 
 		// Emit the conditional label for the true path block
 		nextBlk := b.NewBlock(trueLabel)
@@ -516,9 +502,7 @@ func (b *IRBuilder) IfStmt(stmt *hir.IfStmt) {
 		b.CompoundStmt(branch.Body)
 
 		if !b.BlockTermIsSet() {
-			jmp := &JumpInst{Target: endLabel}
-			b.SetTerm(jmp)
-			b.Emit(jmp)
+			b.SetTerm(&JumpInst{Target: endLabel})
 		}
 
 		// Emit the false path conditional label block
@@ -532,9 +516,7 @@ func (b *IRBuilder) IfStmt(stmt *hir.IfStmt) {
 	}
 
 	if !b.BlockTermIsSet() {
-		jmp := &JumpInst{Target: endLabel}
-		b.SetTerm(jmp)
-		b.Emit(jmp)
+		b.SetTerm(&JumpInst{Target: endLabel})
 	}
 
 	// Final end block
@@ -559,9 +541,7 @@ func (b *IRBuilder) LoopStmt(stmt *hir.LoopStmt) {
 	b.CompoundStmt(stmt.Body)
 
 	// Jump back to loop
-	jmp := &JumpInst{Target: loopLabel}
-	b.SetTerm(jmp)
-	b.Emit(jmp)
+	b.SetTerm(&JumpInst{Target: loopLabel})
 
 	// Emit loop exit label
 	exitBlk := b.NewBlock(exitLabel)
@@ -662,8 +642,10 @@ func (b *IRBuilder) lowerOp(op token.Kind) InstrOp {
 		return SUB
 	case token.STAR:
 		return MUL
+	case token.QUOT:
+		return RDIV
 	case token.DIV:
-		return DIV
+		return IDIV
 	case token.MOD:
 		return REM
 	case token.NOT:
@@ -684,6 +666,10 @@ func (b *IRBuilder) lowerOp(op token.Kind) InstrOp {
 		return OR
 	case token.IN:
 		return IN
+	case token.IS:
+		return IS
+	case token.AND:
+		return AND
 	default:
 		panic("unknown operator " + op.String())
 	}
@@ -806,6 +792,8 @@ func (b *IRBuilder) lowerConst(c *hir.Literal) Value {
 		v = True
 	case token.FALSE:
 		v = False
+	case token.NIL:
+		v = UInt64Lit(0)
 	default:
 		panic("unhandled literal kind: " + c.Kind.String())
 	}
@@ -1029,7 +1017,7 @@ func (b *IRBuilder) lowerSet(op InstrOp, left, right Value) *Temp {
 		cond := b.NewTemp(UInt32Type)
 		t = b.NewTemp(UInt32Type)
 		b.Emit(&MoveInst{Target: t, Value: UInt32Lit(0)})
-		b.Emit(&CmpInst{Target: cond, Op: NE, Left: tmp, Right: t}) // cond = tmp != 0
+		b.Emit(&ICmpInst{Target: cond, Op: NE, Left: tmp, Right: t}) // cond = tmp != 0
 
 		return cond
 	case ADD:
@@ -1047,7 +1035,7 @@ func (b *IRBuilder) lowerSet(op InstrOp, left, right Value) *Temp {
 		res := b.NewTemp(SetType)
 		b.Emit(&BinaryInst{Target: res, Op: AND, Left: left, Right: notSetB})
 		return res
-	case DIV:
+	case RDIV:
 		// seta / setb  == seta ^ setb
 		res := b.NewTemp(SetType)
 		b.Emit(&BinaryInst{Target: res, Op: XOR, Left: left, Right: right})
@@ -1065,7 +1053,7 @@ func (b *IRBuilder) CreateBinary(op InstrOp, left, right Value, ty Type) *Temp {
 	t := b.NewTemp(ty)
 
 	if op.IsCmpCondCode() {
-		b.Emit(&CmpInst{Target: t, Op: op, Left: left, Right: right})
+		b.Emit(&ICmpInst{Target: t, Op: op, Left: left, Right: right})
 	} else {
 		b.Emit(&BinaryInst{Target: t, Op: op, Left: left, Right: right})
 	}
@@ -1095,9 +1083,7 @@ func (b *IRBuilder) CreateAddrOf(addr Value) Value {
 }
 
 func (b *IRBuilder) CreateReturn(value Value) {
-	ret := &ReturnInst{Result: value}
-	b.SetTerm(ret)
-	b.Emit(ret)
+	b.SetTerm(&ReturnInst{Result: value})
 }
 
 func (b *IRBuilder) Emit(instr Instr) {
@@ -1124,6 +1110,7 @@ func (b *IRBuilder) NewLabel(prefix string) string {
 // SetTerm updates the terminating instruction field of the currently active
 // basic block with 'term'.
 func (b *IRBuilder) SetTerm(term Instr) {
+	b.Emit(term)
 	b.Block.Term = term
 }
 

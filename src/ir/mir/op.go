@@ -9,7 +9,8 @@ const (
 	ADD
 	SUB
 	MUL
-	DIV
+	RDIV // Real Division
+	IDIV // Integer Division
 	REM
 	arith_binary_end
 
@@ -18,11 +19,13 @@ const (
 	LSHL // Shift Left Logical
 	LSHR // Shift Right Logical
 	ASHR // Shift Right Arithmetic
-
 	OR
 	AND
 	IN
+	IS
 	XOR
+
+	FNEG
 
 	cmp_begin
 	EQ
@@ -31,6 +34,12 @@ const (
 	LE
 	GT
 	GE
+
+	FEQ
+	FLT
+	FLE
+	FGT
+	FGE
 	cmp_end
 
 	LD
@@ -45,8 +54,10 @@ func (op InstrOp) String() string {
 		return "SUB"
 	case MUL:
 		return "MUL"
-	case DIV:
-		return "DIV"
+	case RDIV:
+		return "RDIV"
+	case IDIV:
+		return "IDIV"
 	case REM:
 		return "REM"
 	case NOT:
@@ -79,6 +90,8 @@ func (op InstrOp) String() string {
 		return "ASHR"
 	case XOR:
 		return "XOR"
+	case FNEG:
+		return "FNEG"
 	default:
 		return "unknown"
 	}

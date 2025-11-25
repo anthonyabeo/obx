@@ -112,7 +112,16 @@ func PatMIRInst(ins mir.Instr) *Node {
 				patMIRValue(inst.Addr),
 			},
 		}
-	case *mir.CmpInst:
+	case *mir.ICmpInst:
+		return &Node{
+			Dst: patMIRValue(inst.Target),
+			Op:  patOp(inst.Op),
+			Args: []*Node{
+				patMIRValue(inst.Left),
+				patMIRValue(inst.Right),
+			},
+		}
+	case *mir.FCmpInst:
 		return &Node{
 			Dst: patMIRValue(inst.Target),
 			Op:  patOp(inst.Op),
@@ -257,8 +266,10 @@ func patOp(op mir.InstrOp) string {
 		return "add"
 	case mir.SUB:
 		return "sub"
-	case mir.DIV:
-		return "div"
+	case mir.RDIV:
+		return "rdiv"
+	case mir.IDIV:
+		return "idiv"
 	case mir.MUL:
 		return "mul"
 	case mir.LD:
@@ -289,9 +300,19 @@ func patOp(op mir.InstrOp) string {
 		return "and"
 	case mir.OR:
 		return "or"
-
+	case mir.FNEG:
+		return "fneg"
+	case mir.FEQ:
+		return "feq"
+	case mir.FLT:
+		return "flt"
+	case mir.FLE:
+		return "fle"
+	case mir.FGT:
+		return "fgt"
+	case mir.FGE:
+		return "fge"
 	default:
 		panic(fmt.Sprintf("invalid mir.InstrOp: '%s'", op))
-
 	}
 }

@@ -88,12 +88,13 @@ var buildCmd = &cobra.Command{
 		})
 
 		ctx := &report.Context{
-			Source:    srcMgr,
-			Reporter:  reporter,
-			TabWidth:  tabWidth,
-			Env:       ast.NewEnv(),
-			Names:     adt.NewStack[string](),
-			ExprLists: adt.NewStack[[]ast.Expression](),
+			Source:                srcMgr,
+			Reporter:              reporter,
+			TabWidth:              tabWidth,
+			Env:                   ast.NewEnv(),
+			Names:                 adt.NewStack[string](),
+			ExprLists:             adt.NewStack[[]ast.Expression](),
+			TargetMachineWordSize: 8,
 		}
 
 		for _, header := range sorted {
