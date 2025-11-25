@@ -3,10 +3,324 @@ package mir
 import "github.com/anthonyabeo/obx/src/ir/hir"
 
 var builtinLowering = map[string]func(*IRBuilder, *Function, *hir.FuncCall) Value{
-	"new":    lowerNewBuiltin,
 	"printf": lowerPrintfBuiltin,
-	"abs":    lowerAbsBuiltin,
-	"cap":    lowerCapBuiltin,
+
+	// predeclared functions
+	"abs":     lowerAbsBuiltin,
+	"cap":     lowerCapBuiltin,
+	"bitand":  lowerBitAndBuiltin,
+	"bitasr":  lowerBitASRBuiltin,
+	"bitor":   lowerBitOrBuiltin,
+	"bitxor":  lowerBitXorBuiltin,
+	"bitnot":  lowerBitNotBuiltin,
+	"bits":    lowerBitsBuiltin,
+	"bitshl":  lowerBitSHLBuiltin,
+	"bitshr":  lowerBitSHRBuiltin,
+	"cast":    lowerCastBuiltin,
+	"chr":     lowerCHRBuiltin,
+	"default": lowerDefaultBuiltin,
+	"floor":   lowerFloorBuiltin,
+	"flt":     lowerFLTBuiltin,
+	"ldcmd":   lowerLDCMDBuiltin,
+	"ldmod":   lowerLDMODBuiltin,
+	"len":     lowerLenBuiltin,
+	"long":    lowerLongBuiltin,
+	"max":     lowerMaxBuiltin,
+	"min":     lowerMinBuiltin,
+	"odd":     lowerOddBuiltin,
+	"ord":     lowerOrdBuiltin,
+	"short":   lowerShortBuiltin,
+	"size":    lowerSizeBuiltin,
+	"strlen":  lowerStrLenBuiltin,
+	"wchar":   lowerWCHARBuiltin,
+	"ash":     lowerASHBuiltin,
+	"asr":     lowerASRBuiltin,
+	"entier":  lowerENTIERBuiltin,
+	"lsl":     lowerLSLBuiltin,
+	"ror":     lowerRORBuiltin,
+
+	// predeclared procedures
+	"assert": lowerAssertBuiltin,
+	"bytes":  lowerBytesBuiltin,
+	"dec":    lowerDecBuiltin,
+	"excl":   lowerExclBuiltin,
+	"halt":   lowerHaltBuiltin,
+	"inc":    lowerIncBuiltin,
+	"incl":   lowerInclBuiltin,
+	"new":    lowerNewBuiltin,
+	"number": lowerNumberBuiltin,
+	"pcall":  lowerPcallBuiltin,
+	"raise":  lowerRaiseBuiltin,
+	"copy":   lowerCopyBuiltin,
+	"pack":   lowerPackBuiltin,
+	"unpk":   lowerUnpackBuiltin,
+}
+
+func lowerAssertBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerBytesBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerDecBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerExclBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerHaltBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerIncBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerInclBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerNumberBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerPcallBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerRaiseBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerCopyBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerPackBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerUnpackBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerLDCMDBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerLDMODBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerASHBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerASRBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerENTIERBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerLSLBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerRORBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerCastBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerCHRBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerDefaultBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerFloorBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerFLTBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerLenBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerLongBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerMaxBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerMinBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerOddBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerOrdBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerShortBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerSizeBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerWCHARBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerStrLenBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerBitSHRBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	xVal := b.ensureValue(call.Args[0])
+	yVal := b.ensureValue(call.Args[1])
+
+	// Allocate result temp
+	res := b.NewTemp(xVal.Type())
+
+	// Emit the logical shift right operation
+	b.Emit(&BinaryInst{
+		Target: res,
+		Op:     LSHR,
+		Left:   xVal,
+		Right:  yVal,
+	})
+
+	return res
+}
+
+func lowerBitSHLBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	xVal := b.ensureValue(call.Args[0])
+	yVal := b.ensureValue(call.Args[1])
+
+	// Allocate result temp
+	res := b.NewTemp(xVal.Type())
+
+	// Emit the logical shift left operation
+	b.Emit(&BinaryInst{
+		Target: res,
+		Op:     LSHL,
+		Left:   xVal,
+		Right:  yVal,
+	})
+
+	return res
+}
+
+func lowerBitsBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	panic("not implemented")
+}
+
+func lowerBitASRBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	xVal := b.ensureValue(call.Args[0])
+	yVal := b.ensureValue(call.Args[1])
+
+	// Allocate result temp
+	res := b.NewTemp(xVal.Type())
+
+	// Emit the arithmetic shift right operation
+	b.Emit(&BinaryInst{
+		Target: res,
+		Op:     ASHR,
+		Left:   xVal,
+		Right:  yVal,
+	})
+
+	return res
+}
+
+func lowerBitNotBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	xVal := b.ensureValue(call.Args[0])
+
+	// Allocate result temp
+	res := b.NewTemp(xVal.Type())
+
+	// Emit the bitwise NOT operation
+	b.Emit(&UnaryInst{
+		Target:  res,
+		Op:      NOT,
+		Operand: xVal,
+	})
+
+	return res
+}
+
+func lowerBitOrBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	xVal := b.ensureValue(call.Args[0])
+	yVal := b.ensureValue(call.Args[1])
+
+	// Allocate result temp
+	res := b.NewTemp(xVal.Type())
+
+	// Emit the bitwise OR operation
+	b.Emit(&BinaryInst{
+		Target: res,
+		Op:     OR,
+		Left:   xVal,
+		Right:  yVal,
+	})
+	return res
+}
+
+func lowerBitXorBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	xVal := b.ensureValue(call.Args[0])
+	yVal := b.ensureValue(call.Args[1])
+
+	// Allocate result temp
+	res := b.NewTemp(xVal.Type())
+
+	// Emit the bitwise XOR operation
+	b.Emit(&BinaryInst{
+		Target: res,
+		Op:     XOR,
+		Left:   xVal,
+		Right:  yVal,
+	})
+
+	return res
+}
+
+func lowerBitAndBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
+	xVal := b.ensureValue(call.Args[0])
+	yVal := b.ensureValue(call.Args[1])
+
+	// Allocate result temp
+	res := b.NewTemp(xVal.Type())
+
+	// Emit the bitwise AND operation
+	b.Emit(&BinaryInst{
+		Target: res,
+		Op:     AND, // your 3AC AND opcode
+		Left:   xVal,
+		Right:  yVal,
+	})
+
+	return res
 }
 
 func lowerAbsBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
