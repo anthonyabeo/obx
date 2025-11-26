@@ -169,15 +169,124 @@ func lowerMaxBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 }
 
 func lowerMinBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	if len(call.Args) == 1 {
+		v := b.ensureValue(call.Args[0])
+		return lowerPredeclaredMINType(v.(Type), b)
+	} else {
+		return lowerMINInts(call.Args[0], call.Args[1], b)
+	}
+}
+
+func lowerPredeclaredMINType(typ Type, b *IRBuilder) Value {
+	temp := b.NewTemp(typ)
+
+	switch ty := typ.(type) {
+	case *IntegerType:
+		var minVal int64
+		if ty.Signed {
+			minVal = int64(-1) << uint(ty.Bits-1)
+		}
+
+		b.Emit(&MoveInst{
+			Target: temp,
+			Value:  Int64Lit(uint64(minVal)),
+		})
+	case *Set:
+		b.Emit(&MoveInst{
+			Target: temp,
+			Value:  Int64Lit(0),
+		})
+	case *FloatType:
+		var minVal float64
+		if ty.Bits == 32 {
+			minVal = -3.4028235e+38 // min float32
+		} else {
+			minVal = -1.7976931348623157e+308 // min float64
+		}
+
+		b.Emit(&MoveInst{
+			Target: temp,
+			Value:  Float64Lit(minVal), // min float64
+		})
+	case *EnumType:
+		panic("not implemented")
+	default:
+		panic("unsupported type for predeclared MIN")
+	}
+
+	return temp
+}
+
+func lowerMINInts(xExpr, yExpr hir.Expr, b *IRBuilder) Value {
+	x := b.ensureValue(xExpr)
+	y := b.ensureValue(yExpr)
+
+	// d = x - y
+	d := b.NewTemp(Int32Type)
+	b.Emit(&BinaryInst{
+		Op:     SUB,
+		Target: d,
+		Left:   x,
+		Right:  y,
+	})
+
+	// m = d >> 31   (arithmetic shift → sign-bit mask)
+	m := b.NewTemp(Int32Type)
+	b.Emit(&BinaryInst{
+		Op:     ASHR, // arithmetic shift
+		Target: m,
+		Left:   d,
+		Right:  Int64Lit((b.ctx.TargetMachineWordSize * 8) - 1),
+	})
+
+	// t = m & d
+	t := b.NewTemp(Int32Type)
+	b.Emit(&BinaryInst{
+		Op:     AND,
+		Target: t,
+		Left:   m,
+		Right:  d,
+	})
+
+	// z = y + t
+	z := b.NewTemp(Int32Type)
+	b.Emit(&BinaryInst{
+		Op:     ADD,
+		Target: z,
+		Left:   y,
+		Right:  t,
+	})
+
+	return z
 }
 
 func lowerOddBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	// 1. Evaluate argument
+	xVal := b.ensureValue(call.Args[0])
+
+	// 2. Generate temp for (x & 1)
+	t := b.NewTemp(xVal.Type()) // same integer type as x
+	b.Emit(&BinaryInst{
+		Op:     AND,
+		Target: t,
+		Left:   xVal,
+		Right:  UInt64Lit(1),
+	})
+
+	// 3. Compare != 0 to produce BOOLEAN
+	result := b.NewTemp(Int1Type)
+	b.Emit(&ICmpInst{
+		Op:     NE,
+		Target: result,
+		Left:   t,
+		Right:  UInt64Lit(0),
+	})
+
+	return result
 }
 
 func lowerOrdBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	return b.ensureValue(call.Args[0])
 }
 
 func lowerShortBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
@@ -185,7 +294,20 @@ func lowerShortBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 }
 
 func lowerSizeBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	tVal := b.ensureValue(call.Args[0])
+
+	typ, ok := tVal.(Type)
+	if !ok {
+		panic("size argument is not a type")
+	}
+
+	sizeTemp := b.NewTemp(Int64Type)
+	b.Emit(&MoveInst{
+		Target: sizeTemp,
+		Value:  Int64Lit(uint64(typ.Width())),
+	})
+
+	return sizeTemp
 }
 
 func lowerWCHARBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {

@@ -262,6 +262,10 @@ func (b *IRBuilder) emitAssign(dst Value, value Value) {
 }
 
 func (b *IRBuilder) ensureValue(expr hir.Expr) Value {
+	if typ, ok := expr.(types.Type); ok {
+		return b.lowerType(typ)
+	}
+
 	switch e := expr.(type) {
 	case *hir.Literal:
 		return b.lowerConst(e)
@@ -460,7 +464,7 @@ func (b *IRBuilder) lowerCaseTest(r *hir.LabelRange, tSel Value, bodyLabel, next
 	b.Emit(&ICmpInst{Target: cmpLo, Op: GE, Left: tSel, Right: tLow})
 	b.Emit(&ICmpInst{Target: cmpHi, Op: LE, Left: tSel, Right: tHigh})
 	b.Emit(&BinaryInst{Target: both, Op: AND, Left: cmpLo, Right: cmpHi})
-	
+
 	b.SetTerm(&CondBrInst{Cond: both, TrueLabel: bodyLabel, FalseLabel: nextTestLabel})
 }
 
@@ -606,7 +610,7 @@ func (b *IRBuilder) FuncCall(call *hir.FuncCall) Value {
 
 	var t Value
 	if call.RetType != nil {
-		t = b.NewTemp(call.RetType)
+		t = b.NewTemp(b.lowerType(call.RetType))
 	} else {
 		t = b.NewTemp(Void)
 	}
@@ -680,7 +684,7 @@ func (b *IRBuilder) lowerBinary(expr *hir.BinaryExpr) Value {
 	right := b.ensureValue(expr.Right)
 	op := b.lowerOp(expr.Op)
 
-	return b.CreateBinary(op, left, right, expr.SemaType)
+	return b.CreateBinary(op, left, right, b.lowerType(expr.SemaType))
 }
 
 func (b *IRBuilder) lowerSetExpr(s *hir.SetExpr) Value {
@@ -744,7 +748,7 @@ func (b *IRBuilder) lowerUnaryExpr(u *hir.UnaryExpr) Value {
 	op := b.lowerOp(u.Op)
 	operand := b.ensureValue(u.Operand)
 
-	return b.CreateUnary(op, operand, u.SemaType)
+	return b.CreateUnary(op, operand, b.lowerType(u.SemaType))
 }
 
 func (b *IRBuilder) lowerConst(c *hir.Literal) Value {
