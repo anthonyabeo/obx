@@ -5,6 +5,7 @@ import (
 )
 
 type Type interface {
+	Value
 	String() string
 	Width() int
 }
@@ -47,7 +48,17 @@ type (
 
 	Set struct {
 	}
+
+	EnumType struct {
+	}
 )
+
+func (e EnumType) Name() string     { panic("implement me") }
+func (e EnumType) BaseName() string { panic("implement me") }
+func (e EnumType) String() string   { panic("implement me") }
+func (e EnumType) Type() Type       { panic("implement me") }
+func (e EnumType) IsMem() bool      { return false }
+func (e EnumType) Width() int       { panic("implement me") }
 
 func (s StringType) String() string { return fmt.Sprintf("string(%d)", s.Length) }
 func (s StringType) Width() int {
@@ -56,6 +67,10 @@ func (s StringType) Width() int {
 	}
 	return s.Length
 }
+func (s StringType) Name() string     { panic("implement me") }
+func (s StringType) BaseName() string { panic("implement me") }
+func (s StringType) Type() Type       { panic("implement me") }
+func (s StringType) IsMem() bool      { panic("implement me") }
 
 func (a ArrayType) IsOpen() bool { return a.Len == -1 }
 func (a ArrayType) String() string {
@@ -111,6 +126,10 @@ func (a ArrayType) BaseElemSize() int {
 
 	return a.Elem.Width()
 }
+func (a ArrayType) Name() string     { panic("implement me") }
+func (a ArrayType) BaseName() string { panic("implement me") }
+func (a ArrayType) Type() Type       { panic("implement me") }
+func (a ArrayType) IsMem() bool      { panic("implement me") }
 
 func (r RecordType) String() string { panic("implement me") }
 func (r RecordType) Width() int     { return r.Size }
@@ -118,6 +137,10 @@ func (r RecordType) Field(name string) (RecordField, bool) {
 	f, ok := r.Fields[name]
 	return f, ok
 }
+func (r RecordType) Name() string     { panic("implement me") }
+func (r RecordType) BaseName() string { panic("implement me") }
+func (r RecordType) Type() Type       { panic("implement me") }
+func (r RecordType) IsMem() bool      { panic("implement me") }
 
 func (t *IntegerType) String() string {
 	if t.Signed {
@@ -126,7 +149,11 @@ func (t *IntegerType) String() string {
 
 	return fmt.Sprintf("u%d", t.Bits)
 }
-func (t *IntegerType) Width() int { return t.Bits / 8 }
+func (t *IntegerType) Width() int       { return t.Bits / 8 }
+func (t *IntegerType) Name() string     { panic("implement me") }
+func (t *IntegerType) BaseName() string { panic("implement me") }
+func (t *IntegerType) Type() Type       { panic("implement me") }
+func (t *IntegerType) IsMem() bool      { panic("implement me") }
 
 func PointerTo(t Type) *PointerType {
 	return &PointerType{Ref: t}
@@ -138,6 +165,10 @@ func (t *PointerType) Width() int {
 	}
 	return 8 // Assuming 64-bit pointers, adjust as necessary
 }
+func (t *PointerType) Name() string     { panic("implement me") }
+func (t *PointerType) BaseName() string { panic("implement me") }
+func (t *PointerType) Type() Type       { panic("implement me") }
+func (t *PointerType) IsMem() bool      { panic("implement me") }
 
 func (t *FloatType) String() string { return fmt.Sprintf("f%d", t.Bits) }
 func (t *FloatType) Width() int {
@@ -150,12 +181,24 @@ func (t *FloatType) Width() int {
 		return -1 // Unsupported float size
 	}
 }
+func (t *FloatType) Name() string     { panic("implement me") }
+func (t *FloatType) BaseName() string { panic("implement me") }
+func (t *FloatType) Type() Type       { panic("implement me") }
+func (t *FloatType) IsMem() bool      { panic("implement me") }
 
-func (t VoidType) String() string { return "void" }
-func (t VoidType) Width() int     { return 0 /* Void type has no width*/ }
+func (t VoidType) String() string   { return "void" }
+func (t VoidType) Width() int       { return 0 /* Void type has no width*/ }
+func (t VoidType) Name() string     { panic("implement me") }
+func (t VoidType) BaseName() string { panic("implement me") }
+func (t VoidType) Type() Type       { panic("implement me") }
+func (t VoidType) IsMem() bool      { panic("implement me") }
 
-func (t Set) String() string { return "set" }
-func (t Set) Width() int     { return 4 }
+func (t Set) String() string   { return "set" }
+func (t Set) Width() int       { return 4 }
+func (t Set) Name() string     { panic("implement me") }
+func (t Set) BaseName() string { panic("implement me") }
+func (t Set) Type() Type       { panic("implement me") }
+func (t Set) IsMem() bool      { panic("implement me") }
 
 var (
 	Int1Type = &IntegerType{Bits: 1, Signed: true}
