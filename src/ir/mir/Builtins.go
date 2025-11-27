@@ -1,6 +1,10 @@
 package mir
 
-import "github.com/anthonyabeo/obx/src/ir/hir"
+import (
+	"math"
+
+	"github.com/anthonyabeo/obx/src/ir/hir"
+)
 
 var builtinLowering = map[string]func(*IRBuilder, *Function, *hir.FuncCall) Value{
 	"printf": lowerPrintfBuiltin,
@@ -161,11 +165,132 @@ func lowerLenBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 }
 
 func lowerLongBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	x := b.ensureValue(call.Args[0])
+
+	switch x := x.Type().(type) {
+	case *IntegerType:
+		if x.Signed {
+			bwSrc := x.Bits
+			bwDst := bwSrc * 2
+
+			// shift = dst_bits - src_bits
+			shift := Int32Lit(uint64(bwDst - bwSrc))
+
+			t := b.NewTemp(UInt64Type)
+			out := b.NewTemp(UInt64Type)
+
+			b.Emit(&BinaryInst{Target: t, Op: LSHL, Left: x, Right: shift})
+			b.Emit(&BinaryInst{Target: out, Op: ASHR, Left: t, Right: shift})
+
+			return out
+		} else {
+			// ZERO EXTENSION (BYTE, CHAR)
+			bwSrc := x.Bits
+			mask := (1 << bwSrc) - 1
+
+			out := b.NewTemp(UInt64Type)
+			b.Emit(&BinaryInst{Target: out, Op: AND, Left: x, Right: UInt64Lit(mask)})
+			return out
+		}
+	case *FloatType:
+		panic("not implemented")
+	default:
+		panic("unsupported type for LONG")
+	}
 }
 
 func lowerMaxBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	if len(call.Args) == 1 {
+		v := b.ensureValue(call.Args[0])
+		return lowerPredeclaredMAXType(v.(Type), b)
+	} else {
+		return lowerPredeclaredMAXInt(call.Args[0], call.Args[1], b)
+	}
+}
+
+func lowerPredeclaredMAXType(typ Type, b *IRBuilder) Value {
+	temp := b.NewTemp(typ)
+
+	switch ty := typ.(type) {
+	case *IntegerType:
+		var maxVal uint64
+		if ty.Signed {
+			maxVal = (uint64(1) << uint(ty.Bits-1)) - 1
+		} else {
+			maxVal = (uint64(1) << uint(ty.Bits)) - 1
+		}
+
+		b.Emit(&MoveInst{
+			Target: temp,
+			Value:  Int64Lit(maxVal),
+		})
+	case *Set:
+		b.Emit(&MoveInst{
+			Target: temp,
+			Value:  Int64Lit(uint64(math.MaxUint32)),
+		})
+	case *FloatType:
+		var maxVal float64
+		if ty.Bits == 32 {
+			maxVal = 3.4028235e+38 // max float32
+		} else {
+			maxVal = 1.7976931348623157e+308 // max float64
+		}
+
+		b.Emit(&MoveInst{
+			Target: temp,
+			Value:  Float64Lit(maxVal), // min float64
+		})
+	case *EnumType:
+		panic("not implemented")
+	default:
+		panic("unsupported type for predeclared MIN")
+	}
+
+	return temp
+}
+
+func lowerPredeclaredMAXInt(xExpr, yExpr hir.Expr, b *IRBuilder) Value {
+	x := b.ensureValue(xExpr)
+	y := b.ensureValue(yExpr)
+
+	// d = x - y
+	d := b.NewTemp(Int32Type)
+	b.Emit(&BinaryInst{
+		Op:     SUB,
+		Target: d,
+		Left:   x,
+		Right:  y,
+	})
+
+	// m = d >> 31   // sign-bit (arith shift)
+	m := b.NewTemp(Int32Type)
+	b.Emit(&BinaryInst{
+		Op:     ASHR,
+		Target: m,
+		Left:   d,
+		Right:  Int64Lit((b.ctx.TargetMachineWordSize * 8) - 1),
+	})
+
+	// t = m & d
+	t := b.NewTemp(Int32Type)
+	b.Emit(&BinaryInst{
+		Op:     AND,
+		Target: t,
+		Left:   m,
+		Right:  d,
+	})
+
+	// z = x - t
+	z := b.NewTemp(Int32Type)
+	b.Emit(&BinaryInst{
+		Op:     SUB,
+		Target: z,
+		Left:   x,
+		Right:  t,
+	})
+
+	return z
 }
 
 func lowerMinBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
@@ -290,7 +415,34 @@ func lowerOrdBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 }
 
 func lowerShortBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	x := b.ensureValue(call.Args[0])
+
+	switch x := x.Type().(type) {
+	case *IntegerType:
+		bwSrc := x.Bits
+		bwDst := bwSrc / 2
+		mask := (1 << bwDst) - 1
+
+		out := b.NewTemp(UInt64Type)
+		b.Emit(&BinaryInst{Target: out, Op: AND, Left: x, Right: UInt64Lit(uint64(mask))})
+
+		if x.Signed {
+			shift := Int32Lit(uint64(bwSrc - bwDst))
+
+			t := b.NewTemp(UInt64Type)
+			b.Emit(&BinaryInst{Target: t, Op: LSHR, Left: x, Right: shift})
+			b.Emit(&BinaryInst{Target: out, Op: AND, Left: t, Right: shift})
+		}
+
+		return out
+	case *FloatType:
+		t := b.NewTemp(Float32Type)
+		b.Emit(&MoveInst{Target: t, Value: x})
+
+		return t
+	default:
+		panic("unsupported type for SHORT")
+	}
 }
 
 func lowerSizeBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
