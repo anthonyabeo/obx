@@ -61,7 +61,27 @@ var builtinLowering = map[string]func(*IRBuilder, *Function, *hir.FuncCall) Valu
 }
 
 func lowerAssertBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	cond := b.ensureValue(call.Args[0])
+
+	var code Value
+	if len(call.Args) > 1 {
+		code = b.ensureValue(call.Args[1])
+	} else {
+		code = UInt64Lit(1)
+	}
+
+	blkPass := b.NewBlock(b.NewLabel("assert.pass"))
+	blkFail := b.NewBlock(b.NewLabel("assert.fail"))
+	b.SetTerm(&CondBrInst{Cond: cond, TrueLabel: blkPass.Label, FalseLabel: blkFail.Label})
+
+	// Fail block
+	b.SetBlock(blkFail)
+	b.SetTerm(&HaltInst{Code: code})
+
+	// Pass block
+	b.SetBlock(blkPass)
+
+	return code
 }
 
 func lowerBytesBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
@@ -69,23 +89,90 @@ func lowerBytesBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 }
 
 func lowerDecBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	x := b.ensureValue(call.Args[0])
+
+	// Determine the amount to decrement by
+	var amt Value
+	if len(call.Args) == 1 {
+		// DEC(x)
+		amt = Int64Lit(1)
+	} else {
+		// DEC(x, n)
+		amt = b.ensureValue(call.Args[1])
+	}
+
+	res := b.NewTemp(x.Type())
+	b.Emit(&BinaryInst{
+		Target: res,
+		Op:     SUB,
+		Left:   x,
+		Right:  amt,
+	})
+
+	return res
 }
 
 func lowerExclBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	vVal := b.ensureValue(call.Args[0])
+	xVal := b.ensureValue(call.Args[1])
+
+	// compute 1 << x
+	bit := b.NewTemp(vVal.Type())
+	b.Emit(&BinaryInst{Op: LSHL, Target: bit, Left: UInt64Lit(1), Right: xVal})
+
+	// compute mask = ~bit
+	mask := b.NewTemp(xVal.Type())
+	b.Emit(&UnaryInst{Op: NOT, Target: mask, Operand: bit})
+
+	newV := b.NewTemp(vVal.Type())
+	b.Emit(&BinaryInst{Op: AND, Target: newV, Left: vVal, Right: mask})
+
+	return newV
 }
 
 func lowerHaltBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	n := b.ensureValue(call.Args[0])
+
+	b.SetTerm(&HaltInst{Code: n})
+	return n
 }
 
 func lowerIncBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	x := b.ensureValue(call.Args[0])
+
+	// Determine the amount to increment by
+	var amt Value
+	if len(call.Args) == 1 {
+		// INC(x)
+		amt = Int64Lit(1)
+	} else {
+		// INC(x, n)
+		amt = b.ensureValue(call.Args[1])
+	}
+
+	res := b.NewTemp(x.Type())
+	b.Emit(&BinaryInst{
+		Target: res,
+		Op:     ADD,
+		Left:   x,
+		Right:  amt,
+	})
+
+	return res
 }
 
 func lowerInclBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	vVal := b.ensureValue(call.Args[0])
+	xVal := b.ensureValue(call.Args[1])
+
+	// compute 1 << x
+	bit := b.NewTemp(vVal.Type())
+	b.Emit(&BinaryInst{Op: LSHL, Target: bit, Left: UInt64Lit(1), Right: xVal})
+
+	newV := b.NewTemp(vVal.Type())
+	b.Emit(&BinaryInst{Op: OR, Target: newV, Left: vVal, Right: bit})
+
+	return newV
 }
 
 func lowerNumberBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
@@ -121,7 +208,45 @@ func lowerLDMODBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 }
 
 func lowerASHBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	x := b.ensureValue(call.Args[0])
+	n := b.ensureValue(call.Args[1])
+
+	// result temp depends only on x's type
+	result := b.NewTemp(x.Type())
+
+	// Create blocks
+	//blkTest := b.NewBlock(b.NewLabel("ash.test"))
+	blkLeft := b.NewBlock(b.NewLabel("ash.left"))   // n > 0
+	blkRight := b.NewBlock(b.NewLabel("ash.right")) // n < 0
+	blkZero := b.NewBlock(b.NewLabel("ash.zero"))   // n == 0
+	blkJoin := b.NewBlock(b.NewLabel("ash.join"))
+
+	// Compare n with 0
+	t0 := b.NewTemp(Int32Type)
+	b.Emit(&ICmpInst{Target: t0, Op: GT, Left: n, Right: Int32Lit(0)})
+	b.SetTerm(&CondBrInst{Cond: t0, TrueLabel: blkLeft.Label, FalseLabel: blkRight.Label})
+
+	// n > 0
+	b.SetBlock(blkLeft)
+	b.Emit(&BinaryInst{Op: LSHL, Target: result, Left: x, Right: n})
+	b.SetTerm(&JumpInst{Target: blkJoin.Label})
+
+	// n < 0
+	b.SetBlock(blkRight)
+	tAbs := b.NewPrefixTemp("abs", n.Type())
+	b.Emit(&UnaryInst{Target: tAbs, Op: NEG, Operand: n})
+	b.Emit(&BinaryInst{Target: result, Op: ASHR, Left: x, Right: tAbs})
+	b.SetTerm(&JumpInst{Target: blkJoin.Label})
+
+	// n == 0
+	b.SetBlock(blkZero)
+	b.emitAssign(result, x)
+	b.SetTerm(&JumpInst{Target: blkJoin.Label})
+
+	// join
+	b.SetBlock(blkJoin)
+
+	return result
 }
 
 func lowerASRBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
@@ -145,7 +270,12 @@ func lowerCastBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 }
 
 func lowerCHRBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	x := b.ensureValue(call.Args[0])
+
+	target := b.NewTemp(UInt8Type)
+	b.Emit(&BinaryInst{Target: target, Op: AND, Left: x, Right: UInt64Lit(0xFF)})
+
+	return target
 }
 
 func lowerDefaultBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
@@ -463,7 +593,12 @@ func lowerSizeBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 }
 
 func lowerWCHARBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	x := b.ensureValue(call.Args[0])
+
+	target := b.NewTemp(UInt16Type)
+	b.Emit(&BinaryInst{Target: target, Op: AND, Left: x, Right: UInt64Lit(0xFFFF)})
+
+	return target
 }
 
 func lowerStrLenBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
