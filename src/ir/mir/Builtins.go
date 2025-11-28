@@ -262,7 +262,56 @@ func lowerLSLBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 }
 
 func lowerRORBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	x := b.ensureValue(call.Args[0])
+	n := b.ensureValue(call.Args[1])
+	bitWidth := b.ctx.TargetMachineWordSize
+
+	// temp values
+	result := b.NewTemp(x.Type())
+	nMod := b.NewTemp(x.Type())
+	right := b.NewTemp(x.Type())
+	left := b.NewTemp(x.Type())
+
+	// n_mod = n & (w-1)
+	b.Emit(&BinaryInst{
+		Op:     AND,
+		Target: nMod,
+		Left:   n,
+		Right:  UInt64Lit(bitWidth - 1),
+	})
+
+	// right = x >> n_mod
+	b.Emit(&BinaryInst{
+		Op:     LSHR, // signed or logical depends on design; usually logical for rotate
+		Target: right,
+		Left:   x,
+		Right:  nMod,
+	})
+
+	// left = x << (w - n_mod)
+	wMinusN := b.NewTemp(x.Type())
+	b.Emit(&BinaryInst{
+		Op:     SUB,
+		Target: wMinusN,
+		Left:   UInt64Lit(bitWidth),
+		Right:  nMod,
+	})
+	b.Emit(&BinaryInst{
+		Op:     LSHL,
+		Target: left,
+		Left:   x,
+		Right:  wMinusN,
+	})
+
+	// result = left | right
+	b.Emit(&BinaryInst{
+		Op:     OR,
+		Target: result,
+		Left:   left,
+		Right:  right,
+	})
+
+	return result
 }
 
 func lowerCastBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
@@ -602,7 +651,16 @@ func lowerWCHARBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 }
 
 func lowerStrLenBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
-	panic("not implemented")
+	addr := b.ensureAddr(call.Args[0]) // pointer to open array header
+	length := b.NewTemp(Int32Type)
+
+	// Load the first dimension from the header
+	b.Emit(&LoadInst{Target: length, Addr: addr})
+
+	// reduce length by to account for null terminator
+	b.Emit(&BinaryInst{Target: length, Op: ADD, Left: length, Right: Int32Lit(-1)})
+
+	return length
 }
 
 func lowerBitSHRBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
