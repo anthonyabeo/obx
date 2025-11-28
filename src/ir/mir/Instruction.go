@@ -20,6 +20,10 @@ type Foldable interface {
 }
 
 type (
+	HaltInst struct {
+		Code Value
+	}
+
 	ICmpInst struct {
 		Target Value
 		Op     InstrOp
@@ -102,6 +106,16 @@ type (
 		Value Value
 	}
 )
+
+func (h HaltInst) String() string { return fmt.Sprintf("HALT(%s)", h.Code) }
+func (h HaltInst) Def() Value     { return nil }
+func (h HaltInst) Uses() []Value  { return []Value{h.Code} }
+func (h HaltInst) ReplaceUses(m map[string]Value) {
+	if nv, ok := m[h.Code.BaseName()]; ok {
+		h.Code = nv
+	}
+}
+func (h HaltInst) ReplaceDef(Value) {}
 
 func (a Arg) String() string                 { return fmt.Sprintf("ARG(%s, %d)", a.Value, a.Index) }
 func (a Arg) Def() Value                     { return nil }

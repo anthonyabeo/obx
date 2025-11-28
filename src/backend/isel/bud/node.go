@@ -191,6 +191,11 @@ func PatMIRInst(ins mir.Instr) *Node {
 			Dst:  patMIRValue(inst.Target),
 			Args: []*Node{patMIRValue(inst.Addr)},
 		}
+	case *mir.HaltInst:
+		return &Node{
+			Op:   "halt",
+			Args: []*Node{patMIRValue(inst.Code)},
+		}
 	default:
 		panic(fmt.Sprintf("patMIRInst: unexpected inst type: %T", inst))
 	}
