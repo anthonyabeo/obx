@@ -7,9 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anthonyabeo/obx/adt"
-	"github.com/anthonyabeo/obx/modgraph"
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/adt"
+	"github.com/anthonyabeo/obx/src/modgraph"
+	"github.com/anthonyabeo/obx/src/diag"
+	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 	"github.com/anthonyabeo/obx/src/types"
@@ -124,13 +126,13 @@ func TestTypeCheckerPrograms(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			obx := ast.NewOberonX()
-			srcMgr := report.NewSourceManager()
-			reporter := report.NewBufferedReporter(srcMgr, 32, report.StdoutSink{
+			srcMgr := source.NewSourceManager()
+			reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
 				Source: srcMgr,
 				Writer: os.Stdout,
 			})
 
-			ctx := &report.Context{
+			ctx := &diag.Context{
 				FileName:  tt.filename,
 				FilePath:  tt.filename,
 				Content:   []byte(tt.source),
@@ -241,13 +243,13 @@ func TestTypeCheckInvalidPrograms(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			obx := ast.NewOberonX()
-			srcMgr := report.NewSourceManager()
-			reporter := report.NewBufferedReporter(srcMgr, 32, report.StdoutSink{
+			srcMgr := source.NewSourceManager()
+			reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
 				Source: srcMgr,
 				Writer: os.Stdout,
 			})
 
-			ctx := &report.Context{
+			ctx := &diag.Context{
 				FileName:  tt.filename,
 				FilePath:  tt.filename,
 				Content:   []byte(tt.source),
@@ -374,13 +376,13 @@ END ExprCompatibilityTest.`)
 	}
 
 	obx := ast.NewOberonX()
-	srcMgr := report.NewSourceManager()
-	reporter := report.NewBufferedReporter(srcMgr, 32, report.StdoutSink{
+	srcMgr := source.NewSourceManager()
+	reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
 		Source: srcMgr,
 		Writer: os.Stdout,
 	})
 
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName:  file,
 		FilePath:  file,
 		Content:   content,
@@ -475,13 +477,13 @@ END InvalidExprCompatibilityTest.
 	}
 
 	obx := ast.NewOberonX()
-	srcMgr := report.NewSourceManager()
-	reporter := report.NewBufferedReporter(srcMgr, 32, report.StdoutSink{
+	srcMgr := source.NewSourceManager()
+	reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
 		Source: srcMgr,
 		Writer: os.Stdout,
 	})
 
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName:  file,
 		FilePath:  file,
 		Content:   content,
@@ -3867,7 +3869,7 @@ func TestPredeclaredProcedureCalls(t *testing.T) {
 	}
 }
 
-func typeCheckSnippet(t *testing.T, code string) *report.Context {
+func typeCheckSnippet(t *testing.T, code string) *diag.Context {
 	tmp := t.TempDir()
 	file := filepath.Join(tmp, "test.obx")
 	if err := os.WriteFile(file, []byte(code), 0644); err != nil {
@@ -3875,12 +3877,12 @@ func typeCheckSnippet(t *testing.T, code string) *report.Context {
 	}
 
 	obx := ast.NewOberonX()
-	srcMgr := report.NewSourceManager()
-	reporter := report.NewBufferedReporter(srcMgr, 32, report.StdoutSink{
+	srcMgr := source.NewSourceManager()
+	reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
 		Source: srcMgr,
 		Writer: os.Stdout,
 	})
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName:        file,
 		FilePath:        file,
 		Content:         []byte(code),
@@ -4996,7 +4998,7 @@ func TestTypeCheckMultiModulePrograms(t *testing.T) {
 	}
 }
 
-func typeCheckMultiModuleSnippet(t *testing.T, code string) *report.Context {
+func typeCheckMultiModuleSnippet(t *testing.T, code string) *diag.Context {
 	tmp := t.TempDir()
 	file := filepath.Join(tmp, "test.obx")
 	if err := os.WriteFile(file, []byte(code), 0644); err != nil {
@@ -5004,13 +5006,13 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *report.Context {
 	}
 
 	obx := ast.NewOberonX()
-	srcMgr := report.NewSourceManager()
-	reporter := report.NewBufferedReporter(srcMgr, 32, report.StdoutSink{
+	srcMgr := source.NewSourceManager()
+	reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
 		Source: srcMgr,
 		Writer: os.Stdout,
 	})
 
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		Source:          srcMgr,
 		Reporter:        reporter,
 		TabWidth:        4,
@@ -5023,8 +5025,8 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *report.Context {
 
 	headers, err := modgraph.ScanModuleHeaders(file)
 	if err != nil {
-		ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  err.Error(),
 		})
 
@@ -5034,8 +5036,8 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *report.Context {
 	// 3. Build graph
 	graph, err := modgraph.BuildImportGraph(tmp, headers)
 	if err != nil {
-		ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  err.Error(),
 		})
 		return ctx
@@ -5044,8 +5046,8 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *report.Context {
 	// 4. Topologically sort
 	sorted, err := modgraph.TopoSort(graph)
 	if err != nil {
-		ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  err.Error(),
 		})
 

@@ -1,7 +1,8 @@
-package report
+package diag
 
 import (
-	"github.com/anthonyabeo/obx/adt"
+	"github.com/anthonyabeo/obx/src/adt"
+	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/types"
 )
@@ -11,7 +12,7 @@ type Context struct {
 	FilePath string
 	Content  []byte
 
-	Source   *SourceManager
+	Source   *source.Manager
 	Reporter Reporter
 	TabWidth int
 

@@ -1,18 +1,18 @@
 package sema
 
 import (
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
 type FlowChecker struct {
-	ctx *report.Context
+	ctx *diag.Context
 
 	label         string
 	loopIDCounter int
 }
 
-func NewFlowChecker(ctx *report.Context) *FlowChecker {
+func NewFlowChecker(ctx *diag.Context) *FlowChecker {
 	return &FlowChecker{ctx: ctx}
 }
 
@@ -152,8 +152,8 @@ func (f *FlowChecker) VisitForStmt(stmt *ast.ForStmt) any {
 
 func (f *FlowChecker) VisitExitStmt(stmt *ast.ExitStmt) any {
 	if f.label == "" {
-		f.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		f.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "Exit statement outside of loop",
 			Range:    f.ctx.Source.Span(f.ctx.FileName, stmt.StartOffset, stmt.EndOffset),
 		})

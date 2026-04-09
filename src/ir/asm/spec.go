@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/anthonyabeo/obx/modgraph"
+	"github.com/anthonyabeo/obx/src/modgraph"
 )
 
 type Module struct {

@@ -6,17 +6,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/types"
 )
 
 type TypeChecker struct {
-	ctx *report.Context
+	ctx *diag.Context
 }
 
-func NewTypeChecker(ctx *report.Context) *TypeChecker {
+func NewTypeChecker(ctx *diag.Context) *TypeChecker {
 	return &TypeChecker{ctx: ctx}
 }
 
@@ -71,8 +71,8 @@ func (t *TypeChecker) VisitDefinition(def *ast.Definition) any {
 
 func (t *TypeChecker) VisitIdentifier(def *ast.Identifier) any {
 	if def.Symbol == nil {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "unresolved identifier: " + def.Name,
 			Range:    t.ctx.Source.Span(t.ctx.FileName, def.StartOffset, def.EndOffset),
 		})
@@ -98,8 +98,8 @@ func (t *TypeChecker) VisitBinaryExpr(expr *ast.BinaryExpr) any {
 
 	ok, typ := types.ExpressionCompatible(op, tx, ty)
 	if !ok {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("incompatible types for binary operator %s: %s and %s", op, tx.String(), ty.String()),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, expr.StartOffset, expr.EndOffset),
 		})
@@ -128,8 +128,8 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				for _, expr := range s.List {
 					expr.Accept(t)
 					if !types.IsInteger(expr.Type()) {
-						t.ctx.Reporter.Report(report.Diagnostic{
-							Severity: report.Error,
+						t.ctx.Reporter.Report(diag.Diagnostic{
+							Severity: diag.Error,
 							Message:  fmt.Sprintf("array index '%s' does not resolve to an integer", expr),
 							Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Pos(), expr.End()),
 						})
@@ -144,8 +144,8 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 			case *types.PointerType:
 				a, ok := types.Underlying(arr.Base).(*types.ArrayType)
 				if !ok {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  fmt.Sprintf("cannot index non-array pointer: '%v'", arr),
 						Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.StartOffset, dsg.EndOffset),
 					})
@@ -154,8 +154,8 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				for _, expr := range s.List {
 					expr.Accept(t)
 					if !types.SameType(expr.Type(), types.Int32Type) {
-						t.ctx.Reporter.Report(report.Diagnostic{
-							Severity: report.Error,
+						t.ctx.Reporter.Report(diag.Diagnostic{
+							Severity: diag.Error,
 							Message:  fmt.Sprintf("array index '%s' does not resolve to an integer", expr),
 							Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Pos(), expr.End()),
 						})
@@ -164,8 +164,8 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 
 				typ = a.Elem
 			default:
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("cannot index non-array: '%v'", arr),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.StartOffset, dsg.EndOffset),
 				})
@@ -180,8 +180,8 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 			case *types.PointerType:
 				base, ok := types.Underlying(u.Base).(*types.RecordType)
 				if !ok {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  fmt.Sprintf("cannot select field '%v' of pointer to non-record type '%v'", s.Field, dsg.QIdent),
 						Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 					})
@@ -191,8 +191,8 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 
 				rec = base
 			default:
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("cannot select field '%v' of non-record '%v'", s.Field, dsg.QIdent),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 				})
@@ -202,8 +202,8 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 
 			field := rec.GetField(s.Field)
 			if field == nil {
-				//t.ctx.Reporter.Report(report.Diagnostic{
-				//	Severity: report.Error,
+				//t.ctx.Reporter.Report(diag.Diagnostic{
+				//	Severity: diag.Error,
 				//	Message:  fmt.Sprintf("record '%v' has no field named '%v'", dsg.QIdent, s.Field),
 				//	Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 				//})
@@ -219,8 +219,8 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				typ = ty.Base
 			case *types.ProcedureType:
 			default:
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("dereference/super operator not applicable to '%s'", dsg.QIdent),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 				})
@@ -233,8 +233,8 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 
 			NamedTy, ok := s.Ty.(*ast.QualifiedIdent)
 			if !ok {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("name identifier: '%v'", dsg.QIdent),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, s.Ty.Pos(), s.Ty.End()),
 				})
@@ -248,8 +248,8 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 			isVarParamRecord := ast.IsVarParam(dsg) && types.IsRecord(base)
 
 			if !(isPointerToRecord || isVarParamRecord) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("type guard only allowed on VAR parameters of record "+
 						"type or pointer to record types (got %s)", base),
 					Range: t.ctx.Source.Span(t.ctx.FileName, dsg.Pos(), dsg.End()),
@@ -260,8 +260,8 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 
 			// 2. Ensure T is a record or pointer to record
 			if !(types.IsPointerToRecord(target) || types.IsRecord(target)) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("type guard target must be a (pointer to) record (got %s)", target),
 				})
 				return dsg
@@ -269,8 +269,8 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 
 			// 3. Ensure target is an extension of base
 			if !types.IsExtensionOf(target, base) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("type guard target %s is not an extension of %s", target, base),
 				})
 				return dsg
@@ -289,8 +289,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 	case "abs":
 		var argType types.Type = types.UnknownType
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -298,8 +298,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			call.ActualParams[0].Accept(t)
 			argType = call.ActualParams[0].Type()
 			if !types.IsNumeric(argType) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects a numeric argument, got %s",
 						pre.Name(), argType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -309,8 +309,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = argType // ABS returns the same type as its argument
 	case "cap":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -321,8 +321,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		argType := call.ActualParams[0].Type()
 
 		if !types.IsChar(argType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects a CHAR argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -333,8 +333,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = types.CharType
 	case "bitand":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -345,8 +345,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			arg.Accept(t)
 			argType := arg.Type()
 			if argType != types.Int32Type && argType != types.Int64Type {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects INT32 or INT64 arguments, "+
 						"got %s", pre.Name(), argType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
@@ -362,8 +362,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "bitasr":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -378,8 +378,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		arg2Type := arg2.Type()
 
 		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be INT32 or INT64, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
@@ -388,8 +388,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 
 		if arg2Type != types.Int32Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, "+
 					"got %s", pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
@@ -404,8 +404,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "bitnot":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -415,8 +415,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.ActualParams[0].Accept(t)
 		argType := call.ActualParams[0].Type()
 		if argType != types.Int32Type && argType != types.Int64Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects an INT32 or INT64 argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -431,8 +431,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "bitor":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -443,8 +443,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			arg.Accept(t)
 			argType := arg.Type()
 			if argType != types.Int32Type && argType != types.Int64Type {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects INT32 or INT64 arguments, "+
 						"got %s", pre.Name(), argType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
@@ -460,8 +460,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "bits":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -471,8 +471,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.ActualParams[0].Accept(t)
 		argType := call.ActualParams[0].Type()
 		if argType != types.Int32Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects an INT32 argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -484,8 +484,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = types.SetType
 	case "bitshl":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -500,8 +500,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		arg2Type := arg2.Type()
 
 		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be INT32 or INT64, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
@@ -510,8 +510,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 
 		if arg2Type != types.Int32Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, "+
 					"got %s", pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
@@ -526,8 +526,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "bitshr":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -541,8 +541,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		arg1Type := arg1.Type()
 		arg2Type := arg2.Type()
 		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be INT32 or INT64, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
@@ -551,8 +551,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 
 		if arg2Type != types.Int32Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, "+
 					"got %s", pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
@@ -567,8 +567,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "bitxor":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -579,8 +579,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			arg.Accept(t)
 			argType := arg.Type()
 			if argType != types.Int32Type && argType != types.Int64Type {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects INT32 or INT64 arguments, "+
 						"got %s", pre.Name(), argType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
@@ -596,8 +596,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "cast":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -606,8 +606,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 
 		T, ok := call.ActualParams[0].Accept(t).(types.Type)
 		if !ok {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects a type as first argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
@@ -616,8 +616,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 
 		E, ok := call.ActualParams[1].(ast.Expression)
 		if !ok {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects an expression as the second argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[1].Pos(), call.ActualParams[1].End()),
 			})
@@ -635,8 +635,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 
 		if !types.IsEnum(T) && !types.IsInteger(T) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects first argument to be integer or enum",
 					pre.Name()),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
@@ -645,8 +645,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 
 		if !types.IsOrdinal(exprType) && !types.IsInteger(exprType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expected second argument to be"+
 					" ordinal number or integer", pre.Name()),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
@@ -660,8 +660,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		// TODO: T: cpointer to void, x: integer type -> T
 	case "chr":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -671,8 +671,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.ActualParams[0].Accept(t)
 		argType := call.ActualParams[0].Type()
 		if !types.IsInteger(argType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer "+
 					"argument, got %s", pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -683,8 +683,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = types.CharType
 	case "default":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -693,8 +693,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 
 		T, ok := call.ActualParams[0].Accept(t).(types.Type)
 		if !ok {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects a type as argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
@@ -704,8 +704,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = T // Default returns the type of the argument
 	case "floor":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -714,8 +714,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.ActualParams[0].Accept(t)
 		argType := call.ActualParams[0].Type()
 		if !types.IsReal(argType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects a REAL or LONGREAL argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -729,8 +729,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "flt":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -742,8 +742,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		argType := call.ActualParams[0].Type()
 
 		if argType != types.Int32Type && argType != types.Int64Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects an INT32 or INT64 argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -757,8 +757,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "ldcmd":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -770,8 +770,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			arg.Accept(t)
 			argType := arg.Type()
 			if !types.IsCharArrayOrString(argType) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects string arguments, got %s",
 						pre.Name(), argType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
@@ -784,8 +784,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = types.NilType
 	case "ldmod":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -795,8 +795,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.ActualParams[0].Accept(t)
 		argType := call.ActualParams[0].Type()
 		if !types.IsCharArrayOrString(argType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects a string argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -807,8 +807,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = types.BooleanType
 	case "len":
 		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects one or two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -826,8 +826,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 				call.SemaType = types.Int32Type
 			default:
 				call.SemaType = types.UnknownType
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects an array or string argument, got %s",
 						pre.Name(), T),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -839,8 +839,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			x, xOk := call.ActualParams[0].(ast.Expression)
 			y, yOk := call.ActualParams[1].(ast.Expression)
 			if !xOk || !yOk {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("predeclared procedure '%s' expects two expressions", pre.Name()),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 				})
@@ -853,8 +853,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			ty := y.Type()
 
 			if !types.IsArray(tx) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an array got %s",
 						pre.Name(), tx.String()),
 					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), x.End()),
@@ -863,8 +863,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			}
 
 			if ty != types.Int32Type {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, got %s",
 						pre.Name(), ty.String()),
 					Range: t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
@@ -875,16 +875,16 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			dim := tx.(*types.ArrayType).Dimensions()
 			value, err := t.EvalConstUint32(y)
 			if err != nil {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("dimension value %s should be integer constant >= 0", y.String()),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
 				})
 			}
 
 			if int(value) >= len(dim) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("ARRAY has fewer than %d dimensions", value+1),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
 				})
@@ -895,8 +895,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "long":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -908,8 +908,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 
 		if argType != types.Int8Type && argType != types.ByteType && argType != types.Int16Type &&
 			argType != types.Int32Type && argType != types.RealType && argType != types.CharType {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects INT8, BYTE, INT16, INT32, "+
 					"REAL, or CHAR argument, got %s", pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -930,8 +930,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "max":
 		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects one or two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -941,8 +941,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if len(call.ActualParams) == 1 {
 			T, ok := call.ActualParams[0].Accept(t).(types.Type)
 			if !ok {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("predeclared procedure '%s': single argument must be a type", pre.Name()),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 				})
@@ -959,8 +959,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			case *types.EnumType:
 				call.SemaType = types.ByteType
 			default:
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects a basic type or enum, got %s",
 						pre.Name(), T),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -972,8 +972,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			x, xOk := call.ActualParams[0].(ast.Expression)
 			y, yOk := call.ActualParams[1].(ast.Expression)
 			if !xOk || !yOk {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("predeclared procedure '%s' expects two expressions", pre.Name()),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 				})
@@ -990,8 +990,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			} else if types.IsChar(tx) && types.IsChar(ty) {
 				call.SemaType = types.SmallestCharType(tx, ty)
 			} else {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be numeric"+
 						" or char types, got %s and %s", pre.Name(), tx.String(), ty.String()),
 					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), y.End()),
@@ -1001,8 +1001,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "min":
 		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects one or two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1012,8 +1012,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		if len(call.ActualParams) == 1 {
 			T, ok := call.ActualParams[0].Accept(t).(types.Type)
 			if !ok {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("predeclared procedure '%s': single argument must be a type", pre.Name()),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 				})
@@ -1030,8 +1030,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			case *types.EnumType:
 				call.SemaType = types.ByteType
 			default:
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects a basic type or enum, got %s",
 						pre.Name(), T),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1044,8 +1044,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			x, xOk := call.ActualParams[0].(ast.Expression)
 			y, yOk := call.ActualParams[1].(ast.Expression)
 			if !xOk || !yOk {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("predeclared procedure '%s' expects two expressions", pre.Name()),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 				})
@@ -1062,8 +1062,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			} else if types.IsChar(tx) && types.IsChar(ty) {
 				call.SemaType = types.SmallestCharType(tx, ty)
 			} else {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be numeric"+
 						" or char types, got %s and %s", pre.Name(), tx.String(), ty.String()),
 					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), y.End()),
@@ -1073,8 +1073,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "odd":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1084,8 +1084,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		argType := call.ActualParams[0].Type()
 
 		if !types.IsInteger(argType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1097,8 +1097,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = types.BooleanType
 	case "ord":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1120,16 +1120,16 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		case types.SetType:
 			call.SemaType = types.Int32Type // Ordinal of a set is an integer
 		default:
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' cannot be applied to type %s", pre.Name(), argType),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
 		}
 	case "short":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1140,8 +1140,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		argType := call.ActualParams[0].Type()
 		if argType != types.Int16Type && argType != types.Int32Type && argType != types.Int64Type &&
 			argType != types.LongRealType && argType != types.WCharType {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects an INT16, INT32, INT64, "+
 					"LONGREAL, or WCHAR argument, got %s", pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1162,8 +1162,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "size":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1171,8 +1171,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 
 		if T, ok := call.ActualParams[0].Accept(t).(types.Type); !ok {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects a type as the argument, got '%v'", pre.Name(), T),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
@@ -1182,8 +1182,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = types.Int32Type
 	case "strlen":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1193,8 +1193,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.ActualParams[0].Accept(t)
 		argType := call.ActualParams[0].Type()
 		if !types.IsCharArrayOrString(argType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects "+
 					"an array of CHAR, array of WCHAR, or string literal as argument, got %s",
 					pre.Name(), argType),
@@ -1206,8 +1206,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = types.Int32Type
 	case "wchr":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1217,8 +1217,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.ActualParams[0].Accept(t)
 		argType := call.ActualParams[0].Type()
 		if !types.IsInteger(argType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer type as argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1229,8 +1229,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = types.WCharType
 	case "ash":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1245,8 +1245,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		arg2Type := arg2.Type()
 
 		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be INT32 or INT64, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
@@ -1255,8 +1255,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 
 		if arg2Type != types.Int32Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, got %s",
 					pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
@@ -1271,8 +1271,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "asr":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1287,8 +1287,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		arg2Type := arg2.Type()
 
 		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be INT32 or INT64, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
@@ -1297,8 +1297,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 
 		if arg2Type != types.Int32Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, got %s",
 					pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
@@ -1313,8 +1313,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "entier":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1324,8 +1324,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.ActualParams[0].Accept(t)
 		argType := call.ActualParams[0].Type()
 		if !types.IsReal(argType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects a real type as argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1336,8 +1336,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = types.Int64Type
 	case "lsl":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1351,8 +1351,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		arg1Type := arg1.Type()
 		arg2Type := arg2.Type()
 		if arg1Type != types.Int32Type && arg1Type != types.Int64Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be INT32 or INT64, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
@@ -1361,8 +1361,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 
 		if arg2Type != types.Int32Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, got %s",
 					pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
@@ -1377,8 +1377,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		}
 	case "ror":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1393,8 +1393,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		arg2Type := arg2.Type()
 
 		if arg1Type != types.Int32Type || arg2Type != types.Int32Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects both arguments to be INT32, got %s and %s",
 					pre.Name(), arg1Type, arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg2.End()),
@@ -1405,8 +1405,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.SemaType = types.Int32Type
 	case "printf":
 		if len(call.ActualParams) == 0 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects at least one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1417,8 +1417,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		formatArg.Accept(t)
 		formatType := formatArg.Type()
 		if !types.IsCharArrayOrString(formatType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects a string literal as the first argument, got %s",
 					pre.Name(), formatType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, formatArg.Pos(), formatArg.End()),
@@ -1432,8 +1432,8 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 
 		call.SemaType = types.Int32Type
 	default:
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("unknown predeclared procedure '%s'", pre.Name()),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.Pos(), call.Callee.End()),
 		})
@@ -1444,8 +1444,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 	switch strings.ToLower(pre.Name()) {
 	case "assert":
 		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects one or two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1457,8 +1457,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			T := types.Underlying(call.ActualParams[0].Type())
 
 			if !types.IsBoolean(T) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects a boolean type, got %s",
 						pre.Name(), T),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1472,8 +1472,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			x, xOk := call.ActualParams[0].(ast.Expression)
 			y, yOk := call.ActualParams[1].(ast.Expression)
 			if !xOk || !yOk {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("predeclared procedure '%s' expects two expressions", pre.Name()),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 				})
@@ -1486,8 +1486,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			ty := types.Underlying(y.Type())
 
 			if !types.IsBoolean(tx) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be boolean, got %s",
 						pre.Name(), tx),
 					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), x.End()),
@@ -1495,8 +1495,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			}
 
 			if !types.IsInteger(ty) || !ast.IsConstExpr(y) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an integer constant, got %s",
 						pre.Name(), ty),
 					Range: t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
@@ -1507,8 +1507,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 	case "bytes":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1523,8 +1523,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		arg2Type := types.Underlying(arg2.Type())
 
 		if !types.IsArrayOf(arg1Type, types.ByteType) && !types.IsArrayOf(arg1Type, types.CharType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an array of byte or char, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
@@ -1533,8 +1533,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 
 		if !types.IsNumeric(arg2Type) && !types.IsSet(arg2Type) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be numeric or set, got %s",
 					pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
@@ -1543,8 +1543,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 	case "dec":
 		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects one or two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1556,8 +1556,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			T := types.Underlying(call.ActualParams[0].Type())
 
 			if !types.IsInteger(T) && !types.IsEnum(T) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects first argument to be an integer or enum type, got %s",
 						pre.Name(), T),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1574,8 +1574,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			x, xOk := call.ActualParams[0].(ast.Expression)
 			y, yOk := call.ActualParams[1].(ast.Expression)
 			if !xOk || !yOk {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("predeclared procedure '%s' expects two expressions", pre.Name()),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 				})
@@ -1586,8 +1586,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			ty := types.Underlying(y.Type())
 
 			if !types.IsInteger(tx) || !t.isAssignable(x) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an assignable integer, got %s",
 						pre.Name(), tx.String()),
 					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), x.End()),
@@ -1596,8 +1596,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			}
 
 			if !types.IsInteger(ty) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an integer, got %s",
 						pre.Name(), ty.String()),
 					Range: t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
@@ -1609,8 +1609,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 	case "excl":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1625,8 +1625,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		arg2Type := types.Underlying(arg2.Type())
 
 		if !types.IsSet(arg1Type) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a set, got %s",
 					pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
@@ -1636,8 +1636,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 
 		value, err := t.EvalConstUint32(arg2)
 		if !types.IsInteger(arg2Type) || err != nil || (value < 0 || value > math.MaxUint32) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an integer in the range [0, MAX(SET)], got %s",
 					pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
@@ -1647,8 +1647,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		return
 	case "halt":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1660,8 +1660,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		argType := types.Underlying(arg.Type())
 
 		if !types.IsInteger(argType) || !ast.IsConstExpr(arg) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer constant argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
@@ -1672,8 +1672,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		return
 	case "inc":
 		if len(call.ActualParams) == 0 || len(call.ActualParams) > 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects one or two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1685,8 +1685,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			T := types.Underlying(call.ActualParams[0].Type())
 
 			if !types.IsInteger(T) && !types.IsEnum(T) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects an integer or enum type, got %s",
 						pre.Name(), T),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1703,8 +1703,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			x, xOk := call.ActualParams[0].(ast.Expression)
 			y, yOk := call.ActualParams[1].(ast.Expression)
 			if !xOk || !yOk {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("predeclared procedure '%s' expects two expressions", pre.Name()),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 				})
@@ -1715,8 +1715,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			ty := types.Underlying(y.Type())
 
 			if !types.IsInteger(tx) || !t.isAssignable(x) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an assignable integer, got %s",
 						pre.Name(), tx.String()),
 					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), x.End()),
@@ -1724,8 +1724,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			}
 
 			if !types.IsInteger(ty) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an integer, got %s",
 						pre.Name(), ty.String()),
 					Range: t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
@@ -1736,8 +1736,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 	case "incl":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1752,8 +1752,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		arg2Type := types.Underlying(arg2.Type())
 
 		if !types.IsSet(arg1Type) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a set, got %s",
 					pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
@@ -1763,8 +1763,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 
 		value, err := t.EvalConstUint32(arg2)
 		if !types.IsInteger(arg2Type) || err != nil || (value < 0 || value > math.MaxUint32) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an integer in the range [0, MAX(SET)], got %s",
 					pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
@@ -1774,8 +1774,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		return
 	case "new":
 		if len(call.ActualParams) == 0 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects at least one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1786,8 +1786,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			call.ActualParams[0].Accept(t)
 			argType := types.Underlying(call.ActualParams[0].Type())
 			if !types.IsPointerToRecord(argType) && !types.IsFixedArray(argType) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects a pointer to a record or a fixed array, got %s",
 						pre.Name(), argType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1800,8 +1800,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			call.ActualParams[0].Accept(t)
 			argType := types.Underlying(call.ActualParams[0].Type())
 			if !types.IsPointerToOpenArray(argType) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects a pointer to an open array, got %s",
 						pre.Name(), argType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1811,8 +1811,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 
 			dim := types.Underlying(argType.(*types.PointerType).Base).(*types.ArrayType).Dimensions()
 			if len(dim) != len(call.ActualParams[1:]) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("'%s': expected %d dimension lengths for open array type, got %d",
 						pre.Name(), len(dim), len(call.ActualParams)-1),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
@@ -1824,8 +1824,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 				arg.Accept(t)
 				argType = types.Underlying(arg.Type())
 				if !types.IsInteger(argType) {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message: fmt.Sprintf("'%s': dimension length must be integer, got %s",
 							pre.Name(), argType),
 						Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
@@ -1840,8 +1840,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 	case "number":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1854,8 +1854,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		arg2Type := types.Underlying(call.ActualParams[1].Type())
 
 		if !types.IsNumeric(arg1Type) && !types.IsSet(arg1Type) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be numeric or set, got %s",
 					pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1864,8 +1864,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 
 		if !t.isAssignable(call.ActualParams[0]) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an "+
 					"assignable numeric or set type, got %s",
 					pre.Name(), arg1Type),
@@ -1875,8 +1875,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 
 		if !types.IsArrayOf(arg2Type, types.ByteType) && !types.IsArrayOf(arg2Type, types.CharType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an array of byte or char, "+
 					"got %s", pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[1].Pos(), call.ActualParams[1].End()),
@@ -1887,8 +1887,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		return
 	case "pcall":
 		if len(call.ActualParams) < 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects at least two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1901,8 +1901,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		arg2Type := types.Underlying(call.ActualParams[1].Type())
 
 		if !types.IsPointerToAnyRec(arg1Type) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a pointer to ANYREC, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1911,8 +1911,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 
 		if !types.IsProperProcedure(arg2Type) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be a proper procedure, "+
 					"got %s", pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[1].Pos(), call.ActualParams[1].End()),
@@ -1923,8 +1923,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		if len(call.ActualParams) > 2 {
 			proc := types.Underlying(call.ActualParams[1].Type()).(*types.ProcedureType)
 			if len(call.ActualParams)-2 != len(proc.Params) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("predeclared procedure '%s' expects %d additional arguments, got %d",
 						pre.Name(), len(proc.Params), len(call.ActualParams)-2),
 					Range: t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
@@ -1935,8 +1935,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 			for i, arg := range call.ActualParams[2:] {
 				arg.Accept(t)
 				if !types.ParameterCompatible(types.Underlying(arg.Type()), proc.Params[i]) {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  fmt.Sprintf("%s: argument %d is incompatible with parameter of type '%s'", pre.Name(), i+1, proc.Params[i].Type.String()),
 						Range:    t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
 					})
@@ -1948,8 +1948,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		return
 	case "raise":
 		if len(call.ActualParams) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1959,8 +1959,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		call.ActualParams[0].Accept(t)
 		argType := types.Underlying(call.ActualParams[0].Type())
 		if !types.IsPointerToAnyRec(argType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects a pointer to ANYREC, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
@@ -1969,8 +1969,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 	case "copy":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -1985,8 +1985,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		arg2Type := types.Underlying(arg2.Type())
 
 		if !types.IsCharArrayOrString(arg1Type) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be a char array or string, "+
 					"got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
@@ -1995,8 +1995,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 
 		if !types.IsArrayOf(arg2Type, types.CharType) || !t.isAssignable(arg2) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an assignable array of char, "+
 					"got %s", pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
@@ -2005,8 +2005,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 	case "pack":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -2021,8 +2021,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		arg2Type := types.Underlying(arg2.Type())
 
 		if !types.IsReal(arg1Type) || !t.isAssignable(arg1) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an assignable REAL/LONGREAL, "+
 					" got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg1.End()),
@@ -2031,8 +2031,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 
 		if arg2Type != types.Int32Type {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be INT32, got %s",
 					pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
@@ -2041,8 +2041,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 	case "unpk":
 		if len(call.ActualParams) != 2 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects exactly two arguments", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -2057,8 +2057,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		arg2Type := types.Underlying(arg2.Type())
 
 		if !types.IsReal(arg1Type) || !t.isAssignable(arg1) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the first argument to be an "+
 					"assignable REAL/LONGREAL, got %s", pre.Name(), arg1Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg1.Pos(), arg2.End()),
@@ -2067,8 +2067,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 
 		if arg2Type != types.Int32Type || !t.isAssignable(arg2) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an assignable INT32, got %s",
 					pre.Name(), arg2Type),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg2.Pos(), arg2.End()),
@@ -2077,8 +2077,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		}
 	case "printf":
 		if len(call.ActualParams) == 0 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("predeclared procedure '%s' expects at least one argument", pre.Name()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, call.StartOffset, call.EndOffset),
 			})
@@ -2089,8 +2089,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		formatArg.Accept(t)
 		formatType := formatArg.Type()
 		if !types.IsCharArrayOrString(formatType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("predeclared procedure '%s' expects a string literal as the first argument, got %s",
 					pre.Name(), formatType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, formatArg.Pos(), formatArg.End()),
@@ -2105,8 +2105,8 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 		call.SemaType = types.Int32Type
 
 	default:
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("unknown predeclared procedure '%s'", pre.Name()),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.Pos(), call.Callee.End()),
 		})
@@ -2118,8 +2118,8 @@ func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
 	call.Callee.Accept(t)
 
 	if !IsCallable(call.Callee) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("name '%s' could not be resolved to a procedure", call.Callee),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
 		})
@@ -2135,8 +2135,8 @@ func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
 
 	procType, ok := types.Underlying(call.Callee.SemaType).(*types.ProcedureType)
 	if !ok {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("cannot call '%v' of non-procedure", call.Callee),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
 		})
@@ -2144,8 +2144,8 @@ func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
 	}
 
 	if len(call.ActualParams) != len(procType.Params) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message: fmt.Sprintf("wrong number of arguments for '%v'. expected %d arguments, got %d",
 				call.Callee, len(procType.Params), len(call.ActualParams)),
 		})
@@ -2160,8 +2160,8 @@ func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
 		actual := arg.Type()
 
 		if !types.ParameterCompatible(actual, formal) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("argument %d: of type, '%s' incompatible with parameter of type '%s'",
 					i+1, actual.String(), formal.Type.String()),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
@@ -2183,8 +2183,8 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 	switch op {
 	case token.PLUS, token.MINUS:
 		if !types.IsNumeric(tx) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("unary operator '%s' not applicable to type '%s'", op, tx),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, expr.StartOffset, expr.EndOffset),
 			})
@@ -2195,8 +2195,8 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 				if e.Kind == token.REAL_LIT || e.Kind == token.LONGREAL_LIT {
 					value, err := strconv.ParseFloat(e.Val, 64)
 					if err != nil {
-						t.ctx.Reporter.Report(report.Diagnostic{
-							Severity: report.Fatal,
+						t.ctx.Reporter.Report(diag.Diagnostic{
+							Severity: diag.Fatal,
 							Message:  fmt.Sprintf("could not parse '%s' to real", e.Val),
 							Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Operand.Pos(), expr.Operand.End()),
 						})
@@ -2215,8 +2215,8 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 				} else if e.Kind != token.CHAR && e.Kind != token.WCHAR && e.Kind != token.SET && e.Kind != token.BOOLEAN {
 					value, err := strconv.ParseInt(e.Val, 10, 64)
 					if err != nil {
-						t.ctx.Reporter.Report(report.Diagnostic{
-							Severity: report.Fatal,
+						t.ctx.Reporter.Report(diag.Diagnostic{
+							Severity: diag.Fatal,
 							Message:  fmt.Sprintf("could not parse '%s' to int", e.Val),
 							Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Operand.Pos(), expr.Operand.End()),
 						})
@@ -2264,8 +2264,8 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 
 	case token.NOT:
 		if !types.IsBoolean(tx) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("unary operator '%s' not applicable to type '%s'", op, tx),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, expr.StartOffset, expr.EndOffset),
 			})
@@ -2275,8 +2275,8 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 			expr.SemaType = types.BooleanType
 		}
 	default:
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("unsupported unary operator: %s", op),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, expr.StartOffset, expr.EndOffset),
 		})
@@ -2327,8 +2327,8 @@ func (t *TypeChecker) VisitSet(n *ast.Set) any {
 			low, errLow := t.EvalConstUint32(e.Low)
 			high, errHigh := t.EvalConstUint32(e.High)
 			if errLow != nil || errHigh != nil {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("invalid set range: %v", errLow),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, elem.Pos(), elem.End()),
 				})
@@ -2336,8 +2336,8 @@ func (t *TypeChecker) VisitSet(n *ast.Set) any {
 			}
 
 			if low > high {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("invalid set range: low (%d) > high (%d)", low, high),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, elem.Pos(), elem.End()),
 				})
@@ -2350,8 +2350,8 @@ func (t *TypeChecker) VisitSet(n *ast.Set) any {
 
 			val, err := t.EvalConstUint32(e)
 			if err != nil {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("invalid set element: %v", err),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, elem.Pos(), elem.End()),
 				})
@@ -2360,8 +2360,8 @@ func (t *TypeChecker) VisitSet(n *ast.Set) any {
 			_ = val // validated by EvalConstUint32
 
 		default:
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  "invalid set element",
 				Range:    t.ctx.Source.Span(t.ctx.FileName, elem.Pos(), elem.End()),
 			})
@@ -2403,8 +2403,8 @@ func (t *TypeChecker) VisitBasicLit(lit *ast.BasicLit) any {
 	case token.NIL:
 		lit.SemaType = types.NilType
 	default:
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "Type Error: unknown literal kind: " + lit.Val,
 			Range:    t.ctx.Source.Span(t.ctx.FileName, lit.StartOffset, lit.EndOffset),
 		})
@@ -2420,8 +2420,8 @@ func (t *TypeChecker) VisitExprRange(n *ast.ExprRange) any {
 	tHigh := n.High.Accept(t).(types.Type)
 
 	if !types.EqualType(tLow, tHigh) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("type mismatchin set range: expected %s but got %s", tLow, tHigh),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, n.StartOffset, n.EndOffset),
 		})
@@ -2434,8 +2434,8 @@ func (t *TypeChecker) VisitExprRange(n *ast.ExprRange) any {
 func (t *TypeChecker) VisitIfStmt(stmt *ast.IfStmt) any {
 	stmt.BoolExpr.Accept(t)
 	if !types.IsBoolean(stmt.BoolExpr.Type()) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message: fmt.Sprintf("condition expression '%s' evaluates to '%s' type. expecting boolean",
 				stmt.BoolExpr, stmt.BoolExpr),
 			Range: t.ctx.Source.Span(t.ctx.FileName, stmt.BoolExpr.Pos(), stmt.BoolExpr.End()),
@@ -2460,8 +2460,8 @@ func (t *TypeChecker) VisitIfStmt(stmt *ast.IfStmt) any {
 func (t *TypeChecker) VisitElseIfBranch(branch *ast.ElseIfBranch) any {
 	branch.BoolExpr.Accept(t)
 	if !types.IsBoolean(branch.BoolExpr.Type()) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message: fmt.Sprintf("condition expression '%s' evaluates to '%s' type. expecting boolean",
 				branch.BoolExpr, branch.BoolExpr),
 			Range: t.ctx.Source.Span(t.ctx.FileName, branch.BoolExpr.Pos(), branch.BoolExpr.End()),
@@ -2484,8 +2484,8 @@ func (t *TypeChecker) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any {
 
 	// Ensure the LHS is a valid variable designator
 	if !t.isAssignable(stmt.LValue) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("left-hand side of assignment assignment, '%s', is not assignable", stmt.LValue),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, stmt.LValue.Pos(), stmt.LValue.End()),
 		})
@@ -2493,8 +2493,8 @@ func (t *TypeChecker) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any {
 	}
 
 	if !types.AssignmentCompatible(te, tv) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message: fmt.Sprintf("expression '%s' is not assignment compatible with variable '%s'",
 				stmt.RValue, stmt.LValue),
 			Range: t.ctx.Source.Span(t.ctx.FileName, stmt.StartOffset, stmt.EndOffset),
@@ -2516,8 +2516,8 @@ func (t *TypeChecker) VisitProcedureCall(call *ast.ProcedureCall) any {
 	call.Callee.Accept(t)
 
 	if !IsCallable(call.Callee) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("name '%s' could not be resolved to a procedure", call.Callee),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
 		})
@@ -2533,8 +2533,8 @@ func (t *TypeChecker) VisitProcedureCall(call *ast.ProcedureCall) any {
 
 	procType, ok := types.Underlying(call.Callee.SemaType).(*types.ProcedureType)
 	if !ok {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("cannot call '%v', a non-procedure object", call.Callee),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
 		})
@@ -2542,8 +2542,8 @@ func (t *TypeChecker) VisitProcedureCall(call *ast.ProcedureCall) any {
 	}
 
 	if len(call.ActualParams) != len(procType.Params) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message: fmt.Sprintf("wrong number of arguments for '%v'. expected %d arguments, got %d",
 				call.Callee, len(procType.Params), len(call.ActualParams)),
 		})
@@ -2558,8 +2558,8 @@ func (t *TypeChecker) VisitProcedureCall(call *ast.ProcedureCall) any {
 		actual := arg.Type()
 
 		if !types.ParameterCompatible(actual, formal) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("argument %d: of type, '%s' is incompatible with parameter of type '%s'",
 					i+1, actual.String(), formal.Type.String()),
 				Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
@@ -2577,8 +2577,8 @@ func (t *TypeChecker) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
 
 	stmt.BoolExpr.Accept(t)
 	if !types.IsBoolean(stmt.BoolExpr.Type()) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message: fmt.Sprintf("condition expression '%s' evaluates to '%s' type. expecting boolean",
 				stmt.BoolExpr, stmt.BoolExpr),
 			Range: t.ctx.Source.Span(t.ctx.FileName, stmt.BoolExpr.Pos(), stmt.BoolExpr.End()),
@@ -2591,8 +2591,8 @@ func (t *TypeChecker) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
 func (t *TypeChecker) VisitWhileStmt(stmt *ast.WhileStmt) any {
 	stmt.BoolExpr.Accept(t)
 	if !types.IsBoolean(stmt.BoolExpr.Type()) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message: fmt.Sprintf("condition expression '%s' evaluates to '%s' type. expecting boolean",
 				stmt.BoolExpr, stmt.BoolExpr),
 			Range: t.ctx.Source.Span(t.ctx.FileName, stmt.BoolExpr.Pos(), stmt.BoolExpr.End()),
@@ -2623,8 +2623,8 @@ func (t *TypeChecker) VisitCaseStmt(stmt *ast.CaseStmt) any {
 	caseType := stmt.Expr.Type()
 
 	if !IsValidCaseDiscriminant(stmt.Expr) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("invalid type '%s' for CASE selector", caseType),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, stmt.Expr.Pos(), stmt.Expr.End()),
 		})
@@ -2659,8 +2659,8 @@ func (t *TypeChecker) VisitLabelRange(labelRange *ast.LabelRange) any {
 		labelRange.High.Accept(t)
 
 		if !types.SameType(labelRange.Low.Type(), labelRange.High.Type()) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("label range boundaries must have the same type, got '%v' and '%v'",
 					labelRange.Low.Type(), labelRange.High.Type()),
 				Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
@@ -2679,8 +2679,8 @@ func (t *TypeChecker) VisitForStmt(stmt *ast.ForStmt) any {
 	ctlType := stmt.CtlVar.Type()
 
 	if !(types.IsInteger(ctlType) || types.IsEnum(ctlType)) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message: fmt.Sprintf("control variable %s must be of integer or enumeration type",
 				stmt.CtlVar.Name),
 			Range: t.ctx.Source.Span(t.ctx.FileName, stmt.CtlVar.Pos(), stmt.CtlVar.End()),
@@ -2694,8 +2694,8 @@ func (t *TypeChecker) VisitForStmt(stmt *ast.ForStmt) any {
 	stmt.FinalVal.Accept(t)
 
 	if !types.AssignmentCompatible(stmt.InitVal.Type(), ctlType) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message: fmt.Sprintf("initial value, '%s' cannot be assiged to control variable '%s'",
 				stmt.InitVal, stmt.CtlVar),
 			Range: t.ctx.Source.Span(t.ctx.FileName, stmt.CtlVar.Pos(), stmt.InitVal.End()),
@@ -2703,8 +2703,8 @@ func (t *TypeChecker) VisitForStmt(stmt *ast.ForStmt) any {
 	}
 
 	if !types.AssignmentCompatible(stmt.FinalVal.Type(), ctlType) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message: fmt.Sprintf("final value, '%s' cannot be assiged to control variable '%s'",
 				stmt.FinalVal, stmt.CtlVar),
 			Range: t.ctx.Source.Span(t.ctx.FileName, stmt.CtlVar.Pos(), stmt.FinalVal.End()),
@@ -2714,32 +2714,32 @@ func (t *TypeChecker) VisitForStmt(stmt *ast.ForStmt) any {
 	// BY expression only allowed for integers
 	if stmt.By != nil {
 		if !types.IsInteger(ctlType) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  "BY expression only allowed for integer control variables",
 				Range:    t.ctx.Source.Span(t.ctx.FileName, stmt.By.Pos(), stmt.By.End()),
 			})
 		} else {
 			stmt.By.Accept(t)
 			if !ast.IsConstExpr(stmt.By) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  "BY expression must be a constant",
 					Range:    t.ctx.Source.Span(t.ctx.FileName, stmt.By.Pos(), stmt.By.End()),
 				})
 			}
 
 			if ast.IsZeroConstExpr(stmt.By) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  "BY expression must be nonzero",
 					Range:    t.ctx.Source.Span(t.ctx.FileName, stmt.By.Pos(), stmt.By.End()),
 				})
 			}
 
 			if !types.AssignmentCompatible(stmt.By.Type(), ctlType) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("BY expression (%s: %s), not assignable to (%s: %s)",
 						stmt.By, stmt.By.Type(), stmt.CtlVar, ctlType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, stmt.CtlVar.Pos(), stmt.By.End()),
@@ -2774,8 +2774,8 @@ func (t *TypeChecker) VisitGuard(guard *ast.Guard) any {
 	guard.Type.Accept(t)
 
 	if !IsValidGuardExpr(guard.Expr) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("'%s' is not a valid guard expression", guard.Expr),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, guard.Expr.Pos(), guard.Expr.End()),
 		})
@@ -2784,8 +2784,8 @@ func (t *TypeChecker) VisitGuard(guard *ast.Guard) any {
 	extOf := types.IsExtensionOf(types.Underlying(guard.Type.Type()), types.Underlying(guard.Expr.Type()))
 	ptrExtOf := types.IsPointerExtensionOf(types.Underlying(guard.Type.Type()), types.Underlying(guard.Expr.Type()))
 	if !extOf && !ptrExtOf {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("'%v' does not extend '%v'", guard.Type, guard.Expr.Type()),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, guard.Type.Pos(), guard.Type.End()),
 		})
@@ -2832,8 +2832,8 @@ func (t *TypeChecker) VisitVariableDecl(decl *ast.VariableDecl) any {
 
 func (t *TypeChecker) VisitConstantDecl(decl *ast.ConstantDecl) any {
 	if !ast.IsConstExpr(decl.Value) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "operands of constant expression must be constants",
 			Range:    t.ctx.Source.Span(t.ctx.FileName, decl.Value.Pos(), decl.Value.End()),
 		})
@@ -2841,8 +2841,8 @@ func (t *TypeChecker) VisitConstantDecl(decl *ast.ConstantDecl) any {
 
 	decl.Value.Accept(t)
 	if types.IsUnknownType(decl.Value.Type()) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("unknown type for value, '%s', in constant declaration", decl.Value),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, decl.StartOffset, decl.EndOffset),
 		})
@@ -2872,8 +2872,8 @@ func (t *TypeChecker) VisitProcedureHeading(heading *ast.ProcedureHeading) any {
 	}
 
 	if heading.Name.Symbol == nil {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "unresolved identifier: " + heading.Name.Name,
 			Range:    t.ctx.Source.Span(t.ctx.FileName, heading.Name.StartOffset, heading.Name.EndOffset),
 		})
@@ -2908,16 +2908,16 @@ func (t *TypeChecker) VisitProcedureBody(body *ast.ProcedureBody) any {
 
 func (t *TypeChecker) VisitReceiver(rcv *ast.Receiver) any {
 	if rcv.Name.Symbol == nil {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "unable to resolve receiver " + rcv.Name.Name,
 			Range:    t.ctx.Source.Span(t.ctx.FileName, rcv.StartOffset, rcv.EndOffset),
 		})
 	}
 
 	if rcv.Name.Symbol.Kind() != ast.ParamSymbolKind {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("receiver variable '%s' must be a parameter", rcv.Name.Name),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, rcv.StartOffset, rcv.EndOffset),
 		})
@@ -2925,8 +2925,8 @@ func (t *TypeChecker) VisitReceiver(rcv *ast.Receiver) any {
 
 	ty, ok := rcv.Type.Accept(t).(*types.NamedType)
 	if !ok {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "invalid type for receiver. Must be Named type",
 			Range:    t.ctx.Source.Span(t.ctx.FileName, rcv.Type.Pos(), rcv.Type.End()),
 		})
@@ -2937,8 +2937,8 @@ func (t *TypeChecker) VisitReceiver(rcv *ast.Receiver) any {
 		// The receiver may be either a variable (VAR or IN) parameter of record type T
 		rec, ok := types.Underlying(ty.Def).(*types.RecordType)
 		if !ok {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("VAR/IN receiver must have a record type, got '%v'", rec.String()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, rcv.Type.Pos(), rcv.Type.End()),
 			})
@@ -2947,8 +2947,8 @@ func (t *TypeChecker) VisitReceiver(rcv *ast.Receiver) any {
 		// value parameter of type POINTER TO T (where T is a record type
 		ptr, ok := types.Underlying(ty.Def).(*types.PointerType)
 		if !ok || types.Underlying(ptr.Base).(*types.RecordType) == nil {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("value receiver must have a pointer to record type, got '%v'", ptr.String()),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, rcv.Type.Pos(), rcv.Type.End()),
 			})
@@ -2987,8 +2987,8 @@ func (t *TypeChecker) VisitFPSection(section *ast.FPSection) any {
 
 		sym := t.ctx.Env.Lookup(id.Name)
 		if sym == nil {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("undeclared parameter name '%s'", id.Name),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, id.Pos(), id.End()),
 			})
@@ -3030,8 +3030,8 @@ func (t *TypeChecker) VisitFormalParams(params *ast.FormalParams) any {
 func (t *TypeChecker) VisitBasicType(ty *ast.BasicType) any {
 	typ, ok := types.PredefinedTypes[ty.Kind]
 	if !ok {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "unknown type: " + ty.Kind.String(),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, ty.StartOffset, ty.EndOffset),
 		})
@@ -3081,8 +3081,8 @@ func (t *TypeChecker) VisitLenList(list *ast.LenList) any {
 		if isVar {
 			// Variable-length expression
 			if !types.IsInteger(expr.Type()) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("VAR array length must be of integer type, %s", expr),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Pos(), expr.End()),
 				})
@@ -3093,8 +3093,8 @@ func (t *TypeChecker) VisitLenList(list *ast.LenList) any {
 			val := ast.EvalConstExpr(expr)
 			n, ok := val.(int64)
 			if !ok || n < 0 {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  "array length must be a constant non-negative integer",
 					Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Pos(), expr.End()),
 				})
@@ -3109,8 +3109,8 @@ func (t *TypeChecker) VisitLenList(list *ast.LenList) any {
 func (t *TypeChecker) VisitPointerType(ty *ast.PointerType) any {
 	base := ty.Base.Accept(t).(types.Type)
 	if base == nil {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("pointer base '%s' is not a type", ty.Base),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, ty.Base.Pos(), ty.Base.End()),
 		})
@@ -3135,8 +3135,8 @@ func (t *TypeChecker) VisitRecordType(ty *ast.RecordType) any {
 	if ty.Base != nil {
 		baseTy := types.Underlying(ty.Base.Accept(t).(types.Type)).(*types.RecordType)
 		if baseTy == nil {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("expected parent of record to be record type, got '%v'", ty.Base),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, ty.StartOffset, ty.EndOffset),
 			})
@@ -3175,8 +3175,8 @@ func (t *TypeChecker) VisitFieldList(list *ast.FieldList) any {
 	for _, def := range list.List {
 		sym := list.Env.Lookup(def.Name)
 		if sym == nil || sym.Kind() != ast.FieldSymbolKind {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("could not resolve field '%s'.", def.Name),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, def.StartOffset, def.EndOffset),
 			})
@@ -3198,8 +3198,8 @@ func (t *TypeChecker) VisitEnumType(ty *ast.EnumType) any {
 
 	for i, variant := range ty.Variants {
 		if _, exists := names[variant.Name]; exists {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("enum variant '%s' is defined more than once", variant),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, ty.StartOffset, ty.EndOffset),
 			})
@@ -3265,8 +3265,8 @@ func (t *TypeChecker) checkIntegerCase(stmt *ast.CaseStmt, caseType types.Type) 
 			labelRange.Accept(t)
 
 			if !types.TypeIncludes(caseType, labelRange.Low.Type()) /*&& !types.EqualType(caseType, labelRange.Low.Type()) */ {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("CASE label '%s' is invalid for the range of CASE expression ('%s': '%s') ",
 						labelRange, stmt.Expr, caseType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
@@ -3275,8 +3275,8 @@ func (t *TypeChecker) checkIntegerCase(stmt *ast.CaseStmt, caseType types.Type) 
 
 			// Case labels are constants, and no value must occur more than once
 			if !ast.IsConstExpr(labelRange.Low) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  "CASE label must be a constant",
 					Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
 				})
@@ -3284,8 +3284,8 @@ func (t *TypeChecker) checkIntegerCase(stmt *ast.CaseStmt, caseType types.Type) 
 
 			lowValue, isInt64 := ast.EvalConstExpr(labelRange.Low).(int64)
 			if !isInt64 {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("'%v' is not a valid INTEGER", labelRange.Low),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
 				})
@@ -3297,16 +3297,16 @@ func (t *TypeChecker) checkIntegerCase(stmt *ast.CaseStmt, caseType types.Type) 
 			if labelRange.High != nil {
 				// Case labels are constants, and no value must occur more than once
 				if !ast.IsConstExpr(labelRange.High) {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  "CASE label must be a constant",
 						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
 					})
 				}
 
 				if !types.TypeIncludes(caseType, labelRange.High.Type()) /*&& !types.EqualType(caseType, labelRange.Low.Type())*/ {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message: fmt.Sprintf("CASE label '%s' is invalid for the range of CASE expression ('%s': '%s') ",
 							labelRange, stmt.Expr, caseType),
 						Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
@@ -3314,8 +3314,8 @@ func (t *TypeChecker) checkIntegerCase(stmt *ast.CaseStmt, caseType types.Type) 
 				}
 
 				if !ast.IsConstExpr(labelRange.High) {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  "high end of CASE label must be a constant",
 						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
 					})
@@ -3323,8 +3323,8 @@ func (t *TypeChecker) checkIntegerCase(stmt *ast.CaseStmt, caseType types.Type) 
 
 				hv, isInt64 := ast.EvalConstExpr(labelRange.High).(int64)
 				if !isInt64 {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  fmt.Sprintf("'%v' is not a valid INTEGER", labelRange.High),
 						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
 					})
@@ -3333,8 +3333,8 @@ func (t *TypeChecker) checkIntegerCase(stmt *ast.CaseStmt, caseType types.Type) 
 				}
 
 				if hv < lowValue {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  fmt.Sprintf("invalid case label range: %d .. %d", lowValue, hv),
 						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
 					})
@@ -3351,8 +3351,8 @@ func (t *TypeChecker) checkIntegerCase(stmt *ast.CaseStmt, caseType types.Type) 
 					pos := t.ctx.Source.Span(t.ctx.FileName, prev.Pos(), prev.End()).Start
 					location := fmt.Sprintf("%s:%d:%d", pos.File, pos.Line, pos.Column)
 
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message: fmt.Sprintf("duplicate case label %d (already defined at %v)",
 							val, location),
 						Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
@@ -3377,16 +3377,16 @@ func (t *TypeChecker) checkCharCase(stmt *ast.CaseStmt) {
 
 			// Case labels are constants, and no value must occur more than once
 			if !ast.IsConstExpr(labelRange.Low) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  "CASE label must be a constant",
 					Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
 				})
 			}
 
 			if !types.IsChar(labelRange.Low.Type()) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("CASE label must be CHAR type, got '%v'", labelRange.Low.Type()),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
 				})
@@ -3394,8 +3394,8 @@ func (t *TypeChecker) checkCharCase(stmt *ast.CaseStmt) {
 
 			lowRune, ok := ast.EvalConstExpr(labelRange.Low).(rune)
 			if !ok {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("'%v' is not a valid LATIN-1 CHAR", labelRange.Low),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
 				})
@@ -3406,16 +3406,16 @@ func (t *TypeChecker) checkCharCase(stmt *ast.CaseStmt) {
 
 			if labelRange.High != nil {
 				if !ast.IsConstExpr(labelRange.High) {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  "CASE label must be a constant",
 						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
 					})
 				}
 
 				if !types.IsChar(labelRange.High.Type()) {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  fmt.Sprintf("CASE label must be CHAR type, got '%v'", labelRange.High.Type()),
 						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
 					})
@@ -3423,8 +3423,8 @@ func (t *TypeChecker) checkCharCase(stmt *ast.CaseStmt) {
 
 				// Case labels are constants, and no value must occur more than once
 				if !ast.IsConstExpr(labelRange.High) {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  "CASE label must be a constant",
 						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
 					})
@@ -3434,8 +3434,8 @@ func (t *TypeChecker) checkCharCase(stmt *ast.CaseStmt) {
 
 				hr, ok := ast.EvalConstExpr(labelRange.High).(rune)
 				if !ok {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  fmt.Sprintf("'%v' is not a valid LATIN-1 CHAR", labelRange.High),
 						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
 					})
@@ -3444,8 +3444,8 @@ func (t *TypeChecker) checkCharCase(stmt *ast.CaseStmt) {
 				}
 
 				if hr < lowRune {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message: fmt.Sprintf("'%s' cannot be greater then '%s'. Invalid case label range: "+
 							"%s .. %s.", string(lowRune), string(hr), string(lowRune), string(hr)),
 						Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
@@ -3462,8 +3462,8 @@ func (t *TypeChecker) checkCharCase(stmt *ast.CaseStmt) {
 					pos := t.ctx.Source.Span(t.ctx.FileName, prev.Pos(), prev.End()).Start
 					location := fmt.Sprintf("%s:%d:%d", pos.File, pos.Line, pos.Column)
 
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message: fmt.Sprintf("duplicate case label '%s' (already defined at %s)",
 							string(val), location),
 						Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
@@ -3489,16 +3489,16 @@ func (t *TypeChecker) checkEnumCase(stmt *ast.CaseStmt, caseType types.Type) {
 
 			// Case labels are constants, and no value must occur more than once
 			if !ast.IsConstExpr(labelRange.Low) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  "CASE label must be a constant",
 					Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
 				})
 			}
 
 			if !types.IsEnum(labelRange.Low.Type()) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("CASE label must be of ENUM type, '%v' got '%v'",
 						caseType, labelRange.Low.Type()),
 					Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
@@ -3508,8 +3508,8 @@ func (t *TypeChecker) checkEnumCase(stmt *ast.CaseStmt, caseType types.Type) {
 			enum := types.Underlying(caseType).(*types.EnumType)
 			lowEnum, isEnumMember := enum.Variants[labelRange.Low.String()]
 			if !isEnumMember {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message: fmt.Sprintf("CASE label, '%s' is not a member of ENUM '%s'",
 						labelRange.Low.String(), caseType),
 					Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Low.Pos(), labelRange.Low.End()),
@@ -3522,16 +3522,16 @@ func (t *TypeChecker) checkEnumCase(stmt *ast.CaseStmt, caseType types.Type) {
 			if labelRange.High != nil {
 				// Case labels are constants, and no value must occur more than once
 				if !ast.IsConstExpr(labelRange.High) {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  "CASE label must be a constant",
 						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
 					})
 				}
 
 				if !types.IsEnum(labelRange.High.Type()) {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  fmt.Sprintf("CASE label must be ENUM type, got '%v'", labelRange.High.Type()),
 						Range:    t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
 					})
@@ -3542,8 +3542,8 @@ func (t *TypeChecker) checkEnumCase(stmt *ast.CaseStmt, caseType types.Type) {
 				enum = types.Underlying(caseType).(*types.EnumType)
 				he, isEnumMember := enum.Variants[labelRange.High.String()]
 				if !isEnumMember {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message: fmt.Sprintf("CASE label, '%s' is not a member of '%s'",
 							labelRange.High.String(), caseType),
 						Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.High.Pos(), labelRange.High.End()),
@@ -3553,8 +3553,8 @@ func (t *TypeChecker) checkEnumCase(stmt *ast.CaseStmt, caseType types.Type) {
 				}
 
 				if he < lowEnum {
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message: fmt.Sprintf("Invalid case label range: %s .. %s.",
 							labelRange.Low.String(), labelRange.High.String()),
 						Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
@@ -3571,8 +3571,8 @@ func (t *TypeChecker) checkEnumCase(stmt *ast.CaseStmt, caseType types.Type) {
 					pos := t.ctx.Source.Span(t.ctx.FileName, prev.Pos(), prev.End()).Start
 					location := fmt.Sprintf("%s:%d:%d", pos.File, pos.Line, pos.Column)
 
-					t.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message: fmt.Sprintf("duplicate case label '%s' (already defined at %s)",
 							enum.GetVariant(val), location),
 						Range: t.ctx.Source.Span(t.ctx.FileName, labelRange.Pos(), labelRange.End()),
@@ -3599,8 +3599,8 @@ func (t *TypeChecker) checkTypeCase(stmt *ast.CaseStmt, caseType types.Type) {
 		)
 
 		if len(c.CaseLabelList) != 1 {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  "type CASE branch must have exactly one type label",
 				Range:    t.ctx.Source.Span(t.ctx.FileName, c.StartOffset, c.EndOffset),
 			})
@@ -3614,8 +3614,8 @@ func (t *TypeChecker) checkTypeCase(stmt *ast.CaseStmt, caseType types.Type) {
 		extOf := types.IsExtensionOf(types.Underlying(labelType), types.Underlying(caseType))
 		ptrExtOf := types.IsPointerExtensionOf(types.Underlying(labelType), types.Underlying(caseType))
 		if !extOf && !ptrExtOf && !types.IsNil(types.Underlying(labelType)) {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message: fmt.Sprintf("CASE label '%v' is not an extension of '%v'",
 					label, caseType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, label.Pos(), label.End()),
@@ -3628,16 +3628,16 @@ func (t *TypeChecker) checkTypeCase(stmt *ast.CaseStmt, caseType types.Type) {
 		}
 
 		if !types.IsPointer(types.Underlying(caseType)) && nilLabelExists {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("cannot have a NIL CASE label for a non-pointer CASE expression '%v'", caseType),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, nilLabel.Pos(), nilLabel.End()),
 			})
 		}
 
 		if name := labelType.String(); seen[name] != nil {
-			t.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("duplicate CASE label '%v'", label.Low),
 				Range:    t.ctx.Source.Span(t.ctx.FileName, label.Pos(), label.End()),
 			})
@@ -3660,8 +3660,8 @@ func (t *TypeChecker) checkTypeCase(stmt *ast.CaseStmt, caseType types.Type) {
 func (t *TypeChecker) assertInteger(n ast.Node, msg string) {
 	ty := t.TypeOf(n)
 	if !types.IsInteger(ty) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  msg,
 			Range:    t.ctx.Source.Span(t.ctx.FileName, n.Pos(), n.Pos()),
 		})
@@ -3677,8 +3677,8 @@ func (t *TypeChecker) TypeOf(n ast.Node) types.Type {
 			return e.SemaType
 		}
 
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "unresolved identifier",
 			Range:    t.ctx.Source.Span(t.ctx.FileName, e.Pos(), e.Pos()),
 		})
@@ -3689,8 +3689,8 @@ func (t *TypeChecker) TypeOf(n ast.Node) types.Type {
 	case *ast.QualifiedIdent:
 		return e.Type()
 	default:
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "node has no type",
 			Range:    t.ctx.Source.Span(t.ctx.FileName, e.Pos(), e.Pos()),
 		})
@@ -3725,8 +3725,8 @@ func (t *TypeChecker) EvalConstUint32(expr ast.Expression) (uint32, error) {
 
 func (t *TypeChecker) assertConst(expr ast.Expression) {
 	if !ast.IsConstExpr(expr) {
-		t.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "expression must be constant",
 			Range:    t.ctx.Source.Span(t.ctx.FileName, expr.Pos(), expr.End()),
 		})
@@ -3755,8 +3755,8 @@ func (t *TypeChecker) checkTypeBoundRedefinition(proc *ast.ProcedureDecl) {
 
 			// Check parameter list match
 			if !types.FormalParamsListMatch(pOrig.Params, pRedef.Params) {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("parameter mismatch between of super and redefinition of '%s'", name),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, proc.Head.Pos(), proc.Head.End()),
 				})
@@ -3764,8 +3764,8 @@ func (t *TypeChecker) checkTypeBoundRedefinition(proc *ast.ProcedureDecl) {
 
 			// Check export rules
 			if field.IsExported && recv.Name.Symbol.Props() == ast.Exported && proc.Head.Name.Symbol.Props() != ast.Exported {
-				t.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("redefinition of exported procedure '%s' must also be exported", name),
 					Range:    t.ctx.Source.Span(t.ctx.FileName, proc.Head.Pos(), proc.Head.Pos()),
 				})

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/anthonyabeo/obx/modgraph"
+	"github.com/anthonyabeo/obx/src/modgraph"
 	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 

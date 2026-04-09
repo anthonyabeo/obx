@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/scan"
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -13,7 +13,7 @@ import (
 
 type Parser struct {
 	sc  *scan.Scanner
-	ctx *report.Context
+	ctx *diag.Context
 
 	// Next token
 	tok    token.Kind
@@ -22,7 +22,7 @@ type Parser struct {
 	end    int
 }
 
-func NewParser(ctx *report.Context) *Parser {
+func NewParser(ctx *diag.Context) *Parser {
 	p := &Parser{sc: scan.Scan(ctx), ctx: ctx}
 	p.next()
 
@@ -39,8 +39,8 @@ func (p *Parser) errorExpected(msg string) {
 		msg += ", found '" + p.tok.String() + "'"
 	}
 
-	p.ctx.Reporter.Report(report.Diagnostic{
-		Severity: report.Error,
+	p.ctx.Reporter.Report(diag.Diagnostic{
+		Severity: diag.Error,
 		Message:  msg,
 		Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
 	})
@@ -199,8 +199,8 @@ func (p *Parser) parseModule() *ast.Module {
 	endName = p.parseIdent()
 
 	if beginName != endName {
-		p.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("opening module name (%s) does not match ending name (%s)", beginName, endName),
 			Range:    p.ctx.Source.Span(p.ctx.FileName, endNameStartOffset, endOffset),
 		})
@@ -298,16 +298,16 @@ func (p *Parser) parseImportList() []*ast.Import {
 	for _, imp := range list {
 		if imp.Alias != "" {
 			if sym := p.ctx.Env.Define(ast.NewImportSymbol(imp.Alias)); sym != nil {
-				p.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				p.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  "duplicate module import",
 					Range:    p.ctx.Source.Span(p.ctx.FileName, imp.StartOffset, imp.EndOffset),
 				})
 			}
 		} else {
 			if sym := p.ctx.Env.Define(ast.NewImportSymbol(imp.Name)); sym != nil {
-				p.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				p.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  "duplicate module import",
 					Range:    p.ctx.Source.Span(p.ctx.FileName, imp.StartOffset, imp.EndOffset),
 				})
@@ -488,8 +488,8 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 	Typ := p.parseType()
 
 	if sym := p.ctx.Env.Define(ast.NewTypeSymbol(name.Name, name.Props, Typ)); sym != nil {
-		p.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "duplicate type declaration " + name.Name,
 			Range:    p.ctx.Source.Span(p.ctx.FileName, name.StartOffset, name.EndOffset),
 		})
@@ -509,8 +509,8 @@ func (p *Parser) parseConstantDecl() *ast.ConstantDecl {
 	value := p.parseExpression()
 
 	if sym := p.ctx.Env.Define(ast.NewConstantSymbol(name.Name, name.Props, value)); sym != nil {
-		p.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "duplicate constant declaration " + name.Name,
 			Range:    p.ctx.Source.Span(p.ctx.FileName, name.StartOffset, name.EndOffset),
 		})
@@ -535,8 +535,8 @@ func (p *Parser) parseVariableDecl() *ast.VariableDecl {
 	for _, id := range decl.IdentList {
 		sym := p.ctx.Env.Define(ast.NewVariableSymbol(id.Name, id.Props, decl.Type))
 		if sym != nil {
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			p.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  "duplicate variable declaration " + id.Name,
 				Range:    p.ctx.Source.Span(p.ctx.FileName, id.StartOffset, id.EndOffset),
 			})
@@ -759,8 +759,8 @@ func (p *Parser) lookupBaseType(baseType *ast.NamedType) ast.Symbol {
 	if baseType.Name.Prefix != "" {
 		base := p.ctx.Env.LookupQualified(baseType.Name.Prefix, baseType.Name.Name)
 		if base == nil || base.Props() != ast.Exported {
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			p.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("object %s is not exported", baseType.Name),
 				Range:    p.ctx.Source.Span(p.ctx.FileName, baseType.Name.StartOffset, baseType.Name.EndOffset),
 			})
@@ -813,8 +813,8 @@ func (p *Parser) addFieldsToEnv(rec *ast.RecordType) {
 		for _, id := range field.List {
 			sym := rec.Env.Insert(ast.NewFieldSymbol(id.Name, id.Props, field.Type))
 			if sym != nil {
-				p.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				p.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  "duplicate field declaration " + id.Name,
 					Range:    p.ctx.Source.Span(p.ctx.FileName, id.StartOffset, id.EndOffset),
 				})
@@ -928,8 +928,8 @@ func (p *Parser) parseFactor() ast.Expression {
 		env := p.ctx.Env.CurrentScope()
 		if dsg.QIdent.Prefix != "" {
 			if env = p.ctx.Env.ModuleScope(dsg.QIdent.Prefix); env == nil {
-				p.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Fatal,
+				p.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Fatal,
 					Message:  fmt.Sprintf("cannot find definition or module for %s", dsg.QIdent.Prefix),
 					Range:    p.ctx.Source.Span(p.ctx.FileName, dsg.StartOffset, dsg.EndOffset),
 				})
@@ -959,8 +959,8 @@ func (p *Parser) parseFactor() ast.Expression {
 		return p.parseLiteral()
 
 	default:
-		p.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  "unexpected token: " + p.lexeme + " does not initiate an expression",
 			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
 		})
@@ -1287,8 +1287,8 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 	proc.EndOffset = p.end
 	p.match(token.END)
 	if proc.Body != nil && p.tok != token.IDENTIFIER && p.lexeme != proc.Head.Name.Name {
-		p.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("non-empty body of procedure declaration must end with a matching name"),
 			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
 		})
@@ -1457,8 +1457,8 @@ func (p *Parser) parseStatementSeq() (seq []ast.Statement) {
 
 			if !p.stmtStart() {
 				last := seq[len(seq)-1]
-				p.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				p.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  "the last statement must not end with a semi-colon",
 					Range:    p.ctx.Source.Span(p.ctx.FileName, last.Pos(), last.End()),
 				})
@@ -1526,8 +1526,8 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 			stmt = &ast.ProcedureCall{Callee: dsg, ActualParams: args, StartOffset: pos, EndOffset: p.end}
 			p.next()
 		default:
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			p.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("%s is not a valid statement", dsg),
 				Range:    p.ctx.Source.Span(p.ctx.FileName, dsg.StartOffset, dsg.EndOffset),
 			})

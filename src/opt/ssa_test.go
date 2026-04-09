@@ -4,9 +4,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/anthonyabeo/obx/adt"
-	"github.com/anthonyabeo/obx/src/format"
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/adt"
+	"github.com/anthonyabeo/obx/src/testutil"
+	"github.com/anthonyabeo/obx/src/diag"
+	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
@@ -163,13 +165,13 @@ end Main
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mgr := report.NewSourceManager()
-			ctx := &report.Context{
+			mgr := source.NewSourceManager()
+			ctx := &diag.Context{
 				FileName: tt.filename,
 				Content:  []byte(tt.input),
 				Env:      ast.NewEnv(),
 				Source:   mgr,
-				Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+				Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 					Source: mgr,
 					Writer: os.Stdout,
 				}),
@@ -178,7 +180,7 @@ end Main
 				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
 
-			program := format.ParseSourceAndLowerToMIR(t, ctx)
+			program := testutil.ParseSourceAndLowerToMIR(t, ctx)
 			for _, module := range program.Modules {
 				for _, fn := range module.Funcs {
 					SSAConstruct(fn)

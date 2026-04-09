@@ -1,4 +1,6 @@
-package report
+package diag
+
+import "github.com/anthonyabeo/obx/src/source"
 
 type Severity int
 
@@ -27,21 +29,8 @@ func (s Severity) String() string {
 	}
 }
 
-type Position struct {
-	File   string
-	Offset int // byte offset in file
-	Line   int // 1-based
-	Column int
-}
-
 type Diagnostic struct {
 	Severity Severity
 	Message  string
-	Range    *Range // optional span
-	//LineText string // optional override (for single-line messages)
-}
-
-type Range struct {
-	Start *Position
-	End   *Position
+	Range    *source.Range // optional span
 }

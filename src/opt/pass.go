@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/format"
 	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
@@ -129,7 +128,7 @@ func (pm *PassManager) RunOnce(fn *mir.Function) {
 		if pm.Verbose {
 			fmt.Printf("==> Running pass: %s\n", p.Name())
 			fmt.Println("----- BEFORE -----")
-			format.FormatFunction(fn)
+			mir.FormatFunction(fn)
 		}
 		cs := p.Run(fn, pm.ctx)
 		if pm.Verbose {
@@ -138,7 +137,7 @@ func (pm *PassManager) RunOnce(fn *mir.Function) {
 					fmt.Printf("  • %s\n", l)
 				}
 				fmt.Println("----- AFTER ------")
-				format.FormatFunction(fn)
+				mir.FormatFunction(fn)
 			} else {
 				fmt.Println("  (no changes)")
 			}
@@ -163,7 +162,7 @@ func (pm *PassManager) RunFixedPoint(fn *mir.Function, maxIters int) {
 			}
 			if pm.Verbose {
 				fmt.Println("----- BEFORE -----")
-				fmt.Println(format.FormatFunction(fn))
+				fmt.Println(mir.FormatFunction(fn))
 			}
 			cs := p.Run(fn, pm.ctx)
 			if cs != nil && cs.Any() {
@@ -173,7 +172,7 @@ func (pm *PassManager) RunFixedPoint(fn *mir.Function, maxIters int) {
 						fmt.Printf("  • %s\n", l)
 					}
 					fmt.Println("----- AFTER ------")
-					fmt.Println(format.FormatFunction(fn))
+					fmt.Println(mir.FormatFunction(fn))
 				}
 			} else if pm.Verbose {
 				fmt.Println("  (no changes)")

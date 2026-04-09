@@ -4,21 +4,17 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
-	"github.com/anthonyabeo/obx/adt"
-	"github.com/anthonyabeo/obx/modgraph"
 	"github.com/anthonyabeo/obx/src/backend"
 	"github.com/anthonyabeo/obx/src/backend/target/riscv"
 	"github.com/anthonyabeo/obx/src/ir/hir"
 	"github.com/anthonyabeo/obx/src/ir/mir"
+	"github.com/anthonyabeo/obx/src/modgraph"
 	"github.com/anthonyabeo/obx/src/opt"
-	"github.com/anthonyabeo/obx/src/report"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
-	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
 
 var buildArgs struct {
@@ -41,36 +37,14 @@ var buildCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		path, _ := cmd.Flags().GetString("path")
 		tabWidth, _ := cmd.Flags().GetInt("tabWidth")
-
 		optLevel, _ := cmd.Flags().GetInt("optlevel")
 		enablePasses, _ := cmd.Flags().GetString("passes")
 		disablePasses, _ := cmd.Flags().GetString("disable-passes")
 		verbose, _ := cmd.Flags().GetBool("verbose")
 		asm, _ := cmd.Flags().GetBool("asm")
 
-		files, err := modgraph.DiscoverModuleFiles(path)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// 2. Extract headers
-		var headers []modgraph.Header
-		for _, file := range files {
-			mods, err := modgraph.ScanModuleHeaders(file)
-			if err != nil {
-				log.Fatalf("error in %s: %v", file, err)
-			}
-			headers = append(headers, mods...)
-		}
-
-		// 3. Build graph
-		graph, err := modgraph.BuildImportGraph(path, headers)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// 4. Topologically sort
-		sorted, err := modgraph.TopoSort(graph)
+		// ── 1. Discover and order modules ────────────────────────────────
+		sorted, err := resolveModules(path)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -80,48 +54,24 @@ var buildCmd = &cobra.Command{
 			fmt.Printf("  %s from %s\n", h.Name, h.File)
 		}
 
+		// ── 2. Parse ─────────────────────────────────────────────────────
+		ctx, _ := newContext(tabWidth, 32)
 		obx := ast.NewOberonX()
-		srcMgr := report.NewSourceManager()
-		reporter := report.NewBufferedReporter(srcMgr, 32, report.StdoutSink{
-			Source: srcMgr,
-			Writer: os.Stdout,
-		})
 
-		ctx := &report.Context{
-			Source:                srcMgr,
-			Reporter:              reporter,
-			TabWidth:              tabWidth,
-			Env:                   ast.NewEnv(),
-			Names:                 adt.NewStack[string](),
-			ExprLists:             adt.NewStack[[]ast.Expression](),
-			TargetMachineWordSize: 8,
+		if ok := parseModules(sorted, ctx, obx); !ok {
+			log.Fatalf("%d errors found", ctx.Reporter.ErrorCount())
 		}
 
-		for _, header := range sorted {
-			data, err := os.ReadFile(header.File)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			ctx.FileName = filepath.Base(header.File)
-			ctx.FilePath = header.File
-			ctx.Content = data[header.StartPos:header.EndPos]
-
-			p := parser.NewParser(ctx)
-			unit := p.Parse()
-			if ctx.Reporter.ErrorCount() > 0 {
-				ctx.Reporter.Flush()
-				log.Fatalf("%d errors found", ctx.Reporter.ErrorCount())
-			}
-
-			obx.AddUnit(unit)
-		}
-
-		// semantics analysis
+		// ── 3. Semantic analysis ──────────────────────────────────────────
 		s := sema.NewSema(ctx, obx)
 		s.Validate()
 
-		// lowering & opt
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			log.Fatalf("%d errors found", ctx.Reporter.ErrorCount())
+		}
+
+		// ── 4. Lower: AST → HIR → MIR ────────────────────────────────────
 		hirGen := hir.NewGenerator(ctx, obx)
 		hirProgram := hirGen.Generate()
 
@@ -134,7 +84,7 @@ var buildCmd = &cobra.Command{
 			}
 		}
 
-		// Optimization
+		// ── 5. Optimise ───────────────────────────────────────────────────
 		config := map[string]any{
 			"verbose":       verbose,
 			"optlevel":      optLevel,
@@ -145,6 +95,7 @@ var buildCmd = &cobra.Command{
 		pm := opt.NewPassManager()
 		pm.ConfigurePasses(config)
 
+		// ── 6. Emit assembly ──────────────────────────────────────────────
 		for _, module := range MIRProgram.Modules {
 			root, err := modgraph.FindProjectRoot()
 			if err != nil {
@@ -152,8 +103,8 @@ var buildCmd = &cobra.Command{
 				root = "."
 			}
 
-			path := root + "/out/" + module.Name + ".s"
-			asmFile, err := os.Create(path)
+			asmPath := root + "/out/" + module.Name + ".s"
+			asmFile, err := os.Create(asmPath)
 			if err != nil {
 				log.Printf("failed to create assembly file: %v", err)
 			}

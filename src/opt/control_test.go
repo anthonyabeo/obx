@@ -6,12 +6,14 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/anthonyabeo/obx/adt"
-	"github.com/anthonyabeo/obx/modgraph"
-	"github.com/anthonyabeo/obx/src/format"
+	"github.com/anthonyabeo/obx/src/adt"
+	"github.com/anthonyabeo/obx/src/diag"
+	"github.com/anthonyabeo/obx/src/diag/emit"
 	"github.com/anthonyabeo/obx/src/ir/mir"
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/modgraph"
+	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/testutil"
 )
 
 func TestBuildCFG(t *testing.T) {
@@ -349,13 +351,13 @@ end Main
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mgr := report.NewSourceManager()
-			ctx := &report.Context{
+			mgr := source.NewSourceManager()
+			ctx := &diag.Context{
 				FileName: tc.filename,
 				Content:  []byte(tc.input),
 				Env:      ast.NewEnv(),
 				Source:   mgr,
-				Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+				Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 					Source: mgr,
 					Writer: os.Stdout,
 				}),
@@ -365,7 +367,7 @@ end Main
 				TargetMachineWordSize: 8,
 			}
 
-			program := format.ParseSourceAndLowerToMIR(t, ctx)
+			program := testutil.ParseSourceAndLowerToMIR(t, ctx)
 
 			for _, module := range program.Modules {
 				for _, function := range module.Funcs {

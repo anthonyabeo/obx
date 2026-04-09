@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/diag"
+	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -87,9 +88,9 @@ func TestScanNumber(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName: file,
-		Source:   report.NewSourceManager(),
+		Source:   source.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
@@ -135,9 +136,9 @@ func TestScanIdentifiers(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName: file,
-		Source:   report.NewSourceManager(),
+		Source:   source.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
@@ -191,9 +192,9 @@ func TestScanDelimitersAndOperators(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName: file,
-		Source:   report.NewSourceManager(),
+		Source:   source.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
@@ -244,9 +245,9 @@ func TestScanHexStrings(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName: file,
-		Source:   report.NewSourceManager(),
+		Source:   source.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
@@ -297,9 +298,9 @@ func TestScanCharacterLiterals(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName: file,
-		Source:   report.NewSourceManager(),
+		Source:   source.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
@@ -355,9 +356,9 @@ next'`, token.ILLEGAL, "", true}, // newline
 	}
 
 	file := "test.ob"
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName: file,
-		Source:   report.NewSourceManager(),
+		Source:   source.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
@@ -398,9 +399,9 @@ func TestScanComments(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName: file,
-		Source:   report.NewSourceManager(),
+		Source:   source.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
@@ -443,10 +444,10 @@ begin
 end Main
 `)
 	file := "test.ob"
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName: file,
 		Content:  input,
-		Source:   report.NewSourceManager(),
+		Source:   source.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
@@ -629,10 +630,10 @@ begin
 end Drawing
 `)
 	file := "test.ob"
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName: file,
 		Content:  input,
-		Source:   report.NewSourceManager(),
+		Source:   source.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}

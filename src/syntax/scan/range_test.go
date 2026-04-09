@@ -5,7 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/diag"
+	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -19,10 +21,10 @@ type ExpectedToken struct {
 }
 
 func expectTokens(t *testing.T, src []byte, filename string, expected []ExpectedToken) {
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName: filename,
 		Content:  src,
-		Source:   report.NewSourceManager(),
+		Source:   source.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
@@ -228,10 +230,10 @@ func TestLexerTokenRanges(t *testing.T) {
     y := x + 1
 `)
 	file := "test.ob"
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName: file,
 		Content:  src,
-		Source:   report.NewSourceManager(),
+		Source:   source.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
@@ -310,10 +312,10 @@ func TestOffsetToLineCol_WithTabs(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName: file,
 		Content:  src,
-		Source:   report.NewSourceManager(),
+		Source:   source.NewSourceManager(),
 		Reporter: nil,
 		TabWidth: 4,
 	}
@@ -367,10 +369,10 @@ END Test.
 	tabWidth := 4
 
 	// Initialize diagnostic tools
-	sm := report.NewSourceManager()
+	sm := source.NewSourceManager()
 	sm.Load(file, []byte(src), tabWidth)
 
-	reporter := report.NewBufferedReporter(sm, 25, report.StdoutSink{
+	reporter := diag.NewBufferedReporter(sm, 25, emit.StdoutSink{
 		Source: sm,
 		Writer: os.Stdout,
 	})
@@ -379,8 +381,8 @@ END Test.
 	startOffset := bytes.Index([]byte(src), []byte(`"`))                   // Start at quote
 	endOffset := bytes.Index([]byte(src), []byte(`error"`)) + len("error") // End at "error"
 
-	reporter.Report(report.Diagnostic{
-		Severity: report.Error,
+	reporter.Report(diag.Diagnostic{
+		Severity: diag.Error,
 		Message:  "unterminated string literal",
 		Range:    sm.Span(file, startOffset, endOffset),
 	})

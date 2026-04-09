@@ -3,18 +3,18 @@ package hir
 import (
 	"fmt"
 
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/types"
 )
 
 type Generator struct {
-	ctx *report.Context
+	ctx *diag.Context
 	obx *ast.OberonX
 }
 
-func NewGenerator(ctx *report.Context, obx *ast.OberonX) *Generator {
+func NewGenerator(ctx *diag.Context, obx *ast.OberonX) *Generator {
 	return &Generator{ctx: ctx, obx: obx}
 }
 

@@ -1,6 +1,10 @@
-package report
+package diag
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/anthonyabeo/obx/src/source"
+)
 
 type Reporter interface {
 	Report(Diagnostic)
@@ -11,16 +15,16 @@ type Reporter interface {
 }
 
 type BufferedReporter struct {
-	Source      *SourceManager
+	Source      *source.Manager
 	MaxErrors   int
 	diagnostics []Diagnostic
 	errorCount  int
 	sink        DiagnosticSink
 }
 
-func NewBufferedReporter(source *SourceManager, maxErrors int, sink DiagnosticSink) *BufferedReporter {
+func NewBufferedReporter(src *source.Manager, maxErrors int, sink DiagnosticSink) *BufferedReporter {
 	return &BufferedReporter{
-		Source:    source,
+		Source:    src,
 		MaxErrors: maxErrors,
 		sink:      sink,
 	}

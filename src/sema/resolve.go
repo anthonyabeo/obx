@@ -3,17 +3,17 @@ package sema
 import (
 	"fmt"
 
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type NamesResolver struct {
-	ctx *report.Context
+	ctx *diag.Context
 	obx *ast.OberonX
 }
 
-func NewNameResolver(ctx *report.Context) *NamesResolver {
+func NewNameResolver(ctx *diag.Context) *NamesResolver {
 	return &NamesResolver{ctx: ctx}
 }
 
@@ -77,8 +77,8 @@ func (n *NamesResolver) VisitIdentifier(def *ast.Identifier) any {
 
 	sym := n.ctx.Env.Lookup(def.Name)
 	if sym == nil {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		n.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("identifier '%s' not found", def.Name),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, def.StartOffset, def.EndOffset),
 		})
@@ -113,8 +113,8 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 
 	for _, selector := range dsg.Select {
 		if astType == nil {
-			n.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			n.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("'%s' must have a denoted type", dsg.QIdent),
 				Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, dsg.QIdent.EndOffset),
 			})
@@ -144,8 +144,8 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 
 			sym := rec.Env.Lookup(s.Field)
 			if sym == nil {
-				n.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				n.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("record '%s' has no field named '%s'", dsg.QIdent, s.Field),
 					Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 				})
@@ -168,8 +168,8 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 			case *ast.PointerType:
 				ptr, ok := tn.Base.(*ast.ArrayType)
 				if !ok {
-					n.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					n.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  fmt.Sprintf("cannot index non-array type '%s'", dsg.QIdent),
 						Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 					})
@@ -178,8 +178,8 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 				}
 				arr = ptr
 			default:
-				n.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				n.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("cannot index non-array type '%s'", dsg.QIdent),
 					Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 				})
@@ -197,8 +197,8 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 			case *ast.ProcedureType:
 				astType = symbol.AstType()
 			default:
-				n.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				n.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("dereference/super operator not applicable to '%s'", dsg.QIdent),
 					Range:    n.ctx.Source.Span(n.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
 				})
@@ -209,8 +209,8 @@ func (n *NamesResolver) VisitDesignator(dsg *ast.Designator) any {
 			s.Ty.Accept(n)
 			ty, ok := s.Ty.(*ast.QualifiedIdent)
 			if !ok || ty.Symbol == nil || ty.Symbol.Kind() != ast.TypeSymbolKind {
-				n.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				n.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  fmt.Sprintf("type-guard expression must be a (qualified) identifier: '%v'", dsg.QIdent),
 					Range:    n.ctx.Source.Span(n.ctx.FileName, s.Ty.Pos(), s.Ty.End()),
 				})
@@ -230,8 +230,8 @@ func (n *NamesResolver) VisitFunctionCall(call *ast.FunctionCall) any {
 	call.Callee.Accept(n)
 
 	if call.Callee.Symbol == nil {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		n.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("cannot resolve name '%v'", call.Callee),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, call.Callee.StartOffset, call.Callee.EndOffset),
 		})
@@ -258,8 +258,8 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 	if ident.Prefix == "" {
 		sym := n.ctx.Env.Lookup(ident.Name)
 		if sym == nil {
-			n.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			n.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("undeclared identifier: '%s'", ident.Name),
 				Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
 			})
@@ -273,8 +273,8 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 
 	sym := n.ctx.Env.Lookup(ident.Prefix)
 	if sym == nil || sym.Kind() != ast.ModuleSymbolKind {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		n.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("'%s' is not defined as a module", ident.Prefix),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
 		})
@@ -284,8 +284,8 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 
 	sym = sym.(*ast.ModuleSymbol).Env.Lookup(ident.Name)
 	if sym == nil {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		n.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("identifier '%s' is not defined in module '%s'", ident.Name, ident.Prefix),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
 		})
@@ -294,8 +294,8 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 	}
 
 	if sym.Props() != ast.Exported {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		n.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("identifier '%s', defined in module '%s' is not exported", ident.Name, ident.Prefix),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
 		})
@@ -403,8 +403,8 @@ func (n *NamesResolver) VisitCaseStmt(stmt *ast.CaseStmt) any {
 
 	dsg, isDsg := stmt.Expr.(*ast.Designator)
 	if !isDsg {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		n.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("'%s' is not a valid CASE selector type", stmt.Expr),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, stmt.Expr.Pos(), stmt.Expr.End()),
 		})
@@ -426,8 +426,8 @@ func (n *NamesResolver) VisitCaseStmt(stmt *ast.CaseStmt) any {
 
 				label, ok := labelRange.Low.(*ast.Designator)
 				if !ok {
-					n.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					n.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  fmt.Sprintf("'%s' is not a valid CASE label", labelRange.Low),
 						Range:    n.ctx.Source.Span(n.ctx.FileName, stmt.Expr.Pos(), stmt.Expr.End()),
 					})
@@ -507,8 +507,8 @@ func (n *NamesResolver) VisitGuard(guard *ast.Guard) any {
 	expr, isExprDsg := guard.Expr.(*ast.Designator)
 	ty, isTypeDsg := guard.Type.(*ast.Designator)
 	if !isExprDsg && !isTypeDsg {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		n.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("'%s' is not a valid guard expression", guard.Expr),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, guard.Expr.Pos(), guard.Expr.End()),
 		})
@@ -534,8 +534,8 @@ func (n *NamesResolver) VisitImport(i *ast.Import) any {
 
 	sym := n.ctx.Env.Lookup(name)
 	if sym == nil || sym.Kind() != ast.ModuleSymbolKind {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		n.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("'%s' is not a known module", name),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, i.StartOffset, i.EndOffset),
 		})
@@ -570,8 +570,8 @@ func (n *NamesResolver) VisitProcedureHeading(heading *ast.ProcedureHeading) any
 
 	sym := n.ctx.Env.Lookup(rcvName + heading.Name.Name)
 	if sym == nil {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		n.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("identifier '%s' not found", heading.Name.Name),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, heading.Name.StartOffset, heading.Name.EndOffset),
 		})
@@ -605,8 +605,8 @@ func (n *NamesResolver) VisitVariableDecl(decl *ast.VariableDecl) any {
 	for _, id := range decl.IdentList {
 		def := id.Accept(n)
 		if def == nil {
-			n.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			n.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("'%s' is not a known variable", id.Name),
 				Range:    n.ctx.Source.Span(n.ctx.FileName, id.StartOffset, id.EndOffset),
 			})
@@ -650,8 +650,8 @@ func (n *NamesResolver) VisitFormalParams(params *ast.FormalParams) any {
 
 func (n *NamesResolver) VisitConstantDecl(decl *ast.ConstantDecl) any {
 	if def := decl.Name.Accept(n); def == nil {
-		n.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		n.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("undeclared constant '%s'", decl.Name.Name),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, decl.Name.StartOffset, decl.Name.EndOffset),
 		})
@@ -709,8 +709,8 @@ func (n *NamesResolver) VisitEnumType(ty *ast.EnumType) any {
 	for _, variant := range ty.Variants {
 		sym := n.ctx.Env.Lookup(variant.Name)
 		if sym == nil {
-			n.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			n.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("undeclared enum variant '%s'", variant.Name),
 				Range:    n.ctx.Source.Span(n.ctx.FileName, variant.StartOffset, variant.EndOffset),
 			})
@@ -734,8 +734,8 @@ func (n *NamesResolver) VisitFieldList(list *ast.FieldList) any {
 	for _, def := range list.List {
 		sym := list.Env.Lookup(def.Name)
 		if sym == nil {
-			n.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			n.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("field '%s' not found in record", def.Name),
 				Range:    n.ctx.Source.Span(n.ctx.FileName, def.StartOffset, def.EndOffset),
 			})

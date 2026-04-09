@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/diag"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Scanner struct {
-	ctx     *report.Context
+	ctx     *diag.Context
 	content []byte
 
 	start    int // start position of this item
@@ -83,12 +83,12 @@ func (s *Scanner) peek() rune {
 	return r
 }
 
-func (s *Scanner) errorf(format string /*, rng *report.Range*/, args ...interface{}) StateFn {
+func (s *Scanner) errorf(format string /*, rng *diag.Range*/, args ...interface{}) StateFn {
 	s.items <- token.Token{Kind: token.ILLEGAL, Lexeme: fmt.Sprintf(format, args...) /*, Range: rng*/, Pos: s.start, End: s.pos}
 	return scanText
 }
 
-func Scan(ctx *report.Context) *Scanner {
+func Scan(ctx *diag.Context) *Scanner {
 	ctx.Source.Load(ctx.FileName, ctx.Content, ctx.TabWidth)
 	scan := &Scanner{
 		ctx:      ctx,

@@ -5,8 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anthonyabeo/obx/adt"
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/adt"
+	"github.com/anthonyabeo/obx/src/diag"
+	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
@@ -33,13 +35,13 @@ begin
 end Main`)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -87,13 +89,13 @@ end Main
 `)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -144,13 +146,13 @@ end Main
 `)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -209,13 +211,13 @@ end Main
 `)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -291,13 +293,13 @@ end Main
 `)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -369,13 +371,13 @@ end Main
 `)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -446,13 +448,13 @@ end Drawing
 `)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -567,13 +569,13 @@ end Drawing
 	envs.AddModuleScope("C", collections)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      envs,
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -670,13 +672,13 @@ end Main
 `)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -763,13 +765,13 @@ end Main
 `)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -845,13 +847,13 @@ end Main
 `)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -955,13 +957,13 @@ end Main
 `)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -1070,13 +1072,13 @@ end Main
 `)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Source:   mgr,
 		Content:  input,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
@@ -1147,13 +1149,13 @@ EN BadModule.
 `)
 
 	filename := "test.obx"
-	mgr := report.NewSourceManager()
-	ctx := &report.Context{
+	mgr := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: filename,
 		Content:  input,
 		Source:   mgr,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 			Source: mgr,
 			Writer: os.Stdout,
 		}),

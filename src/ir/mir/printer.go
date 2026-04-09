@@ -1,31 +1,27 @@
-package format
+package mir
 
 import (
 	"fmt"
 	"io"
 	"sort"
 	"strings"
-
-	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
-func formatBlock(b *mir.Block) string {
+func formatBlock(b *Block) string {
 	var sb strings.Builder
 	sb.WriteString(b.Label + ":\n")
 	for _, instr := range b.Instrs {
 		sb.WriteString("  " + instr.String() + "\n")
 	}
-
 	sb.WriteString("\n")
-
 	return sb.String()
 }
 
-func FormatFunction(fn *mir.Function) string {
+// FormatFunction renders fn as a human-readable text IR string.
+func FormatFunction(fn *Function) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("func %s @%s(", fn.Result, fn.Name))
-	var i int
-	for _, p := range fn.Params {
+	for i, p := range fn.Params {
 		sb.WriteString(fmt.Sprintf("%s %s", p.Type(), p.Name()))
 		if i < len(fn.Params)-1 {
 			sb.WriteString(", ")
@@ -33,25 +29,19 @@ func FormatFunction(fn *mir.Function) string {
 	}
 	sb.WriteString("):\n")
 
-	// Print constants
 	for _, c := range fn.Constants {
 		sb.WriteString(fmt.Sprintf("  const %s: %s = %v\n", c.Name(), c.Type(), c.Value()))
 	}
-
-	// Print local variables
 	for _, l := range fn.Locals {
 		sb.WriteString(fmt.Sprintf("  var %s: %s\n", l.Name(), l.Type()))
 	}
 
-	// Collect and sort block IDs
-	blocks := make([]int, 0, len(fn.Blocks))
+	ids := make([]int, 0, len(fn.Blocks))
 	for id := range fn.Blocks {
-		blocks = append(blocks, id)
+		ids = append(ids, id)
 	}
-	sort.Ints(blocks)
-
-	// Iterate in sorted order
-	for _, id := range blocks {
+	sort.Ints(ids)
+	for _, id := range ids {
 		sb.WriteString(formatBlock(fn.Blocks[id]))
 	}
 
@@ -59,16 +49,15 @@ func FormatFunction(fn *mir.Function) string {
 	return sb.String()
 }
 
-func FormatProgram(p *mir.Program) string {
+// FormatProgram renders every module and function in p as text IR.
+func FormatProgram(p *Program) string {
 	var sb strings.Builder
 	for _, m := range p.Modules {
 		sb.WriteString(fmt.Sprintf("module %s:\n", m.Name))
 		for _, g := range m.Globals {
-			sb.WriteString(fmt.Sprintf("%s = global %s", g.Name(), g.Typ))
-			sb.WriteString("\n")
+			sb.WriteString(fmt.Sprintf("%s = global %s\n", g.Name(), g.Typ))
 		}
 		sb.WriteString("\n")
-
 		for _, f := range m.Funcs {
 			sb.WriteString(FormatFunction(f))
 		}
@@ -77,8 +66,9 @@ func FormatProgram(p *mir.Program) string {
 	return sb.String()
 }
 
-func EmitMIR(w io.Writer, program *mir.Program) error {
-	output := FormatProgram(program)
-	_, err := w.Write([]byte(output))
+// EmitMIR writes the text IR of p to w.
+func EmitMIR(w io.Writer, p *Program) error {
+	_, err := w.Write([]byte(FormatProgram(p)))
 	return err
 }
+

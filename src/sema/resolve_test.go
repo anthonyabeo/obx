@@ -7,9 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anthonyabeo/obx/adt"
-	"github.com/anthonyabeo/obx/modgraph"
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/adt"
+	"github.com/anthonyabeo/obx/src/diag"
+	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/modgraph"
+	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
@@ -31,14 +33,14 @@ END Test.
 `
 
 func TestNameResolution_BasicProcedure(t *testing.T) {
-	sm := report.NewSourceManager()
-	ctx := &report.Context{
+	sm := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: "Test.obx",
 		FilePath: "Test.obx",
 		Content:  []byte(testSource),
 		Source:   sm,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(sm, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(sm, 25, emit.StdoutSink{
 			Source: sm,
 			Writer: os.Stdout,
 		}),
@@ -108,7 +110,7 @@ func TestNameResolution_BasicProcedure(t *testing.T) {
 }
 
 func TestResolveQualifiedIdentifier(t *testing.T) {
-	source := `
+	obxSrc := `
     MODULE Math;
         VAR Pi*: REAL;
     END Math.
@@ -123,7 +125,7 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 
 	tmp := t.TempDir()
 	file := filepath.Join(tmp, "test.obx")
-	if err := os.WriteFile(file, []byte(source), 0644); err != nil {
+	if err := os.WriteFile(file, []byte(obxSrc), 0644); err != nil {
 		t.Fatalf("write failed: %v", err)
 	}
 
@@ -149,13 +151,13 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 	}
 
 	obx := ast.NewOberonX()
-	srcMgr := report.NewSourceManager()
-	reporter := report.NewBufferedReporter(srcMgr, 32, report.StdoutSink{
+	srcMgr := source.NewSourceManager()
+	reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
 		Source: srcMgr,
 		Writer: os.Stdout,
 	})
 
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		Source:    srcMgr,
 		Reporter:  reporter,
 		TabWidth:  4,
@@ -217,14 +219,14 @@ func TestNameResolutionUndefined(t *testing.T) {
 		END Main.
 	`
 
-	sm := report.NewSourceManager()
-	ctx := &report.Context{
+	sm := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: "Test.obx",
 		FilePath: "Test.obx",
 		Content:  []byte(src),
 		Source:   sm,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(sm, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(sm, 25, emit.StdoutSink{
 			Source: sm,
 			Writer: os.Stdout,
 		}),
@@ -267,14 +269,14 @@ func TestNameResolution_Basic(t *testing.T) {
 		END Main.
 	`
 
-	sm := report.NewSourceManager()
-	ctx := &report.Context{
+	sm := source.NewSourceManager()
+	ctx := &diag.Context{
 		FileName: "Test.obx",
 		FilePath: "Test.obx",
 		Content:  []byte(src),
 		Source:   sm,
 		Env:      ast.NewEnv(),
-		Reporter: report.NewBufferedReporter(sm, 25, report.StdoutSink{
+		Reporter: diag.NewBufferedReporter(sm, 25, emit.StdoutSink{
 			Source: sm,
 			Writer: os.Stdout,
 		}),

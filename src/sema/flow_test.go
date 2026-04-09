@@ -6,8 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anthonyabeo/obx/adt"
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/adt"
+	"github.com/anthonyabeo/obx/src/diag"
+	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 	"github.com/anthonyabeo/obx/src/types"
@@ -268,13 +270,13 @@ END M.
 
 			// Set up source manager and reporter
 			filename := "test.obx"
-			mgr := report.NewSourceManager()
-			ctx := &report.Context{
+			mgr := source.NewSourceManager()
+			ctx := &diag.Context{
 				FileName: filename,
 				Content:  src,
 				Env:      ast.NewEnv(),
 				Source:   mgr,
-				Reporter: report.NewBufferedReporter(mgr, 25, report.StdoutSink{
+				Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
 					Source: mgr,
 					Writer: os.Stdout,
 				}),
@@ -577,7 +579,7 @@ func TestFlowCheckerProcedureReturn(t *testing.T) {
 	}
 }
 
-func flowCheckSnippet(t *testing.T, code string) *report.Context {
+func flowCheckSnippet(t *testing.T, code string) *diag.Context {
 	tmp := t.TempDir()
 	file := filepath.Join(tmp, "test.obx")
 	if err := os.WriteFile(file, []byte(code), 0644); err != nil {
@@ -585,12 +587,12 @@ func flowCheckSnippet(t *testing.T, code string) *report.Context {
 	}
 
 	obx := ast.NewOberonX()
-	srcMgr := report.NewSourceManager()
-	reporter := report.NewBufferedReporter(srcMgr, 32, report.StdoutSink{
+	srcMgr := source.NewSourceManager()
+	reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
 		Source: srcMgr,
 		Writer: os.Stdout,
 	})
-	ctx := &report.Context{
+	ctx := &diag.Context{
 		FileName:        file,
 		FilePath:        file,
 		Content:         []byte(code),

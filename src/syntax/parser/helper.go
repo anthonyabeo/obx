@@ -2,7 +2,7 @@ package parser
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
@@ -161,8 +161,8 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 		for _, param := range head.FP.Params {
 			for _, id := range param.Names {
 				if sym := p.ctx.Env.Define(ast.NewParamSymbol(id.Name, param.Kind, param.Type)); sym != nil {
-					p.ctx.Reporter.Report(report.Diagnostic{
-						Severity: report.Error,
+					p.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
 						Message:  fmt.Sprintf("duplicate parameter declaration: '%s'", id.Name),
 						Range:    p.ctx.Source.Span(p.ctx.FileName, id.StartOffset, id.EndOffset),
 					})
@@ -176,8 +176,8 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 		curscope := p.ctx.Env.CurrentScope()
 		sym := curscope.Parent().Insert(ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, curscope, kind))
 		if sym != nil {
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			p.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("duplicate procedure declaration: '%v'" + head.Name.Name),
 				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
 			})
@@ -195,8 +195,8 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 		case token.VAR, token.IN:
 			rec, ok = rcvType.(*ast.RecordType)
 			if !ok {
-				p.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				p.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  "VAR/IN receiver type must be a record type",
 					Range:    p.ctx.Source.Span(p.ctx.FileName, rcvType.Pos(), rcvType.End()),
 				})
@@ -206,8 +206,8 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 		default:
 			rec, ok = p.isPointerToRecord(rcvType)
 			if !ok {
-				p.ctx.Reporter.Report(report.Diagnostic{
-					Severity: report.Error,
+				p.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
 					Message:  "value receiver type must be a pointer to record type",
 					Range:    p.ctx.Source.Span(p.ctx.FileName, rcvType.Pos(), rcvType.End()),
 				})
@@ -219,8 +219,8 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 		// add the procedure to the receiver's environment
 		proc := ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, p.ctx.Env.CurrentScope(), kind)
 		if sym := rec.Env.Insert(proc); sym != nil {
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			p.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("duplicate procedure declaration for '%s'", head.Name.Name),
 				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
 			})
@@ -228,8 +228,8 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 
 		// add the receiver to the procedure's environment
 		if sym := p.ctx.Env.Define(ast.NewParamSymbol(head.Rcv.Name.Name, head.Rcv.Kind, head.Rcv.Type)); sym != nil {
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			p.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("duplicate parameter declaration for '%s'", head.Rcv.Name),
 				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Rcv.StartOffset, head.Rcv.EndOffset),
 			})
@@ -239,8 +239,8 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 		curscope := p.ctx.Env.CurrentScope()
 		sym := curscope.Parent().Insert(ast.NewProcedureSymbol(name, head.Name.Props, procType, curscope, kind))
 		if sym != nil {
-			p.ctx.Reporter.Report(report.Diagnostic{
-				Severity: report.Error,
+			p.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
 				Message:  fmt.Sprintf("duplicate type-bound procedure declaration for '%s'", head.Name.Name),
 				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
 			})
@@ -253,8 +253,8 @@ func (p *Parser) underlyingRcvType(ty ast.Type) ast.Type {
 
 	Named, ok := ty.(*ast.NamedType)
 	if !ok {
-		p.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("receiver type must be Named Type, got: '%v'", ty),
 			Range:    p.ctx.Source.Span(p.ctx.FileName, ty.Pos(), ty.End()),
 		})
@@ -269,8 +269,8 @@ func (p *Parser) underlyingRcvType(ty ast.Type) ast.Type {
 
 	sym := env.Lookup(Named.Name.Name)
 	if sym == nil {
-		p.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("receiver type '%s' not declared", Named.Name),
 			Range:    p.ctx.Source.Span(p.ctx.FileName, Named.Name.StartOffset, Named.EndOffset),
 		})
@@ -280,8 +280,8 @@ func (p *Parser) underlyingRcvType(ty ast.Type) ast.Type {
 
 	typeSymbol, ok := sym.(*ast.TypeSymbol)
 	if !ok || typeSymbol == nil {
-		p.ctx.Reporter.Report(report.Diagnostic{
-			Severity: report.Error,
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
 			Message:  fmt.Sprintf("reciever type '%s' not declared as a type", rcvType),
 			Range:    p.ctx.Source.Span(p.ctx.FileName, Named.Name.StartOffset, Named.EndOffset),
 		})

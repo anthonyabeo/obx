@@ -6,14 +6,14 @@ import (
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/ir/hir"
-	"github.com/anthonyabeo/obx/src/report"
+	"github.com/anthonyabeo/obx/src/diag"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/types"
 )
 
 type IRBuilder struct {
-	ctx *report.Context
+	ctx *diag.Context
 
 	Func  *Function // Current function being built
 	Block *Block    // Current basic block
@@ -23,7 +23,7 @@ type IRBuilder struct {
 	curExit    string
 }
 
-func NewIRBuilder(ctx *report.Context) *IRBuilder {
+func NewIRBuilder(ctx *diag.Context) *IRBuilder {
 	return &IRBuilder{ctx: ctx}
 }
 
