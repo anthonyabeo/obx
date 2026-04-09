@@ -9,7 +9,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/adt"
 	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/diag/formatter"
 	"github.com/anthonyabeo/obx/src/modgraph"
 	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -35,15 +35,12 @@ END Test.
 func TestNameResolution_BasicProcedure(t *testing.T) {
 	sm := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: "Test.obx",
-		FilePath: "Test.obx",
-		Content:  []byte(testSource),
-		Source:   sm,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(sm, 25, emit.StdoutSink{
-			Source: sm,
-			Writer: os.Stdout,
-		}),
+		FileName:  "Test.obx",
+		FilePath:  "Test.obx",
+		Content:   []byte(testSource),
+		Source:    sm,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -151,10 +148,7 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 
 	obx := ast.NewOberonX()
 	srcMgr := source.NewSourceManager()
-	reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
-		Source: srcMgr,
-		Writer: os.Stdout,
-	})
+	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
 	ctx := &diag.Context{
 		Source:    srcMgr,
@@ -219,15 +213,12 @@ func TestNameResolutionUndefined(t *testing.T) {
 
 	sm := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: "Test.obx",
-		FilePath: "Test.obx",
-		Content:  []byte(src),
-		Source:   sm,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(sm, 25, emit.StdoutSink{
-			Source: sm,
-			Writer: os.Stdout,
-		}),
+		FileName:  "Test.obx",
+		FilePath:  "Test.obx",
+		Content:   []byte(src),
+		Source:    sm,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -268,15 +259,12 @@ func TestNameResolution_Basic(t *testing.T) {
 
 	sm := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: "Test.obx",
-		FilePath: "Test.obx",
-		Content:  []byte(src),
-		Source:   sm,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(sm, 25, emit.StdoutSink{
-			Source: sm,
-			Writer: os.Stdout,
-		}),
+		FileName:  "Test.obx",
+		FilePath:  "Test.obx",
+		Content:   []byte(src),
+		Source:    sm,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}

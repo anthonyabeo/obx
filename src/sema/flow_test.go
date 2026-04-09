@@ -8,7 +8,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/adt"
 	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/diag/formatter"
 	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
@@ -272,14 +272,11 @@ END M.
 			filename := "test.obx"
 			mgr := source.NewSourceManager()
 			ctx := &diag.Context{
-				FileName: filename,
-				Content:  src,
-				Env:      ast.NewEnv(),
-				Source:   mgr,
-				Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-					Source: mgr,
-					Writer: os.Stdout,
-				}),
+				FileName:  filename,
+				Content:   src,
+				Env:       ast.NewEnv(),
+				Source:    mgr,
+				Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 				Names:     adt.NewStack[string](),
 				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
@@ -587,10 +584,7 @@ func flowCheckSnippet(t *testing.T, code string) *diag.Context {
 
 	obx := ast.NewOberonX()
 	srcMgr := source.NewSourceManager()
-	reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
-		Source: srcMgr,
-		Writer: os.Stdout,
-	})
+	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 	ctx := &diag.Context{
 		FileName:        file,
 		FilePath:        file,

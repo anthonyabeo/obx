@@ -1,10 +1,8 @@
-// Package render formats Diagnostic values as human-readable, ANSI-coloured
-// text written to an io.Writer.
-package render
+package formatter
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/diag"
@@ -33,28 +31,42 @@ func severityColor(s diag.Severity) string {
 	}
 }
 
-// Diagnostic writes d to out with source context and ANSI colour highlighting.
-// tabWidth controls how many spaces each tab character is expanded to in the
-// source snippet; values <= 0 default to 4.
-func Diagnostic(out io.Writer, sm *source.Manager, d diag.Diagnostic, tabWidth int) {
+// TextFormatter produces ANSI-coloured, human-readable diagnostic text with
+// source-snippet context and caret underlines.
+type TextFormatter struct {
+	Source   *source.Manager
+	TabWidth int // spaces per tab in source snippets; 0 → default 4
+}
+
+// NewTextFormatter creates a TextFormatter. tabWidth <= 0 uses the default of 4.
+func NewTextFormatter(sm *source.Manager, tabWidth int) *TextFormatter {
+	return &TextFormatter{Source: sm, TabWidth: tabWidth}
+}
+
+func (f *TextFormatter) ContentType() string { return "text/plain; charset=utf-8" }
+
+func (f *TextFormatter) Format(d diag.Diagnostic) []byte {
+	tabWidth := f.TabWidth
 	if tabWidth <= 0 {
 		tabWidth = 4
 	}
+
+	var buf bytes.Buffer
+
 	if d.Range == nil {
-		fmt.Fprintf(out, "%s%s:%s %s\n", colorBold, d.Severity, colorReset, d.Message)
-		return
+		fmt.Fprintf(&buf, "%s%s:%s %s\n", colorBold, d.Severity, colorReset, d.Message)
+		return buf.Bytes()
 	}
 
 	color := severityColor(d.Severity)
-	sf := sm.GetSourceFile(d.Range.Start.File)
+	sf := f.Source.GetSourceFile(d.Range.Start.File)
 
-	header := fmt.Sprintf("%s%s:%d:%d: %s%s:%s %s",
+	fmt.Fprintf(&buf, "%s%s:%d:%d: %s%s:%s %s\n",
 		colorBold, d.Range.Start.File, d.Range.Start.Line, d.Range.Start.Column,
 		color, d.Severity, colorReset, d.Message)
-	fmt.Fprintln(out, header)
 
 	if sf == nil {
-		return
+		return buf.Bytes()
 	}
 
 	lineNumWidth := len(fmt.Sprintf("%d", d.Range.End.Line))
@@ -70,9 +82,8 @@ func Diagnostic(out io.Writer, sm *source.Manager, d diag.Diagnostic, tabWidth i
 
 		lineContent := string(sf.Content[lineStart:lineEnd])
 		trimmedLine := strings.ReplaceAll(strings.TrimRight(lineContent, "\n"), "\t", strings.Repeat(" ", tabWidth))
-		fmt.Fprintf(out, "%*d | %s\n", lineNumWidth, line, trimmedLine)
+		fmt.Fprintf(&buf, "%*d | %s\n", lineNumWidth, line, trimmedLine)
 
-		// Compute underline bounds
 		var startCol, endCol int
 		switch {
 		case line == d.Range.Start.Line && line == d.Range.End.Line:
@@ -94,11 +105,13 @@ func Diagnostic(out io.Writer, sm *source.Manager, d diag.Diagnostic, tabWidth i
 		}
 
 		marker := strings.Repeat(" ", startCol) + color + strings.Repeat("^", endCol-startCol) + colorReset
-		fmt.Fprintf(out, "%s | %s", strings.Repeat(" ", lineNumWidth), marker)
+		fmt.Fprintf(&buf, "%s | %s", strings.Repeat(" ", lineNumWidth), marker)
 
 		if line == d.Range.Start.Line {
-			fmt.Fprintf(out, " [%s]", d.Severity)
+			fmt.Fprintf(&buf, " [%s]", d.Severity)
 		}
-		fmt.Fprintln(out)
+		fmt.Fprintln(&buf)
 	}
+
+	return buf.Bytes()
 }

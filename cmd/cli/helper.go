@@ -8,7 +8,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/adt"
 	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/diag/formatter"
 	"github.com/anthonyabeo/obx/src/modgraph"
 	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -50,11 +50,9 @@ func resolveModules(path string) ([]modgraph.Header, error) {
 // that controls tab expansion in rendered diagnostic snippets.
 func newContext(tabWidth, maxErrors int) (*diag.Context, *source.Manager) {
 	srcMgr := source.NewSourceManager()
-	reporter := diag.NewBufferedReporter(srcMgr, maxErrors, emit.StdoutSink{
-		Source:   srcMgr,
-		Writer:   os.Stderr,
-		TabWidth: tabWidth,
-	})
+	reporter := diag.NewBufferedReporter(srcMgr, maxErrors,
+		diag.Stderr(formatter.NewTextFormatter(srcMgr, tabWidth)),
+	)
 	ctx := &diag.Context{
 		Source:                srcMgr,
 		Reporter:              reporter,

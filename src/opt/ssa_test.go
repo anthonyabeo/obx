@@ -1,15 +1,14 @@
 package opt
 
 import (
-	"os"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/adt"
-	"github.com/anthonyabeo/obx/src/testutil"
 	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/diag/formatter"
 	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/testutil"
 )
 
 func TestSSAConstruct(t *testing.T) {
@@ -167,14 +166,11 @@ end Main
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := source.NewSourceManager()
 			ctx := &diag.Context{
-				FileName: tt.filename,
-				Content:  []byte(tt.input),
-				Env:      ast.NewEnv(),
-				Source:   mgr,
-				Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-					Source: mgr,
-					Writer: os.Stdout,
-				}),
+				FileName:  tt.filename,
+				Content:   []byte(tt.input),
+				Env:       ast.NewEnv(),
+				Source:    mgr,
+				Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 				Names:     adt.NewStack[string](),
 				ExprLists: adt.NewStack[[]ast.Expression](),
 			}

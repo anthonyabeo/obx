@@ -353,7 +353,7 @@ func lowerLongBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 			bwDst := bwSrc * 2
 
 			// shift = dst_bits - src_bits
-			shift := Int32Lit(uint64(bwDst - bwSrc))
+			shift := Int32Lit(int64(bwDst - bwSrc))
 
 			t := b.NewTemp(UInt64Type)
 			out := b.NewTemp(UInt64Type)
@@ -606,7 +606,7 @@ func lowerShortBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 		b.Emit(&BinaryInst{Target: out, Op: AND, Left: x, Right: UInt64Lit(uint64(mask))})
 
 		if x.Signed {
-			shift := Int32Lit(uint64(bwSrc - bwDst))
+			shift := Int32Lit(int64(bwSrc - bwDst))
 
 			t := b.NewTemp(UInt64Type)
 			b.Emit(&BinaryInst{Target: t, Op: LSHR, Left: x, Right: shift})

@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/adt"
-	"github.com/anthonyabeo/obx/src/modgraph"
 	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/diag/formatter"
+	"github.com/anthonyabeo/obx/src/modgraph"
 	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
@@ -127,10 +127,7 @@ func TestTypeCheckerPrograms(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			obx := ast.NewOberonX()
 			srcMgr := source.NewSourceManager()
-			reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
-				Source: srcMgr,
-				Writer: os.Stdout,
-			})
+			reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
 			ctx := &diag.Context{
 				FileName:  tt.filename,
@@ -243,10 +240,7 @@ func TestTypeCheckInvalidPrograms(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			obx := ast.NewOberonX()
 			srcMgr := source.NewSourceManager()
-			reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
-				Source: srcMgr,
-				Writer: os.Stdout,
-			})
+			reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
 			ctx := &diag.Context{
 				FileName:  tt.filename,
@@ -375,10 +369,7 @@ END ExprCompatibilityTest.`)
 
 	obx := ast.NewOberonX()
 	srcMgr := source.NewSourceManager()
-	reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
-		Source: srcMgr,
-		Writer: os.Stdout,
-	})
+	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
 	ctx := &diag.Context{
 		FileName:  file,
@@ -475,10 +466,7 @@ END InvalidExprCompatibilityTest.
 
 	obx := ast.NewOberonX()
 	srcMgr := source.NewSourceManager()
-	reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
-		Source: srcMgr,
-		Writer: os.Stdout,
-	})
+	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
 	ctx := &diag.Context{
 		FileName:  file,
@@ -3874,10 +3862,7 @@ func typeCheckSnippet(t *testing.T, code string) *diag.Context {
 
 	obx := ast.NewOberonX()
 	srcMgr := source.NewSourceManager()
-	reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
-		Source: srcMgr,
-		Writer: os.Stdout,
-	})
+	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 	ctx := &diag.Context{
 		FileName:        file,
 		FilePath:        file,
@@ -5002,10 +4987,7 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *diag.Context {
 
 	obx := ast.NewOberonX()
 	srcMgr := source.NewSourceManager()
-	reporter := diag.NewBufferedReporter(srcMgr, 32, emit.StdoutSink{
-		Source: srcMgr,
-		Writer: os.Stdout,
-	})
+	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
 	ctx := &diag.Context{
 		Source:          srcMgr,

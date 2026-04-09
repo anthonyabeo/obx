@@ -1,11 +1,8 @@
 package diag
 
-import (
-	"fmt"
+import "github.com/anthonyabeo/obx/src/source"
 
-	"github.com/anthonyabeo/obx/src/source"
-)
-
+// Reporter is the interface through which the compiler records diagnostics.
 type Reporter interface {
 	Report(Diagnostic)
 	Flush()
@@ -14,25 +11,25 @@ type Reporter interface {
 	Diagnostics() []Diagnostic
 }
 
+// BufferedReporter collects diagnostics and flushes them to an Emitter on demand.
 type BufferedReporter struct {
 	Source      *source.Manager
 	MaxErrors   int
 	diagnostics []Diagnostic
 	errorCount  int
-	sink        DiagnosticSink
+	emitter     *Emitter
 }
 
-func NewBufferedReporter(src *source.Manager, maxErrors int, sink DiagnosticSink) *BufferedReporter {
+// NewBufferedReporter creates a reporter that flushes to e.
+func NewBufferedReporter(src *source.Manager, maxErrors int, e *Emitter) *BufferedReporter {
 	return &BufferedReporter{
 		Source:    src,
 		MaxErrors: maxErrors,
-		sink:      sink,
+		emitter:   e,
 	}
 }
 
-func (r *BufferedReporter) Diagnostics() []Diagnostic {
-	return r.diagnostics
-}
+func (r *BufferedReporter) Diagnostics() []Diagnostic { return r.diagnostics }
 
 func (r *BufferedReporter) Report(d Diagnostic) {
 	if d.Severity == Error {
@@ -45,25 +42,10 @@ func (r *BufferedReporter) Report(d Diagnostic) {
 }
 
 func (r *BufferedReporter) Flush() {
-	for _, d := range r.diagnostics {
-		r.sink.Emit(d)
-	}
-
-	if r.LimitReached() {
-		r.sink.Emit(Diagnostic{
-			Severity: Info,
-			Message:  fmt.Sprintf("stopped after %d errors", r.MaxErrors),
-		})
-	}
-
+	r.emitter.EmitAll(r.diagnostics, r.LimitReached(), r.MaxErrors)
 	r.diagnostics = nil
 	r.errorCount = 0
 }
 
-func (r *BufferedReporter) ErrorCount() int {
-	return r.errorCount
-}
-
-func (r *BufferedReporter) LimitReached() bool {
-	return r.MaxErrors > 0 && r.errorCount >= r.MaxErrors
-}
+func (r *BufferedReporter) ErrorCount() int  { return r.errorCount }
+func (r *BufferedReporter) LimitReached() bool { return r.MaxErrors > 0 && r.errorCount >= r.MaxErrors }

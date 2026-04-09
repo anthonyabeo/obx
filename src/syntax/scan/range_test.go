@@ -2,11 +2,10 @@ package scan
 
 import (
 	"bytes"
-	"os"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/diag/formatter"
 	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
@@ -368,10 +367,7 @@ END Test.
 	sm := source.NewSourceManager()
 	sm.Load(file, []byte(src))
 
-	reporter := diag.NewBufferedReporter(sm, 25, emit.StdoutSink{
-		Source:   sm,
-		Writer:   os.Stdout,
-	})
+	reporter := diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0)))
 
 	// Define the range (manually computed for demo purposes)
 	startOffset := bytes.Index([]byte(src), []byte(`"`))                   // Start at quote

@@ -1,13 +1,12 @@
 package parser
 
 import (
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/adt"
 	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/emit"
+	"github.com/anthonyabeo/obx/src/diag/formatter"
 	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
@@ -37,14 +36,11 @@ end Main`)
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -90,14 +86,11 @@ end Main
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -146,14 +139,11 @@ end Main
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -210,14 +200,11 @@ end Main
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -291,14 +278,11 @@ end Main
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -368,14 +352,11 @@ end Main
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -444,14 +425,11 @@ end Drawing
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -564,14 +542,11 @@ end Drawing
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      envs,
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       envs,
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -666,14 +641,11 @@ end Main
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -758,14 +730,11 @@ end Main
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -839,14 +808,11 @@ end Main
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -948,14 +914,11 @@ end Main
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -1062,14 +1025,11 @@ end Main
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Source:   mgr,
-		Content:  input,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Source:    mgr,
+		Content:   input,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -1138,14 +1098,11 @@ EN BadModule.
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName: filename,
-		Content:  input,
-		Source:   mgr,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-			Source: mgr,
-			Writer: os.Stdout,
-		}),
+		FileName:  filename,
+		Content:   input,
+		Source:    mgr,
+		Env:       ast.NewEnv(),
+		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}

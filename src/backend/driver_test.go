@@ -4,14 +4,14 @@ import (
 	"os"
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/diag/formatter"
 	"github.com/anthonyabeo/obx/src/opt"
 
 	"github.com/anthonyabeo/obx/src/adt"
 	"github.com/anthonyabeo/obx/src/backend/target/riscv"
 	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/emit"
-	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/modgraph"
+	"github.com/anthonyabeo/obx/src/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/testutil"
 )
@@ -235,14 +235,11 @@ func TestCompile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mgr := source.NewSourceManager()
 			ctx := &diag.Context{
-				FileName: tc.filename,
-				Content:  []byte(tc.input),
-				Env:      ast.NewEnv(),
-				Source:   mgr,
-				Reporter: diag.NewBufferedReporter(mgr, 25, emit.StdoutSink{
-					Source: mgr,
-					Writer: os.Stdout,
-				}),
+				FileName:  tc.filename,
+				Content:   []byte(tc.input),
+				Env:       ast.NewEnv(),
+				Source:    mgr,
+				Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
 				Names:     adt.NewStack[string](),
 				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
