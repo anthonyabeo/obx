@@ -14,8 +14,8 @@ func NewSourceManager() *Manager {
 }
 
 // Load registers a source file under name.
-func (sm *Manager) Load(name string, content []byte, tabWidth int) {
-	sm.files[name] = NewSourceFile(name, content, tabWidth)
+func (sm *Manager) Load(name string, content []byte) {
+	sm.files[name] = NewSourceFile(name, content)
 }
 
 // GetSourceFile returns the named File, or nil if not loaded.

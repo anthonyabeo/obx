@@ -14,7 +14,6 @@ type Context struct {
 
 	Source   *source.Manager
 	Reporter Reporter
-	TabWidth int
 
 	Env *ast.Environment // manages scopes (lexical, record)
 

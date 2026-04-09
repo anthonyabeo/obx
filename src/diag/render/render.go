@@ -34,7 +34,12 @@ func severityColor(s diag.Severity) string {
 }
 
 // Diagnostic writes d to out with source context and ANSI colour highlighting.
-func Diagnostic(out io.Writer, sm *source.Manager, d diag.Diagnostic) {
+// tabWidth controls how many spaces each tab character is expanded to in the
+// source snippet; values <= 0 default to 4.
+func Diagnostic(out io.Writer, sm *source.Manager, d diag.Diagnostic, tabWidth int) {
+	if tabWidth <= 0 {
+		tabWidth = 4
+	}
 	if d.Range == nil {
 		fmt.Fprintf(out, "%s%s:%s %s\n", colorBold, d.Severity, colorReset, d.Message)
 		return
@@ -64,7 +69,7 @@ func Diagnostic(out io.Writer, sm *source.Manager, d diag.Diagnostic) {
 		}
 
 		lineContent := string(sf.Content[lineStart:lineEnd])
-		trimmedLine := strings.ReplaceAll(strings.TrimRight(lineContent, "\n"), "\t", strings.Repeat(" ", sf.TabWidth))
+		trimmedLine := strings.ReplaceAll(strings.TrimRight(lineContent, "\n"), "\t", strings.Repeat(" ", tabWidth))
 		fmt.Fprintf(out, "%*d | %s\n", lineNumWidth, line, trimmedLine)
 
 		// Compute underline bounds

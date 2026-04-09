@@ -41,9 +41,9 @@ func UInt8Lit(val uint64) *IntegerLit {
 	}
 }
 
-func Int32Lit(val uint64) *IntegerLit {
+func Int32Lit(val int64) *IntegerLit {
 	return &IntegerLit{
-		LitValue: val,
+		LitValue: uint64(val),
 		Signed:   true,
 		Bits:     32,
 		Typ:      Int32Type,

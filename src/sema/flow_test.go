@@ -280,7 +280,6 @@ END M.
 					Source: mgr,
 					Writer: os.Stdout,
 				}),
-				TabWidth:  4,
 				Names:     adt.NewStack[string](),
 				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
@@ -598,7 +597,6 @@ func flowCheckSnippet(t *testing.T, code string) *diag.Context {
 		Content:         []byte(code),
 		Source:          srcMgr,
 		Reporter:        reporter,
-		TabWidth:        4,
 		Env:             ast.NewEnv(),
 		Names:           adt.NewStack[string](),
 		ExprLists:       adt.NewStack[[]ast.Expression](),

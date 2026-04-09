@@ -45,7 +45,6 @@ end Main`)
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -99,7 +98,6 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -156,7 +154,6 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -221,7 +218,6 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -303,7 +299,6 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -381,7 +376,6 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -458,7 +452,6 @@ end Drawing
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -579,7 +572,6 @@ end Drawing
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -682,7 +674,6 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -775,7 +766,6 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -857,7 +847,6 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -967,7 +956,6 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -1082,7 +1070,6 @@ end Main
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
@@ -1159,7 +1146,6 @@ EN BadModule.
 			Source: mgr,
 			Writer: os.Stdout,
 		}),
-		TabWidth:  4,
 		Names:     adt.NewStack[string](),
 		ExprLists: adt.NewStack[[]ast.Expression](),
 	}

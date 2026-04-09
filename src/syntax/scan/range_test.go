@@ -26,7 +26,6 @@ func expectTokens(t *testing.T, src []byte, filename string, expected []Expected
 		Content:  src,
 		Source:   source.NewSourceManager(),
 		Reporter: nil,
-		TabWidth: 4,
 	}
 
 	sc := Scan(ctx)
@@ -235,7 +234,6 @@ func TestLexerTokenRanges(t *testing.T) {
 		Content:  src,
 		Source:   source.NewSourceManager(),
 		Reporter: nil,
-		TabWidth: 4,
 	}
 
 	lx := Scan(ctx)
@@ -304,11 +302,11 @@ func TestOffsetToLineCol_WithTabs(t *testing.T) {
 		EndColumn   int
 	}{
 		{0, "a", 1, 1, 1, 2},
-		{1, "b", 1, 6, 1, 7},
-		{2, "c", 1, 11, 1, 12},
-		{3, "\n", 1, 12, 2, 1},
+		{1, "b", 1, 3, 1, 4},
+		{2, "c", 1, 5, 1, 6},
+		{3, "\n", 1, 6, 2, 1},
 		{4, "1234", 2, 1, 2, 5},
-		{5, "56", 2, 9, 2, 11},
+		{5, "56", 2, 6, 2, 8},
 	}
 
 	file := "test.ob"
@@ -317,7 +315,6 @@ func TestOffsetToLineCol_WithTabs(t *testing.T) {
 		Content:  src,
 		Source:   source.NewSourceManager(),
 		Reporter: nil,
-		TabWidth: 4,
 	}
 
 	sc := Scan(ctx)
@@ -366,15 +363,14 @@ END Test.
 `)
 
 	file := "test.obx"
-	tabWidth := 4
 
 	// Initialize diagnostic tools
 	sm := source.NewSourceManager()
-	sm.Load(file, []byte(src), tabWidth)
+	sm.Load(file, []byte(src))
 
 	reporter := diag.NewBufferedReporter(sm, 25, emit.StdoutSink{
-		Source: sm,
-		Writer: os.Stdout,
+		Source:   sm,
+		Writer:   os.Stdout,
 	})
 
 	// Define the range (manually computed for demo purposes)

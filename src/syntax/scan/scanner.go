@@ -12,14 +12,13 @@ type Scanner struct {
 	ctx     *diag.Context
 	content []byte
 
-	start    int // start position of this item
-	pos      int // current position of the input
-	width    int // width of the last rune read
-	line     int // current line number
-	column   int // current column number
-	tabWidth int // tab width
-	state    StateFn
-	items    chan token.Token // channel of scanned items
+	start  int // start position of this item
+	pos    int // current position of the input
+	width  int // width of the last rune read
+	line   int // current line number
+	column int // current column number
+	state  StateFn
+	items  chan token.Token // channel of scanned items
 }
 
 func (s *Scanner) NextToken() token.Token {
@@ -59,13 +58,6 @@ func (s *Scanner) next() (r rune) {
 	r, s.width = utf8.DecodeRune(s.content[s.pos:])
 	s.pos += s.width
 
-	if r == '\n' {
-		s.line++
-		s.column = 1
-	} else {
-		s.column++
-	}
-
 	return r
 }
 
@@ -89,15 +81,14 @@ func (s *Scanner) errorf(format string /*, rng *diag.Range*/, args ...interface{
 }
 
 func Scan(ctx *diag.Context) *Scanner {
-	ctx.Source.Load(ctx.FileName, ctx.Content, ctx.TabWidth)
+	ctx.Source.Load(ctx.FileName, ctx.Content)
 	scan := &Scanner{
-		ctx:      ctx,
-		content:  ctx.Content,
-		state:    scanText,
-		items:    make(chan token.Token, 512),
-		line:     1,
-		column:   1,
-		tabWidth: 4,
+		ctx:     ctx,
+		content: ctx.Content,
+		state:   scanText,
+		items:   make(chan token.Token, 512),
+		line:    1,
+		column:  1,
 	}
 
 	return scan

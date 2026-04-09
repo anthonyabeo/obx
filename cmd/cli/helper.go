@@ -46,17 +46,18 @@ func resolveModules(path string) ([]modgraph.Header, error) {
 }
 
 // newContext builds a diag.Context wired to a fresh SourceManager and a
-// BufferedReporter that writes to stdout. tabWidth controls source display.
+// BufferedReporter that writes to stderr. tabWidth is a display-only setting
+// that controls tab expansion in rendered diagnostic snippets.
 func newContext(tabWidth, maxErrors int) (*diag.Context, *source.Manager) {
 	srcMgr := source.NewSourceManager()
 	reporter := diag.NewBufferedReporter(srcMgr, maxErrors, emit.StdoutSink{
-		Source: srcMgr,
-		Writer: os.Stderr,
+		Source:   srcMgr,
+		Writer:   os.Stderr,
+		TabWidth: tabWidth,
 	})
 	ctx := &diag.Context{
 		Source:                srcMgr,
 		Reporter:              reporter,
-		TabWidth:              tabWidth,
 		Env:                   ast.NewEnv(),
 		Names:                 adt.NewStack[string](),
 		ExprLists:             adt.NewStack[[]ast.Expression](),

@@ -17,22 +17,24 @@ import (
 // StdoutSink writes formatted diagnostics to an io.Writer (typically os.Stdout
 // or os.Stderr).
 type StdoutSink struct {
-	Source *source.Manager
-	Writer io.Writer // typically os.Stderr
+	Source   *source.Manager
+	Writer   io.Writer // typically os.Stderr
+	TabWidth int       // spaces per tab in source snippets; 0 → default 4
 }
 
 func (s StdoutSink) Emit(d diag.Diagnostic) {
-	render.Diagnostic(s.Writer, s.Source, d)
+	render.Diagnostic(s.Writer, s.Source, d, s.TabWidth)
 }
 
 // FileSink writes formatted diagnostics to an *os.File.
 type FileSink struct {
-	Source *source.Manager
-	File   *os.File
+	Source   *source.Manager
+	File     *os.File
+	TabWidth int // spaces per tab in source snippets; 0 → default 4
 }
 
 func (s *FileSink) Emit(d diag.Diagnostic) {
-	render.Diagnostic(s.File, s.Source, d)
+	render.Diagnostic(s.File, s.Source, d, s.TabWidth)
 }
 
 // JSONNetworkSink POSTs diagnostics as JSON to an HTTP endpoint.

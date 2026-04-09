@@ -92,7 +92,6 @@ func TestScanNumber(t *testing.T) {
 		FileName: file,
 		Source:   source.NewSourceManager(),
 		Reporter: nil,
-		TabWidth: 4,
 	}
 
 	for _, test := range tests {
@@ -140,7 +139,6 @@ func TestScanIdentifiers(t *testing.T) {
 		FileName: file,
 		Source:   source.NewSourceManager(),
 		Reporter: nil,
-		TabWidth: 4,
 	}
 
 	for _, test := range tests {
@@ -196,7 +194,6 @@ func TestScanDelimitersAndOperators(t *testing.T) {
 		FileName: file,
 		Source:   source.NewSourceManager(),
 		Reporter: nil,
-		TabWidth: 4,
 	}
 
 	for _, test := range tests {
@@ -249,7 +246,6 @@ func TestScanHexStrings(t *testing.T) {
 		FileName: file,
 		Source:   source.NewSourceManager(),
 		Reporter: nil,
-		TabWidth: 4,
 	}
 
 	for _, test := range tests {
@@ -302,7 +298,6 @@ func TestScanCharacterLiterals(t *testing.T) {
 		FileName: file,
 		Source:   source.NewSourceManager(),
 		Reporter: nil,
-		TabWidth: 4,
 	}
 
 	for _, test := range tests {
@@ -360,7 +355,6 @@ next'`, token.ILLEGAL, "", true}, // newline
 		FileName: file,
 		Source:   source.NewSourceManager(),
 		Reporter: nil,
-		TabWidth: 4,
 	}
 
 	for _, tt := range tests {
@@ -403,7 +397,6 @@ func TestScanComments(t *testing.T) {
 		FileName: file,
 		Source:   source.NewSourceManager(),
 		Reporter: nil,
-		TabWidth: 4,
 	}
 
 	for _, test := range tests {
@@ -449,7 +442,6 @@ end Main
 		Content:  input,
 		Source:   source.NewSourceManager(),
 		Reporter: nil,
-		TabWidth: 4,
 	}
 	sc := Scan(ctx)
 
@@ -635,7 +627,6 @@ end Drawing
 		Content:  input,
 		Source:   source.NewSourceManager(),
 		Reporter: nil,
-		TabWidth: 4,
 	}
 	sc := Scan(ctx)
 
