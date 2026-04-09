@@ -17,6 +17,13 @@ var checkArgs struct {
 	Quiet     bool
 }
 
+func init() {
+	checkCmd.Flags().StringVarP(&checkArgs.Path, "path", "p", "", "the filesystem path to the root source directory. Defaults to the current directory")
+	checkCmd.Flags().IntVarP(&checkArgs.TabWidth, "tabWidth", "t", 4, "how many spaces should represent a tab")
+	checkCmd.Flags().IntVar(&checkArgs.MaxErrors, "max-errors", 32, "maximum number of errors to report before stopping")
+	checkCmd.Flags().BoolVarP(&checkArgs.Quiet, "quiet", "q", false, "suppress informational output; only show diagnostics")
+}
+
 var checkCmd = &cobra.Command{
 	Use:   "check",
 	Short: "parse and type-check modules without producing any output files",

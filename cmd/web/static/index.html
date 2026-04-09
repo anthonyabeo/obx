@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>obx — Oberon+ Checker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────── */
+    header {
+      padding: 10px 20px;
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    header h1  { font-size: 1.05rem; font-weight: 700; color: #818cf8; letter-spacing: .06em; }
+    .tagline   { font-size: .78rem; color: #475569; }
+    .hdr-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .version   { font-size: .72rem; color: #374151; font-family: ui-monospace, monospace; }
+    .cors-badge {
+      font-size: .65rem; padding: 2px 8px; border-radius: 3px;
+      background: #14532d; color: #4ade80; border: 1px solid #166534;
+      letter-spacing: .05em; font-weight: 600;
+    }
+
+    /* ── Workspace ──────────────────────────── */
+    .workspace { display: flex; flex: 1; overflow: hidden; }
+
+    .pane {
+      display: flex; flex-direction: column;
+      flex: 1; min-width: 0;
+      padding: 12px 14px; gap: 8px;
+    }
+    .pane + .pane { border-left: 1px solid #2d3148; }
+
+    /* ── Pane headers ───────────────────────── */
+    .pane-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .pane-label  { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: #4b5563; flex-shrink: 0; }
+    .spacer      { flex: 1; }
+
+    input#filename {
+      background: #1a1d27; border: 1px solid #2d3148; border-radius: 4px;
+      color: #94a3b8; font-size: .8rem; padding: 3px 8px; width: 180px;
+    }
+    input#filename:focus { outline: none; border-color: #818cf8; color: #e2e8f0; }
+
+    button#checkBtn {
+      padding: 5px 18px; background: #6366f1; border: none; border-radius: 5px;
+      color: #fff; font-size: .82rem; font-weight: 600; cursor: pointer;
+      transition: background .12s; flex-shrink: 0;
+    }
+    button#checkBtn:hover    { background: #4f46e5; }
+    button#checkBtn:active   { background: #4338ca; }
+    button#checkBtn:disabled { background: #1f2937; color: #4b5563; cursor: default; }
+
+    kbd {
+      font-size: .65rem; background: #1f2937; border: 1px solid #374151;
+      border-radius: 3px; padding: 1px 5px; color: #6b7280;
+    }
+
+    /* ── Editor ─────────────────────────────── */
+    textarea#editor {
+      flex: 1; background: #141720; border: 1px solid #2d3148; border-radius: 6px;
+      color: #e2e8f0; font-family: "JetBrains Mono","Fira Code",ui-monospace,monospace;
+      font-size: .875rem; line-height: 1.65; padding: 12px 14px;
+      resize: none; tab-size: 4; transition: border-color .15s;
+    }
+    textarea#editor:focus { outline: none; border-color: #6366f1; }
+
+    /* ── Results ────────────────────────────── */
+    #results {
+      flex: 1; overflow-y: auto; background: #141720;
+      border: 1px solid #2d3148; border-radius: 6px; padding: 10px;
+    }
+
+    .status { font-size: .74rem; font-weight: 600; letter-spacing: .04em; }
+    .status.ok   { color: #4ade80; }
+    .status.fail { color: #f87171; }
+    .status.idle { color: #4b5563; }
+
+    .diag-item {
+      padding: 8px 10px; border-radius: 5px;
+      margin-bottom: 6px; border-left: 3px solid transparent;
+    }
+    .diag-item.error   { background: #1c1013; border-color: #ef4444; }
+    .diag-item.warning { background: #1a1a0a; border-color: #f59e0b; }
+    .diag-item.info    { background: #0d1726; border-color: #3b82f6; }
+    .diag-item.debug   { background: #111827; border-color: #6b7280; }
+
+    .diag-row { display: flex; align-items: flex-start; gap: 8px; }
+
+    .badge {
+      font-size: .65rem; font-weight: 700; letter-spacing: .07em;
+      padding: 2px 7px; border-radius: 3px; text-transform: uppercase;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .badge.error   { background: #ef4444; color: #fff; }
+    .badge.warning { background: #f59e0b; color: #000; }
+    .badge.info    { background: #3b82f6; color: #fff; }
+    .badge.debug   { background: #6b7280; color: #fff; }
+
+    .diag-msg { color: #e2e8f0; font-size: .84rem; line-height: 1.4; }
+    .diag-loc {
+      margin-top: 3px; padding-left: 32px;
+      color: #4b5563; font-size: .76rem; font-family: ui-monospace, monospace;
+    }
+
+    .empty {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; color: #374151; font-size: .88rem;
+      user-select: none; gap: 8px;
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2d3148; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>obx</h1>
+  <span class="tagline">Oberon+ front-end checker</span>
+  <div class="hdr-right">
+    <span class="cors-badge">CORS enabled</span>
+    <span class="version" id="versionBadge"></span>
+  </div>
+</header>
+
+<div class="workspace">
+
+  <!-- ── Editor pane ─────────────────────────── -->
+  <div class="pane">
+    <div class="pane-header">
+      <span class="pane-label">source</span>
+      <input id="filename" type="text" value="main.obx" spellcheck="false" title="filename sent to the API" />
+      <div class="spacer"></div>
+      <kbd>⌘ Enter</kbd>
+      <button id="checkBtn" onclick="runCheck()">Check</button>
+    </div>
+    <textarea id="editor" spellcheck="false">MODULE Main;
+
+VAR x: INTEGER;
+
+BEGIN
+  x := 42
+END Main.
+</textarea>
+  </div>
+
+  <!-- ── Diagnostics pane ────────────────────── -->
+  <div class="pane">
+    <div class="pane-header">
+      <span class="pane-label">diagnostics</span>
+      <div class="spacer"></div>
+      <span id="statusText" class="status idle">—</span>
+    </div>
+    <div id="results">
+      <div class="empty">🔍&nbsp; Press <strong>Check</strong> or hit ⌘ Enter</div>
+    </div>
+  </div>
+
+</div><!-- .workspace -->
+
+<script>
+const editor   = document.getElementById('editor');
+const results  = document.getElementById('results');
+const statusEl = document.getElementById('statusText');
+const btn      = document.getElementById('checkBtn');
+
+/* ── fetch version on load ─────────────────── */
+fetch('/api/version')
+  .then(r => r.ok ? r.json() : null)
+  .then(d => {
+    if (d) document.getElementById('versionBadge').textContent = `obx ${d.version}  ·  go ${d.go}`;
+  })
+  .catch(() => {});
+
+/* ── run check ─────────────────────────────── */
+async function runCheck() {
+  const source   = editor.value;
+  const filename = document.getElementById('filename').value.trim() || 'main.obx';
+  btn.disabled = true; btn.textContent = 'Checking…';
+  results.innerHTML = ''; setStatus('idle', '…');
+
+  try {
+    const res = await fetch('/api/check', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ source, filename }),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + (await res.text()).trim());
+    renderDiags(await res.json());
+  } catch (err) {
+    results.innerHTML = diagHtml('error', 'error', esc(err.message), null);
+    setStatus('fail', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Check';
+  }
+}
+
+/* ── render diagnostics ────────────────────── */
+function renderDiags(data) {
+  const diags = data.diagnostics || [];
+  if (!diags.length) {
+    results.innerHTML = '<div class="empty">✅&nbsp; No diagnostics — looks clean</div>';
+    return setStatus('ok', 'ok');
+  }
+
+  const counts = {};
+  diags.forEach(d => { counts[d.severity] = (counts[d.severity] || 0) + 1; });
+  const summary = Object.entries(counts)
+    .map(([s, n]) => `${n}\u202f${s}${n !== 1 ? 's' : ''}`)
+    .join(' · ');
+  setStatus(data.ok ? 'ok' : 'fail', summary);
+
+  results.innerHTML = diags.map(d => {
+    const loc = d.location
+      ? `${esc(d.location.file)}:${d.location.start_line}:${d.location.start_col}`
+      : null;
+    return diagHtml(d.severity || 'info', d.severity || 'info', esc(d.message || ''), loc);
+  }).join('');
+}
+
+function diagHtml(cls, sev, msg, loc) {
+  const locRow = loc ? `<div class="diag-loc">${loc}</div>` : '';
+  return `<div class="diag-item ${esc(cls)}">
+    <div class="diag-row">
+      <span class="badge ${esc(cls)}">${esc(sev)}</span>
+      <span class="diag-msg">${msg}</span>
+    </div>${locRow}</div>`;
+}
+
+function setStatus(cls, text) {
+  statusEl.className = 'status ' + cls;
+  statusEl.textContent = text;
+}
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* ── keyboard shortcut ─────────────────────── */
+editor.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault(); runCheck();
+  }
+});
+</script>
+</body>
+</html>
+

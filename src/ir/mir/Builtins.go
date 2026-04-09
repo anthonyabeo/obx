@@ -365,7 +365,7 @@ func lowerLongBuiltin(b *IRBuilder, _ *Function, call *hir.FuncCall) Value {
 		} else {
 			// ZERO EXTENSION (BYTE, CHAR)
 			bwSrc := x.Bits
-			mask := (1 << bwSrc) - 1
+			mask := uint64((1 << bwSrc) - 1)
 
 			out := b.NewTemp(UInt64Type)
 			b.Emit(&BinaryInst{Target: out, Op: AND, Left: x, Right: UInt64Lit(mask)})
