@@ -6,14 +6,14 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/adt"
-	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/formatter"
+	"github.com/anthonyabeo/obx/src/support/adt"
+	"github.com/anthonyabeo/obx/src/support/diag"
+	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/ir/mir"
-	"github.com/anthonyabeo/obx/src/modgraph"
-	"github.com/anthonyabeo/obx/src/source"
+	"github.com/anthonyabeo/obx/src/project"
+	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
-	"github.com/anthonyabeo/obx/src/testutil"
+	"github.com/anthonyabeo/obx/src/support/testutil"
 )
 
 func TestBuildCFG(t *testing.T) {
@@ -371,7 +371,7 @@ end Main
 
 					dot := function.OutputDOT()
 
-					Root, err := modgraph.FindProjectRoot()
+					Root, err := project.FindProjectRoot()
 					if err != nil {
 						t.Errorf("failed to find project root: %s", err)
 						continue

@@ -6,11 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/anthonyabeo/obx/src/adt"
-	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/formatter"
-	"github.com/anthonyabeo/obx/src/modgraph"
-	"github.com/anthonyabeo/obx/src/source"
+	"github.com/anthonyabeo/obx/src/support/adt"
+	"github.com/anthonyabeo/obx/src/support/diag"
+	"github.com/anthonyabeo/obx/src/support/diag/formatter"
+	"github.com/anthonyabeo/obx/src/project"
+	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
@@ -19,20 +19,20 @@ import (
 // derives their ModuleKeys from the filesystem layout, builds the import
 // graph, and returns the headers in topological (dependency-first) order
 // together with the graph (needed for entry-point filtering).
-func resolveModules(roots ...string) ([]modgraph.Header, *modgraph.ImportGraph, error) {
-	r := modgraph.NewResolver(roots...)
+func resolveModules(roots ...string) ([]project.Header, *project.ImportGraph, error) {
+	r := project.NewResolver(roots...)
 
 	headers, err := r.DiscoverAll()
 	if err != nil {
 		return nil, nil, fmt.Errorf("discover: %w", err)
 	}
 
-	graph, err := modgraph.BuildImportGraph(headers)
+	graph, err := project.BuildImportGraph(headers)
 	if err != nil {
 		return nil, nil, fmt.Errorf("import graph: %w", err)
 	}
 
-	sorted, err := modgraph.TopoSort(graph)
+	sorted, err := project.TopoSort(graph)
 	if err != nil {
 		return nil, nil, fmt.Errorf("topo sort: %w", err)
 	}
@@ -43,7 +43,7 @@ func resolveModules(roots ...string) ([]modgraph.Header, *modgraph.ImportGraph, 
 // reachableFrom filters sorted to the entry module and its transitive
 // dependencies, preserving topological order. Returns sorted unchanged if
 // entry is empty or not found in the graph.
-func reachableFrom(sorted []modgraph.Header, graph *modgraph.ImportGraph, entry string) []modgraph.Header {
+func reachableFrom(sorted []project.Header, graph *project.ImportGraph, entry string) []project.Header {
 	if entry == "" {
 		return sorted
 	}
@@ -64,7 +64,7 @@ func reachableFrom(sorted []modgraph.Header, graph *modgraph.ImportGraph, entry 
 	}
 	walk(entry)
 
-	out := make([]modgraph.Header, 0, len(reachable))
+	out := make([]project.Header, 0, len(reachable))
 	for _, h := range sorted {
 		if reachable[h.Key.String()] {
 			out = append(out, h)
@@ -94,7 +94,7 @@ func newContext(tabWidth, maxErrors int) (*diag.Context, *source.Manager) {
 
 // parseModules parses every header (in sorted order) into obx.
 // Returns false and flushes diagnostics if any parse errors are found.
-func parseModules(sorted []modgraph.Header, ctx *diag.Context, obx *ast.OberonX) bool {
+func parseModules(sorted []project.Header, ctx *diag.Context, obx *ast.OberonX) bool {
 	for _, header := range sorted {
 		data, err := os.ReadFile(header.File)
 		if err != nil {

@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/anthonyabeo/obx/src/types"
+import "github.com/anthonyabeo/obx/src/sema/types"
 
 var Global *LexicalScope
 

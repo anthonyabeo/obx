@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/anthonyabeo/obx/src/modgraph"
+	"github.com/anthonyabeo/obx/src/project"
 )
 
 var newArgs struct {
@@ -59,12 +59,12 @@ The generated layout is:
 		}
 
 		// ── 3. Write obx.mod ──────────────────────────────────────────────
-		m := modgraph.Manifest{
+		m := project.Manifest{
 			Name:  name,
 			Roots: []string{newArgs.SrcDir},
 			Entry: newArgs.Entry,
 		}
-		if err := modgraph.WriteManifest(projectDir, m); err != nil {
+		if err := project.WriteManifest(projectDir, m); err != nil {
 			log.Fatalf("new: %v", err)
 		}
 
@@ -77,7 +77,7 @@ The generated layout is:
 		// ── 5. Report ─────────────────────────────────────────────────────
 		fmt.Printf("Created %q\n\n", name)
 		fmt.Printf("  %-36s  project manifest\n",
-			filepath.Join(name, modgraph.ManifestFile))
+			filepath.Join(name, project.ManifestFile))
 		fmt.Printf("  %-36s  entry module\n",
 			filepath.Join(name, newArgs.SrcDir, newArgs.Entry+".obx"))
 		fmt.Printf("\nNext steps:\n")

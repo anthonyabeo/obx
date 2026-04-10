@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/diag"
+	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/scan"
 	"github.com/anthonyabeo/obx/src/syntax/token"

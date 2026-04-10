@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/formatter"
-	"github.com/anthonyabeo/obx/src/source"
+	"github.com/anthonyabeo/obx/src/support/diag"
+	"github.com/anthonyabeo/obx/src/support/diag/formatter"
+	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 

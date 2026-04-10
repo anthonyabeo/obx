@@ -8,12 +8,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/anthonyabeo/obx/src/backend"
-	"github.com/anthonyabeo/obx/src/backend/target/riscv"
-	"github.com/anthonyabeo/obx/src/ir/hir"
+	"github.com/anthonyabeo/obx/src/codegen"
+	"github.com/anthonyabeo/obx/src/codegen/target/riscv"
+	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/mir"
-	"github.com/anthonyabeo/obx/src/modgraph"
 	"github.com/anthonyabeo/obx/src/opt"
+	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
@@ -62,13 +62,13 @@ precedence over obx.mod values.`,
 
 		// ── 0. Fall back to obx.mod when no roots are given ──────────────
 		if len(roots) == 0 {
-			dir, err := modgraph.FindProjectRoot()
+			dir, err := project.FindProjectRoot()
 			if err != nil {
 				log.Fatalf("build: no --root given and %s", err)
 			}
 			projectDir = dir
 
-			m, err := modgraph.LoadManifest(dir)
+			m, err := project.LoadManifest(dir)
 			if err != nil {
 				log.Fatalf("build: %v", err)
 			}
@@ -113,7 +113,7 @@ precedence over obx.mod values.`,
 		}
 
 		// ── 4. Lower: AST → HIR → MIR ────────────────────────────────────
-		hirGen := hir.NewGenerator(ctx, obx)
+		hirGen := desugar.NewGenerator(ctx, obx)
 		hirProgram := hirGen.Generate()
 
 		Builder := mir.NewIRBuilder(ctx)
@@ -145,8 +145,8 @@ precedence over obx.mod values.`,
 			}
 			defer asmFile.Close()
 
-			targetDesc := filepath.Join(projectDir, "src", "backend", "target", "desc")
-			ss := backend.Compile(module, riscv.NewRV64IMAFDTarget(), targetDesc)
+			targetDesc := filepath.Join(projectDir, "src", "codegen", "target", "desc")
+			ss := codegen.Compile(module, riscv.NewRV64IMAFDTarget(), targetDesc)
 			if buildArgs.Asm {
 				fmt.Println(ss)
 			}

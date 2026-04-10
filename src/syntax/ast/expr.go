@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/syntax/token"
-	"github.com/anthonyabeo/obx/src/types"
+	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 // IdentProps is a set of flags denoting the properties of an identifier

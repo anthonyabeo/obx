@@ -1,7 +1,7 @@
 package mir
 
 import (
-	"github.com/anthonyabeo/obx/src/ir/asm"
+	"github.com/anthonyabeo/obx/src/codegen/asm"
 )
 
 // Helpers for creating IntegerLit constants of various sizes

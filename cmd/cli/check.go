@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/anthonyabeo/obx/src/modgraph"
+	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
@@ -45,11 +45,11 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 
 		// ── 0. Fall back to obx.mod when --path is not given ─────────────
 		if checkArgs.Path == "" {
-			dir, err := modgraph.FindProjectRoot()
+			dir, err := project.FindProjectRoot()
 			if err != nil {
 				log.Fatalf("check: no --path given and %s", err)
 			}
-			m, err := modgraph.LoadManifest(dir)
+			m, err := project.LoadManifest(dir)
 			if err != nil {
 				log.Fatalf("check: %v", err)
 			}

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/syntax/token"
-	"github.com/anthonyabeo/obx/src/types"
+	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 type (

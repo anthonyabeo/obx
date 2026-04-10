@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/anthonyabeo/obx/src/syntax/ast"
-	"github.com/anthonyabeo/obx/src/types"
+	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 func (f *FlowChecker) newLoopLabel(loopKind string) string {

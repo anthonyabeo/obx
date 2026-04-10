@@ -7,14 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/adt"
-	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/formatter"
-	"github.com/anthonyabeo/obx/src/modgraph"
-	"github.com/anthonyabeo/obx/src/source"
+	"github.com/anthonyabeo/obx/src/support/adt"
+	"github.com/anthonyabeo/obx/src/support/diag"
+	"github.com/anthonyabeo/obx/src/support/diag/formatter"
+	"github.com/anthonyabeo/obx/src/project"
+	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
-	"github.com/anthonyabeo/obx/src/types"
+	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 func TestTypeCheckerPrograms(t *testing.T) {
@@ -4998,21 +4998,21 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *diag.Context {
 	}
 
 	// 2. Discover, scan and graph
-	headers, err := modgraph.DiscoverAndScan(tmp)
+	headers, err := project.DiscoverAndScan(tmp)
 	if err != nil {
 		ctx.Reporter.Report(diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
 		return ctx
 	}
 
 	// 3. Build graph
-	graph, err := modgraph.BuildImportGraph(headers)
+	graph, err := project.BuildImportGraph(headers)
 	if err != nil {
 		ctx.Reporter.Report(diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
 		return ctx
 	}
 
 	// 4. Topologically sort
-	sorted, err := modgraph.TopoSort(graph)
+	sorted, err := project.TopoSort(graph)
 	if err != nil {
 		ctx.Reporter.Report(diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
 		return ctx

@@ -2,7 +2,7 @@ package mir
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/ir/asm"
+	"github.com/anthonyabeo/obx/src/codegen/asm"
 	"strings"
 )
 

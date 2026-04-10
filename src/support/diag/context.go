@@ -1,0 +1,28 @@
+package diag
+
+import (
+	"github.com/anthonyabeo/obx/src/support/adt"
+	"github.com/anthonyabeo/obx/src/support/source"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/sema/types"
+)
+
+type Context struct {
+	FileName string
+	FilePath string
+	Content  []byte
+
+	Source   *source.Manager
+	Reporter Reporter
+
+	Env *ast.Environment // manages scopes (lexical, record)
+
+	// use to disambiguate between type-guards and procedure calls during parsing
+	Names     *adt.Stack[string]
+	ExprLists *adt.Stack[[]ast.Expression]
+
+	SymbolOverrides map[string]ast.Symbol // temporary binding of name to new type
+	TypeOverrides   map[string]types.Type // temporary types
+
+	TargetMachineWordSize uint64 // in bytes
+}

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/modgraph"
+	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
@@ -103,7 +103,7 @@ func printIDoms(idom map[*mir.Block]*mir.Block) {
 func VizCFG(fn *mir.Function) error {
 	dot := fn.OutputDOT()
 
-	Root, err := modgraph.FindProjectRoot()
+	Root, err := project.FindProjectRoot()
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func VizCFG(fn *mir.Function) error {
 func VizSSA(fn *mir.Function) error {
 	dot := fn.OutputDOT()
 
-	Root, err := modgraph.FindProjectRoot()
+	Root, err := project.FindProjectRoot()
 	if err != nil {
 		return err
 	}

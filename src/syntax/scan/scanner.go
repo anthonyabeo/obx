@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"github.com/anthonyabeo/obx/src/diag"
+	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 

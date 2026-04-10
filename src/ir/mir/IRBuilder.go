@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/ir/hir"
-	"github.com/anthonyabeo/obx/src/diag"
+	"github.com/anthonyabeo/obx/src/ir/desugar"
+	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/token"
-	"github.com/anthonyabeo/obx/src/types"
+	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 type IRBuilder struct {
@@ -27,7 +27,7 @@ func NewIRBuilder(ctx *diag.Context) *IRBuilder {
 	return &IRBuilder{ctx: ctx}
 }
 
-func (b *IRBuilder) Build(MIRProgram *hir.Program) *Program {
+func (b *IRBuilder) Build(MIRProgram *desugar.Program) *Program {
 	program := &Program{}
 
 	for _, HIRModule := range MIRProgram.Modules {
@@ -38,7 +38,7 @@ func (b *IRBuilder) Build(MIRProgram *hir.Program) *Program {
 	return program
 }
 
-func (b *IRBuilder) lowerModule(HIRModule *hir.Module) *Module {
+func (b *IRBuilder) lowerModule(HIRModule *desugar.Module) *Module {
 	env := NewSymbolTable(GlobalEnv)
 	functions := make([]*Function, 0)
 	globals := make(map[string]*GlobalVariable)
@@ -46,11 +46,11 @@ func (b *IRBuilder) lowerModule(HIRModule *hir.Module) *Module {
 
 	for _, decl := range HIRModule.Decls {
 		switch d := decl.(type) {
-		case *hir.Function:
+		case *desugar.Function:
 			fn := b.lowerFunction(d, NewSymbolTable(env))
 			functions = append(functions, fn)
 			env.Define(d.Name, fn)
-		case *hir.Constant:
+		case *desugar.Constant:
 			nameConst := &NamedConst{
 				OrigName:   d.Name,
 				Ident:      d.Mangled,
@@ -60,7 +60,7 @@ func (b *IRBuilder) lowerModule(HIRModule *hir.Module) *Module {
 			}
 			constants[nameConst.Ident] = nameConst
 			env.Define(nameConst.Ident, nameConst)
-		case *hir.Variable:
+		case *desugar.Variable:
 			global := &GlobalVariable{
 				Ident:    d.Mangled,
 				OrigName: d.Name,
@@ -84,7 +84,7 @@ func (b *IRBuilder) lowerModule(HIRModule *hir.Module) *Module {
 	}
 }
 
-func (b *IRBuilder) lowerFunction(HIRFxn *hir.Function, env *SymbolTable) *Function {
+func (b *IRBuilder) lowerFunction(HIRFxn *desugar.Function, env *SymbolTable) *Function {
 	fn := NewFunction(HIRFxn.FnName(), HIRFxn.IsExport, b.lowerType(HIRFxn.Result), env)
 
 	currentFn := b.Func
@@ -95,11 +95,11 @@ func (b *IRBuilder) lowerFunction(HIRFxn *hir.Function, env *SymbolTable) *Funct
 	for _, param := range HIRFxn.Params {
 		var kind string
 		switch param.Kind {
-		case hir.ValueParam:
+		case desugar.ValueParam:
 			kind = "VALUE"
-		case hir.InParam:
+		case desugar.InParam:
 			kind = "IN"
-		case hir.VarParam:
+		case desugar.VarParam:
 			kind = "VAR"
 		}
 
@@ -111,7 +111,7 @@ func (b *IRBuilder) lowerFunction(HIRFxn *hir.Function, env *SymbolTable) *Funct
 
 	for _, local := range HIRFxn.Locals {
 		switch d := local.(type) {
-		case *hir.Variable:
+		case *desugar.Variable:
 			lcl := &Local{
 				Ident:    d.Mangled,
 				OrigName: d.Name,
@@ -120,7 +120,7 @@ func (b *IRBuilder) lowerFunction(HIRFxn *hir.Function, env *SymbolTable) *Funct
 			}
 			fn.Locals = append(fn.Locals, lcl)
 			fn.Env.Define(lcl.Ident, lcl)
-		case *hir.Constant:
+		case *desugar.Constant:
 			c := &NamedConst{
 				Ident:      d.Name,
 				ConstValue: b.ensureValue(d.Value),
@@ -129,7 +129,7 @@ func (b *IRBuilder) lowerFunction(HIRFxn *hir.Function, env *SymbolTable) *Funct
 			}
 			fn.Constants[d.Mangled] = c
 			fn.Env.Define(d.Mangled, c)
-		case *hir.Function:
+		case *desugar.Function:
 		}
 	}
 
@@ -150,26 +150,26 @@ func (b *IRBuilder) lowerFunction(HIRFxn *hir.Function, env *SymbolTable) *Funct
 	return fn
 }
 
-func (b *IRBuilder) CompoundStmt(stmt *hir.CompoundStmt) {
+func (b *IRBuilder) CompoundStmt(stmt *desugar.CompoundStmt) {
 	for _, st := range stmt.Stmts {
 		switch s := st.(type) {
-		case *hir.AssignStmt:
+		case *desugar.AssignStmt:
 			b.AssignStmt(s)
-		case *hir.ReturnStmt:
+		case *desugar.ReturnStmt:
 			b.ReturnStmt(s)
-		case *hir.IfStmt:
+		case *desugar.IfStmt:
 			b.IfStmt(s)
-		case *hir.LoopStmt:
+		case *desugar.LoopStmt:
 			b.LoopStmt(s)
-		case *hir.ExitStmt:
+		case *desugar.ExitStmt:
 			b.ExitStmt()
-		case *hir.CompoundStmt:
+		case *desugar.CompoundStmt:
 			b.CompoundStmt(s)
-		case *hir.FuncCall:
+		case *desugar.FuncCall:
 			b.FuncCall(s)
-		case *hir.CaseStmt:
+		case *desugar.CaseStmt:
 			b.CaseStmt(s)
-		case *hir.WithStmt:
+		case *desugar.WithStmt:
 			b.WithStmt(s)
 		default:
 		}
@@ -246,7 +246,7 @@ func (b *IRBuilder) lowerType(ty types.Type) Type {
 	return Void
 }
 
-func (b *IRBuilder) AssignStmt(assign *hir.AssignStmt) {
+func (b *IRBuilder) AssignStmt(assign *desugar.AssignStmt) {
 	addr := b.ensureAddr(assign.Left)
 	value := b.ensureValue(assign.Right)
 
@@ -261,19 +261,19 @@ func (b *IRBuilder) emitAssign(dst Value, value Value) {
 	}
 }
 
-func (b *IRBuilder) ensureValue(expr hir.Expr) Value {
+func (b *IRBuilder) ensureValue(expr desugar.Expr) Value {
 	if typ, ok := expr.(types.Type); ok {
 		return b.lowerType(typ)
 	}
 
 	switch e := expr.(type) {
-	case *hir.Literal:
+	case *desugar.Literal:
 		return b.lowerConst(e)
-	case *hir.BinaryExpr:
+	case *desugar.BinaryExpr:
 		return b.lowerBinary(e)
-	case *hir.UnaryExpr:
+	case *desugar.UnaryExpr:
 		return b.lowerUnaryExpr(e)
-	case *hir.VariableRef:
+	case *desugar.VariableRef:
 		v, found := b.Func.Env.Lookup(e.Mangled)
 		if !found {
 			panic(fmt.Sprintf("undefined variable: '%s'", e.Name))
@@ -283,9 +283,9 @@ func (b *IRBuilder) ensureValue(expr hir.Expr) Value {
 		b.Emit(&LoadInst{Addr: v, Target: t})
 
 		return t
-	case *hir.ConstantRef:
+	case *desugar.ConstantRef:
 		return b.Func.Constants[e.Mangled]
-	case *hir.Param:
+	case *desugar.Param:
 		v, found := b.Func.Env.Lookup(e.Name)
 		if !found {
 			panic(fmt.Sprintf("undefined parameter: '%s'", e.Name))
@@ -304,40 +304,40 @@ func (b *IRBuilder) ensureValue(expr hir.Expr) Value {
 		b.Emit(&LoadInst{Addr: param, Target: t})
 
 		return t
-	case *hir.SetExpr:
+	case *desugar.SetExpr:
 		return b.lowerSetExpr(e)
-	case *hir.RangeExpr:
+	case *desugar.RangeExpr:
 		return b.lowerRangeExpr(e)
-	case *hir.FieldAccess:
+	case *desugar.FieldAccess:
 		addr := b.lowerFieldAccess(e)
 		t := b.NewTemp(addr.Type())
 		b.Emit(&LoadInst{Addr: addr, Target: t})
 
 		return t
-	case *hir.IndexExpr:
+	case *desugar.IndexExpr:
 		addr := b.lowerIndexExpr(e)
 
 		t := b.NewTemp(addr.Type())
 		b.Emit(&LoadInst{Addr: addr, Target: t})
 
 		return t
-	case *hir.DerefExpr:
+	case *desugar.DerefExpr:
 		addr := b.lowerDerefExpr(e)
 
 		t := b.NewTemp(addr.Type())
 		b.Emit(&LoadInst{Addr: &Mem{Base: addr}, Target: t})
 
 		return t
-	case *hir.TypeGuardExpr:
+	case *desugar.TypeGuardExpr:
 	default:
 		panic("unhandled expr: " + fmt.Sprintf("%T", e))
 	}
 	return nil
 }
 
-func (b *IRBuilder) ensureAddr(expr hir.Expr) Value {
+func (b *IRBuilder) ensureAddr(expr desugar.Expr) Value {
 	switch e := expr.(type) {
-	case *hir.Param:
+	case *desugar.Param:
 		v, found := b.Func.Env.Lookup(e.Name)
 		if !found {
 			panic(fmt.Sprintf("undefined parameter: '%s'", e.Name))
@@ -349,17 +349,17 @@ func (b *IRBuilder) ensureAddr(expr hir.Expr) Value {
 		}
 
 		return param
-	case *hir.VariableRef:
+	case *desugar.VariableRef:
 		v, found := b.Func.Env.Lookup(e.Mangled)
 		if !found {
 			panic(fmt.Sprintf("undefined variable: '%s'", e.Name))
 		}
 		return v
-	case *hir.FieldAccess:
+	case *desugar.FieldAccess:
 		return b.lowerFieldAccess(e)
-	case *hir.IndexExpr:
+	case *desugar.IndexExpr:
 		return b.lowerIndexExpr(e)
-	case *hir.DerefExpr:
+	case *desugar.DerefExpr:
 		addr := b.lowerDerefExpr(e)
 		return &Mem{Base: addr}
 	default:
@@ -368,7 +368,7 @@ func (b *IRBuilder) ensureAddr(expr hir.Expr) Value {
 	return nil
 }
 
-func (b *IRBuilder) CaseStmt(stmt *hir.CaseStmt) {
+func (b *IRBuilder) CaseStmt(stmt *desugar.CaseStmt) {
 	endLabel := b.NewLabel("case_end")
 	elseLabel := endLabel
 	if stmt.Else != nil {
@@ -378,8 +378,8 @@ func (b *IRBuilder) CaseStmt(stmt *hir.CaseStmt) {
 	type test struct {
 		testLabel  string
 		bodyLabel  string
-		labelRange *hir.LabelRange
-		body       *hir.CompoundStmt
+		labelRange *desugar.LabelRange
+		body       *desugar.CompoundStmt
 	}
 
 	var tests []test
@@ -442,7 +442,7 @@ func (b *IRBuilder) CaseStmt(stmt *hir.CaseStmt) {
 	b.SetBlock(endBlk)
 }
 
-func (b *IRBuilder) lowerCaseTest(r *hir.LabelRange, tSel Value, bodyLabel, nextTestLabel string) {
+func (b *IRBuilder) lowerCaseTest(r *desugar.LabelRange, tSel Value, bodyLabel, nextTestLabel string) {
 	tLow := b.ensureValue(r.Low)
 
 	if r.High == nil || r.Low == r.High {
@@ -468,7 +468,7 @@ func (b *IRBuilder) lowerCaseTest(r *hir.LabelRange, tSel Value, bodyLabel, next
 	b.SetTerm(&CondBrInst{Cond: both, TrueLabel: bodyLabel, FalseLabel: nextTestLabel})
 }
 
-func (b *IRBuilder) WithStmt(stmt *hir.WithStmt) {
+func (b *IRBuilder) WithStmt(stmt *desugar.WithStmt) {
 
 }
 
@@ -480,11 +480,11 @@ func (b *IRBuilder) ExitStmt() {
 	b.SetTerm(&JumpInst{Target: b.curExit})
 }
 
-func (b *IRBuilder) IfStmt(stmt *hir.IfStmt) {
+func (b *IRBuilder) IfStmt(stmt *desugar.IfStmt) {
 	endLabel := b.NewLabel("if_end")
 
 	// Track all conditional branches (initial + elsif)
-	allConds := append([]*hir.ElseIfBranch{
+	allConds := append([]*desugar.ElseIfBranch{
 		{Cond: stmt.Cond, Body: stmt.Then},
 	}, stmt.ElseIfs...)
 
@@ -528,7 +528,7 @@ func (b *IRBuilder) IfStmt(stmt *hir.IfStmt) {
 	b.SetBlock(endBlk)
 }
 
-func (b *IRBuilder) LoopStmt(stmt *hir.LoopStmt) {
+func (b *IRBuilder) LoopStmt(stmt *desugar.LoopStmt) {
 	loopLabel := b.NewLabel(stmt.Label)
 	exitLabel := b.NewLabel(stmt.Label + "_exit")
 
@@ -552,7 +552,7 @@ func (b *IRBuilder) LoopStmt(stmt *hir.LoopStmt) {
 	b.SetBlock(exitBlk)
 }
 
-func (b *IRBuilder) lowerArgs(fn *Function, Args []hir.Expr, startIdx, endIdx int, args *[]Value) {
+func (b *IRBuilder) lowerArgs(fn *Function, Args []desugar.Expr, startIdx, endIdx int, args *[]Value) {
 	for idx := startIdx; idx < endIdx; idx++ {
 		param := fn.Params[idx].(*Param)
 		arg := Args[idx]
@@ -571,7 +571,7 @@ func (b *IRBuilder) lowerArgs(fn *Function, Args []hir.Expr, startIdx, endIdx in
 	}
 }
 
-func (b *IRBuilder) lowerVarArgs(Args []hir.Expr, startIdx, endIdx int, args *[]Value) {
+func (b *IRBuilder) lowerVarArgs(Args []desugar.Expr, startIdx, endIdx int, args *[]Value) {
 	for idx := startIdx; idx < endIdx; idx++ {
 		arg := Args[idx]
 
@@ -582,7 +582,7 @@ func (b *IRBuilder) lowerVarArgs(Args []hir.Expr, startIdx, endIdx int, args *[]
 	}
 }
 
-func (b *IRBuilder) FuncCall(call *hir.FuncCall) Value {
+func (b *IRBuilder) FuncCall(call *desugar.FuncCall) Value {
 	fxn, ok := b.Func.Env.Lookup(strings.ToLower(call.Func.Name))
 	if !ok {
 		panic("undefined function: " + call.Func.Name)
@@ -629,7 +629,7 @@ func (b *IRBuilder) FuncCall(call *hir.FuncCall) Value {
 	return t
 }
 
-func (b *IRBuilder) ReturnStmt(s *hir.ReturnStmt) {
+func (b *IRBuilder) ReturnStmt(s *desugar.ReturnStmt) {
 	var result Value
 	if s.Result != nil {
 		result = b.ensureValue(s.Result)
@@ -679,7 +679,7 @@ func (b *IRBuilder) lowerOp(op token.Kind) InstrOp {
 	}
 }
 
-func (b *IRBuilder) lowerBinary(expr *hir.BinaryExpr) Value {
+func (b *IRBuilder) lowerBinary(expr *desugar.BinaryExpr) Value {
 	left := b.ensureValue(expr.Left)
 	right := b.ensureValue(expr.Right)
 	op := b.lowerOp(expr.Op)
@@ -687,7 +687,7 @@ func (b *IRBuilder) lowerBinary(expr *hir.BinaryExpr) Value {
 	return b.CreateBinary(op, left, right, b.lowerType(expr.SemaType))
 }
 
-func (b *IRBuilder) lowerSetExpr(s *hir.SetExpr) Value {
+func (b *IRBuilder) lowerSetExpr(s *desugar.SetExpr) Value {
 	// Initialize set to zero
 	setTemp := b.NewPrefixTemp("set", UInt32Type)
 	b.Emit(&MoveInst{Target: setTemp, Value: UInt32Lit(0)})
@@ -696,7 +696,7 @@ func (b *IRBuilder) lowerSetExpr(s *hir.SetExpr) Value {
 		var mask Value
 
 		switch elem := elem.(type) {
-		case *hir.RangeExpr:
+		case *desugar.RangeExpr:
 			mask = b.lowerRangeExpr(elem)
 		default:
 			idx := b.ensureValue(elem)
@@ -715,7 +715,7 @@ func (b *IRBuilder) lowerSetExpr(s *hir.SetExpr) Value {
 	return setTemp
 }
 
-func (b *IRBuilder) lowerRangeExpr(e *hir.RangeExpr) Value {
+func (b *IRBuilder) lowerRangeExpr(e *desugar.RangeExpr) Value {
 	low := b.ensureValue(e.Low)
 	var high Value
 	if e.High != nil {
@@ -744,14 +744,14 @@ func (b *IRBuilder) lowerRangeExpr(e *hir.RangeExpr) Value {
 	return mask
 }
 
-func (b *IRBuilder) lowerUnaryExpr(u *hir.UnaryExpr) Value {
+func (b *IRBuilder) lowerUnaryExpr(u *desugar.UnaryExpr) Value {
 	op := b.lowerOp(u.Op)
 	operand := b.ensureValue(u.Operand)
 
 	return b.CreateUnary(op, operand, b.lowerType(u.SemaType))
 }
 
-func (b *IRBuilder) lowerConst(c *hir.Literal) Value {
+func (b *IRBuilder) lowerConst(c *desugar.Literal) Value {
 	var v Value
 
 	switch c.Kind {
@@ -925,7 +925,7 @@ func (b *IRBuilder) lowerOpenArrayIndex(arr Value, indices []Value, elemSize uin
 	return &Mem{Base: addr}
 }
 
-func (b *IRBuilder) lowerIndexExpr(e *hir.IndexExpr) Value {
+func (b *IRBuilder) lowerIndexExpr(e *desugar.IndexExpr) Value {
 	arr := b.ensureAddr(e.Array)
 
 	var arrayType *ArrayType
@@ -970,7 +970,7 @@ func (b *IRBuilder) lowerIndexExpr(e *hir.IndexExpr) Value {
 	return &Mem{Base: addr}
 }
 
-func (b *IRBuilder) lowerFieldAccess(e *hir.FieldAccess) Value {
+func (b *IRBuilder) lowerFieldAccess(e *desugar.FieldAccess) Value {
 	// Get the base record address
 	recordAddr := b.ensureAddr(e.Record)
 
@@ -1003,7 +1003,7 @@ func (b *IRBuilder) lowerFieldAccess(e *hir.FieldAccess) Value {
 	return &Mem{Base: fieldAddr}
 }
 
-func (b *IRBuilder) lowerDerefExpr(e *hir.DerefExpr) Value {
+func (b *IRBuilder) lowerDerefExpr(e *desugar.DerefExpr) Value {
 	return b.ensureValue(e.Pointer)
 }
 

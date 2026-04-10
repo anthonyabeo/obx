@@ -3,7 +3,7 @@ package ast
 import (
 	"fmt"
 
-	"github.com/anthonyabeo/obx/src/types"
+	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 type Node interface {

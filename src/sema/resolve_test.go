@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/adt"
-	"github.com/anthonyabeo/obx/src/diag"
-	"github.com/anthonyabeo/obx/src/diag/formatter"
-	"github.com/anthonyabeo/obx/src/modgraph"
-	"github.com/anthonyabeo/obx/src/source"
+	"github.com/anthonyabeo/obx/src/support/adt"
+	"github.com/anthonyabeo/obx/src/support/diag"
+	"github.com/anthonyabeo/obx/src/support/diag/formatter"
+	"github.com/anthonyabeo/obx/src/project"
+	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
@@ -121,17 +121,17 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 	tmp := t.TempDir()
 	writeModuleFiles(t, tmp, obxSrc)
 
-	headers, err := modgraph.DiscoverAndScan(tmp)
+	headers, err := project.DiscoverAndScan(tmp)
 	if err != nil {
 		t.Fatalf("DiscoverAndScan: %v", err)
 	}
 
-	graph, err := modgraph.BuildImportGraph(headers)
+	graph, err := project.BuildImportGraph(headers)
 	if err != nil {
 		t.Fatalf("BuildImportGraph: %v", err)
 	}
 
-	sorted, err := modgraph.TopoSort(graph)
+	sorted, err := project.TopoSort(graph)
 	if err != nil {
 		t.Fatalf("TopoSort: %v", err)
 	}
