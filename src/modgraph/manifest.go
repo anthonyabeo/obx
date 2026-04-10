@@ -71,3 +71,16 @@ func FindProjectRoot() (string, error) {
 	return "", fmt.Errorf("%s not found in any parent directory", ManifestFile)
 }
 
+// WriteManifest serialises m as indented JSON and writes it to
+// filepath.Join(dir, ManifestFile).  Roots should be relative to dir.
+func WriteManifest(dir string, m Manifest) error {
+	data, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal manifest: %w", err)
+	}
+	path := filepath.Join(dir, ManifestFile)
+	if err := os.WriteFile(path, append(data, '\n'), 0644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	return nil
+}

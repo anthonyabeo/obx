@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -111,4 +112,55 @@ func TestFindProjectRoot_NotFound(t *testing.T) {
 	}
 }
 
+func TestWriteManifest_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	want := Manifest{
+		Name:  "roundtrip",
+		Roots: []string{"src", "lib"},
+		Entry: "Main",
+	}
+	if err := WriteManifest(dir, want); err != nil {
+		t.Fatalf("WriteManifest: %v", err)
+	}
 
+	// File must exist.
+	path := filepath.Join(dir, ManifestFile)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("obx.mod not created: %v", err)
+	}
+
+	// LoadManifest should produce the same values (roots become absolute).
+	got, err := LoadManifest(dir)
+	if err != nil {
+		t.Fatalf("LoadManifest after WriteManifest: %v", err)
+	}
+	if got.Name != want.Name {
+		t.Errorf("Name: want %q, got %q", want.Name, got.Name)
+	}
+	if got.Entry != want.Entry {
+		t.Errorf("Entry: want %q, got %q", want.Entry, got.Entry)
+	}
+	if len(got.Roots) != len(want.Roots) {
+		t.Fatalf("Roots len: want %d, got %d", len(want.Roots), len(got.Roots))
+	}
+	// Roots should be absolute after the load round-trip.
+	for _, r := range got.Roots {
+		if !filepath.IsAbs(r) {
+			t.Errorf("root %q should be absolute", r)
+		}
+	}
+}
+
+func TestWriteManifest_IndentedJSON(t *testing.T) {
+	dir := t.TempDir()
+	m := Manifest{Name: "proj", Roots: []string{"src"}, Entry: "Main"}
+	if err := WriteManifest(dir, m); err != nil {
+		t.Fatalf("WriteManifest: %v", err)
+	}
+
+	raw, _ := os.ReadFile(filepath.Join(dir, ManifestFile))
+	// Indented JSON must contain a newline-indented field.
+	if !strings.Contains(string(raw), "\n  ") {
+		t.Errorf("expected indented JSON, got:\n%s", raw)
+	}
+}
