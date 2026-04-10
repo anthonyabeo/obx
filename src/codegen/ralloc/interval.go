@@ -8,6 +8,17 @@ type Interval struct {
 	End   int
 }
 
+// extendInterval expands iv to cover position idx.
+func extendInterval(iv Interval, idx int) Interval {
+	if idx < iv.Start {
+		iv.Start = idx
+	}
+	if idx > iv.End {
+		iv.End = idx
+	}
+	return iv
+}
+
 // BuildIntervals computes live intervals for each vreg in a function.
 // Assumes each instruction has its own LiveIn / LiveOut sets already computed.
 func BuildIntervals(fn *asm.Function) []Interval {
@@ -15,7 +26,7 @@ func BuildIntervals(fn *asm.Function) []Interval {
 
 	getOrInit := func(m map[string]Interval, reg string, idx int) Interval {
 		iv, ok := m[reg]
-		if !ok && (iv.Start == 0 && iv.End == 0) {
+		if !ok {
 			iv = Interval{Start: idx, End: idx, Reg: reg}
 		}
 		return iv
@@ -26,47 +37,19 @@ func BuildIntervals(fn *asm.Function) []Interval {
 		for _, instr := range block.Instr {
 
 			for _, r := range instr.Defs() {
-				iv := getOrInit(intervals, r, idx)
-				if idx < iv.Start {
-					iv.Start = idx
-				}
-				if idx > iv.End {
-					iv.End = idx
-				}
-				intervals[r] = iv
+				intervals[r] = extendInterval(getOrInit(intervals, r, idx), idx)
 			}
 
 			for _, r := range instr.Uses {
-				iv := getOrInit(intervals, r.Name, idx)
-				if idx < iv.Start {
-					iv.Start = idx
-				}
-				if idx > iv.End {
-					iv.End = idx
-				}
-				intervals[r.Name] = iv
+				intervals[r.Name] = extendInterval(getOrInit(intervals, r.Name, idx), idx)
 			}
 
 			for r := range instr.LiveIn {
-				iv := getOrInit(intervals, r, idx)
-				if idx < iv.Start {
-					iv.Start = idx
-				}
-				if idx > iv.End {
-					iv.End = idx
-				}
-				intervals[r] = iv
+				intervals[r] = extendInterval(getOrInit(intervals, r, idx), idx)
 			}
 
 			for r := range instr.LiveOut {
-				iv := getOrInit(intervals, r, idx)
-				if idx < iv.Start {
-					iv.Start = idx
-				}
-				if idx > iv.End {
-					iv.End = idx
-				}
-				intervals[r] = iv
+				intervals[r] = extendInterval(getOrInit(intervals, r, idx), idx)
 			}
 			idx++
 		}

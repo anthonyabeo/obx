@@ -2,6 +2,7 @@ package asm
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -70,7 +71,7 @@ func (fn *Function) OutputDOT() {
 
 	cmd := exec.Command("dot", "-Tpng", dotFile, "-o", pngFile)
 	if err := cmd.Run(); err != nil {
-		panic(err)
+		log.Printf("warning: dot command failed (is graphviz installed?): %v", err)
 	} else {
 		fmt.Printf("Generated %s\n", pngFile)
 	}

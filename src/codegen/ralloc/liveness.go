@@ -67,8 +67,8 @@ func Liveness(fn *asm.Function) {
 	for changed {
 		changed = false
 
-		// Iterate blocks in reverse order (not required but often faster)
-		for _, block := range fn.Blocks {
+		// Process blocks in reverse post-order for faster convergence.
+		for _, block := range fn.ReversePostOrder() {
 			// Work backwards over instructions
 			for i := len(block.Instr) - 1; i >= 0; i-- {
 				ins := block.Instr[i]

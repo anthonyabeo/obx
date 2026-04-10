@@ -2,18 +2,33 @@ package codegen
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/codegen/ralloc"
 	"os"
 
-	"github.com/anthonyabeo/obx/src/codegen/isel"
+	"github.com/anthonyabeo/obx/src/codegen/asm"
 	"github.com/anthonyabeo/obx/src/codegen/bud"
 	"github.com/anthonyabeo/obx/src/codegen/bud/parser"
+	"github.com/anthonyabeo/obx/src/codegen/isel"
+	"github.com/anthonyabeo/obx/src/codegen/ralloc"
 	"github.com/anthonyabeo/obx/src/codegen/target"
-	"github.com/anthonyabeo/obx/src/codegen/asm"
 	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
-func Compile(module *mir.Module, mach target.Machine, targetDescPath string) string {
+// CompileOptions controls optional codegen behavior.
+type CompileOptions struct {
+	// Debug enables frame-layout dumps and CFG dot-file generation.
+	Debug bool
+}
+
+func Compile(module *mir.Module, mach target.Machine, targetDescPath string, opts CompileOptions) (string, error) {
+	// Parse the target description once for the whole module.
+	tdFile := fmt.Sprintf("%s/%s.td", targetDescPath, mach.Name())
+	tdContent, err := os.ReadFile(tdFile)
+	if err != nil {
+		return "", fmt.Errorf("reading target description %q: %w", tdFile, err)
+	}
+	machine := parser.NewParser(parser.NewLexer(string(tdContent))).Parse()
+	selector := isel.NewSelector(machine.Rules)
+
 	asmModule := &asm.Module{Name: module.Name, Globals: make(map[string]*asm.Symbol)}
 
 	for name, global := range module.Globals {
@@ -26,7 +41,7 @@ func Compile(module *mir.Module, mach target.Machine, targetDescPath string) str
 
 	// Instruction Selection
 	for _, fn := range module.Funcs {
-		iSel(fn, mach, targetDescPath)
+		iSel(fn, selector, mach)
 		asmModule.Funcs = append(asmModule.Funcs, fn.Asm)
 		mach.Legalize(fn.Asm)
 
@@ -78,28 +93,27 @@ func Compile(module *mir.Module, mach target.Machine, targetDescPath string) str
 		fn.CalleeRegsUed = alloc.CalleeSavedUsed
 
 		frameLayout := target.ComputeFrameLayout(fn, mach)
-		frameLayout.Output()
+		if opts.Debug {
+			frameLayout.Output()
+		}
 
 		ralloc.Rewrite(fn, alloc, mach, frameLayout)
 	}
 
 	module.Asm = asmModule
 
-	for _, function := range asmModule.Funcs {
-		function.OutputDOT()
+	if opts.Debug {
+		for _, function := range asmModule.Funcs {
+			function.OutputDOT()
+		}
 	}
 
-	return emit(module, mach)
+	return emit(module, mach), nil
 }
 
-func iSel(fn *mir.Function, target target.Machine, targetDescPath string) {
-	tdFile := fmt.Sprintf(targetDescPath+"/%s.td", target.Name())
-	tdContent, err := os.ReadFile(tdFile)
-	if err != nil {
-		panic(err)
-	}
-	machine := parser.NewParser(parser.NewLexer(string(tdContent))).Parse()
-	selector := isel.NewSelector(machine.Rules)
+// iSel runs instruction selection for fn using a pre-built selector, avoiding
+// repeated TD file reads per function.
+func iSel(fn *mir.Function, selector *isel.Selector, mach target.Machine) {
 	asmFn := &asm.Function{Name: fn.FnName, Exported: fn.Exported, IsLeaf: fn.IsLeaf}
 
 	for _, block := range fn.SortedBlocks() {

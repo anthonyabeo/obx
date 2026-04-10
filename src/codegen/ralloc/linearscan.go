@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/anthonyabeo/obx/src/codegen/target"
 	"github.com/anthonyabeo/obx/src/codegen/asm"
+	"github.com/anthonyabeo/obx/src/codegen/target"
 )
 
 type Allocation struct {
@@ -102,10 +102,11 @@ func LinearScan(fn *asm.Function, intervals []Interval, target target.Machine) A
 }
 
 func Rewrite(fn *asm.Function, alloc Allocation, target target.Machine, layout target.FrameLayout) {
+	tempIdx := 0
 	for _, block := range fn.Blocks {
 		newInstrs := make([]*asm.Instr, 0)
 		for _, instr := range block.Instr {
-			rewritten, extra := rewriteInstr(instr, alloc, layout, target)
+			rewritten, extra := rewriteInstr(instr, alloc, layout, target, &tempIdx)
 			// extra holds loads before + stores after
 			newInstrs = append(newInstrs, extra.Before...)
 			newInstrs = append(newInstrs, rewritten)
@@ -122,11 +123,9 @@ type Extra struct {
 	After  []*asm.Instr // stores
 }
 
-var tempIdx int
-
-func freshTemp(temps []string) *asm.Register {
-	t := temps[tempIdx%len(temps)]
-	tempIdx++
+func freshTemp(temps []string, counter *int) *asm.Register {
+	t := temps[*counter%len(temps)]
+	*counter++
 	return &asm.Register{
 		Name: t,
 		Mode: asm.Phys,
@@ -134,7 +133,7 @@ func freshTemp(temps []string) *asm.Register {
 	}
 }
 
-func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout, target target.Machine) (instrOut *asm.Instr, extra *Extra) {
+func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout, target target.Machine, counter *int) (instrOut *asm.Instr, extra *Extra) {
 	before := make([]*asm.Instr, 0)
 	after := make([]*asm.Instr, 0)
 
@@ -161,7 +160,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				panic("spill slot not found")
 			}
 			// Write to spill slot
-			temp := freshTemp(target.RegisterInfo().Temporaries) // pick a preg (like x10) reserved for spill reload
+			temp := freshTemp(target.RegisterInfo().Temporaries, counter)
 			instr.Def = temp
 			instr.DstOperand = temp
 			instr.Uses = append(instr.Uses, temp)
@@ -188,7 +187,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				} else {
 					fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
 					mem := &asm.MemAddr{Base: fp, Offset: &asm.Imm{Value: obj.Offset}}
-					temp := freshTemp(target.RegisterInfo().Temporaries)
+					temp := freshTemp(target.RegisterInfo().Temporaries, counter)
 
 					load := &asm.Instr{Opcode: "ld", DstOperand: temp, SrcOperands: []asm.Operand{mem}, Def: temp, Uses: []*asm.Register{fp}}
 
@@ -204,14 +203,14 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 
 				fp := &asm.Register{Name: target.RegisterInfo().FramePointer, Mode: asm.Phys, Kind: asm.GPR}
 				mem := &asm.MemAddr{Base: fp, Offset: &asm.Imm{Value: obj.Offset}}
-				temp := freshTemp(target.RegisterInfo().Temporaries)
+				temp := freshTemp(target.RegisterInfo().Temporaries, counter)
 
 				load := &asm.Instr{Opcode: "ld", DstOperand: temp, SrcOperands: []asm.Operand{mem}, Def: temp, Uses: []*asm.Register{fp}}
 				before = append(before, load)
 				instr.Uses = append(instr.Uses, temp)
 				instr.SrcOperands[i] = temp
 			case asm.GlobalSK:
-				temp := freshTemp(target.RegisterInfo().Temporaries)
+				temp := freshTemp(target.RegisterInfo().Temporaries, counter)
 				sym := &asm.Symbol{Name: op.Name, Kind: asm.GlobalSK}
 
 				mem := &asm.MemAddr{Base: temp, Offset: &asm.Imm{Value: 0}}
@@ -229,7 +228,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 					instr.SrcOperands[i] = temp
 				}
 			case asm.ConstSK:
-				temp := freshTemp(target.RegisterInfo().Temporaries)
+				temp := freshTemp(target.RegisterInfo().Temporaries, counter)
 				sym := &asm.Symbol{Name: op.Name, Kind: asm.ConstSK}
 
 				before = append(before, &asm.Instr{
@@ -285,7 +284,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 			}
 
 			// Write to spill slot
-			temp := freshTemp(target.RegisterInfo().Temporaries) // pick a preg (like x10) reserved for spill reload
+			temp := freshTemp(target.RegisterInfo().Temporaries, counter)
 			instr.Def = temp
 			instr.DstOperand = temp
 			instr.Uses = append(instr.Uses, temp)
@@ -313,7 +312,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				} else {
 					fp := &asm.Register{Name: "fp", Mode: asm.Phys, Kind: asm.GPR}
 					mem := &asm.MemAddr{Base: fp, Offset: &asm.Imm{Value: obj.Offset}}
-					temp := freshTemp(target.RegisterInfo().Temporaries) // pick a preg (like x10) reserved for spill reload
+					temp := freshTemp(target.RegisterInfo().Temporaries, counter)
 
 					store := &asm.Instr{Opcode: "sd", DstOperand: mem, SrcOperands: []asm.Operand{temp}, Uses: []*asm.Register{temp, fp}}
 
@@ -329,7 +328,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 
 				fp := &asm.Register{Name: target.RegisterInfo().FramePointer, Mode: asm.Phys, Kind: asm.GPR}
 				mem := &asm.MemAddr{Base: fp, Offset: &asm.Imm{Value: obj.Offset}}
-				temp := freshTemp(target.RegisterInfo().Temporaries) // pick a preg (like x10) reserved for spill reload
+				temp := freshTemp(target.RegisterInfo().Temporaries, counter)
 
 				store := &asm.Instr{
 					Opcode:      "sd",
@@ -342,7 +341,7 @@ func rewriteInstr(instr *asm.Instr, alloc Allocation, layout target.FrameLayout,
 				instr.DstOperand = temp
 				after = append(after, store)
 			case asm.GlobalSK:
-				temp := freshTemp(target.RegisterInfo().Temporaries)
+				temp := freshTemp(target.RegisterInfo().Temporaries, counter)
 				sym := &asm.Symbol{Name: op.Name, Kind: asm.GlobalSK}
 
 				mem := &asm.MemAddr{Base: temp, Offset: &asm.Imm{Value: 0}}

@@ -157,7 +157,11 @@ precedence over obx.mod values.`,
 			defer asmFile.Close()
 
 			targetDesc := filepath.Join(projectDir, "src", "codegen", "target", "desc")
-			ss := codegen.Compile(module, mach, targetDesc)
+			ss, err := codegen.Compile(module, mach, targetDesc, codegen.CompileOptions{Debug: buildArgs.Asm})
+			if err != nil {
+				log.Printf("compile failed: %v", err)
+				continue
+			}
 			if buildArgs.Asm {
 				fmt.Println(ss)
 			}

@@ -2,14 +2,12 @@ package isel
 
 import (
 	"fmt"
-	
+
+	"github.com/anthonyabeo/obx/src/codegen/asm"
 	"github.com/anthonyabeo/obx/src/codegen/bud"
 	"github.com/anthonyabeo/obx/src/codegen/bud/ast"
-	"github.com/anthonyabeo/obx/src/codegen/asm"
 	"github.com/anthonyabeo/obx/src/ir/mir"
 )
-
-var temp int
 
 type MatchResult struct {
 	Rule    *ast.Rule
@@ -17,7 +15,7 @@ type MatchResult struct {
 	Bind    map[string]*bud.Value
 }
 
-func (m *MatchResult) Binding(env map[string]*bud.Value) {
+func (m *MatchResult) Binding(env map[string]*bud.Value, counter *int) {
 	if m.Pattern.Dst != nil {
 		rd := m.Rule.Out.(*ast.Register)
 
@@ -42,12 +40,12 @@ func (m *MatchResult) Binding(env map[string]*bud.Value) {
 		env[t.Name] = &bud.Value{
 			Kind: bud.KindGPR,
 			Reg: bud.Reg{
-				Name: fmt.Sprintf("temp_%d", temp),
+				Name: fmt.Sprintf("temp_%d", *counter),
 				Mode: t.Mode,
 				Kind: t.Type,
 			},
 		}
-		temp++
+		*counter++
 	}
 }
 
@@ -170,7 +168,7 @@ func subst(operand ast.Operand, env map[string]*bud.Value) asm.Operand {
 			}
 
 		} else {
-			if v, ok := env[op.Name]; ok && v.Kind == bud.KindGPR || v.Kind == bud.KindFPR {
+			if v, ok := env[op.Name]; ok && (v.Kind == bud.KindGPR || v.Kind == bud.KindFPR) {
 				asmOp = &asm.Register{
 					Name: v.Reg.Name,
 					Mode: RegMode(op.Mode),
@@ -305,7 +303,7 @@ func Subst(inst ast.Instr, env map[string]*bud.Value) *asm.Instr {
 
 	// Destination register
 	if inst.Def != nil && inst.Def.Mode == "virt" {
-		if v, ok := env[inst.Def.Name]; ok && v.Kind == bud.KindGPR || v.Kind == bud.KindFPR {
+		if v, ok := env[inst.Def.Name]; ok && (v.Kind == bud.KindGPR || v.Kind == bud.KindFPR) {
 			def = &asm.Register{
 				Name: v.Reg.Name,
 				Mode: RegMode(inst.Def.Mode),

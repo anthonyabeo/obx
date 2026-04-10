@@ -264,7 +264,10 @@ func TestCompile(t *testing.T) {
 				}
 				defer asmFile.Close()
 
-				asm := Compile(module, riscv.NewRV64IMAFDTarget(), root+"/src/codegen/target/desc")
+				asm, err := Compile(module, riscv.NewRV64IMAFDTarget(), root+"/src/codegen/target/desc", CompileOptions{})
+				if err != nil {
+					t.Fatalf("Compile failed: %v", err)
+				}
 				if _, err := asmFile.WriteString(asm + "\n\n"); err != nil {
 					t.Errorf("failed to write to assembly file: %v", err)
 				}

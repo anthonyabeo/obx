@@ -3,13 +3,14 @@ package isel
 import (
 	"fmt"
 
+	"github.com/anthonyabeo/obx/src/codegen/asm"
 	"github.com/anthonyabeo/obx/src/codegen/bud"
 	"github.com/anthonyabeo/obx/src/codegen/bud/ast"
-	"github.com/anthonyabeo/obx/src/codegen/asm"
 )
 
 type Selector struct {
-	Rules []*ast.Rule
+	Rules   []*ast.Rule
+	tempIdx int // monotonic counter for unique temp register names
 }
 
 func NewSelector(rules []*ast.Rule) *Selector {
@@ -22,7 +23,7 @@ func (s *Selector) Select(pat *bud.Node) []*asm.Instr {
 		panic(fmt.Sprintf("no match found for IR: %v", pat))
 	}
 
-	res.Binding(res.Bind)
+	res.Binding(res.Bind, &s.tempIdx)
 
 	return res.Emit()
 }
