@@ -165,6 +165,7 @@ obx build [flags]
 | `--root` | `-r` | *(obx.mod)* | Source root directory. Repeatable. Falls back to `roots` in `obx.mod`. |
 | `--entry` | `-e` | *(obx.mod)* | Entry module. Falls back to `entry` in `obx.mod`; omit to build all modules. |
 | `--output` | `-o` | | Name of the output file to produce. |
+| `--target` | `-T` | `rv64imafd` | Target architecture. Run `obx build --help` to see all registered targets. |
 | `--asm` | `-S` | `false` | Print generated assembly to stdout in addition to writing it to `out/`. |
 | `--optlevel` | `-O` | `2` | Optimisation level `0`–`3` (see [Optimisation Passes](#optimisation-passes)). |
 | `--passes` | `-P` | | Comma-separated passes to enable, overriding `-O`. |

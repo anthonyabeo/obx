@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/codegen/target"
 	"github.com/anthonyabeo/obx/src/codegen/asm"
+	"github.com/anthonyabeo/obx/src/codegen/target"
 )
 
 type RV64IMAFD struct {
@@ -430,3 +430,8 @@ func (r RV64IMAFD) AssignParams(paramCount int) []target.Location {
 	}
 	return locs
 }
+
+func init() {
+	target.Register("rv64imafd", func() target.Machine { return NewRV64IMAFDTarget() })
+}
+

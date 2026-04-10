@@ -5,11 +5,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/anthonyabeo/obx/src/codegen"
-	"github.com/anthonyabeo/obx/src/codegen/target/riscv"
+	"github.com/anthonyabeo/obx/src/codegen/target"
+	_ "github.com/anthonyabeo/obx/src/codegen/target/riscv" // register rv64imafd
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/mir"
 	"github.com/anthonyabeo/obx/src/opt"
@@ -22,6 +24,7 @@ var buildArgs struct {
 	Roots  []string // --root (repeatable); falls back to roots in obx.mod
 	Entry  string   // --entry; falls back to entry in obx.mod
 	Output string
+	Target string   // --target; defaults to rv64imafd
 
 	TabWidth      int
 	OptLevel      int
@@ -37,6 +40,8 @@ func init() {
 	buildCmd.Flags().StringVarP(&buildArgs.Entry, "entry", "e", "",
 		"entry module to build (defaults to entry in obx.mod; omit to build all)")
 	buildCmd.Flags().StringVarP(&buildArgs.Output, "output", "o", "", "name of the output file to produce")
+	buildCmd.Flags().StringVarP(&buildArgs.Target, "target", "T", "rv64imafd",
+		"target architecture (available: "+strings.Join(target.Available(), ", ")+")")
 	buildCmd.Flags().IntVarP(&buildArgs.TabWidth, "tabWidth", "t", 4, "how many spaces should represent a tab")
 	buildCmd.Flags().IntVarP(&buildArgs.OptLevel, "optlevel", "O", 2, "optimisation level (0-3)")
 	buildCmd.Flags().StringVarP(&buildArgs.EnablePasses, "passes", "P", "", "comma-separated optimisation passes to enable (overrides -O)")
@@ -60,7 +65,13 @@ precedence over obx.mod values.`,
 		entry := buildArgs.Entry
 		projectDir := "."
 
-		// ── 0. Fall back to obx.mod when no roots are given ──────────────
+		// ── 0. Resolve target ─────────────────────────────────────────────
+		mach, err := target.Lookup(buildArgs.Target)
+		if err != nil {
+			log.Fatalf("build: %v", err)
+		}
+
+		// ── 1. Fall back to obx.mod when no roots are given ───────────────
 		if len(roots) == 0 {
 			dir, err := project.FindProjectRoot()
 			if err != nil {
@@ -78,7 +89,7 @@ precedence over obx.mod values.`,
 			}
 		}
 
-		// ── 1. Discover and order modules ────────────────────────────────
+		// ── 2. Discover and order modules ─────────────────────────────────
 		sorted, graph, err := resolveModules(roots...)
 		if err != nil {
 			log.Fatal(err)
@@ -95,7 +106,7 @@ precedence over obx.mod values.`,
 			fmt.Printf("  %-30s  %s\n", h.Key, h.File)
 		}
 
-		// ── 2. Parse ─────────────────────────────────────────────────────
+		// ── 3. Parse ──────────────────────────────────────────────────────
 		ctx, _ := newContext(buildArgs.TabWidth, 32)
 		obx := ast.NewOberonX()
 
@@ -103,7 +114,7 @@ precedence over obx.mod values.`,
 			log.Fatalf("%d errors found", ctx.Reporter.ErrorCount())
 		}
 
-		// ── 3. Semantic analysis ──────────────────────────────────────────
+		// ── 4. Semantic analysis ──────────────────────────────────────────
 		s := sema.NewSema(ctx, obx)
 		s.Validate()
 
@@ -112,7 +123,7 @@ precedence over obx.mod values.`,
 			log.Fatalf("%d errors found", ctx.Reporter.ErrorCount())
 		}
 
-		// ── 4. Lower: AST → HIR → MIR ────────────────────────────────────
+		// ── 5. Lower: AST → desugar → MIR ────────────────────────────────
 		hirGen := desugar.NewGenerator(ctx, obx)
 		hirProgram := hirGen.Generate()
 
@@ -125,7 +136,7 @@ precedence over obx.mod values.`,
 			}
 		}
 
-		// ── 5. Optimise ───────────────────────────────────────────────────
+		// ── 6. Optimise ───────────────────────────────────────────────────
 		pm := opt.NewPassManager()
 		pm.ConfigurePasses(map[string]any{
 			"verbose":       buildArgs.Verbose,
@@ -134,7 +145,7 @@ precedence over obx.mod values.`,
 			"disablePasses": buildArgs.DisablePasses,
 		})
 
-		// ── 6. Emit assembly ──────────────────────────────────────────────
+		// ── 7. Emit assembly ──────────────────────────────────────────────
 		outDir := filepath.Join(projectDir, "out")
 		for _, module := range MIRProgram.Modules {
 			asmPath := filepath.Join(outDir, module.Name+".s")
@@ -146,7 +157,7 @@ precedence over obx.mod values.`,
 			defer asmFile.Close()
 
 			targetDesc := filepath.Join(projectDir, "src", "codegen", "target", "desc")
-			ss := codegen.Compile(module, riscv.NewRV64IMAFDTarget(), targetDesc)
+			ss := codegen.Compile(module, mach, targetDesc)
 			if buildArgs.Asm {
 				fmt.Println(ss)
 			}
