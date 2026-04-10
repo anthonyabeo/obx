@@ -1,7 +1,6 @@
 package sema
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -120,30 +119,21 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
     `
 
 	tmp := t.TempDir()
-	file := filepath.Join(tmp, "test.obx")
-	if err := os.WriteFile(file, []byte(obxSrc), 0644); err != nil {
-		t.Fatalf("write failed: %v", err)
-	}
+	writeModuleFiles(t, tmp, obxSrc)
 
-	files := []string{file}
-
-	var headers []modgraph.Header
-	for _, file := range files {
-		mods, err := modgraph.ScanModuleHeaders(file)
-		if err != nil {
-			log.Fatalf("error in %s: %v", file, err)
-		}
-		headers = append(headers, mods...)
-	}
-
-	graph, err := modgraph.BuildImportGraph(tmp, headers)
+	headers, err := modgraph.DiscoverAndScan(tmp)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatalf("DiscoverAndScan: %v", err)
+	}
+
+	graph, err := modgraph.BuildImportGraph(headers)
+	if err != nil {
+		t.Fatalf("BuildImportGraph: %v", err)
 	}
 
 	sorted, err := modgraph.TopoSort(graph)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatalf("TopoSort: %v", err)
 	}
 
 	obx := ast.NewOberonX()
@@ -161,7 +151,7 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 	for _, header := range sorted {
 		data, err := os.ReadFile(header.File)
 		if err != nil {
-			log.Fatal(err)
+			t.Fatalf("read %s: %v", header.File, err)
 		}
 
 		ctx.FileName = filepath.Base(header.File)
@@ -172,7 +162,7 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 		unit := p.Parse()
 		if ctx.Reporter.ErrorCount() > 0 {
 			ctx.Reporter.Flush()
-			log.Fatalf("%d errors found", ctx.Reporter.ErrorCount())
+			t.Fatalf("%d errors found", ctx.Reporter.ErrorCount())
 		}
 
 		obx.AddUnit(unit)
@@ -287,3 +277,4 @@ func TestNameResolution_Basic(t *testing.T) {
 		t.Errorf("expected y to resolve to local Main$Foo$y, got %v", dsg.QIdent.Name)
 	}
 }
+

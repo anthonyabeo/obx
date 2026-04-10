@@ -8,343 +8,354 @@ import (
 	"testing"
 )
 
-func TestScanModuleHeaders_MultipleModules(t *testing.T) {
-	content := `
-MODULE Math;
-   VAR Pi: REAL;
-END Math.
+// ── helpers ──────────────────────────────────────────────────────────────────
 
-MODULE Util;
-   IMPORT Math;
-   VAR Tau: REAL;
-END Util.
-
-MODULE Main;
-   IMPORT Util, Math;
-   VAR Result: REAL;
-   BEGIN
-       Result := Util.Tau + Math.Pi;
-   END Main.
-`
-	tmp := t.TempDir()
-	file := filepath.Join(tmp, "multi_module.obx")
-	if err := os.WriteFile(file, []byte(content), 0644); err != nil {
-		t.Fatalf("write failed: %v", err)
+// writeFile creates a file inside dir and returns its absolute path.
+func writeFile(t *testing.T, dir, name, content string) string {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
 	}
-
-	headers, err := ScanModuleHeaders(file)
-	if err != nil {
-		t.Fatalf("scanModuleHeaders failed: %v", err)
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
 	}
+	return path
+}
 
-	if len(headers) != 3 {
-		t.Fatalf("expected 3 headers, got %d", len(headers))
+// ── ModuleKey ────────────────────────────────────────────────────────────────
+
+func TestModuleKey_Bare(t *testing.T) {
+	k := NewKey("Math")
+	if k.Name() != "Math" {
+		t.Errorf("Name: want %q, got %q", "Math", k.Name())
 	}
-
-	if headers[0].Name != "Math" || headers[1].Name != "Util" || headers[2].Name != "Main" {
-		t.Errorf("unexpected modgraph names: %+v", headers)
+	if k.String() != "Math" {
+		t.Errorf("String: want %q, got %q", "Math", k.String())
 	}
-
-	if len(headers[1].Imports) != 1 || headers[1].Imports[0].Name != "Math" {
-		t.Errorf("Util should import Math")
-	}
-
-	if len(headers[2].Imports) != 2 {
-		t.Errorf("Main should import Util and Math")
+	if len(k.DirSegs()) != 0 {
+		t.Errorf("DirSegs: want empty, got %v", k.DirSegs())
 	}
 }
 
-func TestTopoSortModulesNoCycle(t *testing.T) {
-	content := `
-MODULE Math;
-   VAR Pi: REAL;
-END Math.
-
-MODULE Util;
-   IMPORT Math;
-   VAR Tau: REAL;
-END Util.
-
-MODULE Main;
-   IMPORT Util, Math;
-   VAR Result: REAL;
-   BEGIN
-       Result := Util.Tau + Math.Pi;
-   END Main.
-`
-
-	tmp := t.TempDir()
-	file := filepath.Join(tmp, "multi_module.obx")
-	if err := os.WriteFile(file, []byte(content), 0644); err != nil {
-		t.Fatal(err)
+func TestModuleKey_Pathed(t *testing.T) {
+	k := NewKey("Collections", "Drawing")
+	if k.Name() != "Drawing" {
+		t.Errorf("Name: want %q, got %q", "Drawing", k.Name())
 	}
+	if k.String() != "Collections.Drawing" {
+		t.Errorf("String: want %q, got %q", "Collections.Drawing", k.String())
+	}
+	if got := k.DirSegs(); len(got) != 1 || got[0] != "Collections" {
+		t.Errorf("DirSegs: want [Collections], got %v", got)
+	}
+}
 
-	headers, err := ScanModuleHeaders(file)
+func TestModuleKey_ToFilePath(t *testing.T) {
+	k := NewKey("Collections", "Drawing")
+	got := k.ToFilePath("/src")
+	want := filepath.Join("/src", "Collections", "Drawing") + ".obx"
+	if got != want {
+		t.Errorf("ToFilePath: want %q, got %q", want, got)
+	}
+}
+
+func TestKeyFromFile(t *testing.T) {
+	root := "/src"
+	file := filepath.Join(root, "Collections", "Drawing.obx")
+	k, err := KeyFromFile(root, file)
 	if err != nil {
-		t.Fatalf("scanModuleHeaders: %v", err)
+		t.Fatalf("KeyFromFile: %v", err)
 	}
+	if k.String() != "Collections.Drawing" {
+		t.Errorf("want %q, got %q", "Collections.Drawing", k.String())
+	}
+}
 
-	// Step 2: Build import graph
-	graph, err := BuildImportGraph(tmp, headers)
+// ── ScanHeader ───────────────────────────────────────────────────────────────
+
+func TestScanHeader_NoImports(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "Math.obx", `
+module Math
+  var Pi: real
+end Math
+`)
+	hdr, err := ScanHeader(root, filepath.Join(root, "Math.obx"))
 	if err != nil {
-		t.Fatalf("BuildImportGraph failed: %v", err)
+		t.Fatalf("ScanHeader: %v", err)
+	}
+	if hdr.Key.String() != "Math" {
+		t.Errorf("key: want %q, got %q", "Math", hdr.Key)
+	}
+	if len(hdr.Imports) != 0 {
+		t.Errorf("imports: want 0, got %d", len(hdr.Imports))
+	}
+}
+
+func TestScanHeader_WithImports(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "Util.obx", `
+module Util
+  import Math
+  var Tau: real
+end Util
+`)
+	hdr, err := ScanHeader(root, filepath.Join(root, "Util.obx"))
+	if err != nil {
+		t.Fatalf("ScanHeader: %v", err)
+	}
+	if len(hdr.Imports) != 1 || hdr.Imports[0].Key.String() != "Math" {
+		t.Errorf("imports: want [Math], got %v", hdr.Imports)
+	}
+}
+
+func TestScanHeader_PathedImport(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "Main.obx", `
+module Main
+  import D := Collections.Drawing
+end Main
+`)
+	hdr, err := ScanHeader(root, filepath.Join(root, "Main.obx"))
+	if err != nil {
+		t.Fatalf("ScanHeader: %v", err)
+	}
+	if len(hdr.Imports) != 1 {
+		t.Fatalf("want 1 import, got %d", len(hdr.Imports))
+	}
+	imp := hdr.Imports[0]
+	if imp.Alias != "D" {
+		t.Errorf("alias: want %q, got %q", "D", imp.Alias)
+	}
+	if imp.Key.String() != "Collections.Drawing" {
+		t.Errorf("key: want %q, got %q", "Collections.Drawing", imp.Key)
+	}
+}
+
+func TestScanHeader_CaseInsensitiveKeywords(t *testing.T) {
+	root := t.TempDir()
+	// All-uppercase keywords (classic Oberon style)
+	writeFile(t, root, "Foo.obx", `
+MODULE Foo;
+  IMPORT Bar;
+END Foo.
+`)
+	hdr, err := ScanHeader(root, filepath.Join(root, "Foo.obx"))
+	if err != nil {
+		t.Fatalf("ScanHeader: %v", err)
+	}
+	if hdr.Key.String() != "Foo" {
+		t.Errorf("key: want %q, got %q", "Foo", hdr.Key)
+	}
+	if len(hdr.Imports) != 1 || hdr.Imports[0].Key.String() != "Bar" {
+		t.Errorf("imports: want [Bar], got %v", hdr.Imports)
+	}
+}
+
+func TestScanHeader_MismatchedName(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "Foo.obx", `module Bar end Bar`)
+	_, err := ScanHeader(root, filepath.Join(root, "Foo.obx"))
+	if err == nil {
+		t.Fatal("expected error for name mismatch, got nil")
+	}
+}
+
+func TestScanHeader_BlockComment(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "Math.obx", `
+(* This is a block comment *)
+module Math
+  (* nested (* comment *) *)
+  var Pi: real
+end Math
+`)
+	if _, err := ScanHeader(root, filepath.Join(root, "Math.obx")); err != nil {
+		t.Fatalf("ScanHeader with block comment: %v", err)
+	}
+}
+
+// ── DiscoverAndScan ───────────────────────────────────────────────────────────
+
+func TestDiscoverAndScan(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "Math.obx", "module Math end Math")
+	writeFile(t, root, "utils/Util.obx", "module Util\nimport Math\nend Util")
+
+	hdrs, err := DiscoverAndScan(root)
+	if err != nil {
+		t.Fatalf("DiscoverAndScan: %v", err)
+	}
+	if len(hdrs) != 2 {
+		t.Fatalf("want 2 headers, got %d", len(hdrs))
 	}
 
-	// Step 3: Topo sort
+	keys := make(map[string]bool)
+	for _, h := range hdrs {
+		keys[h.Key.String()] = true
+	}
+	if !keys["Math"] || !keys["utils.Util"] {
+		t.Errorf("unexpected keys: %v", keys)
+	}
+}
+
+// ── BuildImportGraph ──────────────────────────────────────────────────────────
+
+func TestBuildImportGraph_NoCycle(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "Math.obx", "module Math end Math")
+	writeFile(t, root, "Util.obx", "module Util\nimport Math\nend Util")
+	writeFile(t, root, "Main.obx", "module Main\nimport Util, Math\nend Main")
+
+	hdrs, _ := DiscoverAndScan(root)
+	graph, err := BuildImportGraph(hdrs)
+	if err != nil {
+		t.Fatalf("BuildImportGraph: %v", err)
+	}
+
 	sorted, err := TopoSort(graph)
 	if err != nil {
-		t.Fatalf("TopoSort failed: %v", err)
+		t.Fatalf("TopoSort: %v", err)
 	}
 
-	// ensure topological order: Math -> Util -> Main
-	gotOrder := []string{}
-	for _, h := range sorted {
-		gotOrder = append(gotOrder, h.Name)
+	order := make([]string, len(sorted))
+	for i, h := range sorted {
+		order[i] = h.Key.String()
 	}
 
-	wantOrder := []string{"Math", "Util", "Main"}
-	for i, want := range wantOrder {
-		if gotOrder[i] != want {
-			t.Errorf("order mismatch at %d: want %q, got %q", i, want, gotOrder[i])
-		}
-	}
-}
-
-func TestTopoSortModules(t *testing.T) {
-	source := `MODULE C;
-END C.
-
-MODULE B;
-   IMPORT C;
-END B.
-
-MODULE A;
-   IMPORT B, C;
-END A.`
-
-	// Setup: Create a temporary directory
-	tmpDir := t.TempDir()
-	moduleFile := filepath.Join(tmpDir, "modules.obx")
-
-	if err := os.WriteFile(moduleFile, []byte(source), 0644); err != nil {
-		t.Fatalf("failed to write modgraph source: %v", err)
-	}
-
-	// Step 1: Scan headers
-	headers, err := ScanModuleHeaders(moduleFile)
-	if err != nil {
-		t.Fatalf("ScanModuleHeaders failed: %v", err)
-	}
-
-	// Step 2: Build import graph
-	graph, err := BuildImportGraph(tmpDir, headers)
-	if err != nil {
-		t.Fatalf("BuildImportGraph failed: %v", err)
-	}
-
-	// Step 3: Topo sort
-	sorted, err := TopoSort(graph)
-	if err != nil {
-		t.Fatalf("TopoSort failed: %v", err)
-	}
-
-	// Step 4: Check order
-	gotOrder := []string{}
-	for _, h := range sorted {
-		gotOrder = append(gotOrder, h.Name)
-	}
-
-	wantOrder := []string{"C", "B", "A"}
-
-	for i, want := range wantOrder {
-		if gotOrder[i] != want {
-			t.Errorf("order mismatch at %d: want %q, got %q", i, want, gotOrder[i])
-		}
+	mathIdx := indexOf(order, "Math")
+	utilIdx := indexOf(order, "Util")
+	mainIdx := indexOf(order, "Main")
+	if mathIdx > utilIdx || utilIdx > mainIdx {
+		t.Errorf("wrong order: %v", order)
 	}
 }
 
-func TestTopoSortModulesWithCycle(t *testing.T) {
-	content := `
-MODULE A;
-   IMPORT B;
-END A.
+func TestBuildImportGraph_SelfImport(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "A.obx", "module A\nimport A\nend A")
 
-MODULE B;
-   IMPORT C;
-END B.
-
-MODULE C;
-   IMPORT A;
-END C.
-`
-
-	tmp := t.TempDir()
-	file := filepath.Join(tmp, "cycle.obx")
-	if err := os.WriteFile(file, []byte(content), 0644); err != nil {
-		t.Fatal(err)
+	hdrs, _ := DiscoverAndScan(root)
+	_, err := BuildImportGraph(hdrs)
+	if err == nil {
+		t.Fatal("expected self-import error, got nil")
 	}
+}
 
-	// Step 1: Scan headers
-	headers, err := ScanModuleHeaders(file)
+func TestBuildImportGraph_MissingDep(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "A.obx", "module A\nimport B\nend A")
+
+	hdrs, _ := DiscoverAndScan(root)
+	_, err := BuildImportGraph(hdrs)
+	if err == nil {
+		t.Fatal("expected missing-module error, got nil")
+	}
+}
+
+// ── TopoSort ─────────────────────────────────────────────────────────────────
+
+func TestTopoSort_Cycle(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "A.obx", "module A\nimport B\nend A")
+	writeFile(t, root, "B.obx", "module B\nimport C\nend B")
+	writeFile(t, root, "C.obx", "module C\nimport A\nend C")
+
+	hdrs, _ := DiscoverAndScan(root)
+	graph, err := BuildImportGraph(hdrs)
 	if err != nil {
-		t.Fatalf("ScanModuleHeaders failed: %v", err)
+		t.Fatalf("BuildImportGraph: %v", err)
 	}
 
-	// Step 2: Build import graph
-	graph, err := BuildImportGraph(tmp, headers)
-	if err != nil {
-		t.Fatalf("BuildImportGraph failed: %v", err)
-	}
-
-	// Step 3: Topo sort
 	_, err = TopoSort(graph)
 	if err == nil {
 		t.Fatal("expected cycle error, got nil")
 	}
+	if !strings.Contains(err.Error(), "cycle") {
+		t.Errorf("error should mention cycle: %v", err)
+	}
+	fmt.Println("detected cycle:", err)
 }
 
-func TestImportCycleDetection(t *testing.T) {
-	tmpDir := t.TempDir()
-	moduleFile := filepath.Join(tmpDir, "modules.obx")
-
-	source := `MODULE A;
-   IMPORT B;
-END A.
-
-MODULE B;
-   IMPORT C;
-END B.
-
-MODULE C;
-   IMPORT A;
-END C.`
-
-	if err := os.WriteFile(moduleFile, []byte(source), 0644); err != nil {
-		t.Fatalf("failed to write modgraph source: %v", err)
-	}
-
-	headers, err := ScanModuleHeaders(moduleFile)
-	if err != nil {
-		t.Fatalf("ScanModuleHeaders failed: %v", err)
-	}
-
-	graph, err := BuildImportGraph(tmpDir, headers)
-	if err != nil {
-		t.Fatalf("BuildImportGraph failed: %v", err)
-	}
-
-	_, err = TopoSort(graph)
-	if err == nil {
-		t.Fatal("expected an error due to import cycle, got nil")
-	}
-
-	t.Logf("detected expected cycle error: %v", err)
-}
-
-func TestSelfImportDetection(t *testing.T) {
-	tmpDir := t.TempDir()
-	moduleFile := filepath.Join(tmpDir, "modules.obx")
-
-	source := `MODULE A;
-   IMPORT A;
-END A.`
-
-	if err := os.WriteFile(moduleFile, []byte(source), 0644); err != nil {
-		t.Fatalf("failed to write modgraph source: %v", err)
-	}
-
-	headers, err := ScanModuleHeaders(moduleFile)
-	if err != nil {
-		t.Fatalf("ScanModuleHeaders failed: %v", err)
-	}
-
-	_, err = BuildImportGraph(tmpDir, headers)
-	if err == nil {
-		t.Fatal("expected an error due to self-import, got nil")
-	}
-
-	t.Logf("detected expected self-import error: %v", err)
-}
-
-func TestTopoSortValid(t *testing.T) {
+func TestTopoSort_Manual(t *testing.T) {
 	graph := &ImportGraph{
-		Headers: map[ModuleID]Header{
-			1: {ID: 1, Path: "", Name: "A", File: "a.mod"},
-			2: {ID: 2, Path: "", Name: "B", File: "b.mod"},
-			3: {ID: 3, Path: "", Name: "C", File: "c.mod"},
+		Headers: map[string]Header{
+			"A": {Key: NewKey("A"), File: "a.obx"},
+			"B": {Key: NewKey("B"), File: "b.obx"},
+			"C": {Key: NewKey("C"), File: "c.obx"},
 		},
-		Adj: map[ModuleID][]ModuleID{
-			1: {2},
-			2: {3},
-			3: {},
+		Adj: map[string][]string{
+			"A": {"B"},
+			"B": {"C"},
+			"C": {},
 		},
 	}
 
 	order, err := TopoSort(graph)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("TopoSort: %v", err)
 	}
 
-	var got []string
-	for _, h := range order {
-		got = append(got, h.Name)
+	got := make([]string, len(order))
+	for i, h := range order {
+		got[i] = h.Key.String()
 	}
 	want := []string{"C", "B", "A"}
-
 	if strings.Join(got, ",") != strings.Join(want, ",") {
-		t.Errorf("unexpected topo order: got %v, want %v", got, want)
+		t.Errorf("order: want %v, got %v", want, got)
 	}
 }
 
-func TestTopoSortCycle(t *testing.T) {
-	graph := &ImportGraph{
-		Headers: map[ModuleID]Header{
-			1: {ID: 1, Path: "", Name: "Main", File: "main.mod"},
-			2: {ID: 2, Path: "", Name: "A", File: "a.mod"},
-			3: {ID: 3, Path: "", Name: "B", File: "b.mod"},
-		},
-		Adj: map[ModuleID][]ModuleID{
-			1: {2},
-			2: {3},
-			3: {1}, // cycle here
-		},
-	}
+// ── Resolver ─────────────────────────────────────────────────────────────────
 
-	_, err := TopoSort(graph)
+func TestResolver_Resolve(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, filepath.Join("Collections", "Drawing.obx"),
+		"module Drawing end Drawing")
+
+	r := NewResolver(root)
+	path, err := r.Resolve(NewKey("Collections", "Drawing"))
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	want := filepath.Join(root, "Collections", "Drawing.obx")
+	if path != want {
+		t.Errorf("want %q, got %q", want, path)
+	}
+}
+
+func TestResolver_NotFound(t *testing.T) {
+	root := t.TempDir()
+	r := NewResolver(root)
+	_, err := r.Resolve(NewKey("Missing"))
 	if err == nil {
-		t.Fatal("expected cycle error, got nil")
+		t.Fatal("expected error for missing module, got nil")
 	}
+}
 
-	expected := []string{
-		"Main (main.mod)",
-		"A (a.mod)",
-		"B (b.mod)",
-		"Main (main.mod)",
+func TestResolver_MultiRoot(t *testing.T) {
+	root1 := t.TempDir()
+	root2 := t.TempDir()
+	writeFile(t, root2, "Stdlib.obx", "module Stdlib end Stdlib")
+
+	r := NewResolver(root1, root2)
+	path, err := r.Resolve(NewKey("Stdlib"))
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
 	}
-	for _, part := range expected {
-		if !strings.Contains(err.Error(), part) {
-			t.Errorf("expected error to include %q, got %q", part, err.Error())
+	if !strings.HasSuffix(path, "Stdlib.obx") {
+		t.Errorf("unexpected path: %q", path)
+	}
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+func indexOf(slice []string, s string) int {
+	for i, v := range slice {
+		if v == s {
+			return i
 		}
 	}
-	fmt.Println("Cycle:", err.Error())
-}
-
-func TestTopoSortSelfImport(t *testing.T) {
-	graph := &ImportGraph{
-		Headers: map[ModuleID]Header{
-			1: {ID: 1, Path: "", Name: "Self", File: "self.mod"},
-		},
-		Adj: map[ModuleID][]ModuleID{
-			1: {1}, // self import
-		},
-	}
-
-	_, err := TopoSort(graph)
-	if err == nil {
-		t.Fatal("expected self-cycle error, got nil")
-	}
-	if !strings.Contains(err.Error(), "Self (self.mod)") {
-		t.Errorf("expected error to mention Self (self.mod), got %q", err.Error())
-	}
-	fmt.Println("Self-cycle:", err.Error())
+	return -1
 }

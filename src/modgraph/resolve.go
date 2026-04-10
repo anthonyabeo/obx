@@ -1,44 +1,41 @@
 package modgraph
 
-import (
-	"fmt"
-)
+import "fmt"
 
-func BuildImportGraph(rootDir string, headers []Header) (*ImportGraph, error) {
+// BuildImportGraph constructs a dependency graph from a pre-scanned slice of
+// headers.  Each import is resolved against the header set by ModuleKey; an
+// error is returned for missing modules, self-imports, and duplicate keys.
+func BuildImportGraph(headers []Header) (*ImportGraph, error) {
 	graph := &ImportGraph{
-		Headers: make(map[ModuleID]Header),
-		Adj:     make(map[ModuleID][]ModuleID),
+		Headers: make(map[string]Header),
+		Adj:     make(map[string][]string),
 	}
 
-	// Step 1: Index modules by their full ID (Path + Name)
-	for _, header := range headers {
-		graph.Headers[header.ID] = header
+	// Index every header by its key string.
+	for _, h := range headers {
+		k := h.Key.String()
+		if _, dup := graph.Headers[k]; dup {
+			return nil, fmt.Errorf("duplicate module %q (files: %s and %s)",
+				k, graph.Headers[k].File, h.File)
+		}
+		graph.Headers[k] = h
 	}
 
-	// Step 2: Build adjacency list from imports
-	for modID, header := range graph.Headers {
-		for _, imp := range header.Imports {
-			if imp.ID == 0 {
-				for moduleID, h := range graph.Headers {
-					if h.Name == imp.Name {
-						imp.ID = moduleID
-						break
-					}
-				}
+	// Build the adjacency list.
+	for k, h := range graph.Headers {
+		for _, imp := range h.Imports {
+			depKey := imp.Key.String()
+
+			if depKey == k {
+				return nil, fmt.Errorf("module '%s' cannot import itself (in file %s)", k, h.File)
 			}
 
-			// Self-import check
-			if modID == imp.ID {
-				return nil, fmt.Errorf("module '%s' cannot import itself (in file %s)", header.String(), header.File)
+			if _, ok := graph.Headers[depKey]; !ok {
+				return nil, fmt.Errorf("module %q (in %s) imports %q, which was not found",
+					k, h.File, depKey)
 			}
 
-			// Check existence
-			if _, ok := graph.Headers[imp.ID]; !ok {
-				return nil, fmt.Errorf("module '%s' imports '%s', which was not found",
-					header.String(), graph.Headers[imp.ID].String())
-			}
-
-			graph.Adj[modID] = append(graph.Adj[modID], imp.ID)
+			graph.Adj[k] = append(graph.Adj[k], depKey)
 		}
 	}
 

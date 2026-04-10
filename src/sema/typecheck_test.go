@@ -4979,11 +4979,9 @@ func TestTypeCheckMultiModulePrograms(t *testing.T) {
 }
 
 func typeCheckMultiModuleSnippet(t *testing.T, code string) *diag.Context {
+	t.Helper()
 	tmp := t.TempDir()
-	file := filepath.Join(tmp, "test.obx")
-	if err := os.WriteFile(file, []byte(code), 0644); err != nil {
-		panic(err)
-	}
+	writeModuleFiles(t, tmp, code)
 
 	obx := ast.NewOberonX()
 	srcMgr := source.NewSourceManager()
@@ -4999,36 +4997,25 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *diag.Context {
 		TypeOverrides:   map[string]types.Type{},
 	}
 
-	headers, err := modgraph.ScanModuleHeaders(file)
+	// 2. Discover, scan and graph
+	headers, err := modgraph.DiscoverAndScan(tmp)
 	if err != nil {
-		ctx.Reporter.Report(diag.Diagnostic{
-			Severity: diag.Error,
-			Message:  err.Error(),
-		})
-
+		ctx.Reporter.Report(diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
 		return ctx
 	}
 
 	// 3. Build graph
-	graph, err := modgraph.BuildImportGraph(tmp, headers)
+	graph, err := modgraph.BuildImportGraph(headers)
 	if err != nil {
-		ctx.Reporter.Report(diag.Diagnostic{
-			Severity: diag.Error,
-			Message:  err.Error(),
-		})
+		ctx.Reporter.Report(diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
 		return ctx
 	}
 
 	// 4. Topologically sort
 	sorted, err := modgraph.TopoSort(graph)
 	if err != nil {
-		ctx.Reporter.Report(diag.Diagnostic{
-			Severity: diag.Error,
-			Message:  err.Error(),
-		})
-
+		ctx.Reporter.Report(diag.Diagnostic{Severity: diag.Error, Message: err.Error()})
 		return ctx
-
 	}
 
 	for _, header := range sorted {
@@ -5056,3 +5043,42 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *diag.Context {
 
 	return ctx
 }
+
+// writeModuleFiles splits src (which may contain multiple MODULE or DEFINITION
+// declarations) into one .obx file per module inside dir.
+func writeModuleFiles(t *testing.T, dir, src string) {
+	t.Helper()
+	lines := strings.Split(src, "\n")
+
+	var current strings.Builder
+	var name string
+
+	flush := func() {
+		if name == "" {
+			return
+		}
+		path := filepath.Join(dir, name+".obx")
+		if err := os.WriteFile(path, []byte(current.String()), 0644); err != nil {
+			t.Fatalf("writeModuleFiles: %v", err)
+		}
+		current.Reset()
+		name = ""
+	}
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		lower := strings.ToLower(trimmed)
+		if strings.HasPrefix(lower, "module ") || strings.HasPrefix(lower, "definition ") {
+			flush()
+			parts := strings.Fields(trimmed)
+			if len(parts) >= 2 {
+				name = strings.TrimRight(parts[1], ";(")
+			}
+		}
+		if name != "" {
+			current.WriteString(line + "\n")
+		}
+	}
+	flush()
+}
+

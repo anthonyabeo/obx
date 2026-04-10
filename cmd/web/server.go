@@ -29,11 +29,10 @@ func Start(cfg Config) error {
 	s := &Server{cfg: cfg}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", s.handleUI)
-	mux.HandleFunc("/api/check", s.handleCheck)
-	mux.HandleFunc("/api/version", s.handleVersion)
+	mux.HandleFunc("/", s.HandleUI)
+	mux.HandleFunc("/api/check", s.HandleCheck)
+	mux.HandleFunc("/api/version", s.HandleVersion)
 
 	fmt.Printf("obx web  →  http://%s\n", cfg.Addr)
 	return http.ListenAndServe(cfg.Addr, corsMiddleware(mux))
 }
-

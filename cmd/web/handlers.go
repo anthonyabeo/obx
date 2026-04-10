@@ -22,7 +22,7 @@ var staticFS embed.FS
 
 // ── GET / ────────────────────────────────────────────────────────────────────
 
-func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleUI(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
@@ -38,7 +38,7 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 
 // ── GET /api/version ─────────────────────────────────────────────────────────
 
-func (s *Server) handleVersion(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) HandleVersion(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
 		"version": "dev",
 		"go":      runtime.Version(),
@@ -49,7 +49,7 @@ func (s *Server) handleVersion(w http.ResponseWriter, _ *http.Request) {
 
 // ── POST /api/check ──────────────────────────────────────────────────────────
 
-func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -161,4 +161,3 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 		log.Printf("writeJSON: %v", err)
 	}
 }
-

@@ -15,39 +15,67 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
 
-// resolveModules discovers every .obx file under path, scans their headers,
-// builds the import graph, and returns them in topological (dependency) order.
-func resolveModules(path string) ([]modgraph.Header, error) {
-	files, err := modgraph.DiscoverModuleFiles(path)
+// resolveModules discovers every .obx file under the given source roots,
+// derives their ModuleKeys from the filesystem layout, builds the import
+// graph, and returns the headers in topological (dependency-first) order
+// together with the graph (needed for entry-point filtering).
+func resolveModules(roots ...string) ([]modgraph.Header, *modgraph.ImportGraph, error) {
+	r := modgraph.NewResolver(roots...)
+
+	headers, err := r.DiscoverAll()
 	if err != nil {
-		return nil, fmt.Errorf("discover: %w", err)
+		return nil, nil, fmt.Errorf("discover: %w", err)
 	}
 
-	var headers []modgraph.Header
-	for _, file := range files {
-		mods, err := modgraph.ScanModuleHeaders(file)
-		if err != nil {
-			return nil, fmt.Errorf("scan %s: %w", file, err)
-		}
-		headers = append(headers, mods...)
-	}
-
-	graph, err := modgraph.BuildImportGraph(path, headers)
+	graph, err := modgraph.BuildImportGraph(headers)
 	if err != nil {
-		return nil, fmt.Errorf("import graph: %w", err)
+		return nil, nil, fmt.Errorf("import graph: %w", err)
 	}
 
 	sorted, err := modgraph.TopoSort(graph)
 	if err != nil {
-		return nil, fmt.Errorf("topo sort: %w", err)
+		return nil, nil, fmt.Errorf("topo sort: %w", err)
 	}
 
-	return sorted, nil
+	return sorted, graph, nil
+}
+
+// reachableFrom filters sorted to the entry module and its transitive
+// dependencies, preserving topological order. Returns sorted unchanged if
+// entry is empty or not found in the graph.
+func reachableFrom(sorted []modgraph.Header, graph *modgraph.ImportGraph, entry string) []modgraph.Header {
+	if entry == "" {
+		return sorted
+	}
+	if _, ok := graph.Headers[entry]; !ok {
+		return sorted
+	}
+
+	reachable := make(map[string]bool)
+	var walk func(string)
+	walk = func(key string) {
+		if reachable[key] {
+			return
+		}
+		reachable[key] = true
+		for _, dep := range graph.Adj[key] {
+			walk(dep)
+		}
+	}
+	walk(entry)
+
+	out := make([]modgraph.Header, 0, len(reachable))
+	for _, h := range sorted {
+		if reachable[h.Key.String()] {
+			out = append(out, h)
+		}
+	}
+	return out
 }
 
 // newContext builds a diag.Context wired to a fresh SourceManager and a
-// BufferedReporter that writes to stderr. tabWidth is a display-only setting
-// that controls tab expansion in rendered diagnostic snippets.
+// BufferedReporter that writes to stderr. tabWidth controls tab expansion in
+// rendered diagnostic snippets.
 func newContext(tabWidth, maxErrors int) (*diag.Context, *source.Manager) {
 	srcMgr := source.NewSourceManager()
 	reporter := diag.NewBufferedReporter(srcMgr, maxErrors,

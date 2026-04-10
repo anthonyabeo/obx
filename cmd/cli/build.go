@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -18,56 +19,84 @@ import (
 )
 
 var buildArgs struct {
-	Entry    string
-	Path     string
-	TabWidth int
-	Output   string
+	Roots  []string // --root (repeatable); falls back to roots in obx.mod
+	Entry  string   // --entry; falls back to entry in obx.mod
+	Output string
 
+	TabWidth      int
 	OptLevel      int
 	EnablePasses  string
 	DisablePasses string
 	Verbose       bool
-
-	Asm bool
+	Asm           bool
 }
 
 func init() {
-	buildCmd.Flags().StringVarP(&buildArgs.Entry, "entry", "e", "", "the module that specify the entrypoint into the program")
-	buildCmd.Flags().StringVarP(&buildArgs.Path, "path", "p", "", "the filesystem path to the root source directory. Defaults to the current directory")
-	buildCmd.Flags().StringVarP(&buildArgs.Output, "output", "o", "", "the name of the output file to produce")
-	buildCmd.Flags().IntVarP(&buildArgs.TabWidth, "tabWidth", "t", 4, "how many space should represent a tab")
-	buildCmd.Flags().IntVarP(&buildArgs.OptLevel, "optlevel", "O", 2, "Optimisation level (0-3)")
-	buildCmd.Flags().StringVarP(&buildArgs.EnablePasses, "passes", "P", "", "Comma-separated list of optimisation passes to enable (overrides -O)")
-	buildCmd.Flags().StringVarP(&buildArgs.DisablePasses, "disable-passes", "D", "", "Comma-separated list of optimisation passes to disable")
-	buildCmd.Flags().BoolVarP(&buildArgs.Verbose, "verbose", "V", false, "Output detailed optimization output")
-	buildCmd.Flags().BoolVarP(&buildArgs.Asm, "asm", "S", false, "Output the assembly code to a .s file")
+	buildCmd.Flags().StringArrayVarP(&buildArgs.Roots, "root", "r", nil,
+		"source root directory (repeatable; defaults to roots in obx.mod)")
+	buildCmd.Flags().StringVarP(&buildArgs.Entry, "entry", "e", "",
+		"entry module to build (defaults to entry in obx.mod; omit to build all)")
+	buildCmd.Flags().StringVarP(&buildArgs.Output, "output", "o", "", "name of the output file to produce")
+	buildCmd.Flags().IntVarP(&buildArgs.TabWidth, "tabWidth", "t", 4, "how many spaces should represent a tab")
+	buildCmd.Flags().IntVarP(&buildArgs.OptLevel, "optlevel", "O", 2, "optimisation level (0-3)")
+	buildCmd.Flags().StringVarP(&buildArgs.EnablePasses, "passes", "P", "", "comma-separated optimisation passes to enable (overrides -O)")
+	buildCmd.Flags().StringVarP(&buildArgs.DisablePasses, "disable-passes", "D", "", "comma-separated optimisation passes to disable")
+	buildCmd.Flags().BoolVarP(&buildArgs.Verbose, "verbose", "V", false, "output detailed optimisation info")
+	buildCmd.Flags().BoolVarP(&buildArgs.Asm, "asm", "S", false, "print assembly to stdout")
 }
 
 var buildCmd = &cobra.Command{
 	Use:   "build",
-	Short: "compile module or definition (along with its dependencies) into an object file",
+	Short: "compile module(s) and their dependencies into object files",
+	Long: `build runs the full compilation pipeline (discovery, parsing, semantic
+analysis, IR lowering, optimisation, and code generation).
+
+When --root is omitted, obx.mod in the nearest parent directory is read for
+source roots and the default entry module.  --entry and --root always take
+precedence over obx.mod values.`,
+
 	Run: func(cmd *cobra.Command, args []string) {
-		path, _ := cmd.Flags().GetString("path")
-		tabWidth, _ := cmd.Flags().GetInt("tabWidth")
-		optLevel, _ := cmd.Flags().GetInt("optlevel")
-		enablePasses, _ := cmd.Flags().GetString("passes")
-		disablePasses, _ := cmd.Flags().GetString("disable-passes")
-		verbose, _ := cmd.Flags().GetBool("verbose")
-		asm, _ := cmd.Flags().GetBool("asm")
+		roots := buildArgs.Roots
+		entry := buildArgs.Entry
+		projectDir := "."
+
+		// ── 0. Fall back to obx.mod when no roots are given ──────────────
+		if len(roots) == 0 {
+			dir, err := modgraph.FindProjectRoot()
+			if err != nil {
+				log.Fatalf("build: no --root given and %s", err)
+			}
+			projectDir = dir
+
+			m, err := modgraph.LoadManifest(dir)
+			if err != nil {
+				log.Fatalf("build: %v", err)
+			}
+			roots = m.Roots
+			if entry == "" {
+				entry = m.Entry
+			}
+		}
 
 		// ── 1. Discover and order modules ────────────────────────────────
-		sorted, err := resolveModules(path)
+		sorted, graph, err := resolveModules(roots...)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		fmt.Println("Import order:")
+		sorted = reachableFrom(sorted, graph, entry)
+
+		fmt.Printf("Building %d module(s)", len(sorted))
+		if entry != "" {
+			fmt.Printf("  (entry: %s)", entry)
+		}
+		fmt.Println()
 		for _, h := range sorted {
-			fmt.Printf("  %s from %s\n", h.Name, h.File)
+			fmt.Printf("  %-30s  %s\n", h.Key, h.File)
 		}
 
 		// ── 2. Parse ─────────────────────────────────────────────────────
-		ctx, _ := newContext(tabWidth, 32)
+		ctx, _ := newContext(buildArgs.TabWidth, 32)
 		obx := ast.NewOberonX()
 
 		if ok := parseModules(sorted, ctx, obx); !ok {
@@ -97,39 +126,33 @@ var buildCmd = &cobra.Command{
 		}
 
 		// ── 5. Optimise ───────────────────────────────────────────────────
-		config := map[string]any{
-			"verbose":       verbose,
-			"optlevel":      optLevel,
-			"enablePasses":  enablePasses,
-			"disablePasses": disablePasses,
-		}
-
 		pm := opt.NewPassManager()
-		pm.ConfigurePasses(config)
+		pm.ConfigurePasses(map[string]any{
+			"verbose":       buildArgs.Verbose,
+			"optlevel":      buildArgs.OptLevel,
+			"enablePasses":  buildArgs.EnablePasses,
+			"disablePasses": buildArgs.DisablePasses,
+		})
 
 		// ── 6. Emit assembly ──────────────────────────────────────────────
+		outDir := filepath.Join(projectDir, "out")
 		for _, module := range MIRProgram.Modules {
-			root, err := modgraph.FindProjectRoot()
-			if err != nil {
-				log.Printf("failed to find project root: %v", err)
-				root = "."
-			}
-
-			asmPath := root + "/out/" + module.Name + ".s"
+			asmPath := filepath.Join(outDir, module.Name+".s")
 			asmFile, err := os.Create(asmPath)
 			if err != nil {
 				log.Printf("failed to create assembly file: %v", err)
+				continue
 			}
 			defer asmFile.Close()
 
-			targetDesc := root + "/src/backend/target/desc"
+			targetDesc := filepath.Join(projectDir, "src", "backend", "target", "desc")
 			ss := backend.Compile(module, riscv.NewRV64IMAFDTarget(), targetDesc)
-			if asm {
+			if buildArgs.Asm {
 				fmt.Println(ss)
 			}
 
 			if _, err := asmFile.WriteString(ss + "\n\n"); err != nil {
-				log.Printf("failed to write to assembly file: %v", err)
+				log.Printf("failed to write assembly: %v", err)
 			}
 		}
 	},

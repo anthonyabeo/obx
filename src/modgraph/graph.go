@@ -1,39 +1,26 @@
 package modgraph
 
-type ModuleID int
-
-var id ModuleID
-
-func nextModID() ModuleID {
-	id++
-	return id
-}
-
+// Header holds the metadata extracted from a single .obx file before it is
+// fully parsed.  One file → one Header.
 type Header struct {
-	ID       ModuleID
-	Path     string // logical import path (may be empty)
-	Name     string // name of the module
-	File     string // name of the file containing the module e.g. math.obx
-	StartPos int
-	EndPos   int
-	Imports  []Import
+	Key      ModuleKey // derived from the file's path relative to a root
+	File     string    // absolute path to the source file
+	StartPos int       // byte offset of the MODULE/DEFINITION keyword
+	EndPos   int       // byte offset past the end of the unit (len(content))
+	Imports  []Import  // import list in source order
 }
 
-func (id Header) String() string {
-	if id.Path != "" {
-		return id.Path + "." + id.Name
-	}
-	return id.Name
-}
+func (h Header) String() string { return h.Key.String() }
 
-type ImportGraph struct {
-	Headers map[ModuleID]Header
-	Adj     map[ModuleID][]ModuleID
-}
-
+// Import represents one entry in a module's import list.
 type Import struct {
-	Alias string // optional alias
-	Path  string // logical import path (may be empty)
-	Name  string // name of the module
-	ID    ModuleID
+	Alias string    // local alias, e.g. "D" in "D := Collections.Drawing"
+	Key   ModuleKey // canonical key built from all dot-separated segments
+}
+
+// ImportGraph is a directed graph of module dependencies keyed by the string
+// form of each module's ModuleKey.
+type ImportGraph struct {
+	Headers map[string]Header   // key → Header
+	Adj     map[string][]string // key → keys of direct dependencies
 }
