@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/ir/mir"
+	"github.com/anthonyabeo/obx/src/ir/obxir"
 )
 
 type ChangeSet struct {
@@ -48,7 +48,7 @@ func (ctx *PassContext) Invalidate(names ...string) {
 // Pass is implemented by all transformations/analyses.
 type Pass interface {
 	Name() string
-	Run(fn *mir.Function, ctx *PassContext) *ChangeSet
+	Run(fn *obxir.Function, ctx *PassContext) *ChangeSet
 }
 
 // PassManager coordinates running passes.
@@ -122,13 +122,13 @@ func (pm *PassManager) ConfigurePasses(config map[string]any) {
 }
 
 // RunOnce runs all passes once in order.
-func (pm *PassManager) RunOnce(fn *mir.Function) {
+func (pm *PassManager) RunOnce(fn *obxir.Function) {
 	//ctx := NewPassContext()
 	for _, p := range pm.passes {
 		if pm.Verbose {
 			fmt.Printf("==> Running pass: %s\n", p.Name())
 			fmt.Println("----- BEFORE -----")
-			mir.FormatFunction(fn)
+			obxir.FormatFunction(fn)
 		}
 		cs := p.Run(fn, pm.ctx)
 		if pm.Verbose {
@@ -137,7 +137,7 @@ func (pm *PassManager) RunOnce(fn *mir.Function) {
 					fmt.Printf("  • %s\n", l)
 				}
 				fmt.Println("----- AFTER ------")
-				mir.FormatFunction(fn)
+				obxir.FormatFunction(fn)
 			} else {
 				fmt.Println("  (no changes)")
 			}
@@ -146,7 +146,7 @@ func (pm *PassManager) RunOnce(fn *mir.Function) {
 }
 
 // RunFixedPoint keeps running the whole pipeline until no pass changes anything.
-func (pm *PassManager) RunFixedPoint(fn *mir.Function, maxIters int) {
+func (pm *PassManager) RunFixedPoint(fn *obxir.Function, maxIters int) {
 	if maxIters <= 0 {
 		maxIters = 20
 	}
@@ -162,7 +162,7 @@ func (pm *PassManager) RunFixedPoint(fn *mir.Function, maxIters int) {
 			}
 			if pm.Verbose {
 				fmt.Println("----- BEFORE -----")
-				fmt.Println(mir.FormatFunction(fn))
+				fmt.Println(obxir.FormatFunction(fn))
 			}
 			cs := p.Run(fn, pm.ctx)
 			if cs != nil && cs.Any() {
@@ -172,7 +172,7 @@ func (pm *PassManager) RunFixedPoint(fn *mir.Function, maxIters int) {
 						fmt.Printf("  • %s\n", l)
 					}
 					fmt.Println("----- AFTER ------")
-					fmt.Println(mir.FormatFunction(fn))
+					fmt.Println(obxir.FormatFunction(fn))
 				}
 			} else if pm.Verbose {
 				fmt.Println("  (no changes)")

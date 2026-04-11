@@ -1,5 +1,6 @@
-package mir
+package obxir
 
+// InstrOp is the opcode for a three-address-code instruction.
 type InstrOp int
 
 const (
@@ -9,8 +10,8 @@ const (
 	ADD
 	SUB
 	MUL
-	RDIV // Real Division
-	IDIV // Integer Division
+	RDIV // Real division
+	IDIV // Integer division
 	REM
 	arith_binary_end
 
@@ -46,6 +47,7 @@ const (
 )
 
 func (op InstrOp) IsCmpCondCode() bool { return cmp_begin < op && op < cmp_end }
+
 func (op InstrOp) String() string {
 	switch op {
 	case ADD:
@@ -92,7 +94,22 @@ func (op InstrOp) String() string {
 		return "XOR"
 	case FNEG:
 		return "FNEG"
+	case IN:
+		return "IN"
+	case IS:
+		return "IS"
+	case FEQ:
+		return "FEQ"
+	case FLT:
+		return "FLT"
+	case FLE:
+		return "FLE"
+	case FGT:
+		return "FGT"
+	case FGE:
+		return "FGE"
 	default:
 		return "unknown"
 	}
 }
+

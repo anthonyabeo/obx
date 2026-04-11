@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/anthonyabeo/obx/src/ir/obxir"
 	"github.com/anthonyabeo/obx/src/project"
-	"github.com/anthonyabeo/obx/src/ir/mir"
 )
 
-func filterBlocks(blocks map[int]*mir.Block, reachable map[int]bool) map[int]*mir.Block {
-	out := make(map[int]*mir.Block)
+func filterBlocks(blocks map[int]*obxir.Block, reachable map[int]bool) map[int]*obxir.Block {
+	out := make(map[int]*obxir.Block)
 	for id, b := range blocks {
 		if reachable[id] {
 			out[id] = b
@@ -21,9 +21,9 @@ func filterBlocks(blocks map[int]*mir.Block, reachable map[int]bool) map[int]*mi
 	return out
 }
 
-func intersectAllPreds(doms map[*mir.Block]map[*mir.Block]struct{}, preds []*mir.Block) map[*mir.Block]struct{} {
+func intersectAllPreds(doms map[*obxir.Block]map[*obxir.Block]struct{}, preds []*obxir.Block) map[*obxir.Block]struct{} {
 	if len(preds) == 0 {
-		return map[*mir.Block]struct{}{}
+		return map[*obxir.Block]struct{}{}
 	}
 
 	// Start with copy of first pred's dominators
@@ -34,8 +34,8 @@ func intersectAllPreds(doms map[*mir.Block]map[*mir.Block]struct{}, preds []*mir
 	return res
 }
 
-func intersect(a, b map[*mir.Block]struct{}) map[*mir.Block]struct{} {
-	res := make(map[*mir.Block]struct{})
+func intersect(a, b map[*obxir.Block]struct{}) map[*obxir.Block]struct{} {
+	res := make(map[*obxir.Block]struct{})
 	for k := range a {
 		if _, ok := b[k]; ok {
 			res[k] = struct{}{}
@@ -44,15 +44,15 @@ func intersect(a, b map[*mir.Block]struct{}) map[*mir.Block]struct{} {
 	return res
 }
 
-func copySet(s map[*mir.Block]struct{}) map[*mir.Block]struct{} {
-	res := make(map[*mir.Block]struct{}, len(s))
+func copySet(s map[*obxir.Block]struct{}) map[*obxir.Block]struct{} {
+	res := make(map[*obxir.Block]struct{}, len(s))
 	for k := range s {
 		res[k] = struct{}{}
 	}
 	return res
 }
 
-func sameSet(a, b map[*mir.Block]struct{}) bool {
+func sameSet(a, b map[*obxir.Block]struct{}) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -64,7 +64,7 @@ func sameSet(a, b map[*mir.Block]struct{}) bool {
 	return true
 }
 
-func contains(list []*mir.Block, b *mir.Block) bool {
+func contains(list []*obxir.Block, b *obxir.Block) bool {
 	for _, x := range list {
 		if x == b {
 			return true
@@ -73,7 +73,7 @@ func contains(list []*mir.Block, b *mir.Block) bool {
 	return false
 }
 
-func PrintDominators(doms map[*mir.Block]map[*mir.Block]struct{}) {
+func PrintDominators(doms map[*obxir.Block]map[*obxir.Block]struct{}) {
 	for b, set := range doms {
 		fmt.Printf("Dom(%s): ", b.Label)
 		for bb := range set {
@@ -83,14 +83,14 @@ func PrintDominators(doms map[*mir.Block]map[*mir.Block]struct{}) {
 	}
 }
 
-func printDomTree(root *mir.Block, tree map[*mir.Block][]*mir.Block, depth int) {
+func printDomTree(root *obxir.Block, tree map[*obxir.Block][]*obxir.Block, depth int) {
 	fmt.Printf("%s%s\n", strings.Repeat("  ", depth), root.Label)
 	for _, child := range tree[root] {
 		printDomTree(child, tree, depth+1)
 	}
 }
 
-func printIDoms(idom map[*mir.Block]*mir.Block) {
+func printIDoms(idom map[*obxir.Block]*obxir.Block) {
 	for b, d := range idom {
 		if d == nil {
 			fmt.Printf("idom(%s) = <nil>\n", b.Label)
@@ -100,7 +100,7 @@ func printIDoms(idom map[*mir.Block]*mir.Block) {
 	}
 }
 
-func VizCFG(fn *mir.Function) error {
+func VizCFG(fn *obxir.Function) error {
 	dot := fn.OutputDOT()
 
 	Root, err := project.FindProjectRoot()
@@ -132,7 +132,7 @@ func VizCFG(fn *mir.Function) error {
 	return nil
 }
 
-func VizSSA(fn *mir.Function) error {
+func VizSSA(fn *obxir.Function) error {
 	dot := fn.OutputDOT()
 
 	Root, err := project.FindProjectRoot()

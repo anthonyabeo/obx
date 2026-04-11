@@ -1,10 +1,11 @@
-package mir
+package obxir
 
 import (
 	"fmt"
 	"strings"
 )
 
+// Instr is implemented by every three-address-code instruction.
 type Instr interface {
 	String() string
 	Def() Value    // result variable (nil if none)
@@ -13,11 +14,14 @@ type Instr interface {
 	ReplaceDef(Value)
 }
 
+// Foldable is an Instr that can be constant-folded.
 type Foldable interface {
 	Instr
 	CanFold() bool
 	Fold() Value
 }
+
+// ─── Instruction structs ──────────────────────────────────────────────────
 
 type (
 	HaltInst struct {
@@ -54,7 +58,7 @@ type (
 	}
 
 	ReturnInst struct {
-		Result Value // nil if procedure returns nothing
+		Result Value // nil if void
 	}
 
 	BinaryInst struct {
@@ -71,7 +75,7 @@ type (
 	}
 
 	CallInst struct {
-		Target Value  // optional: nil for void calls
+		Target Value  // nil for void calls
 		Callee string // function name
 		Args   []Value
 	}
@@ -97,8 +101,8 @@ type (
 	}
 
 	PHIArg struct {
-		Block *Block // block where this value comes from
-		Value Value  // value from the block
+		Block *Block
+		Value Value
 	}
 
 	Arg struct {
@@ -107,21 +111,31 @@ type (
 	}
 )
 
-func (h HaltInst) String() string { return fmt.Sprintf("HALT(%s)", h.Code) }
-func (h HaltInst) Def() Value     { return nil }
-func (h HaltInst) Uses() []Value  { return []Value{h.Code} }
-func (h HaltInst) ReplaceUses(m map[string]Value) {
+// ─── HaltInst ─────────────────────────────────────────────────────────────
+
+func (h *HaltInst) String() string { return fmt.Sprintf("HALT(%s)", h.Code) }
+func (h *HaltInst) Def() Value     { return nil }
+func (h *HaltInst) Uses() []Value  { return []Value{h.Code} }
+func (h *HaltInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[h.Code.BaseName()]; ok {
 		h.Code = nv
 	}
 }
-func (h HaltInst) ReplaceDef(Value) {}
+func (h *HaltInst) ReplaceDef(Value) {}
 
-func (a Arg) String() string                 { return fmt.Sprintf("ARG(%s, %d)", a.Value, a.Index) }
-func (a Arg) Def() Value                     { return nil }
-func (a Arg) Uses() []Value                  { return []Value{a.Value} }
-func (a Arg) ReplaceUses(m map[string]Value) {}
-func (a Arg) ReplaceDef(Value)               {}
+// ─── Arg ──────────────────────────────────────────────────────────────────
+
+func (a *Arg) String() string { return fmt.Sprintf("ARG(%s, %d)", a.Value, a.Index) }
+func (a *Arg) Def() Value     { return nil }
+func (a *Arg) Uses() []Value  { return []Value{a.Value} }
+func (a *Arg) ReplaceUses(m map[string]Value) {
+	if nv, ok := m[a.Value.BaseName()]; ok {
+		a.Value = nv
+	}
+}
+func (a *Arg) ReplaceDef(Value) {}
+
+// ─── MoveInst ─────────────────────────────────────────────────────────────
 
 func (a *MoveInst) Def() Value     { return a.Target }
 func (a *MoveInst) Uses() []Value  { return []Value{a.Value} }
@@ -133,11 +147,15 @@ func (a *MoveInst) ReplaceUses(m map[string]Value) {
 }
 func (a *MoveInst) ReplaceDef(t Value) { a.Target = t }
 
+// ─── JumpInst ─────────────────────────────────────────────────────────────
+
 func (*JumpInst) Def() Value                     { return nil }
 func (*JumpInst) Uses() []Value                  { return nil }
 func (j *JumpInst) String() string               { return fmt.Sprintf("JMP %s", j.Target) }
 func (j *JumpInst) ReplaceUses(map[string]Value) {}
 func (j *JumpInst) ReplaceDef(Value)             {}
+
+// ─── CondBrInst ───────────────────────────────────────────────────────────
 
 func (b *CondBrInst) Def() Value    { return nil }
 func (b *CondBrInst) Uses() []Value { return []Value{b.Cond} }
@@ -151,6 +169,8 @@ func (b *CondBrInst) ReplaceUses(m map[string]Value) {
 }
 func (b *CondBrInst) ReplaceDef(Value) {}
 
+// ─── ReturnInst ───────────────────────────────────────────────────────────
+
 func (*ReturnInst) Def() Value { return nil }
 func (r *ReturnInst) Uses() []Value {
 	if r.Result == nil {
@@ -162,19 +182,19 @@ func (r *ReturnInst) String() string {
 	if r.Result != nil {
 		return fmt.Sprintf("RET %v", r.Result.Name())
 	}
-
 	return "ret"
 }
 func (r *ReturnInst) ReplaceUses(m map[string]Value) {
 	if r.Result == nil {
 		return
 	}
-
 	if nv, ok := m[r.Result.BaseName()]; ok {
 		r.Result = nv
 	}
 }
 func (r *ReturnInst) ReplaceDef(Value) {}
+
+// ─── ICmpInst ─────────────────────────────────────────────────────────────
 
 func (c *ICmpInst) Def() Value    { return c.Target }
 func (c *ICmpInst) Uses() []Value { return []Value{c.Left, c.Right} }
@@ -185,12 +205,13 @@ func (c *ICmpInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[c.Left.BaseName()]; ok {
 		c.Left = nv
 	}
-
 	if nv, ok := m[c.Right.BaseName()]; ok {
 		c.Right = nv
 	}
 }
 func (c *ICmpInst) ReplaceDef(t Value) { c.Target = t }
+
+// ─── FCmpInst ─────────────────────────────────────────────────────────────
 
 func (c *FCmpInst) Def() Value    { return c.Target }
 func (c *FCmpInst) Uses() []Value { return []Value{c.Left, c.Right} }
@@ -201,12 +222,13 @@ func (c *FCmpInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[c.Left.BaseName()]; ok {
 		c.Left = nv
 	}
-
 	if nv, ok := m[c.Right.BaseName()]; ok {
 		c.Right = nv
 	}
 }
 func (c *FCmpInst) ReplaceDef(t Value) { c.Target = t }
+
+// ─── BinaryInst ───────────────────────────────────────────────────────────
 
 func (b *BinaryInst) Def() Value    { return b.Target }
 func (b *BinaryInst) Uses() []Value { return []Value{b.Left, b.Right} }
@@ -217,83 +239,59 @@ func (b *BinaryInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[b.Left.BaseName()]; ok {
 		b.Left = nv
 	}
-
 	if nv, ok := m[b.Right.BaseName()]; ok {
 		b.Right = nv
 	}
 }
 func (b *BinaryInst) ReplaceDef(t Value) { b.Target = t }
+
 func (b *BinaryInst) CanFold() bool {
-	_, okLeft := b.Left.(Constant)
-	_, okRight := b.Right.(Constant)
-	return okLeft && okRight
+	_, okL := b.Left.(Constant)
+	_, okR := b.Right.(Constant)
+	return okL && okR
 }
 func (b *BinaryInst) Fold() Value {
 	switch b.Op {
 	case ADD:
-		leftConst, okLeft := b.Left.(*IntegerLit)
-		rightConst, okRight := b.Right.(*IntegerLit)
-		if okLeft && okRight {
-			sum := leftConst.LitValue + rightConst.LitValue
-			return &IntegerLit{
-				LitValue: sum,
-				Signed:   leftConst.Signed,
-				Bits:     leftConst.Bits,
-				Typ:      leftConst.Typ,
-			}
+		lc, okL := b.Left.(*IntegerLit)
+		rc, okR := b.Right.(*IntegerLit)
+		if okL && okR {
+			return &IntegerLit{LitValue: lc.LitValue + rc.LitValue, Signed: lc.Signed, Bits: lc.Bits, Typ: lc.Typ}
 		}
-
-		sl, okLeft := b.Left.(*StrLit)
-		sr, okRight := b.Right.(*StrLit)
-		if okLeft && okRight {
-			concat := sl.LitValue + sr.LitValue
-			return &StrLit{
-				LitValue: concat,
-				Typ:      sr.Typ,
-			}
+		sl, okL := b.Left.(*StrLit)
+		sr, okR := b.Right.(*StrLit)
+		if okL && okR {
+			return &StrLit{LitValue: sl.LitValue + sr.LitValue, Typ: sr.Typ}
 		}
 	case SUB:
-		leftConst, okLeft := b.Left.(*IntegerLit)
-		rightConst, okRight := b.Right.(*IntegerLit)
-		if okLeft && okRight {
-			diff := leftConst.LitValue - rightConst.LitValue
-			return &IntegerLit{
-				LitValue: diff,
-				Signed:   leftConst.Signed,
-				Bits:     leftConst.Bits,
-				Typ:      leftConst.Typ,
-			}
+		lc, okL := b.Left.(*IntegerLit)
+		rc, okR := b.Right.(*IntegerLit)
+		if okL && okR {
+			return &IntegerLit{LitValue: lc.LitValue - rc.LitValue, Signed: lc.Signed, Bits: lc.Bits, Typ: lc.Typ}
 		}
 	case MUL:
-		leftConst, okLeft := b.Left.(*IntegerLit)
-		rightConst, okRight := b.Right.(*IntegerLit)
-		if okLeft && okRight {
-			product := leftConst.LitValue * rightConst.LitValue
-			return &IntegerLit{
-				LitValue: product,
-				Signed:   leftConst.Signed,
-				Bits:     leftConst.Bits,
-				Typ:      leftConst.Typ,
-			}
+		lc, okL := b.Left.(*IntegerLit)
+		rc, okR := b.Right.(*IntegerLit)
+		if okL && okR {
+			return &IntegerLit{LitValue: lc.LitValue * rc.LitValue, Signed: lc.Signed, Bits: lc.Bits, Typ: lc.Typ}
 		}
 	case IDIV:
-		leftConst, okLeft := b.Left.(*IntegerLit)
-		rightConst, okRight := b.Right.(*IntegerLit)
-		if okLeft && okRight && rightConst.LitValue != 0 {
-			div := leftConst.LitValue / rightConst.LitValue
-			return &IntegerLit{
-				LitValue: div,
-				Signed:   leftConst.Signed,
-				Bits:     leftConst.Bits,
-				Typ:      leftConst.Typ,
-			}
+		lc, okL := b.Left.(*IntegerLit)
+		rc, okR := b.Right.(*IntegerLit)
+		if okL && okR && rc.LitValue != 0 {
+			return &IntegerLit{LitValue: lc.LitValue / rc.LitValue, Signed: lc.Signed, Bits: lc.Bits, Typ: lc.Typ}
 		}
-	default:
-		panic(fmt.Sprintf("unsupported binary operation: %s", b.Op))
+	case REM:
+		lc, okL := b.Left.(*IntegerLit)
+		rc, okR := b.Right.(*IntegerLit)
+		if okL && okR && rc.LitValue != 0 {
+			return &IntegerLit{LitValue: lc.LitValue % rc.LitValue, Signed: lc.Signed, Bits: lc.Bits, Typ: lc.Typ}
+		}
 	}
-
 	return nil
 }
+
+// ─── UnaryInst ────────────────────────────────────────────────────────────
 
 func (u *UnaryInst) Def() Value    { return u.Target }
 func (u *UnaryInst) Uses() []Value { return []Value{u.Operand} }
@@ -306,30 +304,54 @@ func (u *UnaryInst) ReplaceUses(m map[string]Value) {
 	}
 }
 func (u *UnaryInst) ReplaceDef(t Value) { u.Target = t }
-func (u *UnaryInst) CanFold() bool      { panic("not implemented") }
-func (u *UnaryInst) Fold() bool         { panic("not implemented") }
+
+func (u *UnaryInst) CanFold() bool {
+	_, isConst := u.Operand.(Constant)
+	return isConst && (u.Op == NEG || u.Op == NOT || u.Op == FNEG)
+}
+func (u *UnaryInst) Fold() Value {
+	switch u.Op {
+	case NEG:
+		if lit, ok := u.Operand.(*IntegerLit); ok {
+			return &IntegerLit{LitValue: uint64(-int64(lit.LitValue)), Signed: lit.Signed, Bits: lit.Bits, Typ: lit.Typ}
+		}
+	case FNEG:
+		if lit, ok := u.Operand.(*FloatLit); ok {
+			return &FloatLit{LitValue: -lit.LitValue, Bits: lit.Bits, Typ: lit.Typ}
+		}
+	case NOT:
+		if lit, ok := u.Operand.(*IntegerLit); ok {
+			return &IntegerLit{LitValue: ^lit.LitValue, Signed: lit.Signed, Bits: lit.Bits, Typ: lit.Typ}
+		}
+	}
+	return nil
+}
+
+// ─── CallInst ─────────────────────────────────────────────────────────────
 
 func (c *CallInst) Def() Value    { return c.Target }
 func (c *CallInst) Uses() []Value { return c.Args }
 func (c *CallInst) String() string {
-	var argNames []string
-	for _, arg := range c.Args {
-		argNames = append(argNames, arg.Name())
+	var names []string
+	for _, a := range c.Args {
+		names = append(names, a.Name())
 	}
-	callStr := fmt.Sprintf("CALL @%s(%s)", c.Callee, strings.Join(argNames, ", "))
+	call := fmt.Sprintf("CALL @%s(%s)", c.Callee, strings.Join(names, ", "))
 	if c.Target == nil {
-		return callStr
+		return call
 	}
-	return fmt.Sprintf("%s := %s", c.Target.Name(), callStr)
+	return fmt.Sprintf("%s := %s", c.Target.Name(), call)
 }
 func (c *CallInst) ReplaceUses(m map[string]Value) {
-	for i, arg := range c.Args {
-		if nv, ok := m[arg.BaseName()]; ok {
+	for i, a := range c.Args {
+		if nv, ok := m[a.BaseName()]; ok {
 			c.Args[i] = nv
 		}
 	}
 }
 func (c *CallInst) ReplaceDef(t Value) { c.Target = t }
+
+// ─── LoadInst ─────────────────────────────────────────────────────────────
 
 func (l *LoadInst) Def() Value    { return l.Target }
 func (l *LoadInst) Uses() []Value { return []Value{l.Addr} }
@@ -343,6 +365,8 @@ func (l *LoadInst) ReplaceUses(m map[string]Value) {
 }
 func (l *LoadInst) ReplaceDef(t Value) { l.Target = t }
 
+// ─── StoreInst ────────────────────────────────────────────────────────────
+
 func (s *StoreInst) Def() Value    { return nil }
 func (s *StoreInst) Uses() []Value { return []Value{s.Addr, s.Val} }
 func (s *StoreInst) String() string {
@@ -352,12 +376,13 @@ func (s *StoreInst) ReplaceUses(m map[string]Value) {
 	if nv, ok := m[s.Addr.BaseName()]; ok {
 		s.Addr = nv
 	}
-
 	if nv, ok := m[s.Val.BaseName()]; ok {
 		s.Val = nv
 	}
 }
 func (s *StoreInst) ReplaceDef(Value) {}
+
+// ─── AddrOf ───────────────────────────────────────────────────────────────
 
 func (a *AddrOf) Def() Value    { return a.Target }
 func (a *AddrOf) Uses() []Value { return []Value{a.Addr} }
@@ -371,25 +396,27 @@ func (a *AddrOf) ReplaceUses(m map[string]Value) {
 }
 func (a *AddrOf) ReplaceDef(t Value) { a.Target = t }
 
+// ─── PhiInst ──────────────────────────────────────────────────────────────
+
 func (phi *PhiInst) Def() Value { return phi.Target }
 func (phi *PhiInst) Uses() []Value {
 	var uses []Value
-	for _, arg := range phi.Args {
-		uses = append(uses, arg.Value)
+	for _, a := range phi.Args {
+		uses = append(uses, a.Value)
 	}
 	return uses
 }
 func (phi *PhiInst) String() string {
-	var argNames []string
-	for _, arg := range phi.Args {
-		argNames = append(argNames, fmt.Sprintf("[%s %s]", arg.Block.Label, arg.Value.Name()))
+	var parts []string
+	for _, a := range phi.Args {
+		parts = append(parts, fmt.Sprintf("[%s %s]", a.Block.Label, a.Value.Name()))
 	}
-	return fmt.Sprintf("%s = PHI %s", phi.Target, strings.Join(argNames, ", "))
+	return fmt.Sprintf("%s = PHI %s", phi.Target, strings.Join(parts, ", "))
 }
 func (phi *PhiInst) ReplaceUses(m map[string]Value) {
-	for _, arg := range phi.Args {
-		if nv, ok := m[arg.Value.BaseName()]; ok {
-			arg.Value = nv
+	for _, a := range phi.Args {
+		if nv, ok := m[a.Value.BaseName()]; ok {
+			a.Value = nv
 		}
 	}
 }

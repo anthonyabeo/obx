@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/anthonyabeo/obx/src/ir/obxir"
 	"github.com/spf13/cobra"
 
 	"github.com/anthonyabeo/obx/src/codegen"
 	"github.com/anthonyabeo/obx/src/codegen/target"
 	_ "github.com/anthonyabeo/obx/src/codegen/target/riscv" // register rv64imafd
 	"github.com/anthonyabeo/obx/src/ir/desugar"
-	"github.com/anthonyabeo/obx/src/ir/mir"
 	"github.com/anthonyabeo/obx/src/opt"
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/sema"
@@ -24,7 +24,7 @@ var buildArgs struct {
 	Roots  []string // --root (repeatable); falls back to roots in obx.mod
 	Entry  string   // --entry; falls back to entry in obx.mod
 	Output string
-	Target string   // --target; defaults to rv64imafd
+	Target string // --target; defaults to rv64imafd
 
 	TabWidth      int
 	OptLevel      int
@@ -127,7 +127,7 @@ precedence over obx.mod values.`,
 		hirGen := desugar.NewGenerator(ctx, obx)
 		hirProgram := hirGen.Generate()
 
-		Builder := mir.NewIRBuilder(ctx)
+		Builder := obxir.NewIRBuilder(ctx)
 		MIRProgram := Builder.Build(hirProgram)
 
 		for _, module := range MIRProgram.Modules {

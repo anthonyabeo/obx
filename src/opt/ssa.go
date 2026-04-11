@@ -1,8 +1,8 @@
 package opt
 
-import "github.com/anthonyabeo/obx/src/ir/mir"
+import "github.com/anthonyabeo/obx/src/ir/obxir"
 
-func SSAConstruct(fn *mir.Function) {
+func SSAConstruct(fn *obxir.Function) {
 	// Step 1: Build the control flow graph (CFG)
 	BuildCFG(fn)
 
@@ -17,18 +17,18 @@ func SSAConstruct(fn *mir.Function) {
 }
 
 // PlacePhiNodes places φ-nodes for all variables using DF and def-sites
-func PlacePhiNodes(fn *mir.Function) {
+func PlacePhiNodes(fn *obxir.Function) {
 	// For each variable independently
 	for v, defs := range fn.SSAInfo.DefSites {
 		// Worklist initially contains all definition blocks
-		worklist := make([]*mir.Block, 0, len(defs))
-		inWork := make(map[*mir.Block]bool) // avoid duplicates in queue
+		worklist := make([]*obxir.Block, 0, len(defs))
+		inWork := make(map[*obxir.Block]bool) // avoid duplicates in queue
 		for b := range defs {
 			worklist = append(worklist, b)
 			inWork[b] = true
 		}
 
-		placed := make(map[*mir.Block]bool) // track where we've placed phi for v
+		placed := make(map[*obxir.Block]bool) // track where we've placed phi for v
 
 		for len(worklist) > 0 {
 			// pop last
@@ -43,7 +43,7 @@ func PlacePhiNodes(fn *mir.Function) {
 						continue
 					}
 
-					phi := &mir.PhiInst{Target: value, Args: make([]*mir.PHIArg, 0, len(y.Preds))}
+					phi := &obxir.PhiInst{Target: value, Args: make([]*obxir.PHIArg, 0, len(y.Preds))}
 					// Add all predecessors of y as arguments to the phi node
 					for _, pred := range y.Preds {
 						phi.AddArg(pred, value)
@@ -72,13 +72,13 @@ func PlacePhiNodes(fn *mir.Function) {
 	}
 }
 
-func RenamePhiNodes(fn *mir.Function) {
+func RenamePhiNodes(fn *obxir.Function) {
 	vst := make(map[int]bool)
 	rename(fn, fn.Entry, vst)
 
 }
 
-func rename(fn *mir.Function, block *mir.Block, vst map[int]bool) {
+func rename(fn *obxir.Function, block *obxir.Block, vst map[int]bool) {
 	if vst[block.ID] {
 		return
 	}
@@ -90,13 +90,13 @@ func rename(fn *mir.Function, block *mir.Block, vst map[int]bool) {
 	}
 
 	for _, ins := range block.Instrs {
-		if _, ok := ins.(*mir.PhiInst); ok {
+		if _, ok := ins.(*obxir.PhiInst); ok {
 			continue
 		}
 
 		// replace uses
 		uses := ins.Uses()
-		subst := map[string]mir.Value{}
+		subst := map[string]obxir.Value{}
 		for _, u := range uses {
 			subst[u.BaseName()] = fn.SSAInfo.NewValue(u)
 		}
@@ -114,7 +114,7 @@ func rename(fn *mir.Function, block *mir.Block, vst map[int]bool) {
 	for _, s := range block.Succs {
 		// for every phi in successor
 		for _, ins := range s.Instrs {
-			if p, ok := ins.(*mir.PhiInst); ok {
+			if p, ok := ins.(*obxir.PhiInst); ok {
 				for _, arg := range p.Args {
 					if arg.Block.ID == block.ID {
 						// arg.Block is the predecessor block

@@ -1,4 +1,4 @@
-package mir
+package obxir
 
 import (
 	"fmt"
@@ -20,7 +20,7 @@ func formatBlock(b *Block) string {
 // FormatFunction renders fn as a human-readable text IR string.
 func FormatFunction(fn *Function) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("func %s @%s(", fn.Result, fn.Name))
+	sb.WriteString(fmt.Sprintf("func %s @%s(", fn.Result, fn.Name()))
 	for i, p := range fn.Params {
 		sb.WriteString(fmt.Sprintf("%s %s", p.Type(), p.Name()))
 		if i < len(fn.Params)-1 {
@@ -66,8 +66,8 @@ func FormatProgram(p *Program) string {
 	return sb.String()
 }
 
-// EmitMIR writes the text IR of p to w.
-func EmitMIR(w io.Writer, p *Program) error {
+// EmitIR writes the text IR of p to w.
+func EmitIR(w io.Writer, p *Program) error {
 	_, err := w.Write([]byte(FormatProgram(p)))
 	return err
 }

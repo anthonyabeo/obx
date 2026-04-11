@@ -1,11 +1,11 @@
 package opt
 
-import "github.com/anthonyabeo/obx/src/ir/mir"
+import "github.com/anthonyabeo/obx/src/ir/obxir"
 
-func EliminateDeadBlocks(f *mir.Function) bool {
+func EliminateDeadBlocks(f *obxir.Function) bool {
 	changed := false
 	reachable := make(map[int]bool)
-	var worklist []*mir.Block
+	var worklist []*obxir.Block
 
 	// Start from entry block
 	entry := f.Entry
@@ -26,7 +26,7 @@ func EliminateDeadBlocks(f *mir.Function) bool {
 	}
 
 	// Filter only reachable blocks
-	newBlocks := make(map[int]*mir.Block)
+	newBlocks := make(map[int]*obxir.Block)
 	for id, b := range f.Blocks {
 		if reachable[id] {
 			// prune dead preds/succs
@@ -44,7 +44,7 @@ func EliminateDeadBlocks(f *mir.Function) bool {
 	return changed
 }
 
-func CombineBlocks(f *mir.Function) bool {
+func CombineBlocks(f *obxir.Function) bool {
 	changed := false
 	for _, bi := range f.Blocks {
 		// Must end with exactly 1 unconditional jump instruction
@@ -52,7 +52,7 @@ func CombineBlocks(f *mir.Function) bool {
 			continue
 		}
 		lastInstr := bi.Instrs[len(bi.Instrs)-1]
-		jmp, ok := lastInstr.(*mir.JumpInst)
+		jmp, ok := lastInstr.(*obxir.JumpInst)
 		if !ok {
 			continue
 		}
@@ -95,7 +95,7 @@ func CombineBlocks(f *mir.Function) bool {
 	return changed
 }
 
-func RemoveEmptyBlocks(f *mir.Function) bool {
+func RemoveEmptyBlocks(f *obxir.Function) bool {
 	changed := true
 	for changed {
 		changed = false
@@ -113,7 +113,7 @@ func RemoveEmptyBlocks(f *mir.Function) bool {
 			if len(bi.Instrs) != 1 {
 				continue
 			}
-			jmp, ok := bi.Instrs[0].(*mir.JumpInst)
+			jmp, ok := bi.Instrs[0].(*obxir.JumpInst)
 			if !ok {
 				continue
 			}
@@ -136,9 +136,9 @@ func RemoveEmptyBlocks(f *mir.Function) bool {
 
 				// update the branch/jump targets
 				switch term := pred.Term.(type) {
-				case *mir.JumpInst:
+				case *obxir.JumpInst:
 					term.Target = bj.Label
-				case *mir.CondBrInst:
+				case *obxir.CondBrInst:
 					if term.TrueLabel == bi.Label {
 						term.TrueLabel = bj.Label
 					}
@@ -150,7 +150,7 @@ func RemoveEmptyBlocks(f *mir.Function) bool {
 			}
 
 			// Remove Bi from Bj’s predecessor list
-			newPreds := make(map[int]*mir.Block)
+			newPreds := make(map[int]*obxir.Block)
 			for _, pred := range bj.Preds {
 				if pred != bi {
 					newPreds[pred.ID] = pred
@@ -169,7 +169,7 @@ func RemoveEmptyBlocks(f *mir.Function) bool {
 	return changed
 }
 
-func FoldRedundantBranches(f *mir.Function) bool {
+func FoldRedundantBranches(f *obxir.Function) bool {
 	changed := false
 	for _, b := range f.Blocks {
 		if len(b.Instrs) == 0 {
@@ -177,7 +177,7 @@ func FoldRedundantBranches(f *mir.Function) bool {
 		}
 
 		// Check if last instruction is a Branch
-		br, ok := b.Instrs[len(b.Instrs)-1].(*mir.CondBrInst)
+		br, ok := b.Instrs[len(b.Instrs)-1].(*obxir.CondBrInst)
 		if !ok {
 			continue
 		}
@@ -189,7 +189,7 @@ func FoldRedundantBranches(f *mir.Function) bool {
 
 		// Replace with a jump
 		target := br.TrueLabel
-		b.Instrs[len(b.Instrs)-1] = &mir.JumpInst{Target: target}
+		b.Instrs[len(b.Instrs)-1] = &obxir.JumpInst{Target: target}
 
 		tgtBlock := f.GetBlock(target)
 		if tgtBlock == nil {
@@ -197,11 +197,11 @@ func FoldRedundantBranches(f *mir.Function) bool {
 		}
 
 		// Adjust CFG edges
-		b.Succs = map[int]*mir.Block{tgtBlock.ID: tgtBlock}
+		b.Succs = map[int]*obxir.Block{tgtBlock.ID: tgtBlock}
 
 		// Remove duplicate predecessors in target
-		seen := make(map[*mir.Block]bool)
-		newPreds := make(map[int]*mir.Block)
+		seen := make(map[*obxir.Block]bool)
+		newPreds := make(map[int]*obxir.Block)
 		for _, pred := range tgtBlock.Preds {
 			if pred == b && seen[pred] {
 				continue
@@ -218,7 +218,7 @@ func FoldRedundantBranches(f *mir.Function) bool {
 	return changed
 }
 
-func HoistBranch(f *mir.Function) bool {
+func HoistBranch(f *obxir.Function) bool {
 	changed := false
 	for _, bi := range f.Blocks {
 		if len(bi.Instrs) == 0 {
@@ -226,7 +226,7 @@ func HoistBranch(f *mir.Function) bool {
 		}
 
 		// Last instruction must be a Jump
-		jmp, ok := bi.Instrs[len(bi.Instrs)-1].(*mir.JumpInst)
+		jmp, ok := bi.Instrs[len(bi.Instrs)-1].(*obxir.JumpInst)
 		if !ok {
 			continue
 		}
@@ -246,13 +246,13 @@ func HoistBranch(f *mir.Function) bool {
 		if len(bj.Instrs) != 1 {
 			continue
 		}
-		branch, ok := bj.Instrs[0].(*mir.CondBrInst)
+		branch, ok := bj.Instrs[0].(*obxir.CondBrInst)
 		if !ok {
 			continue
 		}
 
 		// Replace jump in Bi with a copy of the branch
-		bi.Instrs[len(bi.Instrs)-1] = &mir.CondBrInst{
+		bi.Instrs[len(bi.Instrs)-1] = &obxir.CondBrInst{
 			Cond:       branch.Cond,
 			TrueLabel:  branch.TrueLabel,
 			FalseLabel: branch.FalseLabel,
@@ -265,7 +265,7 @@ func HoistBranch(f *mir.Function) bool {
 			continue
 		}
 
-		bi.Succs = map[int]*mir.Block{
+		bi.Succs = map[int]*obxir.Block{
 			trueTarget.ID:  trueTarget,
 			falseTarget.ID: falseTarget,
 		}

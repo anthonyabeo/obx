@@ -1,79 +1,46 @@
-package mir
+package obxir
 
 import (
 	"github.com/anthonyabeo/obx/src/codegen/asm"
 )
 
-// Helpers for creating IntegerLit constants of various sizes
+// ─── Integer literal constructors ─────────────────────────────────────────
+
 func Int64Lit(val uint64) *IntegerLit {
-	return &IntegerLit{
-		LitValue: val,
-		Signed:   true,
-		Bits:     64,
-		Typ:      Int64Type,
-	}
+	return &IntegerLit{LitValue: val, Signed: true, Bits: 64, Typ: Int64Type}
 }
 
 func UInt64Lit(val uint64) *IntegerLit {
-	return &IntegerLit{
-		LitValue: val,
-		Signed:   false,
-		Bits:     64,
-		Typ:      UInt64Type,
-	}
+	return &IntegerLit{LitValue: val, Signed: false, Bits: 64, Typ: UInt64Type}
 }
 
 func Int8Lit(val uint64) *IntegerLit {
-	return &IntegerLit{
-		LitValue: val,
-		Signed:   true,
-		Bits:     8,
-		Typ:      Int8Type,
-	}
+	return &IntegerLit{LitValue: val, Signed: true, Bits: 8, Typ: Int8Type}
 }
 
 func UInt8Lit(val uint64) *IntegerLit {
-	return &IntegerLit{
-		LitValue: val,
-		Signed:   false,
-		Bits:     8,
-		Typ:      UInt8Type,
-	}
+	return &IntegerLit{LitValue: val, Signed: false, Bits: 8, Typ: UInt8Type}
 }
 
 func Int32Lit(val int64) *IntegerLit {
-	return &IntegerLit{
-		LitValue: uint64(val),
-		Signed:   true,
-		Bits:     32,
-		Typ:      Int32Type,
-	}
+	return &IntegerLit{LitValue: uint64(val), Signed: true, Bits: 32, Typ: Int32Type}
 }
 
 func UInt32Lit(val uint64) *IntegerLit {
-	return &IntegerLit{
-		LitValue: val,
-		Signed:   false,
-		Bits:     32,
-		Typ:      UInt32Type,
-	}
+	return &IntegerLit{LitValue: val, Signed: false, Bits: 32, Typ: UInt32Type}
 }
 
+// ─── Float literal constructors ───────────────────────────────────────────
+
 func Float64Lit(val float64) *FloatLit {
-	return &FloatLit{
-		LitValue: val,
-		Bits:     64,
-		Typ:      Float64Type,
-	}
+	return &FloatLit{LitValue: val, Bits: 64, Typ: Float64Type}
 }
 
 func Float32Lit(val float64) *FloatLit {
-	return &FloatLit{
-		LitValue: val,
-		Bits:     32,
-		Typ:      Float32Type,
-	}
+	return &FloatLit{LitValue: val, Bits: 32, Typ: Float32Type}
 }
+
+// ─── ToAsmType: maps obxir.Type → asm.Type ────────────────────────────────
 
 func ToAsmType(ty Type) asm.Type {
 	switch ty := ty.(type) {
@@ -89,7 +56,7 @@ func ToAsmType(ty Type) asm.Type {
 			case 8:
 				return &asm.BasicType{Kind: asm.I8, Width: ty.Width()}
 			default:
-				panic("unsupported integer size")
+				panic("unsupported signed integer size")
 			}
 		} else {
 			switch ty.Bits {
@@ -102,7 +69,7 @@ func ToAsmType(ty Type) asm.Type {
 			case 8:
 				return &asm.BasicType{Kind: asm.U8, Width: ty.Width()}
 			default:
-				panic("unsupported integer size")
+				panic("unsupported unsigned integer size")
 			}
 		}
 	case *FloatType:
@@ -134,6 +101,7 @@ func ToAsmType(ty Type) asm.Type {
 	case *Set:
 		return &asm.BasicType{Kind: asm.U32, Width: ty.Width()}
 	default:
-		panic("unsupported mir type to asm type conversion")
+		panic("unsupported obxir type to asm type conversion")
 	}
 }
+

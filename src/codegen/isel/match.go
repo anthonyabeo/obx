@@ -6,7 +6,7 @@ import (
 	"github.com/anthonyabeo/obx/src/codegen/asm"
 	"github.com/anthonyabeo/obx/src/codegen/bud"
 	"github.com/anthonyabeo/obx/src/codegen/bud/ast"
-	"github.com/anthonyabeo/obx/src/ir/mir"
+	"github.com/anthonyabeo/obx/src/ir/obxir"
 )
 
 type MatchResult struct {
@@ -261,7 +261,7 @@ func subst(operand ast.Operand, env map[string]*bud.Value) asm.Operand {
 				Name:      v.Symbol.Name,
 				Kind:      SymbolKind(v.Symbol.Kind),
 				Size:      v.Symbol.Size,
-				Ty:        mir.ToAsmType(v.Symbol.Ty),
+				Ty:        obxir.ToAsmType(v.Symbol.Ty),
 				ParamKind: paramKind,
 			}
 		}

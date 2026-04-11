@@ -3,11 +3,11 @@ package opt
 import (
 	"sort"
 
-	"github.com/anthonyabeo/obx/src/ir/mir"
+	"github.com/anthonyabeo/obx/src/ir/obxir"
 )
 
-func BuildCFG(fn *mir.Function) {
-	labelToBlock := map[string]*mir.Block{}
+func BuildCFG(fn *obxir.Function) {
+	labelToBlock := map[string]*obxir.Block{}
 	keys := make([]int, 0, len(fn.Blocks))
 
 	for id, blk := range fn.Blocks {
@@ -22,30 +22,30 @@ func BuildCFG(fn *mir.Function) {
 		blk := fn.Blocks[i]
 		if blk.Term != nil {
 			switch t := blk.Term.(type) {
-			case *mir.CondBrInst:
+			case *obxir.CondBrInst:
 				if b := labelToBlock[t.TrueLabel]; b != nil {
 					blk.Succs[b.ID] = b
 				}
 				if b := labelToBlock[t.FalseLabel]; b != nil {
 					blk.Succs[b.ID] = b
 				}
-			case *mir.JumpInst:
+			case *obxir.JumpInst:
 				if b := labelToBlock[t.Target]; b != nil {
 					blk.Succs[b.ID] = b
 				}
-			case *mir.ReturnInst:
+			case *obxir.ReturnInst:
 				blk.Succs[fn.Exit.ID] = fn.Exit
 
-				jmp := &mir.JumpInst{Target: fn.Exit.Label}
+				jmp := &obxir.JumpInst{Target: fn.Exit.Label}
 				blk.Instrs = append(blk.Instrs, jmp)
 				blk.Term = jmp // normalize return to jump to exit
-			case *mir.HaltInst:
+			case *obxir.HaltInst:
 				blk.Succs[fn.Exit.ID] = fn.Exit
-				
+
 			default:
 				// unknown terminator: assume fallthrough
 				if i+1 <= fn.Exit.ID {
-					jmp := &mir.JumpInst{Target: fn.Blocks[i+1].Label}
+					jmp := &obxir.JumpInst{Target: fn.Blocks[i+1].Label}
 					blk.Instrs = append(blk.Instrs, jmp)
 					blk.Term = jmp
 					blk.Succs[i+1] = fn.Blocks[i+1]
@@ -54,7 +54,7 @@ func BuildCFG(fn *mir.Function) {
 		} else {
 			// no explicit terminator: fallthrough
 			if i+1 <= fn.Exit.ID {
-				jmp := &mir.JumpInst{Target: fn.Blocks[i+1].Label}
+				jmp := &obxir.JumpInst{Target: fn.Blocks[i+1].Label}
 				blk.Instrs = append(blk.Instrs, jmp)
 				blk.Term = jmp
 				blk.Succs[i+1] = fn.Blocks[i+1]
@@ -72,7 +72,7 @@ func BuildCFG(fn *mir.Function) {
 	CleanCFG(fn)
 }
 
-func CleanCFG(f *mir.Function) {
+func CleanCFG(f *obxir.Function) {
 	changed := true
 	for changed {
 		changed = false
@@ -95,14 +95,14 @@ func CleanCFG(f *mir.Function) {
 	}
 }
 
-func ComputeDominators(fn *mir.Function) map[*mir.Block]map[*mir.Block]struct{} {
-	doms := make(map[*mir.Block]map[*mir.Block]struct{})
+func ComputeDominators(fn *obxir.Function) map[*obxir.Block]map[*obxir.Block]struct{} {
+	doms := make(map[*obxir.Block]map[*obxir.Block]struct{})
 
 	blocks := fn.Blocks
 
 	// Step 1: initialize
 	for _, b := range blocks {
-		doms[b] = make(map[*mir.Block]struct{})
+		doms[b] = make(map[*obxir.Block]struct{})
 		if b == fn.Entry {
 			doms[b][b] = struct{}{}
 		} else {
@@ -135,8 +135,8 @@ func ComputeDominators(fn *mir.Function) map[*mir.Block]map[*mir.Block]struct{} 
 	return doms
 }
 
-func ImmediateDominators(fn *mir.Function, doms map[*mir.Block]map[*mir.Block]struct{}) map[*mir.Block]*mir.Block {
-	idom := make(map[*mir.Block]*mir.Block)
+func ImmediateDominators(fn *obxir.Function, doms map[*obxir.Block]map[*obxir.Block]struct{}) map[*obxir.Block]*obxir.Block {
+	idom := make(map[*obxir.Block]*obxir.Block)
 	for _, b := range fn.Blocks {
 		if b == fn.Entry {
 			idom[b] = nil // Entry has no idom
@@ -144,7 +144,7 @@ func ImmediateDominators(fn *mir.Function, doms map[*mir.Block]map[*mir.Block]st
 		}
 
 		// candidates = dominators except b itself
-		candidates := make(map[*mir.Block]struct{})
+		candidates := make(map[*obxir.Block]struct{})
 		for d := range doms[b] {
 			if d != b {
 				candidates[d] = struct{}{}
@@ -152,7 +152,7 @@ func ImmediateDominators(fn *mir.Function, doms map[*mir.Block]map[*mir.Block]st
 		}
 
 		// pick the one that is not dominated by any other candidate
-		var immediate *mir.Block
+		var immediate *obxir.Block
 		for c := range candidates {
 			isImmediate := true
 			for other := range candidates {
@@ -175,8 +175,8 @@ func ImmediateDominators(fn *mir.Function, doms map[*mir.Block]map[*mir.Block]st
 	return idom
 }
 
-func DominatorTree(idom map[*mir.Block]*mir.Block) map[*mir.Block][]*mir.Block {
-	tree := make(map[*mir.Block][]*mir.Block)
+func DominatorTree(idom map[*obxir.Block]*obxir.Block) map[*obxir.Block][]*obxir.Block {
+	tree := make(map[*obxir.Block][]*obxir.Block)
 	for b, parent := range idom {
 		if parent != nil {
 			tree[parent] = append(tree[parent], b)
@@ -185,8 +185,8 @@ func DominatorTree(idom map[*mir.Block]*mir.Block) map[*mir.Block][]*mir.Block {
 	return tree
 }
 
-func ComputeDF(fn *mir.Function, idom map[*mir.Block]*mir.Block) map[*mir.Block][]*mir.Block {
-	df := make(map[*mir.Block][]*mir.Block)
+func ComputeDF(fn *obxir.Function, idom map[*obxir.Block]*obxir.Block) map[*obxir.Block][]*obxir.Block {
+	df := make(map[*obxir.Block][]*obxir.Block)
 
 	for _, b := range fn.Blocks {
 		if b.IsJoinBlock() {
@@ -205,16 +205,16 @@ func ComputeDF(fn *mir.Function, idom map[*mir.Block]*mir.Block) map[*mir.Block]
 	return df
 }
 
-func ComputeDefUse(fn *mir.Function) (map[string]map[*mir.Block]struct{},
-	map[string]map[*mir.Block]struct{}) {
-	defSites := make(map[string]map[*mir.Block]struct{})
-	useSites := make(map[string]map[*mir.Block]struct{})
+func ComputeDefUse(fn *obxir.Function) (map[string]map[*obxir.Block]struct{},
+	map[string]map[*obxir.Block]struct{}) {
+	defSites := make(map[string]map[*obxir.Block]struct{})
+	useSites := make(map[string]map[*obxir.Block]struct{})
 
 	for _, b := range fn.Blocks {
 		for _, instr := range b.Instrs {
 			if instr.Def() != nil {
 				if defSites[instr.Def().Name()] == nil {
-					defSites[instr.Def().Name()] = make(map[*mir.Block]struct{})
+					defSites[instr.Def().Name()] = make(map[*obxir.Block]struct{})
 				}
 				defSites[instr.Def().Name()][b] = struct{}{}
 			}
@@ -222,7 +222,7 @@ func ComputeDefUse(fn *mir.Function) (map[string]map[*mir.Block]struct{},
 			// record uses
 			for _, arg := range instr.Uses() {
 				if useSites[arg.Name()] == nil {
-					useSites[arg.Name()] = make(map[*mir.Block]struct{})
+					useSites[arg.Name()] = make(map[*obxir.Block]struct{})
 				}
 				useSites[arg.Name()][b] = struct{}{}
 			}
@@ -232,7 +232,7 @@ func ComputeDefUse(fn *mir.Function) (map[string]map[*mir.Block]struct{},
 	return defSites, useSites
 }
 
-func ComputeDom(fn *mir.Function) {
+func ComputeDom(fn *obxir.Function) {
 	dom := ComputeDominators(fn)
 	idom := ImmediateDominators(fn, dom)
 	tree := DominatorTree(idom)

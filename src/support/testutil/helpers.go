@@ -4,10 +4,10 @@ package testutil
 import (
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/ir/desugar"
-	"github.com/anthonyabeo/obx/src/ir/mir"
+	obxir2 "github.com/anthonyabeo/obx/src/ir/obxir"
 	"github.com/anthonyabeo/obx/src/sema"
+	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
@@ -15,7 +15,7 @@ import (
 // ParseSourceAndLowerToMIR parses ctx.Content, runs semantic analysis, lowers
 // through HIR and returns the resulting MIR program. It calls t.Fatal on any
 // parse or semantic error.
-func ParseSourceAndLowerToMIR(t *testing.T, ctx *diag.Context) *mir.Program {
+func ParseSourceAndLowerToMIR(t *testing.T, ctx *diag.Context) *obxir2.Program {
 	t.Helper()
 
 	p := parser.NewParser(ctx)
@@ -40,7 +40,6 @@ func ParseSourceAndLowerToMIR(t *testing.T, ctx *diag.Context) *mir.Program {
 	gen := desugar.NewGenerator(ctx, obx)
 	HIRProgram := gen.Generate()
 
-	builder := mir.NewIRBuilder(ctx)
+	builder := obxir2.NewIRBuilder(ctx)
 	return builder.Build(HIRProgram)
 }
-

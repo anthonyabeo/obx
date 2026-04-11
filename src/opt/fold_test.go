@@ -3,16 +3,16 @@ package opt
 import (
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/ir/mir"
+	"github.com/anthonyabeo/obx/src/ir/obxir"
 )
 
 func TestConstantFold(t *testing.T) {
 
-	entry := mir.NewBlock("entry")
-	tt := mir.NewBlock("tt")
-	f := mir.NewBlock("f")
-	j := mir.NewBlock("j")
-	exit := mir.NewBlock("exit")
+	entry := obxir.NewBlock("entry")
+	tt := obxir.NewBlock("tt")
+	f := obxir.NewBlock("f")
+	j := obxir.NewBlock("j")
+	exit := obxir.NewBlock("exit")
 
 	connect(entry, tt)
 	connect(entry, f)
@@ -20,33 +20,33 @@ func TestConstantFold(t *testing.T) {
 	connect(f, j)
 	connect(j, exit)
 
-	a0 := &mir.Temp{Ident: "a.0"}
-	c := &mir.IntegerLit{LitValue: 1}
-	x1 := &mir.Temp{Ident: "x.1"}
-	x2 := &mir.Temp{Ident: "x.2"}
-	y0 := &mir.Temp{Ident: "y.0"}
+	a0 := &obxir.Temp{Ident: "a.0"}
+	c := &obxir.IntegerLit{LitValue: 1}
+	x1 := &obxir.Temp{Ident: "x.1"}
+	x2 := &obxir.Temp{Ident: "x.2"}
+	y0 := &obxir.Temp{Ident: "y.0"}
 
-	entry.Instrs = []mir.Instr{
-		&mir.BinaryInst{Op: mir.ADD, Target: a0, Left: &mir.IntegerLit{LitValue: 2}, Right: &mir.IntegerLit{LitValue: 3}},
-		&mir.CondBrInst{Cond: c, TrueLabel: tt.Label, FalseLabel: f.Label},
+	entry.Instrs = []obxir.Instr{
+		&obxir.BinaryInst{Op: obxir.ADD, Target: a0, Left: &obxir.IntegerLit{LitValue: 2}, Right: &obxir.IntegerLit{LitValue: 3}},
+		&obxir.CondBrInst{Cond: c, TrueLabel: tt.Label, FalseLabel: f.Label},
 	}
-	tt.Instrs = []mir.Instr{
-		&mir.BinaryInst{Op: mir.ADD, Target: x1, Left: a0, Right: c},
-		&mir.JumpInst{Target: j.Label},
+	tt.Instrs = []obxir.Instr{
+		&obxir.BinaryInst{Op: obxir.ADD, Target: x1, Left: a0, Right: c},
+		&obxir.JumpInst{Target: j.Label},
 	}
-	f.Instrs = []mir.Instr{
-		&mir.BinaryInst{Op: mir.ADD, Target: x2, Left: a0, Right: &mir.IntegerLit{LitValue: 2}},
-		&mir.JumpInst{Target: j.Label},
+	f.Instrs = []obxir.Instr{
+		&obxir.BinaryInst{Op: obxir.ADD, Target: x2, Left: a0, Right: &obxir.IntegerLit{LitValue: 2}},
+		&obxir.JumpInst{Target: j.Label},
 	}
-	j.Instrs = []mir.Instr{
-		&mir.PhiInst{Target: y0, Args: []*mir.PHIArg{&mir.PHIArg{Value: x1, Block: tt}, &mir.PHIArg{Value: x2, Block: f}}},
-		&mir.JumpInst{Target: exit.Label},
+	j.Instrs = []obxir.Instr{
+		&obxir.PhiInst{Target: y0, Args: []*obxir.PHIArg{&obxir.PHIArg{Value: x1, Block: tt}, &obxir.PHIArg{Value: x2, Block: f}}},
+		&obxir.JumpInst{Target: exit.Label},
 	}
 
-	fn := &mir.Function{
+	fn := &obxir.Function{
 		FnName: "demo",
 		Entry:  entry,
-		Blocks: map[int]*mir.Block{entry.ID: entry, tt.ID: tt, f.ID: f, j.ID: j, exit.ID: exit},
+		Blocks: map[int]*obxir.Block{entry.ID: entry, tt.ID: tt, f.ID: f, j.ID: j, exit.ID: exit},
 	}
 
 	pm := NewPassManager()
@@ -56,7 +56,7 @@ func TestConstantFold(t *testing.T) {
 	pm.RunFixedPoint(fn, 10)
 }
 
-func connect(p, s *mir.Block) {
+func connect(p, s *obxir.Block) {
 	p.Succs[s.ID] = s
 	s.Preds[p.ID] = p
 }

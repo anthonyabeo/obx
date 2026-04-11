@@ -6,13 +6,13 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/ir/obxir"
+	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
-	"github.com/anthonyabeo/obx/src/ir/mir"
-	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/source"
-	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/support/testutil"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
 func TestBuildCFG(t *testing.T) {
@@ -394,43 +394,43 @@ end Main
 	}
 }
 
-func CFGAlpha() *mir.Function {
+func CFGAlpha() *obxir.Function {
 	// Create blocks
-	blk0 := &mir.Block{ID: 0, Label: "B0"}
-	blk1 := &mir.Block{ID: 1, Label: "B1"}
-	blk2 := &mir.Block{ID: 2, Label: "B2"}
-	blk3 := &mir.Block{ID: 3, Label: "B3"}
-	blk4 := &mir.Block{ID: 4, Label: "B4"}
-	blk5 := &mir.Block{ID: 5, Label: "B5"}
-	blk6 := &mir.Block{ID: 6, Label: "B6"}
-	blk7 := &mir.Block{ID: 7, Label: "B7"}
-	blk8 := &mir.Block{ID: 8, Label: "B8"}
+	blk0 := &obxir.Block{ID: 0, Label: "B0"}
+	blk1 := &obxir.Block{ID: 1, Label: "B1"}
+	blk2 := &obxir.Block{ID: 2, Label: "B2"}
+	blk3 := &obxir.Block{ID: 3, Label: "B3"}
+	blk4 := &obxir.Block{ID: 4, Label: "B4"}
+	blk5 := &obxir.Block{ID: 5, Label: "B5"}
+	blk6 := &obxir.Block{ID: 6, Label: "B6"}
+	blk7 := &obxir.Block{ID: 7, Label: "B7"}
+	blk8 := &obxir.Block{ID: 8, Label: "B8"}
 
 	// Connect successors
-	blk0.Succs = map[int]*mir.Block{blk1.ID: blk1}
-	blk1.Succs = map[int]*mir.Block{blk2.ID: blk2, blk5.ID: blk5}
-	blk2.Succs = map[int]*mir.Block{blk3.ID: blk3}
-	blk3.Succs = map[int]*mir.Block{blk4.ID: blk4, blk1.ID: blk1}
-	blk4.Succs = map[int]*mir.Block{}
-	blk5.Succs = map[int]*mir.Block{blk6.ID: blk6, blk8.ID: blk8}
-	blk6.Succs = map[int]*mir.Block{blk7.ID: blk7}
-	blk7.Succs = map[int]*mir.Block{blk3.ID: blk3}
-	blk8.Succs = map[int]*mir.Block{blk7.ID: blk7}
+	blk0.Succs = map[int]*obxir.Block{blk1.ID: blk1}
+	blk1.Succs = map[int]*obxir.Block{blk2.ID: blk2, blk5.ID: blk5}
+	blk2.Succs = map[int]*obxir.Block{blk3.ID: blk3}
+	blk3.Succs = map[int]*obxir.Block{blk4.ID: blk4, blk1.ID: blk1}
+	blk4.Succs = map[int]*obxir.Block{}
+	blk5.Succs = map[int]*obxir.Block{blk6.ID: blk6, blk8.ID: blk8}
+	blk6.Succs = map[int]*obxir.Block{blk7.ID: blk7}
+	blk7.Succs = map[int]*obxir.Block{blk3.ID: blk3}
+	blk8.Succs = map[int]*obxir.Block{blk7.ID: blk7}
 
 	// Connect predecessors
-	blk0.Preds = map[int]*mir.Block{}
-	blk1.Preds = map[int]*mir.Block{blk0.ID: blk0, blk3.ID: blk3}
-	blk2.Preds = map[int]*mir.Block{blk1.ID: blk1}
-	blk3.Preds = map[int]*mir.Block{blk2.ID: blk2, blk7.ID: blk7}
-	blk4.Preds = map[int]*mir.Block{blk3.ID: blk3}
-	blk5.Preds = map[int]*mir.Block{blk1.ID: blk1}
-	blk6.Preds = map[int]*mir.Block{blk5.ID: blk5}
-	blk7.Preds = map[int]*mir.Block{blk6.ID: blk6, blk8.ID: blk8}
-	blk8.Preds = map[int]*mir.Block{blk5.ID: blk5}
+	blk0.Preds = map[int]*obxir.Block{}
+	blk1.Preds = map[int]*obxir.Block{blk0.ID: blk0, blk3.ID: blk3}
+	blk2.Preds = map[int]*obxir.Block{blk1.ID: blk1}
+	blk3.Preds = map[int]*obxir.Block{blk2.ID: blk2, blk7.ID: blk7}
+	blk4.Preds = map[int]*obxir.Block{blk3.ID: blk3}
+	blk5.Preds = map[int]*obxir.Block{blk1.ID: blk1}
+	blk6.Preds = map[int]*obxir.Block{blk5.ID: blk5}
+	blk7.Preds = map[int]*obxir.Block{blk6.ID: blk6, blk8.ID: blk8}
+	blk8.Preds = map[int]*obxir.Block{blk5.ID: blk5}
 
-	fn := &mir.Function{
+	fn := &obxir.Function{
 		FnName: "Bar",
-		Blocks: map[int]*mir.Block{
+		Blocks: map[int]*obxir.Block{
 			blk0.ID: blk0,
 			blk1.ID: blk1,
 			blk2.ID: blk2,
@@ -442,40 +442,40 @@ func CFGAlpha() *mir.Function {
 			blk8.ID: blk8,
 		},
 		Entry: blk0,
-		Dom:   mir.NewDominatorTree(),
+		Dom:   obxir.NewDominatorTree(),
 	}
 
 	return fn
 }
 
-func CFGBravo() *mir.Function {
+func CFGBravo() *obxir.Function {
 	// Create blocks
-	entry := &mir.Block{ID: 1, Label: "Entry"}
-	b1 := &mir.Block{ID: 2, Label: "B1"}
-	b2 := &mir.Block{ID: 3, Label: "B2"}
-	b3 := &mir.Block{ID: 4, Label: "B3"}
-	exit := &mir.Block{ID: 5, Label: "Exit"}
+	entry := &obxir.Block{ID: 1, Label: "Entry"}
+	b1 := &obxir.Block{ID: 2, Label: "B1"}
+	b2 := &obxir.Block{ID: 3, Label: "B2"}
+	b3 := &obxir.Block{ID: 4, Label: "B3"}
+	exit := &obxir.Block{ID: 5, Label: "Exit"}
 
 	// Connect successors
-	entry.Succs = map[int]*mir.Block{b1.ID: b1}
-	b1.Succs = map[int]*mir.Block{b2.ID: b2, b3.ID: b3}
-	b2.Succs = map[int]*mir.Block{exit.ID: exit}
-	b3.Succs = map[int]*mir.Block{b2.ID: b2}
+	entry.Succs = map[int]*obxir.Block{b1.ID: b1}
+	b1.Succs = map[int]*obxir.Block{b2.ID: b2, b3.ID: b3}
+	b2.Succs = map[int]*obxir.Block{exit.ID: exit}
+	b3.Succs = map[int]*obxir.Block{b2.ID: b2}
 
 	// Connect predecessors
-	b1.Preds = map[int]*mir.Block{entry.ID: entry}
-	b2.Preds = map[int]*mir.Block{b1.ID: b1, b3.ID: b3}
-	b3.Preds = map[int]*mir.Block{b1.ID: b1}
-	exit.Preds = map[int]*mir.Block{b2.ID: b2}
+	b1.Preds = map[int]*obxir.Block{entry.ID: entry}
+	b2.Preds = map[int]*obxir.Block{b1.ID: b1, b3.ID: b3}
+	b3.Preds = map[int]*obxir.Block{b1.ID: b1}
+	exit.Preds = map[int]*obxir.Block{b2.ID: b2}
 
-	blocks := make(map[int]*mir.Block)
+	blocks := make(map[int]*obxir.Block)
 	blocks[entry.ID] = entry
 	blocks[b1.ID] = b1
 	blocks[b2.ID] = b2
 	blocks[b3.ID] = b3
 	blocks[exit.ID] = exit
 
-	fn := &mir.Function{
+	fn := &obxir.Function{
 		FnName: "Foo",
 		Blocks: blocks,
 		Entry:  entry,
@@ -487,7 +487,7 @@ func CFGBravo() *mir.Function {
 func TestComputeDominators(t *testing.T) {
 	tests := []struct {
 		name string
-		fxn  *mir.Function
+		fxn  *obxir.Function
 	}{
 		{
 			name: "eac-9.2.1",
@@ -514,7 +514,7 @@ func TestComputeDominators(t *testing.T) {
 func TestImmediateDominators(t *testing.T) {
 	tests := []struct {
 		name string
-		fxn  *mir.Function
+		fxn  *obxir.Function
 	}{
 		{
 			name: "eac-9.2.1",
@@ -537,32 +537,32 @@ func TestImmediateDominators(t *testing.T) {
 
 func TestDominatorTree(t *testing.T) {
 	// Create blocks
-	entry := &mir.Block{ID: 1, Label: "Entry"}
-	b1 := &mir.Block{ID: 2, Label: "B1"}
-	b2 := &mir.Block{ID: 3, Label: "B2"}
-	b3 := &mir.Block{ID: 4, Label: "B3"}
-	exit := &mir.Block{ID: 5, Label: "Exit"}
+	entry := &obxir.Block{ID: 1, Label: "Entry"}
+	b1 := &obxir.Block{ID: 2, Label: "B1"}
+	b2 := &obxir.Block{ID: 3, Label: "B2"}
+	b3 := &obxir.Block{ID: 4, Label: "B3"}
+	exit := &obxir.Block{ID: 5, Label: "Exit"}
 
 	// Connect successors
-	entry.Succs = map[int]*mir.Block{b1.ID: b1}
-	b1.Succs = map[int]*mir.Block{b2.ID: b2, b3.ID: b3}
-	b2.Succs = map[int]*mir.Block{exit.ID: exit}
-	b3.Succs = map[int]*mir.Block{b2.ID: b2}
+	entry.Succs = map[int]*obxir.Block{b1.ID: b1}
+	b1.Succs = map[int]*obxir.Block{b2.ID: b2, b3.ID: b3}
+	b2.Succs = map[int]*obxir.Block{exit.ID: exit}
+	b3.Succs = map[int]*obxir.Block{b2.ID: b2}
 
 	// Connect predecessors
-	b1.Preds = map[int]*mir.Block{entry.ID: entry}
-	b2.Preds = map[int]*mir.Block{b1.ID: b1, b3.ID: b3}
-	b3.Preds = map[int]*mir.Block{b1.ID: b1}
-	exit.Preds = map[int]*mir.Block{b2.ID: b2}
+	b1.Preds = map[int]*obxir.Block{entry.ID: entry}
+	b2.Preds = map[int]*obxir.Block{b1.ID: b1, b3.ID: b3}
+	b3.Preds = map[int]*obxir.Block{b1.ID: b1}
+	exit.Preds = map[int]*obxir.Block{b2.ID: b2}
 
-	blocks := make(map[int]*mir.Block)
+	blocks := make(map[int]*obxir.Block)
 	blocks[entry.ID] = entry
 	blocks[b1.ID] = b1
 	blocks[b2.ID] = b2
 	blocks[b3.ID] = b3
 	blocks[exit.ID] = exit
 
-	fn := &mir.Function{
+	fn := &obxir.Function{
 		FnName: "Foo",
 		Blocks: blocks,
 		Entry:  entry,
@@ -578,7 +578,7 @@ func TestDominatorTree(t *testing.T) {
 func TestComputeDF(t *testing.T) {
 	tests := []struct {
 		name string
-		fxn  *mir.Function
+		fxn  *obxir.Function
 	}{
 		{
 			name: "eac-9.2.1",
