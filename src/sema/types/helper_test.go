@@ -56,7 +56,7 @@ func TestSameType_OpenArray(t *testing.T) {
 	if SameType(openArr, fixedArr) {
 		t.Errorf("expected open array and fixed array to differ")
 	}
-	if SameType(openArr, openArr2) {
+	if !SameType(openArr, openArr2) {
 		t.Errorf("expected open arrays with same element type to be same")
 	}
 }
@@ -139,8 +139,8 @@ func TestEqualType_Procedure(t *testing.T) {
 		{"same procedure type", proc1, proc2, true},
 		{"different param kind", proc1, proc3, false},
 		{"same function type", func1, func2, true},
-		{"different return type", func1, func3, true},
-		{"procedure vs function", proc1, func1, true},
+		{"different return type", func1, func3, false},
+		{"procedure vs function", proc1, func1, false},
 	}
 
 	for _, test := range tests {
@@ -187,10 +187,17 @@ func TestTypeIncludes(t *testing.T) {
 		// LONGREAL hierarchy
 		{LongRealType, RealType, true},
 		{LongRealType, Int32Type, true},
+		{LongRealType, IntegerType, true}, // INTEGER ≡ INT32
 		{LongRealType, Int16Type, true},
+		{LongRealType, ShortIntType, true}, // SHORTINT ≡ INT16
+		{LongRealType, Int8Type, true},
+		{LongRealType, ByteType, true},
 
 		// REAL hierarchy
 		{RealType, Int16Type, true},
+		{RealType, ShortIntType, true}, // SHORTINT ≡ INT16
+		{RealType, Int8Type, true},
+		{RealType, ByteType, true},
 		{RealType, Int32Type, false},
 
 		// LONGINT hierarchy
@@ -802,11 +809,25 @@ func TestExpressionCompatible(t *testing.T) {
 		// IS operator (type test)
 		{token.IS, ptrFoo, ptrFoo, true, BooleanType},
 
+		// IS operator on record types (VAR-param case)
+		{token.IS, &RecordType{}, &RecordType{}, true, BooleanType},
+
+		// BOOLEAN: only = and # are valid, ordering is not
+		{token.EQUAL, BooleanType, BooleanType, true, BooleanType},
+		{token.NEQ, BooleanType, BooleanType, true, BooleanType},
+		{token.LESS, BooleanType, BooleanType, false, nil},
+		{token.GEQ, BooleanType, BooleanType, false, nil},
+
+		// WCHAR array comparison
+		{token.EQUAL, strWchar, strWchar, true, BooleanType},
+
 		// Incompatible types
 		{token.PLUS, Int32Type, BooleanType, false, nil},
 		{token.STAR, BooleanType, BooleanType, false, nil},
 		{token.QUOT, SetType, Int32Type, false, nil},
 		{token.DIV, RealType, Int32Type, false, nil},
+		// QUOT on pure integers must also fail (DIV should be used instead)
+		{token.QUOT, Int32Type, Int32Type, false, nil},
 		{token.EQUAL, strChar, strWchar, false, nil}, // unless BMP-terminator logic is handled
 	}
 

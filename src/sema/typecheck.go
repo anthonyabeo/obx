@@ -153,7 +153,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 
 				for _, expr := range s.List {
 					expr.Accept(t)
-					if !types.SameType(expr.Type(), types.Int32Type) {
+					if !types.IsInteger(expr.Type()) {
 						t.ctx.Reporter.Report(diag.Diagnostic{
 							Severity: diag.Error,
 							Message:  fmt.Sprintf("array index '%s' does not resolve to an integer", expr),

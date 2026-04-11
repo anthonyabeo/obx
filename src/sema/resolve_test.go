@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
-	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
@@ -33,12 +33,12 @@ END Test.
 func TestNameResolution_BasicProcedure(t *testing.T) {
 	sm := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName:  "Test.obx",
-		FilePath:  "Test.obx",
-		Content:   []byte(testSource),
-		Source:    sm,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
+		FileName: "Test.obx",
+		FilePath: "Test.obx",
+		Content:  []byte(testSource),
+		Source:   sm,
+		Env:      ast.NewEnv(),
+		Reporter: diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
 	}
 
 	// Parse the file
@@ -138,9 +138,9 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
 	ctx := &diag.Context{
-		Source:    srcMgr,
-		Reporter:  reporter,
-		Env:       ast.NewEnv(),
+		Source:   srcMgr,
+		Reporter: reporter,
+		Env:      ast.NewEnv(),
 	}
 
 	for _, header := range sorted {
@@ -198,12 +198,12 @@ func TestNameResolutionUndefined(t *testing.T) {
 
 	sm := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName:  "Test.obx",
-		FilePath:  "Test.obx",
-		Content:   []byte(src),
-		Source:    sm,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
+		FileName: "Test.obx",
+		FilePath: "Test.obx",
+		Content:  []byte(src),
+		Source:   sm,
+		Env:      ast.NewEnv(),
+		Reporter: diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
 	}
 
 	// Parse the file
@@ -242,12 +242,12 @@ func TestNameResolution_Basic(t *testing.T) {
 
 	sm := source.NewSourceManager()
 	ctx := &diag.Context{
-		FileName:  "Test.obx",
-		FilePath:  "Test.obx",
-		Content:   []byte(src),
-		Source:    sm,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
+		FileName: "Test.obx",
+		FilePath: "Test.obx",
+		Content:  []byte(src),
+		Source:   sm,
+		Env:      ast.NewEnv(),
+		Reporter: diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
 	}
 
 	// Parse the file
@@ -269,3 +269,113 @@ func TestNameResolution_Basic(t *testing.T) {
 	}
 }
 
+func TestNameResolution_TypeBoundProcedure(t *testing.T) {
+	src := `
+		MODULE Main;
+		TYPE
+			Animal* = RECORD
+				name: ARRAY 32 OF CHAR
+			END;
+
+			Dog* = RECORD (Animal)
+				breed: ARRAY 32 OF CHAR
+			END;
+
+		VAR
+			d: Dog;
+
+		PROCEDURE (VAR self: Animal) Speak*;
+		END Speak;
+
+		PROCEDURE (VAR 	self: Dog) Fetch*;
+		END Fetch;
+
+		BEGIN
+			d.Speak();
+			d.Fetch()
+		END Main.
+	`
+
+	sm := source.NewSourceManager()
+	ctx := &diag.Context{
+		FileName: "Main.obx",
+		FilePath: "Main.obx",
+		Content:  []byte(src),
+		Source:   sm,
+		Env:      ast.NewEnv(),
+		Reporter: diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
+	}
+
+	p := parser.NewParser(ctx)
+	unit := p.Parse()
+	if ctx.Reporter.ErrorCount() > 0 {
+		ctx.Reporter.Flush()
+		t.Fatalf("parse errors: %d", ctx.Reporter.ErrorCount())
+	}
+
+	ctx.Env.SetCurrentScope(ctx.Env.ModuleScope(unit.Name()))
+	resolve := NewNameResolver(ctx)
+	resolve.Resolve(unit)
+
+	if diags := ctx.Reporter.Diagnostics(); len(diags) > 0 {
+		ctx.Reporter.Flush()
+		t.Fatalf("unexpected resolution errors: %d", len(diags))
+	}
+
+	module := unit.(*ast.Module)
+	env := ctx.Env.ModuleScope(module.BName)
+	if env == nil {
+		t.Fatal("module environment is nil")
+	}
+
+	// Verify type symbols are resolved and mangled correctly
+	checkSymbol := func(name, expectedMangled string) {
+		sym := env.Lookup(name)
+		if sym == nil {
+			t.Errorf("symbol %q not resolved", name)
+			return
+		}
+		if actual := sym.MangledName(); actual != expectedMangled {
+			t.Errorf("symbol %q: expected mangled name %q, got %q", name, expectedMangled, actual)
+		}
+	}
+
+	checkSymbol("Animal", "Main$Animal")
+	checkSymbol("Dog", "Main$Dog")
+	checkSymbol("d", "Main$d")
+
+	// Verify type-bound procedures are resolved within their receiver record's env
+	animalSym := env.Lookup("Animal")
+	if animalSym == nil {
+		t.Fatal("Animal symbol not found")
+	}
+	animalRec, ok := animalSym.AstType().(*ast.RecordType)
+	if !ok {
+		t.Fatal("Animal is not a RecordType")
+	}
+
+	speakSym := animalRec.Env.LookupMethod("Speak")
+	if speakSym == nil {
+		t.Error("method 'Speak' not found in Animal's record env")
+	} else if speakSym.MangledName() != "Main$Animal$Speak" {
+		t.Errorf("Speak: expected mangled name 'Main$Animal$Speak', got %q", speakSym.MangledName())
+	}
+
+	dogSym := env.Lookup("Dog")
+	if dogSym == nil {
+		t.Fatal("Dog symbol not found")
+	}
+	dogRec, ok := dogSym.AstType().(*ast.RecordType)
+	if !ok {
+		t.Fatal("Dog is not a RecordType")
+	}
+
+	fetchSym := dogRec.Env.LookupMethod("Fetch")
+	if fetchSym == nil {
+		t.Error("method 'Fetch' not found in Dog's record env")
+	} else if fetchSym.MangledName() != "Main$Dog$Fetch" {
+		t.Errorf("Fetch: expected mangled name 'Main$Dog$Fetch', got %q", fetchSym.MangledName())
+	}
+}
+
+//

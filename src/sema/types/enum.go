@@ -41,6 +41,22 @@ func (e EnumType) Width() int {
 func (e EnumType) Alignment() int { return 4 }
 
 func (e EnumType) Equals(t Type) bool {
-	//TODO implement me
-	panic("implement me")
+	var other *EnumType
+	switch ot := t.(type) {
+	case *EnumType:
+		other = ot
+	case EnumType:
+		other = &ot
+	default:
+		return false
+	}
+	if len(e.Variants) != len(other.Variants) {
+		return false
+	}
+	for name, ord := range e.Variants {
+		if otherOrd, exists := other.Variants[name]; !exists || ord != otherOrd {
+			return false
+		}
+	}
+	return true
 }

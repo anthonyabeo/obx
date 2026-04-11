@@ -112,6 +112,16 @@ func UnderlyingBasic(t Type) *BasicType {
 	}
 }
 
+// sameAliasKind reports whether two BasicKinds are canonical aliases for the
+// same Oberon type: INTEGER ≡ INT32, SHORTINT ≡ INT16, LONGINT ≡ INT64.
+// Aliases share the same rank in integerTypeRank; types absent from that map
+// (e.g. CHAR, WCHAR) can never be aliases of each other.
+func sameAliasKind(a, b BasicKind) bool {
+	ra, okA := integerTypeRank[a]
+	rb, okB := integerTypeRank[b]
+	return okA && okB && ra == rb
+}
+
 func IsBoolean(ty Type) bool {
 	return ty == BooleanType
 }
@@ -254,6 +264,16 @@ func IsLatin1CharArrayOrString(t Type) bool {
 	return ok
 }
 
+// IsWCharArrayOrString reports whether t is an ARRAY OF WCHAR.
+// String literals (StringType) are treated as Latin-1 (CHAR) only, so they
+// are deliberately excluded here.
+func IsWCharArrayOrString(t Type) bool {
+	if a, ok := t.(*ArrayType); ok {
+		return a.Elem == WCharType
+	}
+	return false
+}
+
 func IsLatin1OrByteString(t Type) bool {
 	arr, ok := t.(*ArrayType)
 	return ok && (arr.Elem == CharType || arr.Elem == ByteType)
@@ -313,8 +333,6 @@ func IsOrdinal(t Type) bool {
 		return IsInteger(t) || IsChar(t)
 	case *EnumType:
 		return true
-	case *NamedType:
-		return IsOrdinal(t.Def)
 	case *PointerType:
 		return false // Pointers are not ordinal types
 	case *ArrayType:

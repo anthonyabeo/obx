@@ -42,21 +42,58 @@ func (r *RecordType) Alignment() int {
 	return maxAlign
 }
 
+// Width returns the byte size of this record type including alignment padding
+// between fields and a final size-rounding pad to a multiple of the record's
+// own alignment.  Returns -1 if any component has an unknown width.
 func (r *RecordType) Width() int {
-	width := 0
-	for _, f := range r.Fields {
-		width += f.Type.Width()
-	}
+	offset := 0
+
+	// Start after the base record's padded size.
 	if r.Base != nil {
-		width += r.Base.Width()
+		bw := r.Base.Width()
+		if bw < 0 {
+			return -1
+		}
+		offset = bw
+		// Pad so that the first own field starts at a properly-aligned offset.
+		if ba := r.Base.Alignment(); ba > 0 {
+			offset = (offset + ba - 1) / ba * ba
+		}
 	}
-	return width
+
+	for _, f := range r.Fields {
+		fw := f.Type.Width()
+		if fw < 0 {
+			return -1
+		}
+		// Align field to its own alignment requirement.
+		if fa := f.Type.Alignment(); fa > 0 {
+			offset = (offset + fa - 1) / fa * fa
+		}
+		offset += fw
+	}
+
+	// Pad the total to a multiple of the record's alignment so that arrays
+	// of this record type lay out correctly.
+	if a := r.Alignment(); a > 0 {
+		offset = (offset + a - 1) / a * a
+	}
+	return offset
 }
 
 func (r *RecordType) Equals(other Type) bool {
 	o, ok := other.(*RecordType)
 	if !ok || len(r.Fields) != len(o.Fields) {
 		return false
+	}
+	// Base records must also match.
+	if r.Base != o.Base {
+		if r.Base == nil || o.Base == nil {
+			return false
+		}
+		if !r.Base.Equals(o.Base) {
+			return false
+		}
 	}
 	for i := range r.Fields {
 		if r.Fields[i].Name != o.Fields[i].Name || !r.Fields[i].Type.Equals(o.Fields[i].Type) {

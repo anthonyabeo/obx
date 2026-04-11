@@ -78,5 +78,7 @@ var basicKindToString = map[BasicKind]string{
 	CHAR:     "char",
 	WCHAR:    "wchar",
 	SET:      "set",
+	NIL:      "NIL",
+	VOID:     "VOID",
 	UNKNOWN:  "unknown",
 }

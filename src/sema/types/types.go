@@ -26,9 +26,12 @@ func TypeIncludes(a, b Type) bool {
 	case Int16Type, ShortIntType:
 		return b == Int8Type || b == ByteType || b == Int16Type || b == ShortIntType
 	case LongRealType:
-		return b == RealType || b == Int32Type || b == Int16Type || b == Int8Type || b == ByteType
+		// LONGREAL (64-bit double, 53-bit mantissa) can exactly represent INT32 and smaller.
+		return b == RealType || b == Int32Type || b == IntegerType || b == Int16Type ||
+			b == ShortIntType || b == Int8Type || b == ByteType
 	case RealType:
-		return b == Int16Type
+		// REAL (32-bit float, 24-bit mantissa) can exactly represent INT16 and smaller.
+		return b == Int16Type || b == ShortIntType || b == Int8Type || b == ByteType
 	case WCharType:
 		return b == CharType
 	case CharType:
@@ -88,7 +91,7 @@ func EqualType(Ta, Tb Type) bool {
 		if !ok {
 			return false
 		}
-		return FormalParamsListMatch(at.Params, bt.Params)
+		return FormalParamsListMatch(at.Params, bt.Params) && ResultTypeMatch(at.Result, bt.Result)
 	default:
 
 	}
@@ -114,6 +117,10 @@ func FormalParamsListMatch(Pa, Pb []*FormalParam) bool {
 }
 
 func ResultTypeMatch(Ta, Tb Type) bool {
+	// Both procedures are commands (no return value) — they match.
+	if Ta == nil && Tb == nil {
+		return true
+	}
 	return SameType(Ta, Tb)
 }
 
@@ -239,7 +246,7 @@ func ParameterCompatible(actual Type, formal *FormalParam) bool {
 		// 2. Value parameters can accept assignment-compatible expressions
 		return AssignmentCompatible(ta, tf)
 
-	case "VAR", "IN":
+	case "VAR", "IN", "OUT":
 		// 3. Must be the same type
 		if SameType(ta, tf) {
 			return true
@@ -291,13 +298,20 @@ func ArrayCompatible(actual, formal Type) bool {
 }
 
 func ExpressionCompatible(op token.Kind, lhs, rhs Type) (bool, Type) {
+	// Unwrap named types before any checks so aliases behave identically to
+	// their underlying basic types throughout this function.
+	lhs = Underlying(lhs)
+	rhs = Underlying(rhs)
+
 	switch op {
 	case token.PLUS, token.MINUS, token.STAR, token.QUOT:
 		if IsNumeric(lhs) && IsNumeric(rhs) && op != token.QUOT {
 			return true, SmallestNumericType(lhs, rhs)
 		}
 
-		if IsNumeric(lhs) && IsNumeric(rhs) && op == token.QUOT {
+		// QUOT (/) is only defined for REAL operands (and SET, handled below).
+		// Using DIV for integer division is required by the spec.
+		if IsReal(lhs) && IsReal(rhs) && op == token.QUOT {
 			return true, SmallestRealType(lhs, rhs)
 		}
 
@@ -321,8 +335,12 @@ func ExpressionCompatible(op token.Kind, lhs, rhs Type) (bool, Type) {
 			return true, BooleanType
 		}
 
+		// BOOLEAN may only be compared for equality/inequality, not ordered.
 		if IsBoolean(lhs) && IsBoolean(rhs) {
-			return true, BooleanType
+			if op == token.EQUAL || op == token.NEQ {
+				return true, BooleanType
+			}
+			return false, nil
 		}
 
 		if IsSet(lhs) && IsSet(rhs) {
@@ -350,8 +368,13 @@ func ExpressionCompatible(op token.Kind, lhs, rhs Type) (bool, Type) {
 			return true, BooleanType
 		}
 
-		// extra for strings, arrays
+		// Latin-1 (CHAR) arrays and string literals
 		if IsLatin1CharArrayOrString(lhs) && IsLatin1CharArrayOrString(rhs) {
+			return true, BooleanType
+		}
+
+		// WCHAR arrays
+		if IsWCharArrayOrString(lhs) && IsWCharArrayOrString(rhs) {
 			return true, BooleanType
 		}
 	case token.IN:
@@ -359,8 +382,12 @@ func ExpressionCompatible(op token.Kind, lhs, rhs Type) (bool, Type) {
 			return true, BooleanType
 		}
 	case token.IS:
-		// lhs: dynamic type (e.g. pointer or record), rhs: static type T1
+		// lhs: variable (pointer to record or VAR-param record), rhs: type name
 		if IsPointer(lhs) && IsPointer(rhs) {
+			return true, BooleanType
+		}
+		// VAR parameter of record type: v IS T
+		if IsRecord(lhs) && IsRecord(rhs) {
 			return true, BooleanType
 		}
 	}
@@ -389,19 +416,31 @@ func Identical(a, b Type) bool {
 	switch a := a.(type) {
 	case *BasicType:
 		bb, ok := b.(*BasicType)
-		return ok && TypeIncludes(a, bb) || TypeIncludes(bb, a)
+		// Two basic types are identical iff they have the same kind, or are
+		// recognized Oberon type aliases (INTEGER≡INT32, SHORTINT≡INT16,
+		// LONGINT≡INT64).  TypeIncludes must NOT be used here because it
+		// expresses subsumption (e.g. WCHAR includes CHAR), not identity.
+		return ok && (a.Kind == bb.Kind || sameAliasKind(a.Kind, bb.Kind))
 	case *ArrayType:
 		ab, ok := b.(*ArrayType)
-		return ok && !a.IsOpen() && !ab.IsOpen() && a.Length == ab.Length && Identical(a.Elem, ab.Elem)
+		if !ok {
+			return false
+		}
+		// Two open arrays are identical iff their element types are identical.
+		if a.IsOpen() && ab.IsOpen() {
+			return Identical(a.Elem, ab.Elem)
+		}
+		// Two fixed arrays are identical iff same length and element type.
+		return !a.IsOpen() && !ab.IsOpen() && a.Length == ab.Length && Identical(a.Elem, ab.Elem)
 	case *PointerType:
 		pb, ok := b.(*PointerType)
 		return ok && Identical(a.Base, pb.Base)
 	case *StringType:
 		str, ok := b.(*StringType)
-		if ok && str.Length == 1 {
-			return true
+		if ok {
+			return a.Length == str.Length
 		}
-
+		// A length-1 string literal is identical to CHAR or WCHAR.
 		return a.Length == 1 && (b == CharType || b == WCharType)
 	// Add more composite types as needed
 	default:
