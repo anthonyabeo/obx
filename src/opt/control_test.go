@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/support/adt"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/ir/mir"
@@ -358,8 +357,6 @@ end Main
 				Env:                   ast.NewEnv(),
 				Source:                mgr,
 				Reporter:              diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-				Names:                 adt.NewStack[string](),
-				ExprLists:             adt.NewStack[[]ast.Expression](),
 				TargetMachineWordSize: 8,
 			}
 

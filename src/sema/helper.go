@@ -3,8 +3,8 @@ package sema
 import (
 	"fmt"
 
-	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
 func (f *FlowChecker) newLoopLabel(loopKind string) string {
@@ -93,7 +93,16 @@ func (n *NamesResolver) underlying(ty ast.Type) ast.Type {
 	for {
 		switch t := ty.(type) {
 		case *ast.NamedType:
-			sym := n.ctx.Env.Lookup(t.Name.Name)
+			var sym ast.Symbol
+			if t.Name.Prefix != "" {
+				scope := n.ctx.Env.ModuleScope(t.Name.Prefix)
+				if scope == nil {
+					return nil
+				}
+				sym = scope.Lookup(t.Name.Name)
+			} else {
+				sym = n.ctx.Env.Lookup(t.Name.Name)
+			}
 			if sym == nil {
 				return nil
 			}

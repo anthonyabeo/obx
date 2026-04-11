@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/support/adt"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
@@ -41,8 +40,6 @@ end Main`)
 		Content:   input,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	p := NewParser(ctx)
@@ -91,8 +88,6 @@ end Main
 		Content:   input,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -144,8 +139,6 @@ end Main
 		Content:   input,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -205,8 +198,6 @@ end Main
 		Content:   input,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -283,8 +274,6 @@ end Main
 		Content:   input,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -357,8 +346,6 @@ end Main
 		Content:   input,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -430,8 +417,6 @@ end Drawing
 		Content:   input,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -547,8 +532,6 @@ end Drawing
 		Content:   input,
 		Env:       envs,
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -646,8 +629,6 @@ end Main
 		Content:   input,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -735,8 +716,6 @@ end Main
 		Content:   input,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	p := NewParser(ctx)
@@ -813,8 +792,6 @@ end Main
 		Content:   input,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	p := NewParser(ctx)
@@ -919,8 +896,6 @@ end Main
 		Content:   input,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	p := NewParser(ctx)
@@ -1030,8 +1005,6 @@ end Main
 		Content:   input,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()
@@ -1103,8 +1076,6 @@ EN BadModule.
 		Source:    mgr,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 	p := NewParser(ctx)
 	unit := p.Parse()

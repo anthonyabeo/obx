@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
-	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 type TypeChecker struct {
@@ -201,18 +201,24 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 			}
 
 			field := rec.GetField(s.Field)
-			if field == nil {
-				//t.ctx.Reporter.Report(diag.Diagnostic{
-				//	Severity: diag.Error,
-				//	Message:  fmt.Sprintf("record '%v' has no field named '%v'", dsg.QIdent, s.Field),
-				//	Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
-				//})
-
-				return dsg
+			if field != nil {
+				typ = field.Type
+				if s.Symbol != nil {
+					s.Symbol.SetType(field.Type)
+				}
+			} else {
+				// Not a regular field – check if it's a type-bound method.
+				// GetMethod searches the record and its base chain so that
+				// inherited methods (and super-calls via ^) are resolved.
+				method := rec.GetMethod(s.Field)
+				if method != nil {
+					typ = method.Type
+					// Don't return early; subsequent selectors (e.g. ^ for a
+					// super-call) still need to be processed.
+				} else {
+					return dsg
+				}
 			}
-
-			typ = field.Type
-			s.Symbol.SetType(field.Type)
 		case *ast.PtrDeref:
 			switch ty := typ.(type) {
 			case *types.PointerType:
@@ -2814,6 +2820,12 @@ func (t *TypeChecker) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 		decl.Body.Accept(t)
 	}
 
+	// Register method in the receiver record's sema type so that
+	// checkTypeBoundRedefinition (and the DotOp type-checker) can find it.
+	if decl.Kind == ast.TypeBoundProcedureKind && decl.Head.Rcv != nil {
+		t.registerMethodInRecordType(decl)
+	}
+
 	// Type-bound procedure redefinition validation
 	t.checkTypeBoundRedefinition(decl)
 
@@ -3733,6 +3745,39 @@ func (t *TypeChecker) assertConst(expr ast.Expression) {
 	}
 }
 
+// registerMethodInRecordType inserts the type-bound procedure into the sema
+// RecordType's Methods map so that checkTypeBoundRedefinition and the DotOp
+// type-checker can discover inherited and overriding methods.
+func (t *TypeChecker) registerMethodInRecordType(decl *ast.ProcedureDecl) {
+	rcvSema := decl.Head.Rcv.Name.SemaType
+	if rcvSema == nil {
+		return
+	}
+
+	procType, ok := decl.Head.Name.Symbol.Type().(*types.ProcedureType)
+	if !ok || procType == nil {
+		return
+	}
+
+	exported := decl.Head.Name.Symbol.Props() == ast.Exported
+
+	var rec *types.RecordType
+	switch rt := types.Underlying(rcvSema).(type) {
+	case *types.RecordType:
+		rec = rt
+	case *types.PointerType:
+		base, ok := types.Underlying(rt.Base).(*types.RecordType)
+		if !ok {
+			return
+		}
+		rec = base
+	default:
+		return
+	}
+
+	rec.InsertMethod(decl.Head.Name.Name, procType, exported)
+}
+
 func (t *TypeChecker) checkTypeBoundRedefinition(proc *ast.ProcedureDecl) {
 	if proc.Kind != ast.TypeBoundProcedureKind || proc.Head.Rcv == nil {
 		return // not a type-bound procedure
@@ -3745,9 +3790,9 @@ func (t *TypeChecker) checkTypeBoundRedefinition(proc *ast.ProcedureDecl) {
 	// Look for overridden method in base types
 	name := proc.Head.Name.Name
 	for base := rcvBase; base != nil; base = types.BaseRecord(base) {
-		if field := base.GetField(name); field != nil {
-			// check that field is a method.
-			pOrig, fieldIsProcedure := field.Type.(*types.ProcedureType)
+		if method := base.GetMethod(name); method != nil {
+			// check that the found symbol is a method (procedure type)
+			pOrig, fieldIsProcedure := method.Type.(*types.ProcedureType)
 			pRedef, procIsProcedure := proc.Head.Name.SemaType.(*types.ProcedureType)
 			if !fieldIsProcedure || !procIsProcedure {
 				continue
@@ -3763,7 +3808,7 @@ func (t *TypeChecker) checkTypeBoundRedefinition(proc *ast.ProcedureDecl) {
 			}
 
 			// Check export rules
-			if field.IsExported && recv.Name.Symbol.Props() == ast.Exported && proc.Head.Name.Symbol.Props() != ast.Exported {
+			if method.IsExported && recv.Name.Symbol.Props() == ast.Exported && proc.Head.Name.Symbol.Props() != ast.Exported {
 				t.ctx.Reporter.Report(diag.Diagnostic{
 					Severity: diag.Error,
 					Message:  fmt.Sprintf("redefinition of exported procedure '%s' must also be exported", name),

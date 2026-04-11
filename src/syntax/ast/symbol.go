@@ -3,8 +3,8 @@ package ast
 import (
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type SymbolKind int
@@ -96,9 +96,14 @@ func NewTypeSymbol(name string, props IdentProps, typ Type) *TypeSymbol {
 
 // ProcedureSymbol ...
 type ProcedureSymbol struct {
-	name        string
-	kind        SymbolKind
-	props       IdentProps
+	name  string
+	kind  SymbolKind
+	props IdentProps
+	// Env is the procedure's own lexical scope (params + locals).
+	// It is distinct from Parent(), which is the enclosing declaration scope.
+	// Sema visitors use ProcedureDecl.Env to restore lexical context; this
+	// field is retained for tooling that needs to navigate from the symbol
+	// directly to its inner scope (e.g. resolving locals inside a procedure).
 	Env         *LexicalScope
 	parent      *LexicalScope
 	astType     Type
@@ -277,7 +282,7 @@ func Mangle(sym Symbol) string {
 		}
 	}
 	parts = append(parts, sym.Name())
-	return strings.Join(parts, "_")
+	return strings.Join(parts, "$")
 }
 
 func IsVarParam(dsg *Designator) bool {

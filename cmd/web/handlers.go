@@ -8,10 +8,9 @@ import (
 	"net/http"
 	"runtime"
 
-	"github.com/anthonyabeo/obx/src/support/adt"
+	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
-	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
@@ -81,8 +80,6 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 		Source:                srcMgr,
 		Reporter:              reporter,
 		Env:                   ast.NewEnv(),
-		Names:                 adt.NewStack[string](),
-		ExprLists:             adt.NewStack[[]ast.Expression](),
 		TargetMachineWordSize: 8,
 	}
 

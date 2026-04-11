@@ -12,8 +12,9 @@ type Field struct {
 }
 
 type RecordType struct {
-	Fields []*Field
-	Base   *RecordType
+	Fields  []*Field
+	Methods map[string]*Field // type-bound procedure methods keyed by name
+	Base    *RecordType
 }
 
 func (r *RecordType) String() string {
@@ -76,6 +77,29 @@ func (r *RecordType) GetField(name string) *Field {
 		return r.Base.GetField(name)
 	}
 
+	return nil
+}
+
+// InsertMethod inserts a type-bound procedure into the record's own method table.
+// It does not modify any base record type; it only records the method at this level.
+func (r *RecordType) InsertMethod(name string, ty *ProcedureType, exported bool) {
+	if r.Methods == nil {
+		r.Methods = make(map[string]*Field)
+	}
+	if _, exists := r.Methods[name]; !exists {
+		r.Methods[name] = &Field{Name: name, Type: ty, IsExported: exported}
+	}
+}
+
+// GetMethod searches the method table of this record and its base chain.
+func (r *RecordType) GetMethod(name string) *Field {
+	for cur := r; cur != nil; cur = cur.Base {
+		if cur.Methods != nil {
+			if f, ok := cur.Methods[name]; ok {
+				return f
+			}
+		}
+	}
 	return nil
 }
 

@@ -3,7 +3,6 @@ package opt
 import (
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/support/adt"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
@@ -171,8 +170,6 @@ end Main
 				Env:       ast.NewEnv(),
 				Source:    mgr,
 				Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-				Names:     adt.NewStack[string](),
-				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
 
 			program := testutil.ParseSourceAndLowerToMIR(t, ctx)

@@ -20,6 +20,11 @@ type Parser struct {
 	lexeme string
 	pos    int
 	end    int
+
+	// Deferred type-bound procedure → RecordScope bindings.
+	// Populated during parseDeclarationSeq; resolved by resolvePendingMethodBindings
+	// after all module declarations have been parsed.
+	pendingMethodBindings []pendingBinding
 }
 
 func NewParser(ctx *diag.Context) *Parser {
@@ -188,6 +193,9 @@ func (p *Parser) parseModule() *ast.Module {
 		}
 	}
 
+	// All declarations have been parsed; bind any deferred type-bound methods.
+	p.resolvePendingMethodBindings()
+
 	if p.tok == token.BEGIN {
 		p.next()
 		stmtSeq = p.parseStatementSeq()
@@ -255,6 +263,9 @@ func (p *Parser) parseDefinition() *ast.Definition {
 	for p.startsDecl() {
 		declSeq = p.parseDeclarationSeq2()
 	}
+
+	// All declarations have been parsed; bind any deferred type-bound methods.
+	p.resolvePendingMethodBindings()
 
 	p.match(token.END)
 	endOffset = p.end
@@ -925,34 +936,20 @@ func (p *Parser) parseFactor() ast.Expression {
 		return expr
 	case token.IDENTIFIER:
 		dsg := p.parseDesignator()
-		env := p.ctx.Env.CurrentScope()
-		if dsg.QIdent.Prefix != "" {
-			if env = p.ctx.Env.ModuleScope(dsg.QIdent.Prefix); env == nil {
-				p.ctx.Reporter.Report(diag.Diagnostic{
-					Severity: diag.Fatal,
-					Message:  fmt.Sprintf("cannot find definition or module for %s", dsg.QIdent.Prefix),
-					Range:    p.ctx.Source.Span(p.ctx.FileName, dsg.StartOffset, dsg.EndOffset),
-				})
-
-				p.advance(exprEnd)
-				return &ast.BadExpr{StartOffset: dsg.StartOffset, EndOffset: dsg.EndOffset}
+		// If parseDesignator attached a CallSelector as the last selector, lift
+		// it into a FunctionCall expression.  The CallSelector is a parse-only
+		// node that must not escape the parser.
+		if n := len(dsg.Select); n > 0 {
+			if cs, ok := dsg.Select[n-1].(*ast.CallSelector); ok {
+				dsg.Select = dsg.Select[:n-1]
+				return &ast.FunctionCall{
+					Callee:       dsg,
+					ActualParams: cs.Args,
+					StartOffset:  dsg.Pos(),
+					EndOffset:    cs.End(),
+				}
 			}
 		}
-
-		sym := env.Lookup(dsg.QIdent.Name)
-		if sym != nil && p.IsCallable(sym) && p.tok == token.RPAREN && p.ctx.Names.Top() == sym.Name() {
-			var args []ast.Expression
-			if !p.ctx.ExprLists.Empty() {
-				args = p.ctx.ExprLists.Pop()
-			}
-
-			p.ctx.Names.Pop()
-
-			call := &ast.FunctionCall{Callee: dsg, ActualParams: args, StartOffset: dsg.Pos(), EndOffset: p.end}
-			p.next()
-			return call
-		}
-
 		return dsg
 	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT, token.REAL_LIT, token.LONGREAL_LIT,
 		token.STR_LIT, token.HEX_STR_LIT, token.CHAR_LIT, token.WCHAR_LIT, token.NIL, token.TRUE, token.FALSE, token.LBRACE:
@@ -1057,83 +1054,39 @@ func (p *Parser) parseDesignator() *ast.Designator {
 			dsg.EndOffset = end
 		case token.LPAREN:
 			pos := p.pos
-			p.next()
-			if !p.parseTypeGuard(dsg, pos) {
-				return dsg
+			p.next() // consume '('
+
+			var args []ast.Expression
+			if p.exprStart() {
+				args = p.parseExprList()
 			}
+
+			end := p.end
+			p.match(token.RPAREN)
+
+			// Decide: TypeGuard or CallSelector.
+			// A TypeGuard requires exactly one argument that is a named type
+			// resolving to a record/pointer-to-record, AND the designator root
+			// must be a variable or parameter (not a procedure like NEW).
+			if p.isTypeGuardCall(dsg, args) {
+				named := args[0].(*ast.NamedType)
+				dsg.Select = append(dsg.Select, &ast.TypeGuard{
+					Ty:          named.Name,
+					StartOffset: pos,
+					EndOffset:   end,
+				})
+			} else {
+				dsg.Select = append(dsg.Select, &ast.CallSelector{
+					Args:        args,
+					StartOffset: pos,
+					EndOffset:   end,
+				})
+			}
+			dsg.EndOffset = end
 		}
 	}
 
 	return dsg
-}
-
-func (p *Parser) parseTypeGuard(dsg *ast.Designator, pos int) bool {
-	p.ctx.Names.Push(dsg.QIdent.Name)
-
-	if !p.exprStart() {
-		return false
-	}
-
-	p.ctx.ExprLists.Push(p.parseExprList())
-	if !p.ctx.ExprLists.Empty() && len(p.ctx.ExprLists.Top()) != 1 {
-		return false
-	}
-
-	ExprList := p.ctx.ExprLists.Top()
-	_, ok := ExprList[0].(*ast.Designator)
-	if ok {
-		return false
-	}
-
-	Named, ok := ExprList[0].(*ast.NamedType)
-	if !ok {
-		return false
-	}
-
-	env := p.ctx.Env.CurrentScope()
-	if Named.Name.Prefix != "" {
-		env = p.ctx.Env.ModuleScope(Named.Name.Prefix)
-	}
-
-	sym := env.Lookup(Named.Name.Name)
-	if sym == nil || sym.Kind() != ast.TypeSymbolKind {
-		return false
-	}
-
-	switch t := sym.(*ast.TypeSymbol).AstType().(type) {
-	case *ast.RecordType:
-	case *ast.PointerType:
-		if _, ok := t.Base.(*ast.RecordType); !ok {
-			return false
-		}
-	default:
-		return false
-	}
-
-	sym = p.ctx.Env.Lookup(dsg.QIdent.Name)
-	if sym == nil || sym.Kind() != ast.VariableSymbolKind && sym.Kind() != ast.ParamSymbolKind {
-		return false
-	}
-
-	end := p.end
-	dsg.Select = append(dsg.Select, &ast.TypeGuard{
-		Ty:          Named.Name,
-		StartOffset: pos,
-		EndOffset:   end,
-	})
-
-	dsg.EndOffset = end
-	p.match(token.RPAREN)
-
-	if !p.ctx.Names.Empty() {
-		p.ctx.Names.Pop()
-	}
-
-	if !p.ctx.ExprLists.Empty() {
-		p.ctx.ExprLists.Pop()
-	}
-
-	return true
 }
 
 // literal = number | string | hexstring | hexchar | NIL | TRUE | FALSE | set
@@ -1279,10 +1232,21 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 	thisScope.Name = proc.Head.Name.Name
 	proc.Env = thisScope
 
+	// Capture the pending-binding watermark before populateEnvs so we can
+	// resolve any bindings added during this procedure's body (including nested
+	// type-bound procs whose receiver type is local to this scope) while this
+	// scope is still active.
+	bindingsBefore := len(p.pendingMethodBindings)
 	p.populateEnvs(proc.Head, proc.Kind)
 
 	// ─── Parse the Procedure Body to the end of the Procedure ──────────────────────
 	proc.Body = p.parseProcBody()
+
+	// Resolve any pending method bindings that were added during this
+	// procedure's parsing.  This handles local types used as receivers (e.g. a
+	// record declared inside a procedure body that has type-bound methods).
+	// Must happen before the deferred PopScope removes this scope.
+	p.resolveLocalPendingMethodBindings(bindingsBefore)
 
 	proc.EndOffset = p.end
 	p.match(token.END)
@@ -1513,19 +1477,20 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 			assign := &ast.AssignmentStmt{LValue: dsg, RValue: p.parseExpression(), StartOffset: pos}
 			assign.EndOffset = assign.RValue.End()
 			stmt = assign
-		case token.RPAREN:
-			var args []ast.Expression
-			if !p.ctx.ExprLists.Empty() {
-				args = p.ctx.ExprLists.Pop()
-			}
-
-			if !p.ctx.Names.Empty() {
-				p.ctx.Names.Pop()
-			}
-
-			stmt = &ast.ProcedureCall{Callee: dsg, ActualParams: args, StartOffset: pos, EndOffset: p.end}
-			p.next()
 		default:
+			// If parseDesignator attached a CallSelector, lift it to a ProcedureCall.
+			if n := len(dsg.Select); n > 0 {
+				if cs, ok := dsg.Select[n-1].(*ast.CallSelector); ok {
+					dsg.Select = dsg.Select[:n-1]
+					stmt = &ast.ProcedureCall{
+						Callee:       dsg,
+						ActualParams: cs.Args,
+						StartOffset:  pos,
+						EndOffset:    cs.End(),
+					}
+					return
+				}
+			}
 			p.ctx.Reporter.Report(diag.Diagnostic{
 				Severity: diag.Error,
 				Message:  fmt.Sprintf("%s is not a valid statement", dsg),

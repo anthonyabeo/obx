@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/support/adt"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/project"
@@ -136,8 +135,6 @@ func TestTypeCheckerPrograms(t *testing.T) {
 				Source:    srcMgr,
 				Reporter:  reporter,
 				Env:       ast.NewEnv(),
-				Names:     adt.NewStack[string](),
-				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
 
 			p := parser.NewParser(ctx)
@@ -249,8 +246,6 @@ func TestTypeCheckInvalidPrograms(t *testing.T) {
 				Source:    srcMgr,
 				Reporter:  reporter,
 				Env:       ast.NewEnv(),
-				Names:     adt.NewStack[string](),
-				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
 
 			p := parser.NewParser(ctx)
@@ -378,8 +373,6 @@ END ExprCompatibilityTest.`)
 		Source:    srcMgr,
 		Reporter:  reporter,
 		Env:       ast.NewEnv(),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	p := parser.NewParser(ctx)
@@ -475,8 +468,6 @@ END InvalidExprCompatibilityTest.
 		Source:    srcMgr,
 		Reporter:  reporter,
 		Env:       ast.NewEnv(),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	p := parser.NewParser(ctx)
@@ -3870,8 +3861,6 @@ func typeCheckSnippet(t *testing.T, code string) *diag.Context {
 		Source:          srcMgr,
 		Reporter:        reporter,
 		Env:             ast.NewEnv(),
-		Names:           adt.NewStack[string](),
-		ExprLists:       adt.NewStack[[]ast.Expression](),
 		SymbolOverrides: map[string]ast.Symbol{},
 		TypeOverrides:   map[string]types.Type{},
 	}
@@ -4991,8 +4980,6 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *diag.Context {
 		Source:          srcMgr,
 		Reporter:        reporter,
 		Env:             ast.NewEnv(),
-		Names:           adt.NewStack[string](),
-		ExprLists:       adt.NewStack[[]ast.Expression](),
 		SymbolOverrides: map[string]ast.Symbol{},
 		TypeOverrides:   map[string]types.Type{},
 	}

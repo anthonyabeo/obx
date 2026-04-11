@@ -6,10 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/anthonyabeo/obx/src/support/adt"
+	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
-	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
@@ -85,8 +84,6 @@ func newContext(tabWidth, maxErrors int) (*diag.Context, *source.Manager) {
 		Source:                srcMgr,
 		Reporter:              reporter,
 		Env:                   ast.NewEnv(),
-		Names:                 adt.NewStack[string](),
-		ExprLists:             adt.NewStack[[]ast.Expression](),
 		TargetMachineWordSize: 8,
 	}
 	return ctx, srcMgr

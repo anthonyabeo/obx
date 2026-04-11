@@ -9,7 +9,6 @@ import (
 
 	"github.com/anthonyabeo/obx/src/codegen/target/riscv"
 	"github.com/anthonyabeo/obx/src/project"
-	"github.com/anthonyabeo/obx/src/support/adt"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/support/testutil"
@@ -240,8 +239,6 @@ func TestCompile(t *testing.T) {
 				Env:       ast.NewEnv(),
 				Source:    mgr,
 				Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-				Names:     adt.NewStack[string](),
-				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
 
 			program := testutil.ParseSourceAndLowerToMIR(t, ctx)

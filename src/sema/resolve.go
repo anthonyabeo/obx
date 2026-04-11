@@ -282,7 +282,7 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 		return ident
 	}
 
-	sym = sym.(*ast.ModuleSymbol).Env.Lookup(ident.Name)
+	sym = n.ctx.Env.LookupQualified(ident.Prefix, ident.Name)
 	if sym == nil {
 		n.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
@@ -562,20 +562,35 @@ func (n *NamesResolver) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 }
 
 func (n *NamesResolver) VisitProcedureHeading(heading *ast.ProcedureHeading) any {
-	var rcvName string
+	var sym ast.Symbol
+
 	if heading.Rcv != nil {
+		// Type-bound procedure: resolve via the receiver type's RecordScope,
+		// not by a synthetic mangled name in the flat module LexicalScope.
 		heading.Rcv.Accept(n)
-		rcvName = heading.Rcv.Type.String() + "."
+
+		rec := n.resolveReceiverRecord(heading.Rcv.Type)
+		if rec == nil {
+			n.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
+				Message:  fmt.Sprintf("cannot resolve receiver type for '%s'", heading.Name.Name),
+				Range:    n.ctx.Source.Span(n.ctx.FileName, heading.Name.StartOffset, heading.Name.EndOffset),
+			})
+			return nil
+		}
+
+		sym = rec.Env.LookupMethod(heading.Name.Name)
+	} else {
+		// Regular procedure: look up in the current lexical scope.
+		sym = n.ctx.Env.Lookup(heading.Name.Name)
 	}
 
-	sym := n.ctx.Env.Lookup(rcvName + heading.Name.Name)
 	if sym == nil {
 		n.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
 			Message:  fmt.Sprintf("identifier '%s' not found", heading.Name.Name),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, heading.Name.StartOffset, heading.Name.EndOffset),
 		})
-
 		return nil
 	}
 
@@ -587,6 +602,54 @@ func (n *NamesResolver) VisitProcedureHeading(heading *ast.ProcedureHeading) any
 	}
 
 	return heading
+}
+
+// resolveReceiverRecord resolves a receiver type expression to its underlying
+// *RecordType, using the NamedType.Symbol set by the preceding heading.Rcv.Accept(n).
+// It handles both a bare record receiver (VAR/IN T) and a pointer-to-record receiver (^T),
+// including the case where the pointer's base is itself a named type.
+func (n *NamesResolver) resolveReceiverRecord(ty ast.Type) *ast.RecordType {
+	named, ok := ty.(*ast.NamedType)
+	if !ok || named.Symbol == nil {
+		return nil
+	}
+
+	typSym, ok := named.Symbol.(*ast.TypeSymbol)
+	if !ok {
+		return nil
+	}
+
+	return n.unwrapToRecord(typSym.AstType())
+}
+
+// unwrapToRecord iteratively walks through PointerType and NamedType wrappers
+// to find the underlying *RecordType, performing scope lookups for NamedTypes.
+func (n *NamesResolver) unwrapToRecord(ty ast.Type) *ast.RecordType {
+	for {
+		switch t := ty.(type) {
+		case *ast.RecordType:
+			return t
+		case *ast.PointerType:
+			ty = t.Base
+		case *ast.NamedType:
+			var sym ast.Symbol
+			if t.Name.Prefix != "" {
+				sym = n.ctx.Env.LookupQualified(t.Name.Prefix, t.Name.Name)
+			} else {
+				sym = n.ctx.Env.Lookup(t.Name.Name)
+			}
+			if sym == nil {
+				return nil
+			}
+			typSym, ok := sym.(*ast.TypeSymbol)
+			if !ok {
+				return nil
+			}
+			ty = typSym.AstType()
+		default:
+			return nil
+		}
+	}
 }
 
 func (n *NamesResolver) VisitProcedureBody(body *ast.ProcedureBody) any {

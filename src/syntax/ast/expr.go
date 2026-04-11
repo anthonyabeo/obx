@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 // IdentProps is a set of flags denoting the properties of an identifier
@@ -241,6 +241,10 @@ func (d *Designator) String() string {
 			s += sel.String()
 		case *PtrDeref:
 			s += sel.String()
+		case *CallSelector:
+			// CallSelector is a parse-only node; it must be lifted to
+			// FunctionCall/ProcedureCall before it can reach String().
+			panic(fmt.Sprintf("CallSelector survived past the parser: %v", sel))
 		default:
 			panic(fmt.Sprintf("unknown selector type: %T", sel))
 		}
@@ -331,3 +335,26 @@ func (deref *PtrDeref) sel()           {}
 func (deref *PtrDeref) String() string { return "^" }
 func (deref *PtrDeref) Pos() int       { return deref.StartOffset }
 func (deref *PtrDeref) End() int       { return deref.EndOffset }
+
+// CallSelector is a parse-only internal node representing actual parameters
+// applied to a designator, e.g. foo(a, b).  It is created in parseDesignator
+// and immediately lifted into FunctionCall (expressions) or ProcedureCall
+// (statements) by parseFactor / parseStatement before it can escape the parser.
+// It intentionally has no Accept/visitor entry.
+type CallSelector struct {
+	Args        []Expression
+	StartOffset int
+	EndOffset   int
+}
+
+func (c *CallSelector) sel()     {}
+func (c *CallSelector) Pos() int { return c.StartOffset }
+func (c *CallSelector) End() int { return c.EndOffset }
+func (c *CallSelector) String() string {
+	var args []string
+	for _, a := range c.Args {
+		args = append(args, a.String())
+	}
+	return fmt.Sprintf("(%s)", strings.Join(args, ", "))
+}
+

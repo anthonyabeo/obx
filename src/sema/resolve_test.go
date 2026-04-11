@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/support/adt"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/project"
@@ -40,8 +39,6 @@ func TestNameResolution_BasicProcedure(t *testing.T) {
 		Source:    sm,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	// Parse the file
@@ -144,8 +141,6 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 		Source:    srcMgr,
 		Reporter:  reporter,
 		Env:       ast.NewEnv(),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	for _, header := range sorted {
@@ -209,8 +204,6 @@ func TestNameResolutionUndefined(t *testing.T) {
 		Source:    sm,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	// Parse the file
@@ -255,8 +248,6 @@ func TestNameResolution_Basic(t *testing.T) {
 		Source:    sm,
 		Env:       ast.NewEnv(),
 		Reporter:  diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
-		Names:     adt.NewStack[string](),
-		ExprLists: adt.NewStack[[]ast.Expression](),
 	}
 
 	// Parse the file

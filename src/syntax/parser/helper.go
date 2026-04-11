@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
@@ -152,6 +153,14 @@ func (p *Parser) copyParamsForProcedureType(FP *ast.FormalParams) *ast.FormalPar
 	return FormalParams
 }
 
+// pendingBinding holds everything needed to insert a type-bound procedure into
+// its receiver record's method table once all module declarations are in scope.
+type pendingBinding struct {
+	head    *ast.ProcedureHeading
+	sym     *ast.ProcedureSymbol
+	procEnv *ast.LexicalScope // the procedure's own (now-popped) lexical scope
+}
+
 func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind) {
 	procType := &ast.ProcedureType{FP: &ast.FormalParams{}}
 
@@ -182,51 +191,14 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
 			})
 		}
+
 	case ast.TypeBoundProcedureKind:
 		procType.IsTypeBound = true
-		rcvType := p.underlyingRcvType(head.Rcv.Type)
+		curscope := p.ctx.Env.CurrentScope()
 
-		var (
-			ok  bool
-			rec *ast.RecordType
-		)
+		proc := ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, curscope, kind)
 
-		switch head.Rcv.Kind {
-		case token.VAR, token.IN:
-			rec, ok = rcvType.(*ast.RecordType)
-			if !ok {
-				p.ctx.Reporter.Report(diag.Diagnostic{
-					Severity: diag.Error,
-					Message:  "VAR/IN receiver type must be a record type",
-					Range:    p.ctx.Source.Span(p.ctx.FileName, rcvType.Pos(), rcvType.End()),
-				})
-
-				return
-			}
-		default:
-			rec, ok = p.isPointerToRecord(rcvType)
-			if !ok {
-				p.ctx.Reporter.Report(diag.Diagnostic{
-					Severity: diag.Error,
-					Message:  "value receiver type must be a pointer to record type",
-					Range:    p.ctx.Source.Span(p.ctx.FileName, rcvType.Pos(), rcvType.End()),
-				})
-
-				return
-			}
-		}
-
-		// add the procedure to the receiver's environment
-		proc := ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, p.ctx.Env.CurrentScope(), kind)
-		if sym := rec.Env.Insert(proc); sym != nil {
-			p.ctx.Reporter.Report(diag.Diagnostic{
-				Severity: diag.Error,
-				Message:  fmt.Sprintf("duplicate procedure declaration for '%s'", head.Name.Name),
-				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
-			})
-		}
-
-		// add the receiver to the procedure's environment
+		// Register the receiver as a parameter in the procedure scope.
 		if sym := p.ctx.Env.Define(ast.NewParamSymbol(head.Rcv.Name.Name, head.Rcv.Kind, head.Rcv.Type)); sym != nil {
 			p.ctx.Reporter.Report(diag.Diagnostic{
 				Severity: diag.Error,
@@ -235,17 +207,127 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 			})
 		}
 
-		name := head.Rcv.Type.String() + "." + head.Name.Name
-		curscope := p.ctx.Env.CurrentScope()
-		sym := curscope.Parent().Insert(ast.NewProcedureSymbol(name, head.Name.Props, procType, curscope, kind))
-		if sym != nil {
+		// Defer the RecordScope binding: the receiver type may not be declared
+		// yet because declarations can appear in any order.
+		// The method symbol lives exclusively in RecordScope.methods — it is NOT
+		// inserted into the flat module LexicalScope under a mangled name.
+		p.pendingMethodBindings = append(p.pendingMethodBindings, pendingBinding{
+			head:    head,
+			sym:     proc,
+			procEnv: curscope,
+		})
+	}
+}
+
+// bindTypeBoundMethod resolves the receiver type and inserts the method symbol
+// into the record's dedicated method table.  Called from resolvePendingMethodBindings
+// once all module declarations have been parsed.
+func (p *Parser) bindTypeBoundMethod(b pendingBinding) bool {
+	named, ok := b.head.Rcv.Type.(*ast.NamedType)
+	if !ok {
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
+			Message:  fmt.Sprintf("receiver type must be a named type, got: '%v'", b.head.Rcv.Type),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, b.head.Rcv.StartOffset, b.head.Rcv.EndOffset),
+		})
+		return false
+	}
+
+	// At this call-site we are back at module scope (all procedure scopes popped).
+	var searchScope *ast.LexicalScope
+	if named.Name.Prefix != "" {
+		searchScope = p.ctx.Env.ModuleScope(named.Name.Prefix)
+		if searchScope == nil {
 			p.ctx.Reporter.Report(diag.Diagnostic{
 				Severity: diag.Error,
-				Message:  fmt.Sprintf("duplicate type-bound procedure declaration for '%s'", head.Name.Name),
-				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
+				Message:  fmt.Sprintf("cannot find module '%s'", named.Name.Prefix),
+				Range:    p.ctx.Source.Span(p.ctx.FileName, named.Name.StartOffset, named.Name.EndOffset),
 			})
+			return false
+		}
+	} else {
+		searchScope = p.ctx.Env.CurrentScope() // module scope
+	}
+
+	sym := searchScope.Lookup(named.Name.Name)
+	if sym == nil {
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
+			Message:  fmt.Sprintf("receiver type '%s' not declared", named.Name),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, named.Name.StartOffset, named.Name.EndOffset),
+		})
+		return false
+	}
+	typeSymbol, ok2 := sym.(*ast.TypeSymbol)
+	if !ok2 {
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
+			Message:  fmt.Sprintf("receiver '%s' is not a type declaration", named.Name),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, named.Name.StartOffset, named.Name.EndOffset),
+		})
+		return false
+	}
+
+	rcvType := typeSymbol.AstType()
+	var rec *ast.RecordType
+	switch b.head.Rcv.Kind {
+	case token.VAR, token.IN:
+		rec, ok = rcvType.(*ast.RecordType)
+		if !ok {
+			p.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
+				Message:  "VAR/IN receiver type must be a record type",
+				Range:    p.ctx.Source.Span(p.ctx.FileName, rcvType.Pos(), rcvType.End()),
+			})
+			return false
+		}
+	default:
+		rec, ok = p.isPointerToRecord(rcvType)
+		if !ok {
+			p.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
+				Message:  "value receiver type must be a pointer to record type",
+				Range:    p.ctx.Source.Span(p.ctx.FileName, rcvType.Pos(), rcvType.End()),
+			})
+			return false
 		}
 	}
+
+	// The method's logical parent is a named scope for the receiver type, so
+	// Mangle() produces "Module$TypeName$MethodName" rather than the ambiguous
+	// "Module$MethodName" that results from using the flat module scope directly.
+	moduleScope := b.procEnv.Parent()
+	typeScope := ast.NewLexicalScope(moduleScope, named.Name.Name)
+	if dup := rec.Env.InsertMethod(b.sym, typeScope); dup != nil {
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
+			Message:  fmt.Sprintf("duplicate type-bound procedure '%s'", b.head.Name.Name),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, b.head.Name.StartOffset, b.head.Name.EndOffset),
+		})
+	}
+	return true
+}
+
+// resolvePendingMethodBindings must be called after the full declaration
+// sequence of a module/definition has been parsed so that every receiver type
+// is guaranteed to be in scope.
+func (p *Parser) resolvePendingMethodBindings() {
+	for _, b := range p.pendingMethodBindings {
+		p.bindTypeBoundMethod(b)
+	}
+	p.pendingMethodBindings = nil
+}
+
+// resolveLocalPendingMethodBindings resolves the bindings that were accumulated
+// starting at index `from` and trims them from the slice.  Call this from
+// parseProcedureDecl, before the procedure scope is popped, so that types
+// declared locally inside the procedure body (e.g. a record type that serves
+// as a receiver for a nested type-bound proc) are still in scope.
+func (p *Parser) resolveLocalPendingMethodBindings(from int) {
+	for _, b := range p.pendingMethodBindings[from:] {
+		p.bindTypeBoundMethod(b)
+	}
+	p.pendingMethodBindings = p.pendingMethodBindings[:from]
 }
 
 func (p *Parser) underlyingRcvType(ty ast.Type) ast.Type {
@@ -316,6 +398,52 @@ func (p *Parser) isPointerToRecord(ty ast.Type) (*ast.RecordType, bool) {
 			return nil, false
 		}
 	}
+}
+
+// isTypeGuardCall reports whether args applied to dsg constitutes a TypeGuard:
+//   - exactly one argument
+//   - the argument is a NamedType resolving to RecordType or PointerType{Base: RecordType}
+//   - the root of the designator is a variable or parameter symbol
+//
+// Types can also appear as regular call arguments (e.g. NEW(T)), so this check
+// additionally requires the designator root to be a variable/param — not a
+// procedure — to distinguish them.
+func (p *Parser) isTypeGuardCall(dsg *ast.Designator, args []ast.Expression) bool {
+	if len(args) != 1 {
+		return false
+	}
+	named, ok := args[0].(*ast.NamedType)
+	if !ok {
+		return false
+	}
+
+	env := p.ctx.Env.CurrentScope()
+	if named.Name.Prefix != "" {
+		env = p.ctx.Env.ModuleScope(named.Name.Prefix)
+		if env == nil {
+			return false
+		}
+	}
+	typeSym := env.Lookup(named.Name.Name)
+	if typeSym == nil || typeSym.Kind() != ast.TypeSymbolKind {
+		return false
+	}
+	switch t := typeSym.(*ast.TypeSymbol).AstType().(type) {
+	case *ast.RecordType:
+		// ok
+	case *ast.PointerType:
+		if _, ok := t.Base.(*ast.RecordType); !ok {
+			return false
+		}
+	default:
+		return false
+	}
+
+	varSym := p.ctx.Env.Lookup(dsg.QIdent.Name)
+	if varSym == nil {
+		return false
+	}
+	return varSym.Kind() == ast.VariableSymbolKind || varSym.Kind() == ast.ParamSymbolKind
 }
 
 func (p *Parser) IsCallable(sym ast.Symbol) bool {

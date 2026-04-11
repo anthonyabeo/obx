@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/support/adt"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
@@ -277,8 +276,6 @@ END M.
 				Env:       ast.NewEnv(),
 				Source:    mgr,
 				Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-				Names:     adt.NewStack[string](),
-				ExprLists: adt.NewStack[[]ast.Expression](),
 			}
 
 			p := parser.NewParser(ctx)
@@ -592,8 +589,6 @@ func flowCheckSnippet(t *testing.T, code string) *diag.Context {
 		Source:          srcMgr,
 		Reporter:        reporter,
 		Env:             ast.NewEnv(),
-		Names:           adt.NewStack[string](),
-		ExprLists:       adt.NewStack[[]ast.Expression](),
 		SymbolOverrides: map[string]ast.Symbol{},
 		TypeOverrides:   map[string]types.Type{},
 	}

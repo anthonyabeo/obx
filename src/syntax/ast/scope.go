@@ -59,14 +59,16 @@ func (s *LexicalScope) Parent() *LexicalScope {
 
 // -------------------------------------------------------------
 type RecordScope struct {
-	fields map[string]Symbol
-	base   *RecordScope
+	fields  map[string]Symbol
+	methods map[string]Symbol
+	base    *RecordScope
 }
 
 func NewRecordScope(base *RecordScope) *RecordScope {
 	return &RecordScope{
-		fields: make(map[string]Symbol),
-		base:   base,
+		fields:  make(map[string]Symbol),
+		methods: make(map[string]Symbol),
+		base:    base,
 	}
 }
 
@@ -91,13 +93,46 @@ func (r *RecordScope) Lookup(name string) Symbol {
 	if sym, ok := r.fields[name]; ok {
 		return sym
 	}
-
+	if sym, ok := r.methods[name]; ok {
+		return sym
+	}
 	if r.base != nil {
 		return r.base.Lookup(name)
 	}
 	return nil
 }
 
+// InsertMethod inserts a type-bound procedure symbol into the record's method
+// table and sets its parent scope.  Returns the existing symbol if duplicate.
+func (r *RecordScope) InsertMethod(obj Symbol, parent *LexicalScope) Symbol {
+	if other, exists := r.methods[obj.Name()]; exists {
+		return other
+	}
+	if r.methods == nil {
+		r.methods = make(map[string]Symbol)
+	}
+	r.methods[obj.Name()] = obj
+	if obj.Parent() == nil && parent != nil {
+		obj.SetParent(parent)
+	}
+	return nil
+}
+
+// LookupMethod searches the method table of this record and its base chain.
+func (r *RecordScope) LookupMethod(name string) Symbol {
+	if sym, ok := r.methods[name]; ok {
+		return sym
+	}
+	if r.base != nil {
+		return r.base.LookupMethod(name)
+	}
+	return nil
+}
+
 func (r *RecordScope) Elems() map[string]Symbol {
 	return r.fields
+}
+
+func (r *RecordScope) Methods() map[string]Symbol {
+	return r.methods
 }
