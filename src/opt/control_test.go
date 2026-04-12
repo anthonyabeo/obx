@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/ir/obxir"
-	"github.com/anthonyabeo/obx/src/project"
+	//"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
@@ -368,14 +368,14 @@ end Main
 
 					dot := function.OutputDOT()
 
-					Root, err := project.FindProjectRoot()
+					outDir, err := os.MkdirTemp(".", "cfg-*")
 					if err != nil {
-						t.Errorf("failed to find project root: %s", err)
+						t.Errorf("failed to create temp directory: %s", err)
 						continue
 					}
 
-					dotFile := fmt.Sprintf("%s/out/%s.cfg.dot", Root, function.FnName)
-					pngFile := fmt.Sprintf("%s/out/%s.cfg.png", Root, function.FnName)
+					dotFile := fmt.Sprintf("%s/%s.cfg.dot", outDir, function.FnName)
+					pngFile := fmt.Sprintf("%s/%s.cfg.png", outDir, function.FnName)
 
 					if err := os.WriteFile(dotFile, []byte(dot), 0644); err != nil {
 						t.Errorf("failed to write dot: %s", err)
