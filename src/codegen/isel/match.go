@@ -268,7 +268,13 @@ func subst(operand ast.Operand, env map[string]*bud.Value) asm.Operand {
 	case *ast.Arg:
 		if imm, ok := env[op.Index.Name]; ok && imm.Kind == bud.KindImm {
 			op.Index.Value = imm.Imm
-			asmOp = &asm.Argument{Index: imm.Imm}
+			arg := &asm.Argument{Index: imm.Imm}
+			if op.ArgKind != nil {
+				if v, ok := env[op.ArgKind.Name]; ok && v.Kind == bud.KindString {
+					arg.ParamKind = v.Str.Value
+				}
+			}
+			asmOp = arg
 		}
 	case *ast.String:
 		if v, ok := env[op.Name]; ok && v.Kind == bud.KindString {

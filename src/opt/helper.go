@@ -100,23 +100,38 @@ func printIDoms(idom map[*obxir.Block]*obxir.Block) {
 	}
 }
 
+// vizOutputDir resolves the output directory for DOT/PNG visualizations.
+// It prefers {project_root}/out/ when an obx.mod manifest is reachable; otherwise
+// it falls back to a per-invocation temp directory so that tests that run outside
+// a project tree still succeed.
+func vizOutputDir(suffix string) (string, error) {
+	if Root, err := project.FindProjectRoot(); err == nil {
+		outDir := filepath.Join(Root, "out")
+		if err := os.MkdirAll(outDir, 0755); err != nil {
+			return "", fmt.Errorf("failed to create output directory: %w", err)
+		}
+		return outDir, nil
+	}
+
+	// Fallback: temp directory alongside the test binary / caller.
+	tmp, err := os.MkdirTemp(".", "cfg-*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp output directory: %w", err)
+	}
+	_ = suffix
+	return tmp, nil
+}
+
 func VizCFG(fn *obxir.Function) error {
 	dot := fn.OutputDOT()
 
-	Root, err := project.FindProjectRoot()
+	outDir, err := vizOutputDir("cfg")
 	if err != nil {
 		return err
 	}
 
-	outDir := filepath.Join(Root, "out")
-	if _, err := os.Stat(outDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(outDir, 0755); err != nil {
-			return fmt.Errorf("failed to create output directory: %w", err)
-		}
-	}
-
-	dotFile := fmt.Sprintf("%s/%s.ssa.cfg.dot", outDir, fn.FnName)
-	pngFile := fmt.Sprintf("%s/%s.ssa.cfg.png", outDir, fn.FnName)
+	dotFile := fmt.Sprintf("%s/%s.cfg.dot", outDir, fn.FnName)
+	pngFile := fmt.Sprintf("%s/%s.cfg.png", outDir, fn.FnName)
 
 	if err := os.WriteFile(dotFile, []byte(dot), 0644); err != nil {
 		return err
@@ -125,9 +140,8 @@ func VizCFG(fn *obxir.Function) error {
 	cmd := exec.Command("dot", "-Tpng", dotFile, "-o", pngFile)
 	if err := cmd.Run(); err != nil {
 		return err
-	} else {
-		fmt.Printf("Generated %s\n", pngFile)
 	}
+	fmt.Printf("Generated %s\n", pngFile)
 
 	return nil
 }
@@ -135,16 +149,9 @@ func VizCFG(fn *obxir.Function) error {
 func VizSSA(fn *obxir.Function) error {
 	dot := fn.OutputDOT()
 
-	Root, err := project.FindProjectRoot()
+	outDir, err := vizOutputDir("ssa")
 	if err != nil {
 		return err
-	}
-
-	outDir := filepath.Join(Root, "out")
-	if _, err := os.Stat(outDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(outDir, 0755); err != nil {
-			return fmt.Errorf("failed to create output directory: %w", err)
-		}
 	}
 
 	dotFile := fmt.Sprintf("%s/%s.ssa.cfg.dot", outDir, fn.FnName)
@@ -157,9 +164,8 @@ func VizSSA(fn *obxir.Function) error {
 	cmd := exec.Command("dot", "-Tpng", dotFile, "-o", pngFile)
 	if err := cmd.Run(); err != nil {
 		return err
-	} else {
-		fmt.Printf("Generated %s\n", pngFile)
 	}
+	fmt.Printf("Generated %s\n", pngFile)
 
 	return nil
 }

@@ -4,16 +4,36 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/ir/obxir"
-	//"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/support/testutil"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
+
+func findProjectRoot(start string) (string, error) {
+	dir, err := filepath.Abs(start)
+	if err != nil {
+		return "", err
+	}
+	const maxDepth = 100
+	for i := 0; i < maxDepth; i++ {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// reached filesystem root without finding go.mod
+			break
+		}
+		dir = parent
+	}
+	return "", fmt.Errorf("go.mod not found from %s", start)
+}
 
 func TestBuildCFG(t *testing.T) {
 	tests := []struct {
@@ -362,13 +382,18 @@ end Main
 
 			program := testutil.ParseSourceAndLowerToMIR(t, ctx)
 
+			projectRoot, err := findProjectRoot(".")
+			if err != nil {
+				t.Fatalf("could not locate project root: %v", err)
+			}
+
 			for _, module := range program.Modules {
 				for _, function := range module.Funcs {
 					BuildCFG(function)
 
 					dot := function.OutputDOT()
 
-					outDir, err := os.MkdirTemp(".", "cfg-*")
+					outDir, err := os.MkdirTemp(projectRoot, "cfg-*")
 					if err != nil {
 						t.Errorf("failed to create temp directory: %s", err)
 						continue

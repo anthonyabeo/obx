@@ -23,7 +23,8 @@ type (
 	}
 
 	Argument struct {
-		Index int64
+		Index     int64
+		ParamKind string // VAR / IN / VALUE, when argument is a parameter
 	}
 
 	Symbol struct {
@@ -66,7 +67,12 @@ type (
 func (s String) String() string { return s.Name }
 func (s String) Type() Type     { panic("implement me") }
 
-func (a Argument) String() string { return fmt.Sprintf("arg(#%d)", a.Index) }
+func (a Argument) String() string {
+	if a.ParamKind != "" {
+		return fmt.Sprintf("arg(%s)(#%d)", a.ParamKind, a.Index)
+	}
+	return fmt.Sprintf("arg(#%d)", a.Index)
+}
 func (a Argument) Type() Type     { panic("implement me") }
 
 func (s Symbol) String() string { return s.Name }

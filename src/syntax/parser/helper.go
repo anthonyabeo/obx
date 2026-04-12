@@ -8,6 +8,10 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
+// stmtStart lists tokens that genuinely begin a statement.
+// Used only as a loop-continuation predicate in parseStatementSeq.
+// Do NOT add block terminators (END, ELSE, ELSIF, UNTIL) here – they would
+// cause the loop to re-enter and spin forever.
 var stmtStart = map[token.Kind]bool{
 	token.EXIT:       true,
 	token.WHILE:      true,
@@ -21,6 +25,30 @@ var stmtStart = map[token.Kind]bool{
 	token.IDENTIFIER: true,
 }
 
+// stmtRecover is the sync set used by advance() in statement-level error
+// recovery. It is stmtStart plus the tokens that legally follow a statement
+// sequence so recovery never skips past an enclosing block terminator.
+var stmtRecover = map[token.Kind]bool{
+	token.EXIT:       true,
+	token.WHILE:      true,
+	token.FOR:        true,
+	token.LOOP:       true,
+	token.IF:         true,
+	token.RETURN:     true,
+	token.CASE:       true,
+	token.WITH:       true,
+	token.REPEAT:     true,
+	token.IDENTIFIER: true,
+	token.END:        true,
+	token.ELSE:       true,
+	token.ELSIF:      true,
+	token.UNTIL:      true,
+	token.BAR:        true,
+}
+
+// declStart lists tokens that genuinely begin a declaration.
+// Used only as a loop-continuation predicate in parseDeclarationSeq.
+// Do NOT add BEGIN or END here – they would cause the loop to re-enter.
 var declStart = map[token.Kind]bool{
 	token.IMPORT:    true,
 	token.CONST:     true,
@@ -28,6 +56,31 @@ var declStart = map[token.Kind]bool{
 	token.VAR:       true,
 	token.PROC:      true,
 	token.PROCEDURE: true,
+}
+
+// declRecover is the sync set used by advance() in declaration-level error
+// recovery. It is declStart plus BEGIN and END so recovery halts before the
+// module/procedure body rather than skipping past it.
+var declRecover = map[token.Kind]bool{
+	token.IMPORT:    true,
+	token.CONST:     true,
+	token.TYPE:      true,
+	token.VAR:       true,
+	token.PROC:      true,
+	token.PROCEDURE: true,
+	token.BEGIN:     true,
+	token.END:       true,
+}
+
+// typeEnd is the sync set used when recovering inside a type expression.
+// It is deliberately narrow so recovery stays within the current declaration
+// instead of jumping all the way to the next CONST/VAR/PROC keyword.
+var typeEnd = map[token.Kind]bool{
+	token.SEMICOLON: true,
+	token.END:       true,
+	token.RPAREN:    true,
+	token.RBRACK:    true,
+	token.OF:        true,
 }
 
 var exprStart = map[token.Kind]bool{
@@ -187,7 +240,7 @@ func (p *Parser) populateEnvs(head *ast.ProcedureHeading, kind ast.ProcedureKind
 		if sym != nil {
 			p.ctx.Reporter.Report(diag.Diagnostic{
 				Severity: diag.Error,
-				Message:  fmt.Sprintf("duplicate procedure declaration: '%v'" + head.Name.Name),
+				Message:  fmt.Sprintf("duplicate procedure declaration: '%s'", head.Name.Name),
 				Range:    p.ctx.Source.Span(p.ctx.FileName, head.Name.StartOffset, head.Name.EndOffset),
 			})
 		}
@@ -364,7 +417,7 @@ func (p *Parser) underlyingRcvType(ty ast.Type) ast.Type {
 	if !ok || typeSymbol == nil {
 		p.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
-			Message:  fmt.Sprintf("reciever type '%s' not declared as a type", rcvType),
+			Message:  fmt.Sprintf("receiver type '%s' is not a type declaration", Named.Name),
 			Range:    p.ctx.Source.Span(p.ctx.FileName, Named.Name.StartOffset, Named.EndOffset),
 		})
 

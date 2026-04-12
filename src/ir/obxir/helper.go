@@ -43,6 +43,9 @@ func Float32Lit(val float64) *FloatLit {
 // ─── ToAsmType: maps obxir.Type → asm.Type ────────────────────────────────
 
 func ToAsmType(ty Type) asm.Type {
+	if ty == nil {
+		return nil
+	}
 	switch ty := ty.(type) {
 	case *IntegerType:
 		if ty.Signed {

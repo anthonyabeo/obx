@@ -56,6 +56,7 @@ const (
 	TokStr
 	TokDst
 	TokSrc
+	TokOperands
 )
 
 type Token struct {
@@ -271,6 +272,8 @@ func (l *Lexer) NextToken() Token {
 			return Token{Kind: TokComm, Value: ident}
 		case "str":
 			return Token{Kind: TokStr, Value: ident}
+		case "operands":
+			return Token{Kind: TokOperands, Value: ident}
 		}
 		return Token{Kind: TokIdent, Value: ident}
 	}

@@ -25,19 +25,31 @@ type Parser struct {
 	// Populated during parseDeclarationSeq; resolved by resolvePendingMethodBindings
 	// after all module declarations have been parsed.
 	pendingMethodBindings []pendingBinding
+
+	// Error-count cap. Once errorCount reaches maxErrors the bailout flag is
+	// set and all further match/advance/error calls become no-ops until EOF,
+	// preventing a cascade of hundreds of misleading follow-on diagnostics.
+	maxErrors  int
+	errorCount int
+	bailout    bool
 }
 
 func NewParser(ctx *diag.Context) *Parser {
-	p := &Parser{sc: scan.Scan(ctx), ctx: ctx}
+	p := &Parser{sc: scan.Scan(ctx), ctx: ctx, maxErrors: 20}
 	p.next()
 
 	return p
 }
 
 func (p *Parser) errorExpected(msg string) {
+	if p.bailout {
+		return
+	}
 	msg = "expected " + msg
 
 	switch {
+	case p.tok == token.EOF:
+		msg += ", but reached end of file"
 	case p.tok.IsLiteral():
 		msg += ", found " + p.lexeme
 	default:
@@ -49,11 +61,48 @@ func (p *Parser) errorExpected(msg string) {
 		Message:  msg,
 		Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
 	})
+
+	p.errorCount++
+	if p.maxErrors > 0 && p.errorCount >= p.maxErrors {
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Info,
+			Message:  fmt.Sprintf("too many errors (%d); stopping", p.maxErrors),
+		})
+		p.bailout = true
+	}
+}
+
+// error reports a semantic diagnostic at the current token position without
+// prepending "expected …". Use this for type/name errors; use errorExpected
+// only for missing-token situations.
+func (p *Parser) error(msg string) {
+	if p.bailout {
+		return
+	}
+	p.ctx.Reporter.Report(diag.Diagnostic{
+		Severity: diag.Error,
+		Message:  msg,
+		Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
+	})
+
+	p.errorCount++
+	if p.maxErrors > 0 && p.errorCount >= p.maxErrors {
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Info,
+			Message:  fmt.Sprintf("too many errors (%d); stopping", p.maxErrors),
+		})
+		p.bailout = true
+	}
 }
 
 func (p *Parser) match(tok token.Kind) {
+	if p.bailout {
+		return
+	}
+
 	if p.tok != tok {
 		p.errorExpected("'" + tok.String() + "'")
+		return
 	}
 
 	p.next()
@@ -188,7 +237,7 @@ func (p *Parser) parseModule() *ast.Module {
 		default:
 			pos := p.pos
 			p.errorExpected("import or declaration")
-			p.advance(declStart)
+			p.advance(declRecover)
 			declSeq = append(declSeq, &ast.BadDecl{StartOffset: pos, EndOffset: p.pos})
 		}
 	}
@@ -270,6 +319,15 @@ func (p *Parser) parseDefinition() *ast.Definition {
 	p.match(token.END)
 	endOffset = p.end
 	endName = p.parseIdent()
+
+	if beginName != endName {
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
+			Message:  fmt.Sprintf("opening definition name (%s) does not match ending name (%s)", beginName, endName),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
+		})
+	}
+
 	if p.tok == token.PERIOD {
 		endOffset = p.end
 		p.next()
@@ -311,7 +369,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 			if sym := p.ctx.Env.Define(ast.NewImportSymbol(imp.Alias)); sym != nil {
 				p.ctx.Reporter.Report(diag.Diagnostic{
 					Severity: diag.Error,
-					Message:  "duplicate module import",
+					Message:  fmt.Sprintf("duplicate import: '%s'", imp.Alias),
 					Range:    p.ctx.Source.Span(p.ctx.FileName, imp.StartOffset, imp.EndOffset),
 				})
 			}
@@ -319,7 +377,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 			if sym := p.ctx.Env.Define(ast.NewImportSymbol(imp.Name)); sym != nil {
 				p.ctx.Reporter.Report(diag.Diagnostic{
 					Severity: diag.Error,
-					Message:  "duplicate module import",
+					Message:  fmt.Sprintf("duplicate import: '%s'", imp.Name),
 					Range:    p.ctx.Source.Span(p.ctx.FileName, imp.StartOffset, imp.EndOffset),
 				})
 			}
@@ -423,7 +481,7 @@ func (p *Parser) parseDeclarationSeq2() (seq []ast.Declaration) {
 		default:
 			pos := p.pos
 			p.errorExpected("declaration")
-			p.advance(declStart)
+			p.advance(declRecover)
 			seq = append(seq, &ast.BadDecl{StartOffset: pos, EndOffset: p.pos})
 		}
 	}
@@ -484,7 +542,7 @@ func (p *Parser) parseDeclarationSeq() (seq []ast.Declaration) {
 		default:
 			pos := p.pos
 			p.errorExpected("declaration")
-			p.advance(declStart)
+			p.advance(declRecover)
 			seq = append(seq, &ast.BadDecl{StartOffset: pos, EndOffset: p.pos})
 		}
 	}
@@ -550,6 +608,7 @@ func (p *Parser) parseVariableDecl() *ast.VariableDecl {
 				Severity: diag.Error,
 				Message:  "duplicate variable declaration " + id.Name,
 				Range:    p.ctx.Source.Span(p.ctx.FileName, id.StartOffset, id.EndOffset),
+				Notes:    []diag.Note{p.dupDeclNote(sym)},
 			})
 		}
 	}
@@ -579,7 +638,7 @@ func (p *Parser) parseType() (ty ast.Type) {
 	default:
 		pos := p.pos
 		p.errorExpected("type")
-		p.advance(declStart)
+		p.advance(typeEnd)
 		return &ast.BadType{StartOffset: pos, EndOffset: p.pos}
 	}
 
@@ -633,10 +692,10 @@ func (p *Parser) parseProcedureType() *ast.ProcedureType {
 	proc := &ast.ProcedureType{StartOffset: p.pos, EndOffset: p.end}
 	if p.tok != token.PROC && p.tok != token.PROCEDURE {
 		p.errorExpected("PROC or PROCEDURE")
-		p.advance(declStart)
+		p.advance(typeEnd)
+		return proc
 	}
-
-	p.next()
+	p.next() // consume PROC / PROCEDURE
 
 	if p.tok == token.LPAREN {
 		LParen := p.tok
@@ -749,7 +808,7 @@ func (p *Parser) parseRecordBase(rec *ast.RecordType) *ast.RecordScope {
 
 	baseType, ok := rec.Base.(*ast.NamedType)
 	if !ok {
-		p.errorExpected("named type")
+		p.error("base type must be a named type")
 		return nil
 	}
 
@@ -770,12 +829,8 @@ func (p *Parser) lookupBaseType(baseType *ast.NamedType) ast.Symbol {
 	if baseType.Name.Prefix != "" {
 		base := p.ctx.Env.LookupQualified(baseType.Name.Prefix, baseType.Name.Name)
 		if base == nil || base.Props() != ast.Exported {
-			p.ctx.Reporter.Report(diag.Diagnostic{
-				Severity: diag.Error,
-				Message:  fmt.Sprintf("object %s is not exported", baseType.Name),
-				Range:    p.ctx.Source.Span(p.ctx.FileName, baseType.Name.StartOffset, baseType.Name.EndOffset),
-			})
-			p.advance(declStart)
+			p.error(fmt.Sprintf("object '%s' is not exported", baseType.Name))
+			p.advance(typeEnd)
 			return nil
 		}
 		return base
@@ -787,8 +842,8 @@ func (p *Parser) lookupBaseType(baseType *ast.NamedType) ast.Symbol {
 func (p *Parser) getRecordType(base ast.Symbol) *ast.RecordType {
 	typeSymbol, ok := base.(*ast.TypeSymbol)
 	if !ok || typeSymbol == nil {
-		p.errorExpected("record type")
-		p.advance(declStart)
+		p.error("base type must be a record type")
+		p.advance(typeEnd)
 		return nil
 	}
 
@@ -801,8 +856,8 @@ func (p *Parser) getRecordType(base ast.Symbol) *ast.RecordType {
 		}
 	}
 
-	p.errorExpected("record type")
-	p.advance(declStart)
+	p.error("base type must be a record type")
+	p.advance(typeEnd)
 	return nil
 }
 
@@ -843,9 +898,29 @@ func (p *Parser) fieldList() *ast.FieldList {
 	return fl
 }
 
+// dupDeclNote returns a Note pointing at the first declaration of sym,
+// using sym.AstType().Pos()/End() as a best-effort source location.
+func (p *Parser) dupDeclNote(sym interface{ AstType() ast.Type }) diag.Note {
+	if ty := sym.AstType(); ty != nil {
+		return diag.Note{
+			Message: "first declared here",
+			Range:   p.ctx.Source.Span(p.ctx.FileName, ty.Pos(), ty.End()),
+		}
+	}
+	return diag.Note{Message: "first declared here"}
+}
+
 // advance consumes tokens until the current token p.tok
 // is in the 'to' set, or token.EOF. For diagnostics recovery.
 func (p *Parser) advance(to map[token.Kind]bool) {
+	if p.bailout {
+		// Drain to EOF so every enclosing loop whose condition tests p.tok
+		// (e.g. stmtStart, startsDecl) naturally exits instead of spinning.
+		for p.tok != token.EOF {
+			p.next()
+		}
+		return
+	}
 	for ; p.tok != token.EOF; p.next() {
 		if to[p.tok] {
 			return
@@ -956,11 +1031,7 @@ func (p *Parser) parseFactor() ast.Expression {
 		return p.parseLiteral()
 
 	default:
-		p.ctx.Reporter.Report(diag.Diagnostic{
-			Severity: diag.Error,
-			Message:  "unexpected token: " + p.lexeme + " does not initiate an expression",
-			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
-		})
+		p.errorExpected("expression")
 		pos := p.pos
 		p.advance(exprEnd)
 		return &ast.BadExpr{StartOffset: pos, EndOffset: p.pos}
@@ -1250,10 +1321,16 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 
 	proc.EndOffset = p.end
 	p.match(token.END)
-	if proc.Body != nil && p.tok != token.IDENTIFIER && p.lexeme != proc.Head.Name.Name {
+	if p.tok == token.IDENTIFIER && p.lexeme != proc.Head.Name.Name {
 		p.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
-			Message:  fmt.Sprintf("non-empty body of procedure declaration must end with a matching name"),
+			Message:  fmt.Sprintf("END name '%s' does not match procedure name '%s'", p.lexeme, proc.Head.Name.Name),
+			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
+		})
+	} else if proc.Body != nil && p.tok != token.IDENTIFIER {
+		p.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
+			Message:  fmt.Sprintf("procedure '%s' with a body must have a matching END name", proc.Head.Name.Name),
 			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
 		})
 	}
@@ -1273,7 +1350,7 @@ func (p *Parser) parseProcHeading() (head *ast.ProcedureHeading) {
 
 	if p.tok != token.PROC && p.tok != token.PROCEDURE {
 		p.errorExpected("proc or procedure")
-		p.advance(declStart)
+		p.advance(declRecover)
 		return head
 	}
 
@@ -1417,16 +1494,16 @@ func (p *Parser) parseStatementSeq() (seq []ast.Statement) {
 
 	for p.tok == token.SEMICOLON || p.stmtStart() {
 		if p.tok == token.SEMICOLON {
+			semiPos, semiEnd := p.pos, p.end
 			p.next()
 
 			if !p.stmtStart() {
-				last := seq[len(seq)-1]
 				p.ctx.Reporter.Report(diag.Diagnostic{
 					Severity: diag.Error,
-					Message:  "the last statement must not end with a semi-colon",
-					Range:    p.ctx.Source.Span(p.ctx.FileName, last.Pos(), last.End()),
+					Message:  "trailing semicolon after last statement",
+					Range:    p.ctx.Source.Span(p.ctx.FileName, semiPos, semiEnd),
 				})
-				p.advance(stmtStart)
+				p.advance(stmtRecover)
 			}
 		}
 
@@ -1496,13 +1573,14 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 				Message:  fmt.Sprintf("%s is not a valid statement", dsg),
 				Range:    p.ctx.Source.Span(p.ctx.FileName, dsg.StartOffset, dsg.EndOffset),
 			})
-			p.advance(stmtStart)
+			p.advance(stmtRecover)
 			stmt = &ast.BadStmt{StartOffset: pos, EndOffset: p.pos}
 		}
 	default:
 		p.errorExpected("statement")
-		p.advance(stmtStart)
-		stmt = &ast.BadStmt{StartOffset: p.pos, EndOffset: p.end}
+		errPos := p.pos
+		p.advance(stmtRecover)
+		stmt = &ast.BadStmt{StartOffset: errPos, EndOffset: p.pos}
 	}
 
 	return

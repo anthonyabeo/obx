@@ -180,8 +180,15 @@ func (p *Parser) parseArg() *ast.Arg {
 	p.match(TokArg)
 	p.match(TokLBrace)
 	imm := p.parseImm()
+
+	var kind *ast.String
+	if p.cur.Kind == TokComma {
+		p.next()
+		kind = p.parseString()
+	}
+
 	p.match(TokRBrace)
-	return &ast.Arg{Index: imm}
+	return &ast.Arg{Index: imm, ArgKind: kind}
 }
 
 func (p *Parser) parseSymbol() *ast.Symbol {
@@ -348,11 +355,11 @@ func (p *Parser) parseInstr() ast.Instr {
 	p.match(TokLBrace)
 
 	var (
-		opcode string
-		dst    ast.Operand
-		src    []ast.Operand
-		def    *ast.Register
-		uses   []*ast.Register
+		opcode   string
+		dst      ast.Operand
+		operands []ast.Operand
+		def      *ast.Register
+		uses     []*ast.Register
 	)
 
 	for {
@@ -361,52 +368,43 @@ func (p *Parser) parseInstr() ast.Instr {
 			break
 		}
 
-		p.match(TokOpcode)
-		p.match(TokColon)
-		opcode = p.match(TokString)
-
-		if p.cur.Kind == TokComma {
+		switch p.cur.Kind {
+		case TokOpcode:
 			p.next()
-		}
+			p.match(TokColon)
+			opcode = p.match(TokString)
 
-		if p.cur.Kind == TokDst {
+		case TokOperands:
+			// New unified syntax: operands: [op1, op2, ...]
+			p.next()
+			p.match(TokColon)
+			p.match(TokLBrack)
+			operands = p.parseOperandList()
+			p.match(TokRBrack)
+
+		case TokDst:
+			// Legacy syntax: dst: <operand>
 			p.next()
 			p.match(TokColon)
 			dst = p.parseOperand()
-		}
 
-		if p.cur.Kind == TokComma {
-			p.next()
-		}
-
-		if p.cur.Kind == TokSrc {
+		case TokSrc:
+			// Legacy syntax: src: [op1, op2, ...]
 			p.next()
 			p.match(TokColon)
 			p.match(TokLBrack)
-
-			src = p.parseOperandList()
+			operands = p.parseOperandList()
 			p.match(TokRBrack)
-		}
 
-		if p.cur.Kind == TokComma {
-			p.next()
-		}
-
-		if p.cur.Kind == TokDef {
+		case TokDef:
 			p.next()
 			p.match(TokColon)
 			def = p.parseReg()
-		}
 
-		if p.cur.Kind == TokComma {
-			p.next()
-		}
-
-		if p.cur.Kind == TokUses {
+		case TokUses:
 			p.next()
 			p.match(TokColon)
 			p.match(TokLBrack)
-
 			for {
 				uses = append(uses, p.parseReg())
 				if p.cur.Kind == TokComma {
@@ -415,15 +413,21 @@ func (p *Parser) parseInstr() ast.Instr {
 				}
 				break
 			}
-
 			p.match(TokRBrack)
+
+		default:
+			panic("unexpected token in instr: " + p.cur.Value)
+		}
+
+		if p.cur.Kind == TokComma {
+			p.next()
 		}
 	}
 
 	return ast.Instr{
 		Opcode:   opcode,
 		Dst:      dst,
-		Operands: src,
+		Operands: operands,
 		Def:      def,
 		Uses:     uses,
 	}

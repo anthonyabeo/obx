@@ -497,6 +497,10 @@ func (b *IRBuilder) lowerBinary(expr *desugar.BinaryExpr) Value {
 
 func (b *IRBuilder) lowerUnaryExpr(u *desugar.UnaryExpr) Value {
 	op := b.lowerOp(u.Op)
+	// Unary minus maps to NEG, not binary SUB.
+	if op == SUB {
+		op = NEG
+	}
 	operand := b.ensureValue(u.Operand)
 	return b.CreateUnary(op, operand, b.lowerType(u.SemaType))
 }
