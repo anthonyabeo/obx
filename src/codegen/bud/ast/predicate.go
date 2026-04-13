@@ -77,6 +77,19 @@ func init() {
 		return val.Imm >= 0 && val.Imm <= (1<<20)-1
 	})
 
+	RegisterPredicate("UImmFits16", func(args []string, env map[string]*bud.Value) bool {
+		if len(args) != 1 {
+			return false
+		}
+
+		val, ok := env[args[0]]
+		if !ok || val.Kind != bud.KindImm {
+			return false
+		}
+
+		return val.Imm >= 0 && val.Imm <= 65535
+	})
+
 	RegisterPredicate("ShamtFits6", func(args []string, env map[string]*bud.Value) bool {
 		if len(args) != 1 {
 			return false
