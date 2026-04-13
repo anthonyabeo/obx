@@ -13,7 +13,6 @@ import (
 // Config holds all runtime parameters for the web server.
 type Config struct {
 	Addr      string // host:port to listen on, e.g. ":8080"
-	TabWidth  int    // spaces per tab in rendered diagnostic snippets
 	MaxErrors int    // max errors before the pipeline stops
 }
 

@@ -73,12 +73,12 @@ func reachableFrom(sorted []project.Header, graph *project.ImportGraph, entry st
 }
 
 // newContext builds a diag.Context wired to a fresh SourceManager and a
-// BufferedReporter that writes to stderr. tabWidth controls tab expansion in
-// rendered diagnostic snippets.
-func newContext(tabWidth, maxErrors int) (*diag.Context, *source.Manager) {
+// BufferedReporter that writes to stderr.
+// The text formatter uses its built-in tab-width default of 4 spaces.
+func newContext(maxErrors int) (*diag.Context, *source.Manager) {
 	srcMgr := source.NewSourceManager()
 	reporter := diag.NewBufferedReporter(srcMgr, maxErrors,
-		diag.Stderr(formatter.NewTextFormatter(srcMgr, tabWidth)),
+		diag.Stderr(formatter.NewTextFormatter(srcMgr, 0)),
 	)
 	ctx := &diag.Context{
 		Source:                srcMgr,

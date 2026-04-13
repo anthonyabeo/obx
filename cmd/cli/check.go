@@ -14,7 +14,6 @@ import (
 
 var checkArgs struct {
 	Path      string
-	TabWidth  int
 	MaxErrors int
 	Quiet     bool
 }
@@ -22,7 +21,6 @@ var checkArgs struct {
 func init() {
 	checkCmd.Flags().StringVarP(&checkArgs.Path, "path", "p", "",
 		"source root directory (defaults to roots in obx.mod)")
-	checkCmd.Flags().IntVarP(&checkArgs.TabWidth, "tabWidth", "t", 4, "how many spaces should represent a tab")
 	checkCmd.Flags().IntVar(&checkArgs.MaxErrors, "max-errors", 32, "maximum number of errors to report before stopping")
 	checkCmd.Flags().BoolVarP(&checkArgs.Quiet, "quiet", "q", false, "suppress informational output; only show diagnostics")
 }
@@ -73,7 +71,7 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 		}
 
 		// ── 2. Parse ─────────────────────────────────────────────────────
-		ctx, _ := newContext(checkArgs.TabWidth, checkArgs.MaxErrors)
+		ctx, _ := newContext(checkArgs.MaxErrors)
 		obx := ast.NewOberonX()
 
 		if ok := parseModules(sorted, ctx, obx); !ok {

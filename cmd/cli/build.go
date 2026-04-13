@@ -27,7 +27,6 @@ var buildArgs struct {
 	Output string
 	Target string // --target; defaults to rv64imafd
 
-	TabWidth      int
 	OptLevel      int
 	EnablePasses  string
 	DisablePasses string
@@ -43,7 +42,6 @@ func init() {
 	buildCmd.Flags().StringVarP(&buildArgs.Output, "output", "o", "", "name of the output file to produce")
 	buildCmd.Flags().StringVarP(&buildArgs.Target, "target", "T", "rv64imafd",
 		"target architecture (available: "+strings.Join(target.Available(), ", ")+")")
-	buildCmd.Flags().IntVarP(&buildArgs.TabWidth, "tabWidth", "t", 4, "how many spaces should represent a tab")
 	buildCmd.Flags().IntVarP(&buildArgs.OptLevel, "optlevel", "O", 2, "optimisation level (0-3)")
 	buildCmd.Flags().StringVarP(&buildArgs.EnablePasses, "passes", "P", "", "comma-separated optimisation passes to enable (overrides -O)")
 	buildCmd.Flags().StringVarP(&buildArgs.DisablePasses, "disable-passes", "D", "", "comma-separated optimisation passes to disable")
@@ -108,7 +106,8 @@ precedence over obx.mod values.`,
 		}
 
 		// ── 3. Parse ──────────────────────────────────────────────────────
-		ctx, _ := newContext(buildArgs.TabWidth, 32)
+		ctx, _ := newContext(32)
+
 		obx := ast.NewOberonX()
 
 		if ok := parseModules(sorted, ctx, obx); !ok {
