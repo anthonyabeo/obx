@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/scan"
@@ -12,8 +13,9 @@ import (
 )
 
 type Parser struct {
-	sc  *scan.Scanner
-	ctx *diag.Context
+	sc       *scan.Scanner
+	ctx      *compiler.Context
+	fileName string // per-file; not stored on the shared context
 
 	// Next token
 	tok    token.Kind
@@ -34,8 +36,12 @@ type Parser struct {
 	bailout    bool
 }
 
-func NewParser(ctx *diag.Context) *Parser {
-	p := &Parser{sc: scan.Scan(ctx), ctx: ctx, maxErrors: 20}
+func NewParser(ctx *compiler.Context, fileName string, content []byte) *Parser {
+	p := &Parser{
+		sc:       scan.Scan(fileName, content, ctx.Source),
+		ctx:      ctx,
+		fileName: fileName,
+	}
 	p.next()
 
 	return p
@@ -49,7 +55,7 @@ func (p *Parser) errorExpected(msg string) {
 
 	switch {
 	case p.tok == token.EOF:
-		msg += ", but reached end of file"
+		msg += ", found 'EOF'"
 	case p.tok.IsLiteral():
 		msg += ", found " + p.lexeme
 	default:
@@ -59,7 +65,7 @@ func (p *Parser) errorExpected(msg string) {
 	p.ctx.Reporter.Report(diag.Diagnostic{
 		Severity: diag.Error,
 		Message:  msg,
-		Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
+		Range:    p.ctx.Source.Span(p.fileName, p.pos, p.end),
 	})
 
 	p.errorCount++
@@ -82,7 +88,7 @@ func (p *Parser) error(msg string) {
 	p.ctx.Reporter.Report(diag.Diagnostic{
 		Severity: diag.Error,
 		Message:  msg,
-		Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
+		Range:    p.ctx.Source.Span(p.fileName, p.pos, p.end),
 	})
 
 	p.errorCount++
@@ -117,6 +123,16 @@ func (p *Parser) next() {
 		p.end = tok.End
 
 		switch tok.Kind {
+		case token.ILLEGAL:
+			// Surface scanner-level errors (e.g. "invalid character", "malformed number")
+			// directly to the diagnostic reporter so callers see them, then skip the
+			// bad token and continue scanning.
+			p.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
+				Message:  tok.Lexeme,
+				Range:    p.ctx.Source.Span(p.fileName, tok.Pos, tok.End),
+			})
+			continue
 		case token.SL_COMMENT_START:
 			// Skip until end of line
 			for tok.Kind != token.EOF && tok.Kind != token.NEWLINE {
@@ -259,7 +275,7 @@ func (p *Parser) parseModule() *ast.Module {
 		p.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
 			Message:  fmt.Sprintf("opening module name (%s) does not match ending name (%s)", beginName, endName),
-			Range:    p.ctx.Source.Span(p.ctx.FileName, endNameStartOffset, endOffset),
+			Range:    p.ctx.Source.Span(p.fileName, endNameStartOffset, endOffset),
 		})
 	}
 
@@ -276,6 +292,7 @@ func (p *Parser) parseModule() *ast.Module {
 		EndOffset:   endOffset,
 		BName:       beginName,
 		EName:       endName,
+		FileName:    p.fileName,
 		MetaParams:  meta,
 		ImportList:  importList,
 		DeclSeq:     declSeq,
@@ -324,7 +341,7 @@ func (p *Parser) parseDefinition() *ast.Definition {
 		p.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
 			Message:  fmt.Sprintf("opening definition name (%s) does not match ending name (%s)", beginName, endName),
-			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
+			Range:    p.ctx.Source.Span(p.fileName, p.pos, p.end),
 		})
 	}
 
@@ -338,6 +355,7 @@ func (p *Parser) parseDefinition() *ast.Definition {
 	return &ast.Definition{
 		BName:       beginName,
 		EName:       endName,
+		FileName:    p.fileName,
 		ImportList:  importList,
 		DeclSeq:     declSeq,
 		StartOffset: startOffset,
@@ -370,7 +388,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 				p.ctx.Reporter.Report(diag.Diagnostic{
 					Severity: diag.Error,
 					Message:  fmt.Sprintf("duplicate import: '%s'", imp.Alias),
-					Range:    p.ctx.Source.Span(p.ctx.FileName, imp.StartOffset, imp.EndOffset),
+					Range:    p.ctx.Source.Span(p.fileName, imp.StartOffset, imp.EndOffset),
 				})
 			}
 		} else {
@@ -378,7 +396,7 @@ func (p *Parser) parseImportList() []*ast.Import {
 				p.ctx.Reporter.Report(diag.Diagnostic{
 					Severity: diag.Error,
 					Message:  fmt.Sprintf("duplicate import: '%s'", imp.Name),
-					Range:    p.ctx.Source.Span(p.ctx.FileName, imp.StartOffset, imp.EndOffset),
+					Range:    p.ctx.Source.Span(p.fileName, imp.StartOffset, imp.EndOffset),
 				})
 			}
 		}
@@ -560,7 +578,7 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 		p.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
 			Message:  "duplicate type declaration " + name.Name,
-			Range:    p.ctx.Source.Span(p.ctx.FileName, name.StartOffset, name.EndOffset),
+			Range:    p.ctx.Source.Span(p.fileName, name.StartOffset, name.EndOffset),
 		})
 	}
 
@@ -581,7 +599,7 @@ func (p *Parser) parseConstantDecl() *ast.ConstantDecl {
 		p.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
 			Message:  "duplicate constant declaration " + name.Name,
-			Range:    p.ctx.Source.Span(p.ctx.FileName, name.StartOffset, name.EndOffset),
+			Range:    p.ctx.Source.Span(p.fileName, name.StartOffset, name.EndOffset),
 		})
 	}
 
@@ -607,7 +625,7 @@ func (p *Parser) parseVariableDecl() *ast.VariableDecl {
 			p.ctx.Reporter.Report(diag.Diagnostic{
 				Severity: diag.Error,
 				Message:  "duplicate variable declaration " + id.Name,
-				Range:    p.ctx.Source.Span(p.ctx.FileName, id.StartOffset, id.EndOffset),
+				Range:    p.ctx.Source.Span(p.fileName, id.StartOffset, id.EndOffset),
 				Notes:    []diag.Note{p.dupDeclNote(sym)},
 			})
 		}
@@ -882,7 +900,7 @@ func (p *Parser) addFieldsToEnv(rec *ast.RecordType) {
 				p.ctx.Reporter.Report(diag.Diagnostic{
 					Severity: diag.Error,
 					Message:  "duplicate field declaration " + id.Name,
-					Range:    p.ctx.Source.Span(p.ctx.FileName, id.StartOffset, id.EndOffset),
+					Range:    p.ctx.Source.Span(p.fileName, id.StartOffset, id.EndOffset),
 				})
 			}
 		}
@@ -904,7 +922,7 @@ func (p *Parser) dupDeclNote(sym interface{ AstType() ast.Type }) diag.Note {
 	if ty := sym.AstType(); ty != nil {
 		return diag.Note{
 			Message: "first declared here",
-			Range:   p.ctx.Source.Span(p.ctx.FileName, ty.Pos(), ty.End()),
+			Range:   p.ctx.Source.Span(p.fileName, ty.Pos(), ty.End()),
 		}
 	}
 	return diag.Note{Message: "first declared here"}
@@ -1031,7 +1049,7 @@ func (p *Parser) parseFactor() ast.Expression {
 		return p.parseLiteral()
 
 	default:
-		p.errorExpected("expression")
+		p.errorExpected("expression: " + p.lexeme)
 		pos := p.pos
 		p.advance(exprEnd)
 		return &ast.BadExpr{StartOffset: pos, EndOffset: p.pos}
@@ -1325,13 +1343,13 @@ func (p *Parser) parseProcedureDecl() (proc *ast.ProcedureDecl) {
 		p.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
 			Message:  fmt.Sprintf("END name '%s' does not match procedure name '%s'", p.lexeme, proc.Head.Name.Name),
-			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
+			Range:    p.ctx.Source.Span(p.fileName, p.pos, p.end),
 		})
 	} else if proc.Body != nil && p.tok != token.IDENTIFIER {
 		p.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
 			Message:  fmt.Sprintf("procedure '%s' with a body must have a matching END name", proc.Head.Name.Name),
-			Range:    p.ctx.Source.Span(p.ctx.FileName, p.pos, p.end),
+			Range:    p.ctx.Source.Span(p.fileName, p.pos, p.end),
 		})
 	}
 
@@ -1501,7 +1519,7 @@ func (p *Parser) parseStatementSeq() (seq []ast.Statement) {
 				p.ctx.Reporter.Report(diag.Diagnostic{
 					Severity: diag.Error,
 					Message:  "trailing semicolon after last statement",
-					Range:    p.ctx.Source.Span(p.ctx.FileName, semiPos, semiEnd),
+					Range:    p.ctx.Source.Span(p.fileName, semiPos, semiEnd),
 				})
 				p.advance(stmtRecover)
 			}
@@ -1571,7 +1589,7 @@ func (p *Parser) parseStatement() (stmt ast.Statement) {
 			p.ctx.Reporter.Report(diag.Diagnostic{
 				Severity: diag.Error,
 				Message:  fmt.Sprintf("%s is not a valid statement", dsg),
-				Range:    p.ctx.Source.Span(p.ctx.FileName, dsg.StartOffset, dsg.EndOffset),
+				Range:    p.ctx.Source.Span(p.fileName, dsg.StartOffset, dsg.EndOffset),
 			})
 			p.advance(stmtRecover)
 			stmt = &ast.BadStmt{StartOffset: pos, EndOffset: p.pos}

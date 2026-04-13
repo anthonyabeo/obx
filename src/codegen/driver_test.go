@@ -4,12 +4,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/opt"
-	"github.com/anthonyabeo/obx/src/support/diag/formatter"
-
 	"github.com/anthonyabeo/obx/src/codegen/target/riscv"
+	"github.com/anthonyabeo/obx/src/opt"
 	"github.com/anthonyabeo/obx/src/project"
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
+	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/support/testutil"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -233,15 +233,10 @@ func TestCompile(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mgr := source.NewSourceManager()
-			ctx := &diag.Context{
-				FileName:  tc.filename,
-				Content:   []byte(tc.input),
-				Env:       ast.NewEnv(),
-				Source:    mgr,
-				Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-			}
+			reporter := diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0)))
+			ctx := compiler.New(tc.filename, mgr, reporter, ast.NewEnv(), 8)
 
-			program := testutil.ParseSourceAndLowerToMIR(t, ctx)
+			program := testutil.ParseSourceAndLowerToMIR(t, ctx, tc.filename, []byte(tc.input))
 			for _, module := range program.Modules {
 				for _, function := range module.Funcs {
 					opt.BuildCFG(function)

@@ -1,18 +1,19 @@
 package sema
 
 import (
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
 type FlowChecker struct {
-	ctx *diag.Context
+	ctx *compiler.Context
 
 	label         string
 	loopIDCounter int
 }
 
-func NewFlowChecker(ctx *diag.Context) *FlowChecker {
+func NewFlowChecker(ctx *compiler.Context) *FlowChecker {
 	return &FlowChecker{ctx: ctx}
 }
 
@@ -57,8 +58,6 @@ func (f *FlowChecker) VisitSet(set *ast.Set) any { return set }
 func (f *FlowChecker) VisitBasicLit(lit *ast.BasicLit) any { return lit }
 
 func (f *FlowChecker) VisitExprRange(rng *ast.ExprRange) any { return rng }
-
-//func (f *FlowChecker) VisitNil(n *ast.Nil) any { return n }
 
 func (f *FlowChecker) VisitIfStmt(stmt *ast.IfStmt) any {
 	for _, s := range stmt.ThenPath {
@@ -223,7 +222,6 @@ func (f *FlowChecker) VisitDotOp(op *ast.DotOp) any { return op }
 func (f *FlowChecker) VisitTypeGuard(guard *ast.TypeGuard) any { return guard }
 
 func (f *FlowChecker) VisitProcedureBody(body *ast.ProcedureBody) any {
-	f.visitStmtSeq(body.StmtSeq)
 	f.visitStmtSeq(body.StmtSeq)
 	return body
 }

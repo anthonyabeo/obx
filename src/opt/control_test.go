@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/ir/obxir"
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
@@ -371,16 +372,10 @@ end Main
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mgr := source.NewSourceManager()
-			ctx := &diag.Context{
-				FileName:              tc.filename,
-				Content:               []byte(tc.input),
-				Env:                   ast.NewEnv(),
-				Source:                mgr,
-				Reporter:              diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-				TargetMachineWordSize: 8,
-			}
+			reporter := diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0)))
+			ctx := compiler.New(tc.filename, mgr, reporter, ast.NewEnv(), 8)
 
-			program := testutil.ParseSourceAndLowerToMIR(t, ctx)
+			program := testutil.ParseSourceAndLowerToMIR(t, ctx, tc.filename, []byte(tc.input))
 
 			projectRoot, err := findProjectRoot(".")
 			if err != nil {

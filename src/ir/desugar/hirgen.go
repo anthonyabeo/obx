@@ -3,19 +3,17 @@ package desugar
 import (
 	"fmt"
 
-	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 type Generator struct {
-	ctx *diag.Context
 	obx *ast.OberonX
 }
 
-func NewGenerator(ctx *diag.Context, obx *ast.OberonX) *Generator {
-	return &Generator{ctx: ctx, obx: obx}
+func NewGenerator(obx *ast.OberonX) *Generator {
+	return &Generator{obx: obx}
 }
 
 func (g Generator) Generate() *Program {

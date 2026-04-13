@@ -20,14 +20,8 @@ type ExpectedToken struct {
 }
 
 func expectTokens(t *testing.T, src []byte, filename string, expected []ExpectedToken) {
-	ctx := &diag.Context{
-		FileName: filename,
-		Content:  src,
-		Source:   source.NewSourceManager(),
-		Reporter: nil,
-	}
-
-	sc := Scan(ctx)
+	srcMgr := source.NewSourceManager()
+	sc := Scan(filename, src, srcMgr)
 
 	var tokens []token.Token
 	for {
@@ -55,7 +49,7 @@ func expectTokens(t *testing.T, src []byte, filename string, expected []Expected
 			t.Errorf("token %d: expected lexeme %q, got %q", i, exp.Lexeme, tok.Lexeme)
 		}
 
-		r := ctx.Source.Span(filename, tok.Pos, tok.End)
+		r := srcMgr.Span(filename, tok.Pos, tok.End)
 		start := r.Start
 		end := r.End
 
@@ -228,14 +222,8 @@ func TestLexerTokenRanges(t *testing.T) {
     y := x + 1
 `)
 	file := "test.ob"
-	ctx := &diag.Context{
-		FileName: file,
-		Content:  src,
-		Source:   source.NewSourceManager(),
-		Reporter: nil,
-	}
-
-	lx := Scan(ctx)
+	srcMgr := source.NewSourceManager()
+	lx := Scan(file, src, srcMgr)
 
 	var tokens []token.Token
 	for {
@@ -273,7 +261,7 @@ func TestLexerTokenRanges(t *testing.T) {
 			t.Errorf("token %d: expected lexeme %q, got %q", tt.Index, tt.Lexeme, tok.Lexeme)
 		}
 
-		r := ctx.Source.Span(file, tok.Pos, tok.End)
+		r := srcMgr.Span(file, tok.Pos, tok.End)
 
 		start := r.Start
 		end := r.End
@@ -309,14 +297,8 @@ func TestOffsetToLineCol_WithTabs(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &diag.Context{
-		FileName: file,
-		Content:  src,
-		Source:   source.NewSourceManager(),
-		Reporter: nil,
-	}
-
-	sc := Scan(ctx)
+	srcMgr := source.NewSourceManager()
+	sc := Scan(file, src, srcMgr)
 
 	var tokens []token.Token
 	for {
@@ -333,7 +315,7 @@ func TestOffsetToLineCol_WithTabs(t *testing.T) {
 			t.Errorf("token %d: expected lexeme %q, got %q", tt.Index, tt.Lexeme, tok.Lexeme)
 		}
 
-		r := ctx.Source.Span(file, tok.Pos, tok.End)
+		r := srcMgr.Span(file, tok.Pos, tok.End)
 
 		start := r.Start
 		end := r.End

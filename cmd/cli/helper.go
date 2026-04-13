@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/anthonyabeo/obx/src/project"
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
@@ -72,37 +73,31 @@ func reachableFrom(sorted []project.Header, graph *project.ImportGraph, entry st
 	return out
 }
 
-// newContext builds a diag.Context wired to a fresh SourceManager and a
+// newContext builds a compiler.Context wired to a fresh SourceManager and a
 // BufferedReporter that writes to stderr.
 // The text formatter uses its built-in tab-width default of 4 spaces.
-func newContext(maxErrors int) (*diag.Context, *source.Manager) {
+func newContext(maxErrors int) (*compiler.Context, *source.Manager) {
 	srcMgr := source.NewSourceManager()
 	reporter := diag.NewBufferedReporter(srcMgr, maxErrors,
 		diag.Stderr(formatter.NewTextFormatter(srcMgr, 0)),
 	)
-	ctx := &diag.Context{
-		Source:                srcMgr,
-		Reporter:              reporter,
-		Env:                   ast.NewEnv(),
-		TargetMachineWordSize: 8,
-	}
+	ctx := compiler.New("", srcMgr, reporter, ast.NewEnv(), 8)
 	return ctx, srcMgr
 }
 
 // parseModules parses every header (in sorted order) into obx.
 // Returns false and flushes diagnostics if any parse errors are found.
-func parseModules(sorted []project.Header, ctx *diag.Context, obx *ast.OberonX) bool {
+func parseModules(sorted []project.Header, ctx *compiler.Context, obx *ast.OberonX) bool {
 	for _, header := range sorted {
 		data, err := os.ReadFile(header.File)
 		if err != nil {
 			log.Fatalf("read %s: %v", header.File, err)
 		}
 
-		ctx.FileName = filepath.Base(header.File)
-		ctx.FilePath = header.File
-		ctx.Content = data[header.StartPos:header.EndPos]
+		fileName := filepath.Base(header.File)
+		content := data[header.StartPos:header.EndPos]
 
-		p := parser.NewParser(ctx)
+		p := parser.NewParser(ctx, fileName, content)
 		unit := p.Parse()
 		if ctx.Reporter.ErrorCount() > 0 {
 			ctx.Reporter.Flush()

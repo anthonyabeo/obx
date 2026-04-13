@@ -1,16 +1,16 @@
 package sema
 
 import (
-	"github.com/anthonyabeo/obx/src/support/diag"
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
 type Sema struct {
-	ctx *diag.Context
+	ctx *compiler.Context
 	obx *ast.OberonX
 }
 
-func NewSema(ctx *diag.Context, obx *ast.OberonX) *Sema {
+func NewSema(ctx *compiler.Context, obx *ast.OberonX) *Sema {
 	return &Sema{ctx: ctx, obx: obx}
 }
 

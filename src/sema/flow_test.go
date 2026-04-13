@@ -6,12 +6,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
-	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 type TestCase struct {
@@ -270,15 +270,10 @@ END M.
 			// Set up source manager and reporter
 			filename := "test.obx"
 			mgr := source.NewSourceManager()
-			ctx := &diag.Context{
-				FileName:  filename,
-				Content:   src,
-				Env:       ast.NewEnv(),
-				Source:    mgr,
-				Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-			}
+			reporter := diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0)))
+			ctx := compiler.New(filename, mgr, reporter, ast.NewEnv(), 0)
 
-			p := parser.NewParser(ctx)
+			p := parser.NewParser(ctx, filename, src)
 			unit := p.Parse()
 			if ctx.Reporter.ErrorCount() > 0 {
 				t.Error("found parse errors")
@@ -572,7 +567,7 @@ func TestFlowCheckerProcedureReturn(t *testing.T) {
 	}
 }
 
-func flowCheckSnippet(t *testing.T, code string) *diag.Context {
+func flowCheckSnippet(t *testing.T, code string) *compiler.Context {
 	tmp := t.TempDir()
 	file := filepath.Join(tmp, "test.obx")
 	if err := os.WriteFile(file, []byte(code), 0644); err != nil {
@@ -582,17 +577,9 @@ func flowCheckSnippet(t *testing.T, code string) *diag.Context {
 	obx := ast.NewOberonX()
 	srcMgr := source.NewSourceManager()
 	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
-	ctx := &diag.Context{
-		FileName:        file,
-		FilePath:        file,
-		Content:         []byte(code),
-		Source:          srcMgr,
-		Reporter:        reporter,
-		Env:             ast.NewEnv(),
-		SymbolOverrides: map[string]ast.Symbol{},
-		TypeOverrides:   map[string]types.Type{},
-	}
-	p := parser.NewParser(ctx)
+	ctx := compiler.New(file, srcMgr, reporter, ast.NewEnv(), 0)
+
+	p := parser.NewParser(ctx, file, []byte(code))
 	unit := p.Parse()
 	if ctx.Reporter.ErrorCount() > 0 {
 		return ctx

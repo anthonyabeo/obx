@@ -277,7 +277,7 @@ func lowerLSLBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 func lowerRORBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	x := b.ensureValue(call.Args[0])
 	n := b.ensureValue(call.Args[1])
-	bitWidth := b.ctx.TargetMachineWordSize
+	bitWidth := b.wordSize
 
 	result := b.NewTemp(x.Type())
 	nMod := b.NewTemp(x.Type())
@@ -361,7 +361,7 @@ func lowerLenBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 			addr := b.NewTemp(Int64Type)
 			b.Emit(&BinaryInst{
 				Target: addr, Op: ADD, Left: x,
-				Right: Int64Lit(uint64(dim) * b.ctx.TargetMachineWordSize),
+				Right: Int64Lit(uint64(dim) * b.wordSize),
 			})
 			length := b.NewTemp(Int32Type)
 			b.Emit(&LoadInst{Target: length, Addr: &Mem{Base: addr}})
@@ -452,7 +452,7 @@ func lowerPredeclaredMAXInt(xExpr, yExpr desugar.Expr, b *IRBuilder) Value {
 	d := b.NewTemp(Int32Type)
 	b.Emit(&BinaryInst{Op: SUB, Target: d, Left: x, Right: y})
 	m := b.NewTemp(Int32Type)
-	b.Emit(&BinaryInst{Op: ASHR, Target: m, Left: d, Right: Int64Lit((b.ctx.TargetMachineWordSize * 8) - 1)})
+	b.Emit(&BinaryInst{Op: ASHR, Target: m, Left: d, Right: Int64Lit((b.wordSize * 8) - 1)})
 	t := b.NewTemp(Int32Type)
 	b.Emit(&BinaryInst{Op: AND, Target: t, Left: m, Right: d})
 	z := b.NewTemp(Int32Type)
@@ -503,7 +503,7 @@ func lowerMINInts(xExpr, yExpr desugar.Expr, b *IRBuilder) Value {
 	d := b.NewTemp(Int32Type)
 	b.Emit(&BinaryInst{Op: SUB, Target: d, Left: x, Right: y})
 	m := b.NewTemp(Int32Type)
-	b.Emit(&BinaryInst{Op: ASHR, Target: m, Left: d, Right: Int64Lit((b.ctx.TargetMachineWordSize * 8) - 1)})
+	b.Emit(&BinaryInst{Op: ASHR, Target: m, Left: d, Right: Int64Lit((b.wordSize * 8) - 1)})
 	t := b.NewTemp(Int32Type)
 	b.Emit(&BinaryInst{Op: AND, Target: t, Left: m, Right: d})
 	z := b.NewTemp(Int32Type)
@@ -709,7 +709,7 @@ func lowerNewBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 		dims := args[1:]
 		arr := args[0].Type().(*PointerType).Ref.(*ArrayType)
 		elemSize := uint64(arr.Elem.Width())
-		ptr = b.lowerNEWOpen(dims, elemSize, b.ctx.TargetMachineWordSize)
+		ptr = b.lowerNEWOpen(dims, elemSize, b.wordSize)
 	} else {
 		ty := dst.Type()
 		if pt, ok := ty.(*PointerType); ok {

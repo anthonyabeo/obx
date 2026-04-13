@@ -8,13 +8,12 @@ import (
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/sema/types"
-	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 // IRBuilder lowers a desugared HIR program into obxir.
 type IRBuilder struct {
-	ctx *diag.Context
+	wordSize uint64 // target machine word / pointer size in bytes
 
 	Func  *Function // currently active function
 	Block *Block    // currently active basic block
@@ -24,8 +23,8 @@ type IRBuilder struct {
 	curExit    string
 }
 
-func NewIRBuilder(ctx *diag.Context) *IRBuilder {
-	return &IRBuilder{ctx: ctx}
+func NewIRBuilder(wordSize uint64) *IRBuilder {
+	return &IRBuilder{wordSize: wordSize}
 }
 
 // Build lowers a complete HIR program to an obxir Program.
@@ -716,7 +715,7 @@ func (b *IRBuilder) lowerIndexExpr(e *desugar.IndexExpr) Value {
 	}
 
 	if arrayType.IsOpen() {
-		wordSize := b.ctx.TargetMachineWordSize
+		wordSize := b.wordSize
 		width := uint64(arrayType.Elem.Width())
 		return b.lowerOpenArrayIndex(arr, indices, width, wordSize)
 	}

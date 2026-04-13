@@ -3,18 +3,27 @@ package sema
 import (
 	"fmt"
 
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
+// NamesResolver resolves all name references in a compilation unit.
+// symbolOverrides is private to this visitor — it holds the temporary
+// type-narrowed symbol bindings for WITH and CASE arms and must not
+// be shared with other phases.
 type NamesResolver struct {
-	ctx *diag.Context
-	obx *ast.OberonX
+	ctx             *compiler.Context
+	obx             *ast.OberonX
+	symbolOverrides map[string]ast.Symbol
 }
 
-func NewNameResolver(ctx *diag.Context) *NamesResolver {
-	return &NamesResolver{ctx: ctx}
+func NewNameResolver(ctx *compiler.Context) *NamesResolver {
+	return &NamesResolver{
+		ctx:             ctx,
+		symbolOverrides: make(map[string]ast.Symbol),
+	}
 }
 
 func (n *NamesResolver) Resolve(unit ast.CompilationUnit) {
@@ -30,6 +39,10 @@ func (n *NamesResolver) VisitOberon(oberon *ast.OberonX) any {
 }
 
 func (n *NamesResolver) VisitModule(module *ast.Module) any {
+	if module.FileName != "" {
+		n.ctx.FileName = module.FileName
+	}
+
 	for _, meta := range module.MetaParams {
 		meta.Accept(n)
 	}
@@ -59,6 +72,10 @@ func (n *NamesResolver) VisitMetaSection(sec *ast.MetaSection) any {
 }
 
 func (n *NamesResolver) VisitDefinition(def *ast.Definition) any {
+	if def.FileName != "" {
+		n.ctx.FileName = def.FileName
+	}
+
 	for _, imp := range def.ImportList {
 		imp.Accept(n)
 	}
@@ -250,7 +267,7 @@ func (n *NamesResolver) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 }
 
 func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
-	if sym, ok := n.ctx.SymbolOverrides[ident.Name]; ok {
+	if sym, ok := n.symbolOverrides[ident.Name]; ok {
 		ident.Symbol = sym
 		return ident
 	}
@@ -437,7 +454,7 @@ func (n *NamesResolver) VisitCaseStmt(stmt *ast.CaseStmt) any {
 
 				switch n.underlying(label.Symbol.AstType()).(type) {
 				case *ast.RecordType, *ast.PointerType:
-					n.ctx.SymbolOverrides[caseExprName] = ast.NewVariableSymbol(caseExprName, label.Symbol.Props(), label.Symbol.AstType())
+					n.symbolOverrides[caseExprName] = ast.NewVariableSymbol(caseExprName, label.Symbol.Props(), label.Symbol.AstType())
 				default:
 					continue
 				}
@@ -450,7 +467,7 @@ func (n *NamesResolver) VisitCaseStmt(stmt *ast.CaseStmt) any {
 			statement.Accept(n)
 		}
 
-		delete(n.ctx.SymbolOverrides, caseExprName)
+		delete(n.symbolOverrides, caseExprName)
 	}
 
 	for _, statement := range stmt.Else {
@@ -516,8 +533,8 @@ func (n *NamesResolver) VisitGuard(guard *ast.Guard) any {
 		return guard
 	}
 
-	n.ctx.SymbolOverrides[guard.Expr.String()] = ast.NewVariableSymbol(expr.Symbol.Name(), expr.Symbol.Props(), ty.Symbol.AstType())
-	defer delete(n.ctx.SymbolOverrides, guard.Expr.String())
+	n.symbolOverrides[guard.Expr.String()] = ast.NewVariableSymbol(expr.Symbol.Name(), expr.Symbol.Props(), ty.Symbol.AstType())
+	defer delete(n.symbolOverrides, guard.Expr.String())
 
 	for _, stmt := range guard.StmtSeq {
 		stmt.Accept(n)

@@ -9,6 +9,7 @@ import (
 	"runtime"
 
 	"github.com/anthonyabeo/obx/src/sema"
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
@@ -74,17 +75,10 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 	emitter := diag.ToWriter(formatter.NewJSONFormatter(srcMgr), io.Discard)
 	reporter := diag.NewBufferedReporter(srcMgr, s.cfg.MaxErrors, emitter)
 
-	ctx := &diag.Context{
-		FileName:              req.Filename,
-		Content:               []byte(req.Source),
-		Source:                srcMgr,
-		Reporter:              reporter,
-		Env:                   ast.NewEnv(),
-		TargetMachineWordSize: 8,
-	}
+	ctx := compiler.New(req.Filename, srcMgr, reporter, ast.NewEnv(), 0)
 
 	// parse
-	p := parser.NewParser(ctx)
+	p := parser.NewParser(ctx, req.Filename, []byte(req.Source))
 	unit := p.Parse()
 
 	// sema — only when parsing succeeded

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/project"
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
@@ -32,17 +33,11 @@ END Test.
 
 func TestNameResolution_BasicProcedure(t *testing.T) {
 	sm := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName: "Test.obx",
-		FilePath: "Test.obx",
-		Content:  []byte(testSource),
-		Source:   sm,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
-	}
+	reporter := diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0)))
+	ctx := compiler.New("Test.obx", sm, reporter, ast.NewEnv(), 0)
 
 	// Parse the file
-	p := parser.NewParser(ctx)
+	p := parser.NewParser(ctx, "Test.obx", []byte(testSource))
 	unit := p.Parse()
 
 	ctx.Env.SetCurrentScope(ctx.Env.ModuleScope(unit.Name()))
@@ -137,11 +132,7 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 	srcMgr := source.NewSourceManager()
 	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
-	ctx := &diag.Context{
-		Source:   srcMgr,
-		Reporter: reporter,
-		Env:      ast.NewEnv(),
-	}
+	ctx := compiler.New("", srcMgr, reporter, ast.NewEnv(), 0)
 
 	for _, header := range sorted {
 		data, err := os.ReadFile(header.File)
@@ -149,11 +140,10 @@ func TestResolveQualifiedIdentifier(t *testing.T) {
 			t.Fatalf("read %s: %v", header.File, err)
 		}
 
-		ctx.FileName = filepath.Base(header.File)
-		ctx.FilePath = header.File
-		ctx.Content = data[header.StartPos:header.EndPos]
+		fileName := filepath.Base(header.File)
+		content := data[header.StartPos:header.EndPos]
 
-		p := parser.NewParser(ctx)
+		p := parser.NewParser(ctx, fileName, content)
 		unit := p.Parse()
 		if ctx.Reporter.ErrorCount() > 0 {
 			ctx.Reporter.Flush()
@@ -197,17 +187,11 @@ func TestNameResolutionUndefined(t *testing.T) {
 	`
 
 	sm := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName: "Test.obx",
-		FilePath: "Test.obx",
-		Content:  []byte(src),
-		Source:   sm,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
-	}
+	reporter := diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0)))
+	ctx := compiler.New("Test.obx", sm, reporter, ast.NewEnv(), 0)
 
 	// Parse the file
-	p := parser.NewParser(ctx)
+	p := parser.NewParser(ctx, "Test.obx", []byte(src))
 	unit := p.Parse()
 
 	resolve := NewNameResolver(ctx)
@@ -241,17 +225,11 @@ func TestNameResolution_Basic(t *testing.T) {
 	`
 
 	sm := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName: "Test.obx",
-		FilePath: "Test.obx",
-		Content:  []byte(src),
-		Source:   sm,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
-	}
+	reporter := diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0)))
+	ctx := compiler.New("Test.obx", sm, reporter, ast.NewEnv(), 0)
 
 	// Parse the file
-	p := parser.NewParser(ctx)
+	p := parser.NewParser(ctx, "Test.obx", []byte(src))
 	unit := p.Parse()
 
 	assign := findAssignmentTo("y", unit)
@@ -297,16 +275,10 @@ func TestNameResolution_TypeBoundProcedure(t *testing.T) {
 	`
 
 	sm := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName: "Main.obx",
-		FilePath: "Main.obx",
-		Content:  []byte(src),
-		Source:   sm,
-		Env:      ast.NewEnv(),
-		Reporter: diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0))),
-	}
+	reporter := diag.NewBufferedReporter(sm, 25, diag.Stdout(formatter.NewTextFormatter(sm, 0)))
+	ctx := compiler.New("Main.obx", sm, reporter, ast.NewEnv(), 0)
 
-	p := parser.NewParser(ctx)
+	p := parser.NewParser(ctx, "Main.obx", []byte(src))
 	unit := p.Parse()
 	if ctx.Reporter.ErrorCount() > 0 {
 		ctx.Reporter.Flush()

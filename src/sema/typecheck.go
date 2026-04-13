@@ -7,17 +7,26 @@ import (
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type TypeChecker struct {
-	ctx *diag.Context
+	ctx *compiler.Context
+
+	// typeOverrides is private per-walk scratch space for type-guard narrowing.
+	// Written in VisitGuard and CASE type-label arms; deleted on exit.
+	// Not shared with other phases.
+	typeOverrides map[string]types.Type
 }
 
-func NewTypeChecker(ctx *diag.Context) *TypeChecker {
-	return &TypeChecker{ctx: ctx}
+func NewTypeChecker(ctx *compiler.Context) *TypeChecker {
+	return &TypeChecker{
+		ctx:           ctx,
+		typeOverrides: make(map[string]types.Type),
+	}
 }
 
 func (t *TypeChecker) TypeCheck(unit ast.CompilationUnit) {
@@ -33,6 +42,10 @@ func (t *TypeChecker) VisitOberon(x *ast.OberonX) any {
 }
 
 func (t *TypeChecker) VisitModule(module *ast.Module) any {
+	if module.FileName != "" {
+		t.ctx.FileName = module.FileName
+	}
+
 	for _, meta := range module.MetaParams {
 		meta.Accept(t)
 	}
@@ -58,6 +71,10 @@ func (t *TypeChecker) VisitMetaSection(section *ast.MetaSection) any {
 }
 
 func (t *TypeChecker) VisitDefinition(def *ast.Definition) any {
+	if def.FileName != "" {
+		t.ctx.FileName = def.FileName
+	}
+
 	for _, i := range def.ImportList {
 		i.Accept(t)
 	}
@@ -2293,7 +2310,7 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 }
 
 func (t *TypeChecker) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
-	if ty, ok := t.ctx.TypeOverrides[ident.Name]; ok {
+	if ty, ok := t.typeOverrides[ident.Name]; ok {
 		ident.SemaType = ty
 		ident.Symbol.SetType(ty)
 		return ident
@@ -2797,13 +2814,13 @@ func (t *TypeChecker) VisitGuard(guard *ast.Guard) any {
 		})
 	}
 
-	t.ctx.TypeOverrides[guard.Expr.String()] = guard.Type.Type()
+	t.typeOverrides[guard.Expr.String()] = guard.Type.Type()
 
 	for _, statement := range guard.StmtSeq {
 		statement.Accept(t)
 	}
 
-	delete(t.ctx.TypeOverrides, guard.Expr.String())
+	delete(t.typeOverrides, guard.Expr.String())
 
 	return guard
 }
@@ -3659,13 +3676,13 @@ func (t *TypeChecker) checkTypeCase(stmt *ast.CaseStmt, caseType types.Type) {
 
 		dsg := stmt.Expr.(*ast.Designator)
 
-		t.ctx.TypeOverrides[dsg.Symbol.Name()] = labelType
+		t.typeOverrides[dsg.Symbol.Name()] = labelType
 
 		for _, statement := range c.StmtSeq {
 			statement.Accept(t)
 		}
 
-		delete(t.ctx.TypeOverrides, dsg.Symbol.Name())
+		delete(t.typeOverrides, dsg.Symbol.Name())
 	}
 }
 

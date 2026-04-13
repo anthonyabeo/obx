@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
@@ -34,20 +35,14 @@ end Main`)
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
 
-	p := NewParser(ctx)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
 
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -82,19 +77,13 @@ end Main
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
-	p := NewParser(ctx)
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
 
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -133,19 +122,13 @@ end Main
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
-	p := NewParser(ctx)
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
 
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -192,19 +175,13 @@ end Main
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
-	p := NewParser(ctx)
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
 
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	tests := []string{
@@ -268,19 +245,13 @@ end Main
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
-	p := NewParser(ctx)
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
 
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -340,19 +311,13 @@ end Main
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
-	p := NewParser(ctx)
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
 
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	tests := []struct {
@@ -411,19 +376,13 @@ end Drawing
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
-	p := NewParser(ctx)
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
 
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	tests := []string{
@@ -526,19 +485,13 @@ end Drawing
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       envs,
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
-	p := NewParser(ctx)
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), envs, 0)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
 
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -623,18 +576,12 @@ end Main
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
-	p := NewParser(ctx)
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -710,19 +657,13 @@ end Main
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
 
-	p := NewParser(ctx)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -786,19 +727,13 @@ end Main
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
 
-	p := NewParser(ctx)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	main := unit.(*ast.Module)
@@ -890,19 +825,13 @@ end Main
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
 
-	p := NewParser(ctx)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	tests := []struct {
@@ -999,18 +928,12 @@ end Main
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Source:    mgr,
-		Content:   input,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
-	p := NewParser(ctx)
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
-	if p.ctx.Reporter.ErrorCount() > 0 {
+	if ctx.Reporter.ErrorCount() > 0 {
 		t.Error("found parse errors")
-		p.ctx.Reporter.Flush()
+		ctx.Reporter.Flush()
 	}
 
 	tests := []struct {
@@ -1070,14 +993,8 @@ EN BadModule.
 
 	filename := "test.obx"
 	mgr := source.NewSourceManager()
-	ctx := &diag.Context{
-		FileName:  filename,
-		Content:   input,
-		Source:    mgr,
-		Env:       ast.NewEnv(),
-		Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-	}
-	p := NewParser(ctx)
+	ctx := compiler.New(filename, mgr, diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))), ast.NewEnv(), 0)
+	p := NewParser(ctx, filename, input)
 	unit := p.Parse()
 
 	if _, ok := unit.(*ast.Module); !ok {
@@ -1085,16 +1002,16 @@ EN BadModule.
 	}
 
 	// Check that errors were recorded
-	diags := p.ctx.Reporter.Diagnostics()
+	diags := ctx.Reporter.Diagnostics()
 	if len(diags) == 0 {
 		t.Error("Expected diagnostics, got none")
 	}
 
 	// Assert specific diagnostics
 	expectedMessages := []string{
-		"invalid character", // y := @;
-		"malformed number",  // 0zx
-		"last statement must not end with a semi-colon", // inc(y);;
+		"invalid character",                       // y := @;
+		"malformed number",                        // 0zx
+		"trailing semicolon after last statement", // inc(y);;
 		"is not a valid statement",
 		"expected 'IDENTIFIER', found 'EOF'",
 		"is not a valid statement",

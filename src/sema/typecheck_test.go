@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/project"
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
-	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
-	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 func TestTypeCheckerPrograms(t *testing.T) {
@@ -128,16 +128,9 @@ func TestTypeCheckerPrograms(t *testing.T) {
 			srcMgr := source.NewSourceManager()
 			reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
-			ctx := &diag.Context{
-				FileName:  tt.filename,
-				FilePath:  tt.filename,
-				Content:   []byte(tt.source),
-				Source:    srcMgr,
-				Reporter:  reporter,
-				Env:       ast.NewEnv(),
-			}
+			ctx := compiler.New(tt.filename, srcMgr, reporter, ast.NewEnv(), 0)
 
-			p := parser.NewParser(ctx)
+			p := parser.NewParser(ctx, tt.filename, []byte(tt.source))
 			unit := p.Parse()
 			if ctx.Reporter.ErrorCount() > 0 {
 				ctx.Reporter.Flush()
@@ -239,16 +232,9 @@ func TestTypeCheckInvalidPrograms(t *testing.T) {
 			srcMgr := source.NewSourceManager()
 			reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
-			ctx := &diag.Context{
-				FileName:  tt.filename,
-				FilePath:  tt.filename,
-				Content:   []byte(tt.source),
-				Source:    srcMgr,
-				Reporter:  reporter,
-				Env:       ast.NewEnv(),
-			}
+			ctx := compiler.New(tt.filename, srcMgr, reporter, ast.NewEnv(), 0)
 
-			p := parser.NewParser(ctx)
+			p := parser.NewParser(ctx, tt.filename, []byte(tt.source))
 			unit := p.Parse()
 			if ctx.Reporter.ErrorCount() > 0 {
 				ctx.Reporter.Flush()
@@ -366,16 +352,9 @@ END ExprCompatibilityTest.`)
 	srcMgr := source.NewSourceManager()
 	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
-	ctx := &diag.Context{
-		FileName:  file,
-		FilePath:  file,
-		Content:   content,
-		Source:    srcMgr,
-		Reporter:  reporter,
-		Env:       ast.NewEnv(),
-	}
+	ctx := compiler.New(file, srcMgr, reporter, ast.NewEnv(), 0)
 
-	p := parser.NewParser(ctx)
+	p := parser.NewParser(ctx, file, content)
 	unit := p.Parse()
 	if ctx.Reporter.ErrorCount() > 0 {
 		ctx.Reporter.Flush()
@@ -461,16 +440,9 @@ END InvalidExprCompatibilityTest.
 	srcMgr := source.NewSourceManager()
 	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
-	ctx := &diag.Context{
-		FileName:  file,
-		FilePath:  file,
-		Content:   content,
-		Source:    srcMgr,
-		Reporter:  reporter,
-		Env:       ast.NewEnv(),
-	}
+	ctx := compiler.New(file, srcMgr, reporter, ast.NewEnv(), 0)
 
-	p := parser.NewParser(ctx)
+	p := parser.NewParser(ctx, file, content)
 	unit := p.Parse()
 	if ctx.Reporter.ErrorCount() > 0 {
 		ctx.Reporter.Flush()
@@ -3844,7 +3816,7 @@ func TestPredeclaredProcedureCalls(t *testing.T) {
 	}
 }
 
-func typeCheckSnippet(t *testing.T, code string) *diag.Context {
+func typeCheckSnippet(t *testing.T, code string) *compiler.Context {
 	tmp := t.TempDir()
 	file := filepath.Join(tmp, "test.obx")
 	if err := os.WriteFile(file, []byte(code), 0644); err != nil {
@@ -3854,17 +3826,8 @@ func typeCheckSnippet(t *testing.T, code string) *diag.Context {
 	obx := ast.NewOberonX()
 	srcMgr := source.NewSourceManager()
 	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
-	ctx := &diag.Context{
-		FileName:        file,
-		FilePath:        file,
-		Content:         []byte(code),
-		Source:          srcMgr,
-		Reporter:        reporter,
-		Env:             ast.NewEnv(),
-		SymbolOverrides: map[string]ast.Symbol{},
-		TypeOverrides:   map[string]types.Type{},
-	}
-	p := parser.NewParser(ctx)
+	ctx := compiler.New(file, srcMgr, reporter, ast.NewEnv(), 0)
+	p := parser.NewParser(ctx, file, []byte(code))
 	unit := p.Parse()
 	if ctx.Reporter.ErrorCount() > 0 {
 		return ctx
@@ -4967,7 +4930,7 @@ func TestTypeCheckMultiModulePrograms(t *testing.T) {
 	}
 }
 
-func typeCheckMultiModuleSnippet(t *testing.T, code string) *diag.Context {
+func typeCheckMultiModuleSnippet(t *testing.T, code string) *compiler.Context {
 	t.Helper()
 	tmp := t.TempDir()
 	writeModuleFiles(t, tmp, code)
@@ -4976,13 +4939,7 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *diag.Context {
 	srcMgr := source.NewSourceManager()
 	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
 
-	ctx := &diag.Context{
-		Source:          srcMgr,
-		Reporter:        reporter,
-		Env:             ast.NewEnv(),
-		SymbolOverrides: map[string]ast.Symbol{},
-		TypeOverrides:   map[string]types.Type{},
-	}
+	ctx := compiler.New("", srcMgr, reporter, ast.NewEnv(), 0)
 
 	// 2. Discover, scan and graph
 	headers, err := project.DiscoverAndScan(tmp)
@@ -5011,11 +4968,10 @@ func typeCheckMultiModuleSnippet(t *testing.T, code string) *diag.Context {
 			log.Fatal(err)
 		}
 
-		ctx.FileName = filepath.Base(header.File)
-		ctx.FilePath = header.File
-		ctx.Content = data[header.StartPos:header.EndPos]
+		fileName := filepath.Base(header.File)
+		content := data[header.StartPos:header.EndPos]
 
-		p := parser.NewParser(ctx)
+		p := parser.NewParser(ctx, fileName, content)
 		unit := p.Parse()
 		if ctx.Reporter.ErrorCount() > 0 {
 			ctx.Reporter.Flush()
@@ -5068,4 +5024,3 @@ func writeModuleFiles(t *testing.T, dir, src string) {
 	}
 	flush()
 }
-

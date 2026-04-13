@@ -51,8 +51,12 @@ func (sm *Manager) LinesInRange(rng Range) ([]string, error) {
 }
 
 // Span converts a pair of byte offsets in file into a *Range.
+// Returns nil if the named file has not been loaded.
 func (sm *Manager) Span(file string, start, end int) *Range {
 	f := sm.files[file]
+	if f == nil {
+		return nil
+	}
 	return &Range{
 		Start: f.OffsetToPosition(start),
 		End:   f.OffsetToPosition(end),

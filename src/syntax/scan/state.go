@@ -65,7 +65,9 @@ func scanNumber(s *Scanner) StateFn {
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("malformed number: invalid character '%c' after hex literal", s.peek())
+			bad := s.peek()
+			s.skipToNumberBoundary()
+			return s.errorf("malformed number: invalid character '%c' after hex literal", bad)
 		}
 
 		fullNum := string(s.content[s.start : s.pos-1])
@@ -90,7 +92,9 @@ func scanNumber(s *Scanner) StateFn {
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("malformed number: invalid character '%c' after char literal", s.peek())
+			bad := s.peek()
+			s.skipToNumberBoundary()
+			return s.errorf("malformed number: invalid character '%c' after char literal", bad)
 		}
 
 		// remove preceding zeroes from hexValue
@@ -153,7 +157,9 @@ func scanNumber(s *Scanner) StateFn {
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("malformed number: invalid character '%c' after real literal", s.peek())
+			bad := s.peek()
+			s.skipToNumberBoundary()
+			return s.errorf("malformed number: invalid character '%c' after real literal", bad)
 		}
 	}
 
@@ -172,7 +178,9 @@ func scanNumber(s *Scanner) StateFn {
 		}
 
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("malformed number literal. '%c' after integer literal", s.peek())
+			bad := s.peek()
+			s.skipToNumberBoundary()
+			return s.errorf("malformed number literal. '%c' after integer literal", bad)
 		}
 
 		fullNum := string(s.content[s.start:s.pos])
@@ -202,7 +210,9 @@ func scanNumber(s *Scanner) StateFn {
 		}
 	default:
 		if !isNumberTokenBoundary(s.peek()) {
-			return s.errorf("malformed number literal. '%c' after real literal", s.peek())
+			bad := s.peek()
+			s.skipToNumberBoundary()
+			return s.errorf("malformed number literal. '%c' after real literal", bad)
 		}
 
 		s.emit(token.REAL_LIT, s.start, s.pos)
@@ -433,5 +443,5 @@ func scanText(s *Scanner) StateFn {
 
 	s.emit(token.EOF, s.start, s.pos)
 
-	return scanText
+	return nil
 }

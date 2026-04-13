@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
@@ -88,15 +87,9 @@ func TestScanNumber(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &diag.Context{
-		FileName: file,
-		Source:   source.NewSourceManager(),
-		Reporter: nil,
-	}
-
+	srcMgr := source.NewSourceManager()
 	for _, test := range tests {
-		ctx.Content = []byte(test.input)
-		sc := Scan(ctx)
+		sc := Scan(file, []byte(test.input), srcMgr)
 
 		got := sc.NextToken()
 
@@ -135,15 +128,10 @@ func TestScanIdentifiers(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &diag.Context{
-		FileName: file,
-		Source:   source.NewSourceManager(),
-		Reporter: nil,
-	}
+	srcMgr := source.NewSourceManager()
 
 	for _, test := range tests {
-		ctx.Content = []byte(test.input)
-		sc := Scan(ctx)
+		sc := Scan(file, []byte(test.input), srcMgr)
 
 		got := sc.NextToken()
 		if test.wantErr {
@@ -190,15 +178,10 @@ func TestScanDelimitersAndOperators(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &diag.Context{
-		FileName: file,
-		Source:   source.NewSourceManager(),
-		Reporter: nil,
-	}
+	srcMgr := source.NewSourceManager()
 
 	for _, test := range tests {
-		ctx.Content = []byte(test.input)
-		sc := Scan(ctx)
+		sc := Scan(file, []byte(test.input), srcMgr)
 
 		got := sc.NextToken()
 		if test.wantErr {
@@ -242,15 +225,10 @@ func TestScanHexStrings(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &diag.Context{
-		FileName: file,
-		Source:   source.NewSourceManager(),
-		Reporter: nil,
-	}
+	srcMgr := source.NewSourceManager()
 
 	for _, test := range tests {
-		ctx.Content = []byte(test.input)
-		sc := Scan(ctx)
+		sc := Scan(file, []byte(test.input), srcMgr)
 
 		got := sc.NextToken()
 
@@ -294,15 +272,10 @@ func TestScanCharacterLiterals(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &diag.Context{
-		FileName: file,
-		Source:   source.NewSourceManager(),
-		Reporter: nil,
-	}
+	srcMgr := source.NewSourceManager()
 
 	for _, test := range tests {
-		ctx.Content = []byte(test.input)
-		sc := Scan(ctx)
+		sc := Scan(file, []byte(test.input), srcMgr)
 
 		got := sc.NextToken()
 		if test.wantErr {
@@ -351,15 +324,10 @@ next'`, token.ILLEGAL, "", true}, // newline
 	}
 
 	file := "test.ob"
-	ctx := &diag.Context{
-		FileName: file,
-		Source:   source.NewSourceManager(),
-		Reporter: nil,
-	}
+	srcMgr := source.NewSourceManager()
 
 	for _, tt := range tests {
-		ctx.Content = []byte(tt.input)
-		sc := Scan(ctx)
+		sc := Scan(file, []byte(tt.input), srcMgr)
 
 		tok := sc.NextToken()
 
@@ -393,15 +361,10 @@ func TestScanComments(t *testing.T) {
 	}
 
 	file := "test.ob"
-	ctx := &diag.Context{
-		FileName: file,
-		Source:   source.NewSourceManager(),
-		Reporter: nil,
-	}
+	srcMgr := source.NewSourceManager()
 
 	for _, test := range tests {
-		ctx.Content = []byte(test.input)
-		sc := Scan(ctx)
+		sc := Scan(file, []byte(test.input), srcMgr)
 
 		got := sc.NextToken()
 
@@ -429,21 +392,16 @@ module Main
 		  b := fib(n - 2)
 		  return a + b
 		end
-  	end fib
+	end fib
 
 begin
 	res := fib(21)
-  	assert(res = 10946)
+	assert(res = 10946)
 end Main
 `)
-	file := "test.ob"
-	ctx := &diag.Context{
-		FileName: file,
-		Content:  input,
-		Source:   source.NewSourceManager(),
-		Reporter: nil,
-	}
-	sc := Scan(ctx)
+
+	srcMgr := source.NewSourceManager()
+	sc := Scan("test.ob", input, srcMgr)
 
 	tests := []struct {
 		tokenKind token.Kind
@@ -622,13 +580,8 @@ begin
 end Drawing
 `)
 	file := "test.ob"
-	ctx := &diag.Context{
-		FileName: file,
-		Content:  input,
-		Source:   source.NewSourceManager(),
-		Reporter: nil,
-	}
-	sc := Scan(ctx)
+	srcMgr := source.NewSourceManager()
+	sc := Scan(file, input, srcMgr)
 
 	tests := []struct {
 		tokenKind token.Kind

@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"github.com/anthonyabeo/obx/src/support/diag"
+	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Scanner struct {
-	ctx     *diag.Context
 	content []byte
 
 	start  int // start position of this item
@@ -17,19 +16,15 @@ type Scanner struct {
 	width  int // width of the last rune read
 	line   int // current line number
 	column int // current column number
-	state  StateFn
 	items  chan token.Token // channel of scanned items
 }
 
 func (s *Scanner) NextToken() token.Token {
-	for {
-		select {
-		case item := <-s.items:
-			return item
-		default:
-			s.state = s.state(s)
-		}
+	tok, ok := <-s.items
+	if !ok {
+		return token.Token{Kind: token.EOF}
 	}
+	return tok
 }
 
 func (s *Scanner) run() {
@@ -77,19 +72,23 @@ func (s *Scanner) peek() rune {
 
 func (s *Scanner) errorf(format string /*, rng *diag.Range*/, args ...interface{}) StateFn {
 	s.items <- token.Token{Kind: token.ILLEGAL, Lexeme: fmt.Sprintf(format, args...) /*, Range: rng*/, Pos: s.start, End: s.pos}
+	s.start = s.pos // reset so the next token starts cleanly after the error
 	return scanText
 }
 
-func Scan(ctx *diag.Context) *Scanner {
-	ctx.Source.Load(ctx.FileName, ctx.Content)
+// Scan creates a Scanner for the given source file.  The content bytes are
+// registered with srcMgr under fileName so that source spans can be resolved
+// later during diagnostic formatting.
+func Scan(fileName string, content []byte, srcMgr *source.Manager) *Scanner {
+	srcMgr.Load(fileName, content)
 	scan := &Scanner{
-		ctx:     ctx,
-		content: ctx.Content,
-		state:   scanText,
+		content: content,
 		items:   make(chan token.Token, 512),
 		line:    1,
 		column:  1,
 	}
+
+	go scan.run()
 
 	return scan
 }

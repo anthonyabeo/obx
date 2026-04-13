@@ -3,11 +3,12 @@ package opt
 import (
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
-	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/support/testutil"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
 func TestSSAConstruct(t *testing.T) {
@@ -164,15 +165,10 @@ end Main
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mgr := source.NewSourceManager()
-			ctx := &diag.Context{
-				FileName:  tt.filename,
-				Content:   []byte(tt.input),
-				Env:       ast.NewEnv(),
-				Source:    mgr,
-				Reporter:  diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0))),
-			}
+			reporter := diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0)))
+			ctx := compiler.New(tt.filename, mgr, reporter, ast.NewEnv(), 8)
 
-			program := testutil.ParseSourceAndLowerToMIR(t, ctx)
+			program := testutil.ParseSourceAndLowerToMIR(t, ctx, tt.filename, []byte(tt.input))
 			for _, module := range program.Modules {
 				for _, fn := range module.Funcs {
 					SSAConstruct(fn)

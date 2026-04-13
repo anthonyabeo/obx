@@ -5,9 +5,10 @@ import "github.com/anthonyabeo/obx/src/syntax/token"
 // Module
 // --------------
 type Module struct {
-	BName   string
-	EName   string
-	IsEntry bool
+	BName    string
+	EName    string
+	IsEntry  bool
+	FileName string // source file this module was parsed from
 
 	MetaParams []*MetaSection
 	ImportList []*Import
@@ -72,6 +73,7 @@ func (ms *MetaSection) Children() []Node {
 type Definition struct {
 	BName      string
 	EName      string
+	FileName   string // source file this definition was parsed from
 	ImportList []*Import
 	DeclSeq    []Declaration
 

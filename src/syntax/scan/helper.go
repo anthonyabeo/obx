@@ -1,11 +1,12 @@
 package scan
 
 import (
-	"github.com/anthonyabeo/obx/src/syntax/token"
 	"math"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 func (s *Scanner) isWhiteSpace(ch rune) bool {
@@ -110,6 +111,20 @@ func isNumberTokenBoundary(r rune) bool {
 		unicode.IsSpace(r) ||
 		strings.ContainsRune(":;,(){}[]", r) || // statement and grouping
 		strings.ContainsRune("+-*/%=<>#", r) // typical operators
+}
+
+// skipToNumberBoundary consumes characters until a natural number boundary
+// (whitespace, EOF, operator, delimiter) is reached. It is used for error
+// recovery so that a malformed number token spans the entire bad lexeme and
+// the scanner can resume from a clean position.
+func (s *Scanner) skipToNumberBoundary() {
+	for {
+		r := s.peek()
+		if isNumberTokenBoundary(r) {
+			return
+		}
+		s.next()
+	}
 }
 
 const (

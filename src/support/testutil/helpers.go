@@ -5,20 +5,20 @@ import (
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
-	obxir2 "github.com/anthonyabeo/obx/src/ir/obxir"
+	"github.com/anthonyabeo/obx/src/ir/obxir"
 	"github.com/anthonyabeo/obx/src/sema"
-	"github.com/anthonyabeo/obx/src/support/diag"
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
 
-// ParseSourceAndLowerToMIR parses ctx.Content, runs semantic analysis, lowers
-// through HIR and returns the resulting MIR program. It calls t.Fatal on any
-// parse or semantic error.
-func ParseSourceAndLowerToMIR(t *testing.T, ctx *diag.Context) *obxir2.Program {
+// ParseSourceAndLowerToMIR parses fileName/content, runs semantic analysis,
+// lowers through HIR and returns the resulting MIR program. It calls t.Fatal
+// on any parse or semantic error.
+func ParseSourceAndLowerToMIR(t *testing.T, ctx *compiler.Context, fileName string, content []byte) *obxir.Program {
 	t.Helper()
 
-	p := parser.NewParser(ctx)
+	p := parser.NewParser(ctx, fileName, content)
 	unit := p.Parse()
 
 	if ctx.Reporter.ErrorCount() > 0 {
@@ -37,9 +37,9 @@ func ParseSourceAndLowerToMIR(t *testing.T, ctx *diag.Context) *obxir2.Program {
 		t.Fatalf("semantics errors")
 	}
 
-	gen := desugar.NewGenerator(ctx, obx)
+	gen := desugar.NewGenerator(obx)
 	HIRProgram := gen.Generate()
 
-	builder := obxir2.NewIRBuilder(ctx)
+	builder := obxir.NewIRBuilder(ctx.Target.WordSize)
 	return builder.Build(HIRProgram)
 }
