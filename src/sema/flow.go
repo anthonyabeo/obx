@@ -1,6 +1,8 @@
 package sema
 
 import (
+	"fmt"
+
 	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -11,6 +13,10 @@ type FlowChecker struct {
 
 	label         string
 	loopIDCounter int
+
+	// procedure return-path context
+	isFunctionProc bool
+	procName       string
 }
 
 func NewFlowChecker(ctx *compiler.Context) *FlowChecker {
@@ -79,7 +85,22 @@ func (f *FlowChecker) VisitIfStmt(stmt *ast.IfStmt) any {
 
 func (f *FlowChecker) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any { return stmt }
 
-func (f *FlowChecker) VisitReturnStmt(stmt *ast.ReturnStmt) any { return stmt }
+func (f *FlowChecker) VisitReturnStmt(stmt *ast.ReturnStmt) any {
+	if f.isFunctionProc && stmt.Value == nil {
+		f.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
+			Message:  "missing RETURN value in function",
+			Range:    f.ctx.Source.Span(f.ctx.FileName, stmt.StartOffset, stmt.EndOffset),
+		})
+	} else if !f.isFunctionProc && stmt.Value != nil {
+		f.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
+			Message:  "RETURN value in non-function procedure",
+			Range:    f.ctx.Source.Span(f.ctx.FileName, stmt.StartOffset, stmt.EndOffset),
+		})
+	}
+	return stmt
+}
 
 func (f *FlowChecker) VisitProcedureCall(call *ast.ProcedureCall) any { return call }
 
@@ -176,8 +197,44 @@ func (f *FlowChecker) VisitWithStmt(stmt *ast.WithStmt) any {
 func (f *FlowChecker) VisitImport(i *ast.Import) any { return i }
 
 func (f *FlowChecker) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
+	// Save and restore all procedure-scoped state so that nested procedures
+	// get their own isolated context (loop label, function-proc flag, name).
+	savedLabel := f.label
+	savedIsFunc := f.isFunctionProc
+	savedName := f.procName
+	defer func() {
+		f.label = savedLabel
+		f.isFunctionProc = savedIsFunc
+		f.procName = savedName
+	}()
+
+	// A procedure body opens a new scope: EXIT cannot jump past a procedure
+	// boundary, so reset the enclosing loop label to "".
+	f.label = ""
+	f.isFunctionProc = isFuncProc(decl)
+	f.procName = decl.Head.Name.Name
+
 	if decl.Body != nil {
+		// Visit nested declarations first (inner procedures get their own check).
+		f.visitDeclSeq(decl.Body.DeclSeq)
 		f.visitStmtSeq(decl.Body.StmtSeq)
+	}
+
+	// Every control path of a function procedure must return a value.
+	// Exception: a function with no statements is legal — a default zero-value
+	// return is assumed (the body is intentionally left empty / not yet written).
+	if f.isFunctionProc {
+		var stmts []ast.Statement
+		if decl.Body != nil {
+			stmts = decl.Body.StmtSeq
+		}
+		if len(stmts) > 0 && !returnsOnAllPaths(stmts) {
+			f.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
+				Message:  fmt.Sprintf("missing RETURN in function %s", f.procName),
+				Range:    f.ctx.Source.Span(f.ctx.FileName, decl.StartOffset, decl.EndOffset),
+			})
+		}
 	}
 
 	return decl

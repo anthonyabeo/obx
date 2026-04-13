@@ -523,13 +523,18 @@ func (n *NamesResolver) VisitGuard(guard *ast.Guard) any {
 
 	expr, isExprDsg := guard.Expr.(*ast.Designator)
 	ty, isTypeDsg := guard.Type.(*ast.Designator)
-	if !isExprDsg && !isTypeDsg {
-		n.ctx.Reporter.Report(diag.Diagnostic{
-			Severity: diag.Error,
-			Message:  fmt.Sprintf("'%s' is not a valid guard expression", guard.Expr),
-			Range:    n.ctx.Source.Span(n.ctx.FileName, guard.Expr.Pos(), guard.Expr.End()),
-		})
+	if !isExprDsg || !isTypeDsg || expr.Symbol == nil || ty.Symbol == nil {
+		if !isExprDsg || !isTypeDsg {
+			n.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
+				Message:  fmt.Sprintf("'%s' is not a valid guard expression", guard.Expr),
+				Range:    n.ctx.Source.Span(n.ctx.FileName, guard.Expr.Pos(), guard.Expr.End()),
+			})
+		}
 
+		for _, stmt := range guard.StmtSeq {
+			stmt.Accept(n)
+		}
 		return guard
 	}
 

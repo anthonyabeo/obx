@@ -7,6 +7,75 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
+// isFuncProc reports whether decl requires a RETURN value on every control
+// path. This is true for FunctionProcedureKind procedures, and also for
+// TypeBoundProcedureKind procedures that declare a return type.
+func isFuncProc(decl *ast.ProcedureDecl) bool {
+	switch decl.Kind {
+	case ast.FunctionProcedureKind:
+		return true
+	case ast.TypeBoundProcedureKind:
+		return decl.Head.FP != nil && decl.Head.FP.RetType != nil
+	default:
+		return false
+	}
+}
+
+// returnsOnAllPaths reports whether every control path through stmts is
+// guaranteed to reach a RETURN statement.
+func returnsOnAllPaths(stmts []ast.Statement) bool {
+	for _, stmt := range stmts {
+		if stmtReturns(stmt) {
+			return true
+		}
+	}
+	return false
+}
+
+// stmtReturns reports whether stmt guarantees a RETURN on every control path
+// it contains.
+func stmtReturns(stmt ast.Statement) bool {
+	switch s := stmt.(type) {
+	case *ast.ReturnStmt:
+		return true
+
+	case *ast.IfStmt:
+		// All branches must be present and return:
+		//   – the THEN path
+		//   – every ELSIF branch
+		//   – an ELSE branch (absent ELSE ⟹ not all paths are covered)
+		if len(s.ElsePath) == 0 {
+			return false
+		}
+		if !returnsOnAllPaths(s.ThenPath) {
+			return false
+		}
+		for _, elif := range s.ElseIfBranches {
+			if !returnsOnAllPaths(elif.ThenPath) {
+				return false
+			}
+		}
+		return returnsOnAllPaths(s.ElsePath)
+
+	case *ast.CaseStmt:
+		// Every case arm and the ELSE branch must return.
+		// Without an ELSE the discriminant value space is not fully covered.
+		if !returnsOnAllPaths(s.Else) {
+			return false
+		}
+		for _, c := range s.Cases {
+			if !returnsOnAllPaths(c.StmtSeq) {
+				return false
+			}
+		}
+		return true
+
+	default:
+		// Loops, assignments, calls, etc. do not guarantee a return.
+		return false
+	}
+}
+
 func (f *FlowChecker) newLoopLabel(loopKind string) string {
 	l := fmt.Sprintf("%s_loop_%d", loopKind, f.loopIDCounter)
 	f.loopIDCounter++
