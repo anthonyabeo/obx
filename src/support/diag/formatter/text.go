@@ -45,6 +45,21 @@ func NewTextFormatter(sm *source.Manager, tabWidth int) *TextFormatter {
 
 func (f *TextFormatter) ContentType() string { return "text/plain; charset=utf-8" }
 
+// byteColToVisual converts a 0-based byte column within rawLine to the
+// corresponding 0-based visual column after tab expansion (each tab expands
+// to exactly tabWidth spaces, matching the strings.ReplaceAll display).
+func byteColToVisual(rawLine []byte, byteCol int, tabWidth int) int {
+	visual := 0
+	for i := 0; i < byteCol && i < len(rawLine); i++ {
+		if rawLine[i] == '\t' {
+			visual += tabWidth
+		} else {
+			visual++
+		}
+	}
+	return visual
+}
+
 func (f *TextFormatter) Format(d diag.Diagnostic) []byte {
 	tabWidth := f.TabWidth
 	if tabWidth <= 0 {
@@ -80,21 +95,24 @@ func (f *TextFormatter) Format(d diag.Diagnostic) []byte {
 			lineEnd = len(sf.Content)
 		}
 
-		lineContent := string(sf.Content[lineStart:lineEnd])
+		rawLine := sf.Content[lineStart:lineEnd]
+		lineContent := string(rawLine)
 		trimmedLine := strings.ReplaceAll(strings.TrimRight(lineContent, "\n"), "\t", strings.Repeat(" ", tabWidth))
 		fmt.Fprintf(&buf, "%*d | %s\n", lineNumWidth, line, trimmedLine)
 
+		// Column values in the diagnostic are byte-based (tabs count as 1).
+		// Convert to visual columns to align with the tab-expanded display.
 		var startCol, endCol int
 		switch {
 		case line == d.Range.Start.Line && line == d.Range.End.Line:
-			startCol = d.Range.Start.Column - 1
-			endCol = d.Range.End.Column - 1
+			startCol = byteColToVisual(rawLine, d.Range.Start.Column-1, tabWidth)
+			endCol = byteColToVisual(rawLine, d.Range.End.Column-1, tabWidth)
 		case line == d.Range.Start.Line:
-			startCol = d.Range.Start.Column - 1
+			startCol = byteColToVisual(rawLine, d.Range.Start.Column-1, tabWidth)
 			endCol = len(trimmedLine)
 		case line == d.Range.End.Line:
 			startCol = 0
-			endCol = d.Range.End.Column - 1
+			endCol = byteColToVisual(rawLine, d.Range.End.Column-1, tabWidth)
 		default:
 			startCol = 0
 			endCol = len(trimmedLine)

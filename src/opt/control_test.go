@@ -80,7 +80,7 @@ end Main
 			  ELSE
 			   y := -1
 			  END
-				return y
+				printf("x: %d, y: %d\n", x, y)
 			 END IfTest.
 			`,
 			filename: "if_test.obx",
