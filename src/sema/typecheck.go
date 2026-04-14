@@ -27,6 +27,11 @@ type TypeChecker struct {
 	procReturnType types.Type
 	// procName is the name of that same procedure; used in error messages.
 	procName string
+
+	// currentModuleName is the name of the module currently being type-checked.
+	// It is used to enforce ExportedReadOnly (v-) visibility: a variable exported
+	// with '-' may only be written from within its defining module.
+	currentModuleName string
 }
 
 func NewTypeChecker(ctx *compiler.Context) *TypeChecker {
@@ -52,6 +57,7 @@ func (t *TypeChecker) VisitModule(module *ast.Module) any {
 	if module.FileName != "" {
 		t.ctx.FileName = module.FileName
 	}
+	t.currentModuleName = module.BName
 
 	for _, meta := range module.MetaParams {
 		meta.Accept(t)
@@ -81,6 +87,7 @@ func (t *TypeChecker) VisitDefinition(def *ast.Definition) any {
 	if def.FileName != "" {
 		t.ctx.FileName = def.FileName
 	}
+	t.currentModuleName = def.BName
 
 	for _, i := range def.ImportList {
 		i.Accept(t)
@@ -2189,6 +2196,43 @@ func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
 		formal := procType.Params[i]
 		actual := arg.Type()
 
+		// For VAR parameters the actual argument must be a writable variable;
+		// in particular, a module-level variable exported read-only (v-) may not
+		// be passed as VAR from an external module.
+		if formal.Kind == "VAR" {
+			if dsg, ok := arg.(*ast.Designator); ok {
+				if rootSym := dsg.QIdent.Symbol; rootSym != nil && t.isExportedReadOnlyFromExternal(rootSym) {
+					ownerName := ""
+					if vs, ok2 := rootSym.(*ast.VariableSymbol); ok2 && vs.Parent() != nil {
+						ownerName = vs.Parent().Name
+					}
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
+						Message: fmt.Sprintf(
+							"argument %d '%s' is exported read-only (v-) from module '%s' and cannot be passed as a %s parameter",
+							i+1, arg, ownerName, formal.Kind),
+						Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+					})
+				} else if !t.isAssignable(arg) {
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
+						Message: fmt.Sprintf(
+							"argument %d '%s' passed to %s parameter must be a writable variable",
+							i+1, arg, formal.Kind),
+						Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+					})
+				}
+			} else if !t.isAssignable(arg) {
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
+					Message: fmt.Sprintf(
+						"argument %d '%s' passed to %s parameter must be a writable variable",
+						i+1, arg, formal.Kind),
+					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+				})
+			}
+		}
+
 		if !types.ParameterCompatible(actual, formal) {
 			t.ctx.Reporter.Report(diag.Diagnostic{
 				Severity: diag.Error,
@@ -2512,6 +2556,29 @@ func (t *TypeChecker) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any {
 	tv := types.Underlying(stmt.LValue.Type()) // variable type
 	te := types.Underlying(stmt.RValue.Type()) // expression type
 
+	// Give a specific, actionable diagnostic when the LHS is a module-level
+	// variable exported with the read-only mark (v-) and we are in a different
+	// module.  This check runs before the generic assignability check so that
+	// the user sees the most helpful message.
+	if dsg, ok := stmt.LValue.(*ast.Designator); ok {
+		if rootSym := dsg.QIdent.Symbol; rootSym != nil {
+			if t.isExportedReadOnlyFromExternal(rootSym) {
+				ownerName := ""
+				if vs, ok2 := rootSym.(*ast.VariableSymbol); ok2 && vs.Parent() != nil {
+					ownerName = vs.Parent().Name
+				}
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
+					Message: fmt.Sprintf(
+						"cannot assign to '%s': variable is exported read-only (v-) from module '%s'",
+						stmt.LValue, ownerName),
+					Range: t.ctx.Source.Span(t.ctx.FileName, stmt.LValue.Pos(), stmt.LValue.End()),
+				})
+				return stmt
+			}
+		}
+	}
+
 	// Ensure the LHS is a valid variable designator
 	if !t.isAssignable(stmt.LValue) {
 		t.ctx.Reporter.Report(diag.Diagnostic{
@@ -2612,6 +2679,43 @@ func (t *TypeChecker) VisitProcedureCall(call *ast.ProcedureCall) any {
 
 		formal := procType.Params[i]
 		actual := arg.Type()
+
+		// For VAR parameters the actual argument must be a writable variable.
+		// In particular, a module-level variable exported with the read-only mark
+		// (v-) may not be passed as a VAR argument from an external module.
+		if formal.Kind == "VAR" {
+			if dsg, ok := arg.(*ast.Designator); ok {
+				if rootSym := dsg.QIdent.Symbol; rootSym != nil && t.isExportedReadOnlyFromExternal(rootSym) {
+					ownerName := ""
+					if vs, ok2 := rootSym.(*ast.VariableSymbol); ok2 && vs.Parent() != nil {
+						ownerName = vs.Parent().Name
+					}
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
+						Message: fmt.Sprintf(
+							"argument %d '%s' is exported read-only (v-) from module '%s' and cannot be passed as a %s parameter",
+							i+1, arg, ownerName, formal.Kind),
+						Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+					})
+				} else if !t.isAssignable(arg) {
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
+						Message: fmt.Sprintf(
+							"argument %d '%s' passed to %s parameter must be a writable variable",
+							i+1, arg, formal.Kind),
+						Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+					})
+				}
+			} else if !t.isAssignable(arg) {
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
+					Message: fmt.Sprintf(
+						"argument %d '%s' passed to %s parameter must be a writable variable",
+						i+1, arg, formal.Kind),
+					Range: t.ctx.Source.Span(t.ctx.FileName, arg.Pos(), arg.End()),
+				})
+			}
+		}
 
 		if !types.ParameterCompatible(actual, formal) {
 			t.ctx.Reporter.Report(diag.Diagnostic{
@@ -3329,12 +3433,42 @@ func (t *TypeChecker) isAssignable(e ast.Expression) bool {
 
 	switch sym := sym.(type) {
 	case *ast.VariableSymbol:
+		// A variable exported with the read-only mark (v-) may not be written
+		// from outside its defining module.
+		if t.isExportedReadOnlyFromExternal(sym) {
+			return false
+		}
 		return true
 	case *ast.ParamSymbol:
 		return sym.Mod == token.VAR || sym.Mod == token.ILLEGAL
 	default:
 		return false
 	}
+}
+
+// isExportedReadOnlyFromExternal reports whether sym is a module-level variable
+// exported with the read-only mark (v-) that belongs to a module other than the
+// one currently being type-checked. Such a variable is visible but not writable
+// from the importing module.
+func (t *TypeChecker) isExportedReadOnlyFromExternal(sym ast.Symbol) bool {
+	vs, ok := sym.(*ast.VariableSymbol)
+	if !ok {
+		return false
+	}
+	if vs.Props() != ast.ExportedReadOnly {
+		return false
+	}
+	// Look up the registered scope for the current module. If we have no module
+	// context yet (currentModuleName is empty) be conservative and allow the
+	// write; the resolver will catch any real visibility problems.
+	if t.currentModuleName == "" {
+		return false
+	}
+	currentScope := t.ctx.Env.ModuleScope(t.currentModuleName)
+	// sym.Parent() is the LexicalScope into which the symbol was inserted.
+	// For module-level variables this is the module's registered scope.
+	// If the two scopes differ, sym is owned by a different module.
+	return currentScope == nil || vs.Parent() != currentScope
 }
 
 func (t *TypeChecker) checkIntegerCase(stmt *ast.CaseStmt, caseType types.Type) {

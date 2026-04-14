@@ -334,7 +334,7 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 		return ident
 	}
 
-	if sym.Props() != ast.Exported {
+	if sym.Props()&ast.Exported == 0 {
 		n.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
 			Message:  fmt.Sprintf("identifier '%s', defined in module '%s' is not exported", ident.Name, ident.Prefix),

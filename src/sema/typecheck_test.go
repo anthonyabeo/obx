@@ -4922,6 +4922,153 @@ func TestTypeCheckMultiModulePrograms(t *testing.T) {
 				}
 				return
 			}
+
+			for i, want := range tt.WantErrs {
+				if !strings.Contains(diags[i].Message, want) {
+					t.Errorf("diagnostic %d = %q, want substring %q", i, diags[i].Message, want)
+				}
+			}
+		})
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ExportedReadOnly (v-) enforcement tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestExportedReadOnlyEnforcement(t *testing.T) {
+	tests := []typeCheckTestCase{
+		// ── Error cases ───────────────────────────────────────────────────────
+		{
+			Name: "direct assignment to v- from importing module",
+			Source: `
+MODULE Main;
+IMPORT Counter;
+
+BEGIN
+  Counter.Count := 42
+END Main.
+
+MODULE Counter;
+
+VAR Count-: INTEGER;
+
+END Counter.`,
+			WantErrs: []string{
+				"exported read-only (v-) from module 'Counter'",
+			},
+		},
+		{
+			Name: "v- passed as VAR parameter from importing module",
+			Source: `
+MODULE Main;
+IMPORT Counter;
+
+PROCEDURE Inc(VAR x: INTEGER);
+BEGIN
+  x := x + 1
+END Inc;
+
+BEGIN
+  Inc(Counter.Count)
+END Main.
+
+MODULE Counter;
+
+VAR Count-: INTEGER;
+
+END Counter.`,
+			WantErrs: []string{
+				"exported read-only (v-) from module 'Counter'",
+			},
+		},
+		{
+			Name: "multiple v- variables, all blocked from importing module",
+			Source: `
+MODULE Main;
+IMPORT Stats;
+
+BEGIN
+  Stats.Min := 0;
+  Stats.Max := 100
+END Main.
+
+MODULE Stats;
+
+VAR
+  Min-: INTEGER;
+  Max-: INTEGER;
+
+END Stats.`,
+			WantErrs: []string{
+				"exported read-only (v-) from module 'Stats'",
+				"exported read-only (v-) from module 'Stats'",
+			},
+		},
+
+		// ── Valid cases ───────────────────────────────────────────────────────
+		{
+			Name: "v- can be assigned within the defining module",
+			Source: `
+MODULE Counter;
+
+VAR Count-: INTEGER;
+
+BEGIN
+  Count := 0
+END Counter.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "v- read (not assigned) from importing module is allowed",
+			Source: `
+MODULE Main;
+IMPORT Counter;
+
+VAR x: INTEGER;
+
+BEGIN
+  x := Counter.Count
+END Main.
+
+MODULE Counter;
+
+VAR Count-: INTEGER;
+
+END Counter.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "normal exported variable (v*) can be assigned from importing module",
+			Source: `
+MODULE Main;
+IMPORT Counter;
+
+BEGIN
+  Counter.Count := 42
+END Main.
+
+MODULE Counter;
+
+VAR Count*: INTEGER;
+
+END Counter.`,
+			WantErrs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			ctx := typeCheckMultiModuleSnippet(t, tt.Source)
+
+			diags := ctx.Reporter.Diagnostics()
+			if len(diags) != len(tt.WantErrs) {
+				t.Errorf("got %d diagnostics, want %d", len(diags), len(tt.WantErrs))
+				for _, d := range diags {
+					t.Logf("  diag: %s", d.Message)
+				}
+				return
+			}
 			for i, want := range tt.WantErrs {
 				if !strings.Contains(diags[i].Message, want) {
 					t.Errorf("diagnostic %d = %q, want substring %q", i, diags[i].Message, want)
