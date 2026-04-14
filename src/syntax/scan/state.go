@@ -345,7 +345,10 @@ func scanText(s *Scanner) StateFn {
 			s.emit(token.EQUAL, s.start, s.pos)
 		case '<':
 			c := s.peek()
-			if c == '=' {
+			if c == '*' {
+				s.next()
+				s.emit(token.DIRECTIVE_START, s.start, s.pos)
+			} else if c == '=' {
 				s.next()
 				s.emit(token.LEQ, s.start, s.pos)
 			} else {
@@ -385,7 +388,10 @@ func scanText(s *Scanner) StateFn {
 			}
 		case '*':
 			c := s.peek()
-			if c == ')' {
+			if c == '>' {
+				s.next()
+				s.emit(token.DIRECTIVE_END, s.start, s.pos)
+			} else if c == ')' {
 				s.next()
 				s.emit(token.ML_COMMENT_END, s.start, s.pos)
 			} else {

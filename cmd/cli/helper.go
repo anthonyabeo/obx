@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/compiler"
@@ -108,3 +110,48 @@ func parseModules(sorted []project.Header, ctx *compiler.Context, obx *ast.Obero
 	}
 	return true
 }
+
+// applyDirectives parses each entry in defines (format "NAME" or "NAME=VALUE")
+// and registers the corresponding compile-time directive constant on ctx via
+// ctx.SetDirective.
+//
+// Supported value formats:
+//   - Bare name with no "="  → bool true  (e.g. --define RISCV64)
+//   - NAME=true / NAME=false → bool
+//   - NAME=<integer>         → int64  (e.g. --define Version=3)
+//   - NAME=<float>           → float64 (e.g. --define Pi=3.14)
+//
+// Returns an error for malformed entries so callers can report and exit.
+func applyDirectives(ctx *compiler.Context, defines []string) error {
+	for _, def := range defines {
+		name, valStr, hasEq := strings.Cut(def, "=")
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return fmt.Errorf("--define: empty directive name in %q", def)
+		}
+		if !hasEq {
+			// Bare name: a boolean presence flag, e.g. -d RISCV64
+			ctx.SetDirective(name, true)
+			continue
+		}
+		valStr = strings.TrimSpace(valStr)
+		// Try bool first (handles "true"/"false"/"1"/"0" etc.)
+		if b, err := strconv.ParseBool(valStr); err == nil {
+			ctx.SetDirective(name, b)
+			continue
+		}
+		// Try integer
+		if i, err := strconv.ParseInt(valStr, 10, 64); err == nil {
+			ctx.SetDirective(name, i)
+			continue
+		}
+		// Try float
+		if f, err := strconv.ParseFloat(valStr, 64); err == nil {
+			ctx.SetDirective(name, f)
+			continue
+		}
+		return fmt.Errorf("--define: value %q for %q is not a recognised type (use bool, integer, or float)", valStr, name)
+	}
+	return nil
+}
+

@@ -29,6 +29,8 @@ const (
 	SL_COMMENT_START
 	ML_COMMENT_START
 	ML_COMMENT_END
+	DIRECTIVE_START // <*
+	DIRECTIVE_END   // *>
 	NEWLINE
 
 	IDENTIFIER // main
@@ -147,6 +149,8 @@ var tokens = [...]string{
 	SL_COMMENT_START: "//",
 	ML_COMMENT_START: "(*",
 	ML_COMMENT_END:   "*)",
+	DIRECTIVE_START:  "<*",
+	DIRECTIVE_END:    "*>",
 	NEWLINE:          "\n",
 
 	IDENTIFIER: "IDENTIFIER",

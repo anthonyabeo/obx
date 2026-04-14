@@ -37,6 +37,12 @@ type Context struct {
 
 	// Target holds target-machine parameters used during IR lowering.
 	Target TargetConfig
+
+	// Directives holds compiler-supplied compile-time named constants that
+	// are visible inside <* IF … *> / <* ASSERT … *> source directives.
+	// Keys are case-sensitive. Values must be bool, int64, or float64.
+	// Looked up before ctx.Env so the build system can shadow language CONSTs.
+	Directives map[string]any
 }
 
 // New constructs a Context with a freshly allocated diag.Context wired to the
@@ -49,8 +55,16 @@ func New(
 	wordSize uint64,
 ) *Context {
 	return &Context{
-		Context: &diag.Context{FileName: fileName, Source: src, Reporter: reporter},
-		Env:     env,
-		Target:  TargetConfig{WordSize: wordSize},
+		Context:    &diag.Context{FileName: fileName, Source: src, Reporter: reporter},
+		Env:        env,
+		Target:     TargetConfig{WordSize: wordSize},
+		Directives: make(map[string]any),
 	}
 }
+
+// SetDirective registers a compile-time directive constant.
+// val must be bool, int64, or float64.
+func (c *Context) SetDirective(name string, val any) {
+	c.Directives[name] = val
+}
+

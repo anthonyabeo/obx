@@ -16,6 +16,7 @@ var checkArgs struct {
 	Path      string
 	MaxErrors int
 	Quiet     bool
+	Defines   []string // --define (repeatable); NAME or NAME=VALUE
 }
 
 func init() {
@@ -23,6 +24,8 @@ func init() {
 		"source root directory (defaults to roots in obx.mod)")
 	checkCmd.Flags().IntVar(&checkArgs.MaxErrors, "max-errors", 32, "maximum number of errors to report before stopping")
 	checkCmd.Flags().BoolVarP(&checkArgs.Quiet, "quiet", "q", false, "suppress informational output; only show diagnostics")
+	checkCmd.Flags().StringArrayVarP(&checkArgs.Defines, "define", "d", nil,
+		"set a compile-time directive constant: NAME (bool true) or NAME=VALUE (bool/int/float)")
 }
 
 var checkCmd = &cobra.Command{
@@ -72,6 +75,12 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 
 		// ── 2. Parse ─────────────────────────────────────────────────────
 		ctx, _ := newContext(checkArgs.MaxErrors)
+
+		if err := applyDirectives(ctx, checkArgs.Defines); err != nil {
+			fmt.Fprintf(os.Stderr, "check: %v\n", err)
+			os.Exit(1)
+		}
+
 		obx := ast.NewOberonX()
 
 		if ok := parseModules(sorted, ctx, obx); !ok {

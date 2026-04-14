@@ -1142,3 +1142,225 @@ BEGIN x := 3 END M.`)
 	})
 }
 
+// TestSourceDirectives exercises the <* IF *> / <* ASSERT *> directives.
+func TestSourceDirectives(t *testing.T) {
+	newCtx := func(filename string) *compiler.Context {
+		mgr := source.NewSourceManager()
+		rep := diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0)))
+		return compiler.New(filename, mgr, rep, ast.NewEnv(), 0)
+	}
+
+	// ── IF true → body is included ───────────────────────────────────────────
+	t.Run("IF true includes body", func(t *testing.T) {
+		src := []byte(`
+module M
+<* IF true THEN *>
+var x: integer
+<* END *>
+begin
+  x := 1
+end M`)
+		ctx := newCtx("if_true.obx")
+		p := NewParser(ctx, "if_true.obx", src)
+		unit := p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			t.Fatal("unexpected parse errors")
+		}
+		m := unit.(*ast.Module)
+		if len(m.DeclSeq) != 1 {
+			t.Fatalf("expected 1 declaration, got %d", len(m.DeclSeq))
+		}
+	})
+
+	// ── IF false → body is skipped, ELSE is taken ────────────────────────────
+	t.Run("IF false takes ELSE", func(t *testing.T) {
+		src := []byte(`
+module M
+<* IF false THEN *>
+var x: integer
+<* ELSE *>
+var y: integer
+<* END *>
+begin
+  y := 2
+end M`)
+		ctx := newCtx("if_else.obx")
+		p := NewParser(ctx, "if_else.obx", src)
+		unit := p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			t.Fatal("unexpected parse errors")
+		}
+		m := unit.(*ast.Module)
+		if len(m.DeclSeq) != 1 {
+			t.Fatalf("expected 1 declaration, got %d", len(m.DeclSeq))
+		}
+		vd := m.DeclSeq[0].(*ast.VariableDecl)
+		if vd.IdentList[0].Name != "y" {
+			t.Fatalf("expected 'y', got %q", vd.IdentList[0].Name)
+		}
+	})
+
+	// ── ELSIF chain selects correct arm ──────────────────────────────────────
+	t.Run("ELSIF chain selects correct arm", func(t *testing.T) {
+		src := []byte(`
+module M
+<* IF false THEN *>
+var a: integer
+<* ELSIF true THEN *>
+var b: integer
+<* ELSE *>
+var c: integer
+<* END *>
+begin
+  b := 3
+end M`)
+		ctx := newCtx("elsif.obx")
+		p := NewParser(ctx, "elsif.obx", src)
+		unit := p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			t.Fatal("unexpected parse errors")
+		}
+		m := unit.(*ast.Module)
+		if len(m.DeclSeq) != 1 {
+			t.Fatalf("expected 1 declaration, got %d", len(m.DeclSeq))
+		}
+		vd := m.DeclSeq[0].(*ast.VariableDecl)
+		if vd.IdentList[0].Name != "b" {
+			t.Fatalf("expected 'b', got %q", vd.IdentList[0].Name)
+		}
+	})
+
+	// ── no branch taken → nothing is included ───────────────────────────────
+	t.Run("IF false no ELSE → no declarations", func(t *testing.T) {
+		src := []byte(`
+module M
+<* IF false THEN *>
+var x: integer
+<* END *>
+end M`)
+		ctx := newCtx("if_false_noelse.obx")
+		p := NewParser(ctx, "if_false_noelse.obx", src)
+		unit := p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			t.Fatal("unexpected parse errors")
+		}
+		m := unit.(*ast.Module)
+		if len(m.DeclSeq) != 0 {
+			t.Fatalf("expected 0 declarations, got %d", len(m.DeclSeq))
+		}
+	})
+
+	// ── ctx.SetDirective flag ────────────────────────────────────────────────
+	t.Run("SetDirective flag controls branch", func(t *testing.T) {
+		src := []byte(`
+module M
+<* IF RISCV64 THEN *>
+var reg: integer
+<* ELSE *>
+var reg: integer
+<* END *>
+end M`)
+		ctx := newCtx("directive_flag.obx")
+		ctx.SetDirective("RISCV64", true)
+		p := NewParser(ctx, "directive_flag.obx", src)
+		unit := p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			t.Fatal("unexpected parse errors")
+		}
+		m := unit.(*ast.Module)
+		if len(m.DeclSeq) != 1 {
+			t.Fatalf("expected 1 declaration, got %d", len(m.DeclSeq))
+		}
+	})
+
+	// ── CONST-backed condition (Option B) ────────────────────────────────────
+	t.Run("CONST-backed condition", func(t *testing.T) {
+		src := []byte(`
+module M
+const Version = 3
+<* IF Version >= 3 THEN *>
+var newFeature: integer
+<* ELSE *>
+var oldFeature: integer
+<* END *>
+end M`)
+		ctx := newCtx("const_cond.obx")
+		p := NewParser(ctx, "const_cond.obx", src)
+		unit := p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			t.Fatal("unexpected parse errors")
+		}
+		m := unit.(*ast.Module)
+		// DeclSeq = CONST Version + VAR newFeature
+		if len(m.DeclSeq) != 2 {
+			t.Fatalf("expected 2 declarations, got %d", len(m.DeclSeq))
+		}
+		vd, ok := m.DeclSeq[1].(*ast.VariableDecl)
+		if !ok {
+			t.Fatalf("expected VariableDecl at index 1")
+		}
+		if vd.IdentList[0].Name != "newFeature" {
+			t.Fatalf("expected 'newFeature', got %q", vd.IdentList[0].Name)
+		}
+	})
+
+	// ── ASSERT passes silently ───────────────────────────────────────────────
+	t.Run("ASSERT true is silent", func(t *testing.T) {
+		src := []byte(`
+module M
+<* ASSERT true, "should not fire" *>
+end M`)
+		ctx := newCtx("assert_pass.obx")
+		p := NewParser(ctx, "assert_pass.obx", src)
+		p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			t.Fatal("expected no diagnostics for passing ASSERT")
+		}
+	})
+
+	// ── ASSERT false emits the required message ──────────────────────────────
+	t.Run("ASSERT false emits diagnostic", func(t *testing.T) {
+		src := []byte(`
+module M
+<* ASSERT false, "boom" *>
+end M`)
+		ctx := newCtx("assert_fail.obx")
+		p := NewParser(ctx, "assert_fail.obx", src)
+		p.Parse()
+		if ctx.Reporter.ErrorCount() == 0 {
+			t.Fatal("expected a diagnostic from failing ASSERT, got none")
+		}
+		found := false
+		for _, d := range ctx.Reporter.Diagnostics() {
+			if strings.Contains(d.Message, "boom") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatal("expected diagnostic containing 'boom', not found")
+		}
+	})
+
+	// ── ASSERT missing message is an error ───────────────────────────────────
+	t.Run("ASSERT missing message is an error", func(t *testing.T) {
+		src := []byte(`
+module M
+<* ASSERT true *>
+end M`)
+		ctx := newCtx("assert_no_msg.obx")
+		p := NewParser(ctx, "assert_no_msg.obx", src)
+		p.Parse()
+		if ctx.Reporter.ErrorCount() == 0 {
+			t.Fatal("expected a diagnostic for missing ASSERT message, got none")
+		}
+	})
+}
+

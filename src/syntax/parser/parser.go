@@ -34,6 +34,11 @@ type Parser struct {
 	maxErrors  int
 	errorCount int
 	bailout    bool
+
+	// directiveDepth tracks how many taken <* IF *> branches we are currently
+	// inside.  When > 0, the next DIRECTIVE_START token is a closing arm
+	// (ELSIF/ELSE/END) of the innermost active directive chain, not a new one.
+	directiveDepth int
 }
 
 func NewParser(ctx *compiler.Context, fileName string, content []byte) *Parser {
@@ -162,6 +167,21 @@ func (p *Parser) next() {
 					p.tok = token.EOF
 					return
 				}
+			}
+		case token.DIRECTIVE_START:
+			// Source code directive: <* IF … *>, <* ASSERT … *>, etc.
+			// If we are inside a taken branch, this token may be the closing
+			// ELSIF/ELSE/END of the enclosing IF chain.
+			if p.directiveDepth > 0 {
+				p.handleClosingDirective()
+			} else {
+				p.parseDirective()
+			}
+			// Either path above may have mutated p.tok (e.g. returned EOF).
+			// If so, honour it; otherwise fall through to the next outer iteration
+			// which will call p.sc.NextToken() again.
+			if p.tok == token.EOF {
+				return
 			}
 		case token.NEWLINE:
 			continue
@@ -610,14 +630,36 @@ func (p *Parser) parseTypeDecl() *ast.TypeDecl {
 func (p *Parser) parseConstantDecl() *ast.ConstantDecl {
 	name := p.parseIdentifier()
 	p.match(token.EQUAL)
+
+	// Pre-define with the peeked literal value when the initializer is a
+	// simple literal.  This lets a <* IF name ... *> directive that is
+	// processed by next() during parseExpression (i.e. while scanning one
+	// token ahead past the literal) already see this constant in the
+	// environment (Option B: CONST-backed directive conditions).
+	var pendingSym *ast.ConstantSymbol
+	if p.tok.IsLiteral() || p.tok == token.TRUE || p.tok == token.FALSE {
+		preVal := &ast.BasicLit{Kind: p.tok, Val: p.lexeme, StartOffset: p.pos, EndOffset: p.end}
+		pendingSym = ast.NewConstantSymbol(name.Name, name.Props, preVal)
+		if dup := p.ctx.Env.Define(pendingSym); dup != nil {
+			// Duplicate already present; cancel pre-define and fall through
+			// to the normal Define+error path below.
+			pendingSym = nil
+		}
+	}
+
 	value := p.parseExpression()
 
-	if sym := p.ctx.Env.Define(ast.NewConstantSymbol(name.Name, name.Props, value)); sym != nil {
-		p.ctx.Reporter.Report(diag.Diagnostic{
-			Severity: diag.Error,
-			Message:  "duplicate constant declaration " + name.Name,
-			Range:    p.ctx.Source.Span(p.fileName, name.StartOffset, name.EndOffset),
-		})
+	if pendingSym != nil {
+		// Update the pre-defined symbol with the fully-parsed expression.
+		pendingSym.Value = value
+	} else {
+		if sym := p.ctx.Env.Define(ast.NewConstantSymbol(name.Name, name.Props, value)); sym != nil {
+			p.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
+				Message:  "duplicate constant declaration " + name.Name,
+				Range:    p.ctx.Source.Span(p.fileName, name.StartOffset, name.EndOffset),
+			})
+		}
 	}
 
 	return &ast.ConstantDecl{
