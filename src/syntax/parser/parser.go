@@ -139,12 +139,29 @@ func (p *Parser) next() {
 				tok = p.sc.NextToken()
 			}
 		case token.ML_COMMENT_START:
-			// Skip until ML_COMMENT_END
-			for tok.Kind != token.EOF && tok.Kind != token.ML_COMMENT_END {
+			// The spec requires nested block comments:
+			//   (* outer (* inner *) still outer *)
+			// Track depth: each "(*" increments, each "*)" decrements;
+			// stop only when the outermost "*)" has been consumed (depth == 0).
+			// The outer for-loop will then call NextToken() for whatever follows
+			// the comment — no extra fetch is needed here.
+			depth := 1
+			for depth > 0 {
 				tok = p.sc.NextToken()
-			}
-			if tok.Kind == token.ML_COMMENT_END {
-				tok = p.sc.NextToken() // Consume the end token
+				switch tok.Kind {
+				case token.ML_COMMENT_START:
+					depth++
+				case token.ML_COMMENT_END:
+					depth--
+				case token.EOF:
+					p.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
+						Message:  "unterminated block comment",
+						Range:    p.ctx.Source.Span(p.fileName, tok.Pos, tok.End),
+					})
+					p.tok = token.EOF
+					return
+				}
 			}
 		case token.NEWLINE:
 			continue

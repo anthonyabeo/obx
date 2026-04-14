@@ -216,7 +216,7 @@ func TestCompile(t *testing.T) {
 					C := A + B;
 					(* intersection *)
 					C := A * B; 
-					(* difference 
+					(* difference *)
 					(* C := A - B; *)
 					IF 1 IN C THEN
 						x := 100

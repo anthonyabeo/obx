@@ -1034,3 +1034,111 @@ EN BadModule.
 		}
 	}
 }
+
+// TestNestedBlockComments verifies that the parser correctly handles block
+// comments at all nesting depths and reports an error for unterminated ones.
+func TestNestedBlockComments(t *testing.T) {
+	newCtx := func(filename string) *compiler.Context {
+		mgr := source.NewSourceManager()
+		rep := diag.NewBufferedReporter(mgr, 25, diag.Stdout(formatter.NewTextFormatter(mgr, 0)))
+		return compiler.New(filename, mgr, rep, ast.NewEnv(), 0)
+	}
+
+	t.Run("flat comment before module body", func(t *testing.T) {
+		src := []byte(`MODULE M;
+(* this is a flat block comment *)
+VAR x: INTEGER;
+BEGIN x := 1 END M.`)
+		ctx := newCtx("flat.obx")
+		p := NewParser(ctx, "flat.obx", src)
+		p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			t.Fatal("unexpected parse errors for flat comment")
+		}
+	})
+
+	t.Run("singly nested comment", func(t *testing.T) {
+		// (* outer (* inner *) outer *) — the first *) must NOT end the outer comment
+		src := []byte(`MODULE M;
+(* outer (* inner *) still outer *)
+VAR x: INTEGER;
+BEGIN x := 2 END M.`)
+		ctx := newCtx("nested1.obx")
+		p := NewParser(ctx, "nested1.obx", src)
+		p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			t.Fatal("unexpected parse errors for singly nested comment")
+		}
+	})
+
+	t.Run("deeply nested comment (3 levels)", func(t *testing.T) {
+		src := []byte(`MODULE M;
+(* L1 (* L2 (* L3 *) back-L2 *) back-L1 *)
+VAR x: INTEGER;
+BEGIN x := 3 END M.`)
+		ctx := newCtx("nested3.obx")
+		p := NewParser(ctx, "nested3.obx", src)
+		p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			t.Fatal("unexpected parse errors for 3-level nested comment")
+		}
+	})
+
+	t.Run("comment immediately followed by token (no newline)", func(t *testing.T) {
+		// Regression: the old code fetched one extra token after *) and discarded it.
+		src := []byte(`MODULE M; (* comment *) VAR x: INTEGER; BEGIN x := 4 END M.`)
+		ctx := newCtx("inline.obx")
+		p := NewParser(ctx, "inline.obx", src)
+		p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			t.Fatal("unexpected parse errors for inline comment (extra-fetch regression)")
+		}
+	})
+
+	t.Run("nested comment immediately followed by token (no newline)", func(t *testing.T) {
+		src := []byte(`MODULE M; (* a (* b *) c *) VAR x: INTEGER; BEGIN x := 5 END M.`)
+		ctx := newCtx("inline_nested.obx")
+		p := NewParser(ctx, "inline_nested.obx", src)
+		p.Parse()
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			t.Fatal("unexpected parse errors for inline nested comment")
+		}
+	})
+
+	t.Run("unterminated block comment reports error", func(t *testing.T) {
+		src := []byte(`MODULE M; (* unterminated...`)
+		ctx := newCtx("unterm.obx")
+		p := NewParser(ctx, "unterm.obx", src)
+		p.Parse()
+		if ctx.Reporter.ErrorCount() == 0 {
+			t.Fatal("expected an error for unterminated block comment, got none")
+		}
+		found := false
+		for _, d := range ctx.Reporter.Diagnostics() {
+			if strings.Contains(d.Message, "unterminated block comment") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatal("expected 'unterminated block comment' diagnostic, not found")
+		}
+	})
+
+	t.Run("unterminated nested block comment reports error", func(t *testing.T) {
+		// The inner *) closes the inner comment but the outer is still open.
+		src := []byte(`MODULE M; (* outer (* inner *) still open...`)
+		ctx := newCtx("unterm_nested.obx")
+		p := NewParser(ctx, "unterm_nested.obx", src)
+		p.Parse()
+		if ctx.Reporter.ErrorCount() == 0 {
+			t.Fatal("expected an error for unterminated nested block comment, got none")
+		}
+	})
+}
+
