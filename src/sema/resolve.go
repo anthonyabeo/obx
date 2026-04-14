@@ -17,6 +17,12 @@ type NamesResolver struct {
 	ctx             *compiler.Context
 	obx             *ast.OberonX
 	symbolOverrides map[string]ast.Symbol
+
+	// type-bound procedure access restriction:
+	// a type-bound procedure cannot access params or local variables of
+	// any enclosing (outer) procedure.
+	insideTypeBound bool
+	outerProcScopes map[*ast.LexicalScope]bool
 }
 
 func NewNameResolver(ctx *compiler.Context) *NamesResolver {
@@ -282,6 +288,24 @@ func (n *NamesResolver) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 			})
 
 			return nil
+		}
+
+		// Enforce the type-bound procedure scoping restriction:
+		// a type-bound procedure cannot access parameters or local variables
+		// that belong to an enclosing (outer) procedure.
+		if n.insideTypeBound && n.outerProcScopes[sym.Parent()] {
+			switch sym.Kind() {
+			case ast.VariableSymbolKind, ast.ParamSymbolKind:
+				n.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
+					Message: fmt.Sprintf(
+						"type-bound procedure cannot access '%s': "+
+							"it is a local variable or parameter of an outer procedure",
+						ident.Name,
+					),
+					Range: n.ctx.Source.Span(n.ctx.FileName, ident.StartOffset, ident.EndOffset),
+				})
+			}
 		}
 
 		ident.Symbol = sym
@@ -573,7 +597,36 @@ func (n *NamesResolver) VisitImport(i *ast.Import) any {
 func (n *NamesResolver) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	tmp := n.ctx.Env.CurrentScope()
 	n.ctx.Env.SetCurrentScope(decl.Env)
-	defer func() { n.ctx.Env.SetCurrentScope(tmp) }()
+
+	savedInsideTB := n.insideTypeBound
+	savedOuterScopes := n.outerProcScopes
+	defer func() {
+		n.ctx.Env.SetCurrentScope(tmp)
+		n.insideTypeBound = savedInsideTB
+		n.outerProcScopes = savedOuterScopes
+	}()
+
+	if decl.Kind == ast.TypeBoundProcedureKind {
+		n.insideTypeBound = true
+		// Collect the procedure scopes that enclose this type-bound procedure.
+		// These are the scopes that the type-bound procedure is forbidden from
+		// accessing variables or parameters in.
+		forbidden := collectOuterProcScopes(decl)
+		if len(forbidden) > 0 {
+			merged := make(map[*ast.LexicalScope]bool)
+			for k := range n.outerProcScopes {
+				merged[k] = true
+			}
+			for k := range forbidden {
+				merged[k] = true
+			}
+			n.outerProcScopes = merged
+		}
+	} else {
+		// Entering a regular/function procedure: clear the type-bound flag so
+		// that nested regular procs don't inherit the restriction.
+		n.insideTypeBound = false
+	}
 
 	decl.Head.Accept(n)
 	if decl.Body != nil {

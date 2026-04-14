@@ -567,6 +567,134 @@ func TestFlowCheckerProcedureReturn(t *testing.T) {
 	}
 }
 
+func TestTypeBoundOuterScopeAccess(t *testing.T) {
+	tests := []TestCase{
+		{
+			// VAR receiver (VAR r: R) is correct for a plain RECORD receiver.
+			// Module-level method accesses a module-level VAR — allowed.
+			Name: "module-level type-bound accessing module VAR (valid)",
+			Source: `
+MODULE M;
+TYPE R = RECORD END;
+VAR x: INTEGER;
+PROCEDURE (VAR r: R) Method;
+BEGIN
+  x := 1
+END Method;
+END M.`,
+			WantErrs: nil,
+		},
+		{
+			// Type-bound procedure nested inside Outer tries to read Outer's local
+			// variable x — this violates the scoping rule.
+			Name: "type-bound nested in proc accesses outer VAR (invalid)",
+			Source: `
+MODULE M;
+TYPE R = RECORD END;
+PROCEDURE Outer;
+  VAR x: INTEGER;
+  PROCEDURE (VAR r: R) Method;
+  BEGIN
+    x := 1
+  END Method;
+END Outer;
+END M.`,
+			WantErrs: []string{
+				"type-bound procedure cannot access 'x'",
+			},
+		},
+		{
+			// Type-bound procedure nested inside Outer tries to read Outer's
+			// parameter x — also a violation.
+			Name: "type-bound nested in proc accesses outer PARAM (invalid)",
+			Source: `
+MODULE M;
+TYPE R = RECORD END;
+PROCEDURE Outer(x: INTEGER);
+  PROCEDURE (VAR r: R) Method;
+  BEGIN
+    x := 1
+  END Method;
+END Outer;
+END M.`,
+			WantErrs: []string{
+				"type-bound procedure cannot access 'x'",
+			},
+		},
+		{
+			// The method's own parameter x lives in the method's own scope —
+			// access is always allowed.
+			Name: "type-bound accesses its own param (valid)",
+			Source: `
+MODULE M;
+TYPE R = RECORD END;
+PROCEDURE (VAR r: R) Method(x: INTEGER);
+BEGIN
+  x := 1
+END Method;
+END M.`,
+			WantErrs: nil,
+		},
+		{
+			// Outer's CONST c is allowed (only variables/params are forbidden).
+			// Outer's VAR y is forbidden — exactly one error expected.
+			Name: "type-bound nested in proc accesses outer CONST (valid) but outer VAR (invalid)",
+			Source: `
+MODULE M;
+TYPE R = RECORD END;
+PROCEDURE Outer;
+  CONST c = 42;
+  VAR y: INTEGER;
+  PROCEDURE (VAR r: R) Method;
+  BEGIN
+    y := c
+  END Method;
+END Outer;
+END M.`,
+			WantErrs: []string{
+				"type-bound procedure cannot access 'y'",
+			},
+		},
+		{
+			// Calling a procedure declared in an outer scope is explicitly allowed.
+			Name: "type-bound nested in proc calling outer PROCEDURE (valid)",
+			Source: `
+MODULE M;
+TYPE R = RECORD END;
+PROCEDURE Outer;
+  PROCEDURE Helper;
+  END Helper;
+  PROCEDURE (VAR r: R) Method;
+  BEGIN
+    Helper()
+  END Method;
+END Outer;
+END M.`,
+			WantErrs: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			ctx := flowCheckSnippet(t, tt.Source)
+
+			diags := ctx.Reporter.Diagnostics()
+			if len(diags) != len(tt.WantErrs) {
+				t.Errorf("got %d diagnostics, want %d", len(diags), len(tt.WantErrs))
+				for _, d := range diags {
+					t.Logf("diag: %s", d.Message)
+				}
+				return
+			}
+			for i, want := range tt.WantErrs {
+				if !strings.Contains(diags[i].Message, want) {
+					t.Errorf("diagnostic %d = %q, want substring %q", i, diags[i].Message, want)
+				}
+			}
+		})
+	}
+}
+
 func flowCheckSnippet(t *testing.T, code string) *compiler.Context {
 	tmp := t.TempDir()
 	file := filepath.Join(tmp, "test.obx")

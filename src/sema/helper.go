@@ -233,3 +233,23 @@ func AlignTo(offset, alignment int) int {
 	mask := alignment - 1
 	return (offset + mask) &^ mask
 }
+
+// collectOuterProcScopes returns the set of LexicalScopes that belong to
+// procedures enclosing decl in the lexical scope chain.  Starting from
+// decl.Env.Parent() it walks up the parent chain, collecting every scope
+// that is NOT the module scope (i.e. whose parent is ast.Global) and NOT
+// ast.Global itself.  These are the procedure-owned scopes from which a
+// type-bound procedure is forbidden from reading variables or parameters.
+func collectOuterProcScopes(decl *ast.ProcedureDecl) map[*ast.LexicalScope]bool {
+	result := make(map[*ast.LexicalScope]bool)
+	if decl.Env == nil {
+		return result
+	}
+	for s := decl.Env.Parent(); s != nil && s != ast.Global; s = s.Parent() {
+		// The module scope has ast.Global as its direct parent; skip it.
+		if s.Parent() != ast.Global {
+			result[s] = true
+		}
+	}
+	return result
+}
