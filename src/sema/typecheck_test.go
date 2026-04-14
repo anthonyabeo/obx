@@ -3877,7 +3877,8 @@ func TestTypeCheckPrograms(t *testing.T) {
 
 				END M.
 			`,
-			WantErrs: nil,
+			// RETURN TRUE in an INTEGER function is now correctly caught
+			WantErrs: []string{"not compatible"},
 		},
 		{
 			Name: "Call procedure with wrong number of args",
@@ -5024,3 +5025,168 @@ func writeModuleFiles(t *testing.T, dir, src string) {
 	}
 	flush()
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RETURN expression type validation tests
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestReturnTypeValidation(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   string
+		wantErrs []string // expected error-message substrings; nil = no errors
+	}{
+		// ── Valid cases ───────────────────────────────────────────────────────
+		{
+			name: "valid: return correct integer type",
+			source: `
+MODULE Test;
+PROCEDURE Add(a, b: INTEGER): INTEGER;
+BEGIN RETURN a + b END Add;
+END Test.`,
+			wantErrs: nil,
+		},
+		{
+			name: "valid: return boolean",
+			source: `
+MODULE Test;
+PROCEDURE IsPositive(n: INTEGER): BOOLEAN;
+BEGIN RETURN n > 0 END IsPositive;
+END Test.`,
+			wantErrs: nil,
+		},
+		{
+			name: "valid: return INT16 from function typed REAL (widening)",
+			source: `
+MODULE Test;
+PROCEDURE ToReal(n: INT16): REAL;
+BEGIN RETURN n END ToReal;
+END Test.`,
+			wantErrs: nil,
+		},
+		{
+			name: "valid: return NIL for pointer return type",
+			source: `
+MODULE Test;
+TYPE P = POINTER TO RECORD x: INTEGER END;
+PROCEDURE NilPtr(): P;
+BEGIN RETURN NIL END NilPtr;
+END Test.`,
+			wantErrs: nil,
+		},
+		{
+			name: "valid: nested – inner and outer both return correct types",
+			source: `
+MODULE Test;
+PROCEDURE Outer(): INTEGER;
+    PROCEDURE Inner(): BOOLEAN;
+    BEGIN RETURN TRUE END Inner;
+BEGIN RETURN 42 END Outer;
+END Test.`,
+			wantErrs: nil,
+		},
+		// ── Error cases ───────────────────────────────────────────────────────
+		{
+			name: "error: RETURN BOOLEAN from INTEGER function",
+			source: `
+MODULE Test;
+PROCEDURE F(): INTEGER;
+BEGIN RETURN TRUE END F;
+END Test.`,
+			wantErrs: []string{"not compatible", "bool", "integer"},
+		},
+		{
+			name: "error: RETURN integer literal from BOOLEAN function",
+			source: `
+MODULE Test;
+PROCEDURE F(): BOOLEAN;
+BEGIN RETURN 42 END F;
+END Test.`,
+			// literal 42 has type 'byte' (smallest fitting integer type); declared return is 'bool'
+			wantErrs: []string{"not compatible", "bool"},
+		},
+		{
+			name: "error: RETURN REAL variable from INTEGER function",
+			source: `
+MODULE Test;
+PROCEDURE F(): INTEGER;
+VAR r: REAL;
+BEGIN r := 3.14; RETURN r END F;
+END Test.`,
+			wantErrs: []string{"not compatible"},
+		},
+		{
+			name: "error: only outer procedure returns wrong type; inner is correct",
+			source: `
+MODULE Test;
+PROCEDURE Outer(): INTEGER;
+    PROCEDURE Inner(): BOOLEAN;
+    BEGIN RETURN TRUE END Inner;
+BEGIN
+    RETURN TRUE   (* wrong: BOOLEAN for INTEGER *)
+END Outer;
+END Test.`,
+			wantErrs: []string{"not compatible"},
+		},
+		{
+			name: "error: RETURN name of procedure from BOOLEAN function",
+			source: `
+MODULE Test;
+PROCEDURE F(): BOOLEAN;
+    PROCEDURE G(): INTEGER;
+    BEGIN RETURN 1 END G;
+BEGIN RETURN G END F;
+END Test.`,
+			wantErrs: []string{"not compatible"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obx := ast.NewOberonX()
+			srcMgr := source.NewSourceManager()
+			reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
+			ctx := compiler.New("test.obx", srcMgr, reporter, ast.NewEnv(), 0)
+
+			p := parser.NewParser(ctx, "test.obx", []byte(tt.source))
+			unit := p.Parse()
+			if ctx.Reporter.ErrorCount() > 0 {
+				ctx.Reporter.Flush()
+				t.Fatalf("unexpected parse errors in %q", tt.name)
+			}
+
+			obx.AddUnit(unit)
+			NewSema(ctx, obx).Validate()
+
+			diags := ctx.Reporter.Diagnostics()
+
+			if len(tt.wantErrs) == 0 {
+				if ctx.Reporter.ErrorCount() > 0 {
+					t.Errorf("expected no errors, got %d:", ctx.Reporter.ErrorCount())
+					for _, d := range diags {
+						t.Logf("  %s", d.Message)
+					}
+				}
+				return
+			}
+
+			if ctx.Reporter.ErrorCount() == 0 {
+				t.Errorf("expected errors containing %v but got none", tt.wantErrs)
+				return
+			}
+
+			// Collect every diagnostic message into one text blob for easy substring checks.
+			var msgs []string
+			for _, d := range diags {
+				msgs = append(msgs, d.Message)
+			}
+			allText := strings.Join(msgs, "\n")
+			for _, want := range tt.wantErrs {
+				if !strings.Contains(allText, want) {
+					t.Errorf("expected a diagnostic containing %q;\nall diagnostics:\n%s", want, allText)
+				}
+			}
+		})
+	}
+}
+

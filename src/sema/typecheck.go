@@ -20,6 +20,13 @@ type TypeChecker struct {
 	// Written in VisitGuard and CASE type-label arms; deleted on exit.
 	// Not shared with other phases.
 	typeOverrides map[string]types.Type
+
+	// procReturnType is the declared return type of the innermost function
+	// procedure currently being type-checked. nil means the current procedure
+	// is a proper procedure (commands have no return value).
+	procReturnType types.Type
+	// procName is the name of that same procedure; used in error messages.
+	procName string
 }
 
 func NewTypeChecker(ctx *compiler.Context) *TypeChecker {
@@ -2528,8 +2535,34 @@ func (t *TypeChecker) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any {
 }
 
 func (t *TypeChecker) VisitReturnStmt(stmt *ast.ReturnStmt) any {
-	if stmt.Value != nil {
-		stmt.Value.Accept(t)
+	if stmt.Value == nil {
+		return stmt
+	}
+
+	stmt.Value.Accept(t)
+
+	// If the expression failed to resolve earlier, suppress the secondary
+	// type error — the primary diagnostic has already been reported.
+	exprType := stmt.Value.Type()
+	if exprType == nil || types.IsUnknownType(exprType) {
+		return stmt
+	}
+
+	// FlowChecker already flags "RETURN value in proper procedure".
+	// Here we only validate type compatibility when there IS a declared return type.
+	if t.procReturnType == nil {
+		return stmt
+	}
+
+	if !types.AssignmentCompatible(types.Underlying(exprType), types.Underlying(t.procReturnType)) {
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
+			Message: fmt.Sprintf(
+				"RETURN expression of type '%s' is not compatible with declared return type '%s' of '%s'",
+				types.Underlying(exprType), types.Underlying(t.procReturnType), t.procName,
+			),
+			Range: t.ctx.Source.Span(t.ctx.FileName, stmt.Value.Pos(), stmt.Value.End()),
+		})
 	}
 
 	return stmt
@@ -2833,6 +2866,24 @@ func (t *TypeChecker) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	defer func() { t.ctx.Env.SetCurrentScope(tmp) }()
 
 	decl.Head.Accept(t)
+
+	// Push return-type context so that VisitReturnStmt can validate the
+	// return expression's type against the declared return type.
+	// Save and restore across nested procedures (each gets its own context).
+	savedReturnType := t.procReturnType
+	savedProcName := t.procName
+	defer func() {
+		t.procReturnType = savedReturnType
+		t.procName = savedProcName
+	}()
+
+	if procType, ok := types.Underlying(decl.Head.Name.SemaType).(*types.ProcedureType); ok {
+		t.procReturnType = procType.Result // nil for proper procedures (commands)
+	} else {
+		t.procReturnType = nil
+	}
+	t.procName = decl.Head.Name.Name
+
 	if decl.Body != nil {
 		decl.Body.Accept(t)
 	}
