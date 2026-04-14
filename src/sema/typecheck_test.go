@@ -5337,3 +5337,169 @@ END Test.`,
 	}
 }
 
+func TestForLoopCtlVarMutation(t *testing.T) {
+	tests := []typeCheckTestCase{
+		// ── Valid cases ───────────────────────────────────────────────────────
+		{
+			Name: "valid: read control var in body",
+			Source: `
+MODULE M;
+VAR i, sum: INTEGER;
+BEGIN
+  FOR i := 1 TO 10 DO
+    sum := sum + i
+  END
+END M.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "valid: nested FOR loops, no control-var mutation",
+			Source: `
+MODULE M;
+VAR i, j, x: INTEGER;
+BEGIN
+  FOR i := 1 TO 5 DO
+    FOR j := 1 TO 5 DO
+      x := i + j
+    END
+  END
+END M.`,
+			WantErrs: nil,
+		},
+		{
+			Name: "valid: local variable with same name as outer control var is ok",
+			Source: `
+MODULE M;
+VAR i: INTEGER;
+PROCEDURE Inner;
+  VAR i: INTEGER;
+BEGIN
+  i := 99
+END Inner;
+BEGIN
+  FOR i := 1 TO 3 DO
+    Inner()
+  END
+END M.`,
+			WantErrs: nil,
+		},
+
+		// ── Error cases ───────────────────────────────────────────────────────
+		{
+			Name: "error: direct assignment to control variable",
+			Source: `
+MODULE M;
+VAR i: INTEGER;
+BEGIN
+  FOR i := 1 TO 10 DO
+    i := 5
+  END
+END M.`,
+			WantErrs: []string{"FOR loop control variable 'i' must not be modified"},
+		},
+		{
+			Name: "error: INC(ctlVar) inside loop",
+			Source: `
+MODULE M;
+VAR i: INTEGER;
+BEGIN
+  FOR i := 1 TO 10 DO
+    INC(i)
+  END
+END M.`,
+			WantErrs: []string{"FOR loop control variable 'i' must not be modified"},
+		},
+		{
+			Name: "error: DEC(ctlVar) inside loop",
+			Source: `
+MODULE M;
+VAR i: INTEGER;
+BEGIN
+  FOR i := 1 TO 10 DO
+    DEC(i)
+  END
+END M.`,
+			WantErrs: []string{"FOR loop control variable 'i' must not be modified"},
+		},
+		{
+			Name: "error: INC(ctlVar, n) inside loop",
+			Source: `
+MODULE M;
+VAR i: INTEGER;
+BEGIN
+  FOR i := 1 TO 10 DO
+    INC(i, 3)
+  END
+END M.`,
+			WantErrs: []string{"FOR loop control variable 'i' must not be modified"},
+		},
+		{
+			Name: "error: DEC(ctlVar, n) inside loop",
+			Source: `
+MODULE M;
+VAR i: INTEGER;
+BEGIN
+  FOR i := 1 TO 10 DO
+    DEC(i, 2)
+  END
+END M.`,
+			WantErrs: []string{"FOR loop control variable 'i' must not be modified"},
+		},
+		{
+			Name: "error: outer control var modified inside inner loop body",
+			Source: `
+MODULE M;
+VAR i, j: INTEGER;
+BEGIN
+  FOR i := 1 TO 5 DO
+    FOR j := 1 TO 5 DO
+      i := j
+    END
+  END
+END M.`,
+			WantErrs: []string{"FOR loop control variable 'i' must not be modified"},
+		},
+		{
+			Name: "error: assignment to control var inside nested IF",
+			Source: `
+MODULE M;
+VAR i: INTEGER;
+BEGIN
+  FOR i := 1 TO 10 DO
+    IF i > 5 THEN
+      i := 0
+    END
+  END
+END M.`,
+			WantErrs: []string{"FOR loop control variable 'i' must not be modified"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			ctx := typeCheckSnippet(t, tt.Source)
+			diags := ctx.Reporter.Diagnostics()
+
+			if len(tt.WantErrs) == 0 {
+				if ctx.Reporter.ErrorCount() > 0 {
+					t.Errorf("expected no errors, got %d:", ctx.Reporter.ErrorCount())
+					for _, d := range diags {
+						t.Logf("  %s", d.Message)
+					}
+				}
+				return
+			}
+
+			var msgs []string
+			for _, d := range diags {
+				msgs = append(msgs, d.Message)
+			}
+			allText := strings.Join(msgs, "\n")
+			for _, want := range tt.WantErrs {
+				if !strings.Contains(allText, want) {
+					t.Errorf("expected a diagnostic containing %q;\nall diagnostics:\n%s", want, allText)
+				}
+			}
+		})
+	}
+}

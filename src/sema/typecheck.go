@@ -32,6 +32,14 @@ type TypeChecker struct {
 	// It is used to enforce ExportedReadOnly (v-) visibility: a variable exported
 	// with '-' may only be written from within its defining module.
 	currentModuleName string
+
+	// forCtlVars is a stack of the control-variable symbols for every active
+	// (enclosing) FOR loop.  The spec says "the variable v must not be modified
+	// within the statement sequence".  Entries are pushed when VisitForStmt
+	// starts processing its body and popped on exit via defer; nested FOR loops
+	// accumulate entries so that all enclosing control variables are
+	// simultaneously protected.
+	forCtlVars []ast.Symbol
 }
 
 func NewTypeChecker(ctx *compiler.Context) *TypeChecker {
@@ -1602,6 +1610,14 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 				return
 			}
 
+			if varName, isCtl := t.isForCtlVarExpr(call.ActualParams[0]); isCtl {
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
+					Message:  fmt.Sprintf("FOR loop control variable '%s' must not be modified in the loop body", varName),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+			}
+
 			return
 		}
 
@@ -1640,6 +1656,14 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 					Range: t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
 				})
 				return
+			}
+
+			if varName, isCtl := t.isForCtlVarExpr(x); isCtl {
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
+					Message:  fmt.Sprintf("FOR loop control variable '%s' must not be modified in the loop body", varName),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, x.Pos(), x.End()),
+				})
 			}
 
 			return
@@ -1731,6 +1755,14 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 				return
 			}
 
+			if varName, isCtl := t.isForCtlVarExpr(call.ActualParams[0]); isCtl {
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
+					Message:  fmt.Sprintf("FOR loop control variable '%s' must not be modified in the loop body", varName),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
+				})
+			}
+
 			return
 		}
 
@@ -1758,6 +1790,7 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 						pre.Name(), tx.String()),
 					Range: t.ctx.Source.Span(t.ctx.FileName, x.Pos(), x.End()),
 				})
+				return
 			}
 
 			if !types.IsInteger(ty) {
@@ -1766,6 +1799,14 @@ func (t *TypeChecker) checkPredeclaredProcedure(call *ast.ProcedureCall, pre *as
 					Message: fmt.Sprintf("predeclared procedure '%s' expects the second argument to be an integer, got %s",
 						pre.Name(), ty.String()),
 					Range: t.ctx.Source.Span(t.ctx.FileName, y.Pos(), y.End()),
+				})
+			}
+
+			if varName, isCtl := t.isForCtlVarExpr(x); isCtl {
+				t.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
+					Message:  fmt.Sprintf("FOR loop control variable '%s' must not be modified in the loop body", varName),
+					Range:    t.ctx.Source.Span(t.ctx.FileName, x.Pos(), x.End()),
 				})
 			}
 
@@ -2579,6 +2620,16 @@ func (t *TypeChecker) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any {
 		}
 	}
 
+	// Enforce: FOR loop control variable must not be modified in the loop body.
+	if varName, isCtl := t.isForCtlVarExpr(stmt.LValue); isCtl {
+		t.ctx.Reporter.Report(diag.Diagnostic{
+			Severity: diag.Error,
+			Message:  fmt.Sprintf("FOR loop control variable '%s' must not be modified in the loop body", varName),
+			Range:    t.ctx.Source.Span(t.ctx.FileName, stmt.LValue.Pos(), stmt.LValue.End()),
+		})
+		return stmt
+	}
+
 	// Ensure the LHS is a valid variable designator
 	if !t.isAssignable(stmt.LValue) {
 		t.ctx.Reporter.Report(diag.Diagnostic{
@@ -2906,6 +2957,13 @@ func (t *TypeChecker) VisitForStmt(stmt *ast.ForStmt) any {
 				})
 			}
 		}
+	}
+
+	// Guard the control variable against mutation inside the loop body.
+	// Push it onto the active stack before visiting statements, pop on exit.
+	if ctlSym := stmt.CtlVar.Symbol; ctlSym != nil {
+		t.forCtlVars = append(t.forCtlVars, ctlSym)
+		defer func() { t.forCtlVars = t.forCtlVars[:len(t.forCtlVars)-1] }()
 	}
 
 	for _, s := range stmt.StmtSeq {
@@ -3469,6 +3527,34 @@ func (t *TypeChecker) isExportedReadOnlyFromExternal(sym ast.Symbol) bool {
 	// For module-level variables this is the module's registered scope.
 	// If the two scopes differ, sym is owned by a different module.
 	return currentScope == nil || vs.Parent() != currentScope
+}
+
+// isForCtlVarExpr checks whether expr is a plain Designator that resolves to
+// one of the currently active FOR-loop control variables.  If so it returns
+// the variable name and true; otherwise it returns "", false.
+// Used to enforce the spec rule: "the variable v must not be modified within
+// the statement sequence".
+func (t *TypeChecker) isForCtlVarExpr(expr ast.Expression) (string, bool) {
+	if len(t.forCtlVars) == 0 {
+		return "", false
+	}
+	dsg, ok := expr.(*ast.Designator)
+	if !ok {
+		return "", false
+	}
+	if dsg.QIdent == nil {
+		return "", false
+	}
+	sym := dsg.QIdent.Symbol
+	if sym == nil {
+		return "", false
+	}
+	for _, ctlSym := range t.forCtlVars {
+		if ctlSym == sym {
+			return dsg.QIdent.Name, true
+		}
+	}
+	return "", false
 }
 
 func (t *TypeChecker) checkIntegerCase(stmt *ast.CaseStmt, caseType types.Type) {
