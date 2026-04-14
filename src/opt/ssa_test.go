@@ -160,6 +160,45 @@ end Main
  `,
 			filename: "repeat_until_test.obx",
 		},
+		{
+			// Regression test: lowerNumberBuiltin previously unconditionally
+			// panicked. Verify that NUMBER(v, a) lowers without panicking and
+			// emits a call to __obx_bytes(dst, src, SIZE(v)).
+			name: "NumberBuiltin_BYTE",
+			input: `
+  MODULE NumberTest;
+  VAR n: BYTE;
+      a: ARRAY 1 OF BYTE;
+  BEGIN
+   NUMBER(n, a)
+  END NumberTest.
+ `,
+			filename: "number_test.obx",
+		},
+		{
+			name: "NumberBuiltin_INT32",
+			input: `
+  MODULE NumberTest2;
+  VAR n: INT32;
+      a: ARRAY 4 OF BYTE;
+  BEGIN
+   NUMBER(n, a)
+  END NumberTest2.
+ `,
+			filename: "number_test2.obx",
+		},
+		{
+			name: "NumberBuiltin_SET",
+			input: `
+  MODULE NumberTest3;
+  VAR s: SET;
+      a: ARRAY 4 OF BYTE;
+  BEGIN
+   NUMBER(s, a)
+  END NumberTest3.
+ `,
+			filename: "number_test3.obx",
+		},
 	}
 
 	for _, tt := range tests {

@@ -4571,6 +4571,165 @@ func TestTypeCheckCaseStatementsPrograms(t *testing.T) {
 				END pointer_dynamic_binding.`,
 			WantErrs: nil,
 		},
+
+		// ── Integer: additional duplicate / overlap scenarios ─────────────────
+
+		{
+			Name: "Duplicate Scalar Integer Labels (cross arms)",
+			Source: `
+				MODULE dup_scalar_int;
+				VAR x: INTEGER;
+				BEGIN
+					CASE x OF
+						| 7: x := 0
+						| 7: x := 1
+					END
+				END dup_scalar_int.`,
+			WantErrs: []string{
+				"duplicate case label 7",
+			},
+		},
+		{
+			Name: "Scalar Integer Contained in Range (cross arms)",
+			Source: `
+				MODULE scalar_in_range_int;
+				VAR x: INTEGER;
+				BEGIN
+					CASE x OF
+						| 5: x := 0
+						| 3 .. 10: x := 1
+					END
+				END scalar_in_range_int.`,
+			WantErrs: []string{
+				"duplicate case label 5",
+			},
+		},
+		{
+			Name: "Duplicate Scalar in Comma-Separated Label List (same arm)",
+			Source: `
+				MODULE dup_scalar_comma;
+				VAR x: INTEGER;
+				BEGIN
+					CASE x OF
+						| 5, 5: x := 0
+					END
+				END dup_scalar_comma.`,
+			WantErrs: []string{
+				"duplicate case label 5",
+			},
+		},
+		{
+			Name: "Scalar Overlaps Range in Comma-Separated Label List (same arm)",
+			Source: `
+				MODULE scalar_in_range_comma;
+				VAR x: INTEGER;
+				BEGIN
+					CASE x OF
+						| 5, 3 .. 10: x := 0
+					END
+				END scalar_in_range_comma.`,
+			WantErrs: []string{
+				"duplicate case label 5",
+			},
+		},
+		{
+			Name: "Multiple Distinct Overlapping Ranges (integers)",
+			Source: `
+				MODULE multi_overlap_int;
+				VAR x: INTEGER;
+				BEGIN
+					CASE x OF
+						| 1 .. 5:  x := 0
+						| 4 .. 8:  x := 1
+					END
+				END multi_overlap_int.`,
+			WantErrs: []string{
+				"duplicate case label 4",
+				"duplicate case label 5",
+			},
+		},
+
+		// ── CHAR: additional duplicate / overlap scenarios ────────────────────
+
+		{
+			Name: "Duplicate Scalar CHAR Labels (cross arms)",
+			Source: `
+		MODULE dup_scalar_char;
+		VAR ch: CHAR;
+		BEGIN
+			CASE ch OF
+				| "A": ch := "Z"
+				| "A": ch := "B"
+			END
+		END dup_scalar_char.`,
+			WantErrs: []string{
+				"duplicate case label 'A'",
+			},
+		},
+		{
+			Name: "CHAR Scalar Contained in Range (cross arms)",
+			Source: `
+		MODULE scalar_in_range_char;
+		VAR ch: CHAR;
+		BEGIN
+			CASE ch OF
+				| "B": ch := "Z"
+				| "A" .. "C": ch := "B"
+			END
+		END scalar_in_range_char.`,
+			WantErrs: []string{
+				"duplicate case label 'B'",
+			},
+		},
+		{
+			Name: "Duplicate Scalar CHAR in Comma-Separated List (same arm)",
+			Source: `
+		MODULE dup_char_comma;
+		VAR ch: CHAR;
+		BEGIN
+			CASE ch OF
+				| "X", "X": ch := "A"
+			END
+		END dup_char_comma.`,
+			WantErrs: []string{
+				"duplicate case label 'X'",
+			},
+		},
+
+		// ── Enum: additional duplicate / overlap scenarios ────────────────────
+
+		{
+			Name: "Duplicate Scalar Enum Labels (cross arms)",
+			Source: `
+				MODULE dup_scalar_enum;
+					TYPE Color = (Red, Green, Blue);
+					VAR c: Color;
+				BEGIN
+					CASE c OF
+						| Red: ASSERT(TRUE)
+						| Red: ASSERT(FALSE)
+					END
+				END dup_scalar_enum.`,
+			WantErrs: []string{
+				"duplicate case label 'Red'",
+			},
+		},
+		{
+			Name: "Enum Scalar Contained in Range (cross arms)",
+			Source: `
+				MODULE scalar_in_range_enum;
+					TYPE Color = (Red, Green, Blue);
+					VAR c: Color;
+				BEGIN
+					CASE c OF
+						| Green: ASSERT(TRUE)
+						| Red .. Blue: ASSERT(FALSE)
+					END
+				END scalar_in_range_enum.`,
+			WantErrs: []string{
+				"duplicate case label 'Green'",
+			},
+		},
 	}
 
 	for _, tt := range tests {

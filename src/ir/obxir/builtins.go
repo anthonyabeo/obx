@@ -154,8 +154,16 @@ func lowerInclBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return newV
 }
 
-func lowerNumberBuiltin(_ *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
-	panic(fmt.Sprintf("NUMBER: EnumType element count not available at IR level (arg type: %T)", call.Args[0].Type()))
+func lowerNumberBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+	// NUMBER(v, a): reinterpret the byte representation of array a as the
+	// numeric/set type of v.  Semantically equivalent to:
+	//   memcpy(&v, &a, SIZE(v))
+	// We reuse the __obx_bytes runtime helper that lowerBytesBuiltin calls.
+	dst := b.ensureAddr(call.Args[0])
+	src := b.ensureAddr(call.Args[1])
+	size := Int64Lit(uint64(call.Args[0].Type().Width()))
+	b.Emit(&CallInst{Callee: "__obx_bytes", Args: []Value{dst, src, size}})
+	return nil
 }
 
 func lowerPcallBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
