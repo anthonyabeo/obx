@@ -8,10 +8,10 @@ import (
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 )
 
-var builtinLowering map[string]func(*IRBuilder, *Function, *desugar.FuncCall) Value
+var builtinLowering map[string]func(*IRBuilder, *desugar.FuncCall) Value
 
 func init() {
-	builtinLowering = map[string]func(*IRBuilder, *Function, *desugar.FuncCall) Value{
+	builtinLowering = map[string]func(*IRBuilder, *desugar.FuncCall) Value{
 		"printf": lowerPrintfBuiltin,
 
 		// predeclared functions
@@ -68,7 +68,7 @@ func init() {
 
 // ─── Predeclared procedures ───────────────────────────────────────────────
 
-func lowerAssertBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerAssertBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	cond := b.ensureValue(call.Args[0])
 	var code Value
 	if len(call.Args) > 1 {
@@ -88,7 +88,7 @@ func lowerAssertBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value
 	return code
 }
 
-func lowerBytesBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerBytesBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	dst := b.ensureAddr(call.Args[0])
 	src := b.ensureAddr(call.Args[1])
 	n := b.ensureValue(call.Args[2])
@@ -96,7 +96,7 @@ func lowerBytesBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value 
 	return nil
 }
 
-func lowerDecBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerDecBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	addr := b.ensureAddr(call.Args[0])
 	x := b.ensureValue(call.Args[0])
 	var amt Value
@@ -111,7 +111,7 @@ func lowerDecBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return res
 }
 
-func lowerExclBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerExclBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	vVal := b.ensureValue(call.Args[0])
 	xVal := b.ensureValue(call.Args[1])
 	bit := b.NewTemp(vVal.Type())
@@ -123,13 +123,13 @@ func lowerExclBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return newV
 }
 
-func lowerHaltBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerHaltBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	n := b.ensureValue(call.Args[0])
 	b.SetTerm(&HaltInst{Code: n})
 	return n
 }
 
-func lowerIncBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerIncBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	addr := b.ensureAddr(call.Args[0])
 	x := b.ensureValue(call.Args[0])
 	var amt Value
@@ -144,7 +144,7 @@ func lowerIncBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return res
 }
 
-func lowerInclBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerInclBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	vVal := b.ensureValue(call.Args[0])
 	xVal := b.ensureValue(call.Args[1])
 	bit := b.NewTemp(vVal.Type())
@@ -154,7 +154,7 @@ func lowerInclBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return newV
 }
 
-func lowerNumberBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerNumberBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	// NUMBER(v, a): reinterpret the byte representation of array a as the
 	// numeric/set type of v.  Semantically equivalent to:
 	//   memcpy(&v, &a, SIZE(v))
@@ -166,7 +166,7 @@ func lowerNumberBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value
 	return nil
 }
 
-func lowerPcallBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerPcallBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	proc := b.ensureValue(call.Args[0])
 	var args []Value
 	for _, a := range call.Args[1:] {
@@ -177,20 +177,20 @@ func lowerPcallBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value 
 	return ret
 }
 
-func lowerRaiseBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerRaiseBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	n := b.ensureValue(call.Args[0])
 	b.SetTerm(&HaltInst{Code: n})
 	return n
 }
 
-func lowerCopyBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerCopyBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	src := b.ensureAddr(call.Args[0])
 	dst := b.ensureAddr(call.Args[1])
 	b.Emit(&CallInst{Callee: "__obx_copy", Args: []Value{src, dst}})
 	return nil
 }
 
-func lowerPackBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerPackBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xAddr := b.ensureAddr(call.Args[0])
 	xVal := b.NewTemp(Float64Type)
 	b.Emit(&LoadInst{Target: xVal, Addr: xAddr})
@@ -201,7 +201,7 @@ func lowerPackBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return result
 }
 
-func lowerUnpackBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerUnpackBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xAddr := b.ensureAddr(call.Args[0])
 	eAddr := b.ensureAddr(call.Args[1])
 	xVal := b.NewTemp(Float64Type)
@@ -217,7 +217,7 @@ func lowerUnpackBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value
 
 // ─── Predeclared functions ────────────────────────────────────────────────
 
-func lowerLDCMDBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerLDCMDBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	mod := b.ensureValue(call.Args[0])
 	name := b.ensureValue(call.Args[1])
 	res := b.NewTemp(PointerTo(UInt8Type))
@@ -225,14 +225,14 @@ func lowerLDCMDBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value 
 	return res
 }
 
-func lowerLDMODBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerLDMODBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	name := b.ensureValue(call.Args[0])
 	res := b.NewTemp(PointerTo(UInt8Type))
 	b.Emit(&CallInst{Target: res, Callee: "__obx_ldmod", Args: []Value{name}})
 	return res
 }
 
-func lowerASHBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerASHBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	x := b.ensureValue(call.Args[0])
 	n := b.ensureValue(call.Args[1])
 	result := b.NewTemp(x.Type())
@@ -259,7 +259,7 @@ func lowerASHBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return result
 }
 
-func lowerASRBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerASRBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	x := b.ensureValue(call.Args[0])
 	n := b.ensureValue(call.Args[1])
 	res := b.NewTemp(x.Type())
@@ -267,14 +267,14 @@ func lowerASRBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return res
 }
 
-func lowerENTIERBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerENTIERBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	x := b.ensureValue(call.Args[0])
 	res := b.NewTemp(Int64Type)
 	b.Emit(&CallInst{Target: res, Callee: "floor", Args: []Value{x}})
 	return res
 }
 
-func lowerLSLBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerLSLBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	x := b.ensureValue(call.Args[0])
 	n := b.ensureValue(call.Args[1])
 	res := b.NewTemp(x.Type())
@@ -282,7 +282,7 @@ func lowerLSLBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return res
 }
 
-func lowerRORBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerRORBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	x := b.ensureValue(call.Args[0])
 	n := b.ensureValue(call.Args[1])
 	bitWidth := b.wordSize
@@ -303,7 +303,7 @@ func lowerRORBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return result
 }
 
-func lowerCastBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerCastBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	targetType := b.lowerType(call.Args[0].Type())
 	x := b.ensureValue(call.Args[1])
 	res := b.NewTemp(targetType)
@@ -311,14 +311,14 @@ func lowerCastBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return res
 }
 
-func lowerCHRBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerCHRBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	x := b.ensureValue(call.Args[0])
 	target := b.NewTemp(UInt8Type)
 	b.Emit(&BinaryInst{Target: target, Op: AND, Left: x, Right: UInt64Lit(0xFF)})
 	return target
 }
 
-func lowerDefaultBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerDefaultBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	ty := b.lowerType(call.Args[0].Type())
 	res := b.NewTemp(ty)
 	switch ty.(type) {
@@ -330,21 +330,21 @@ func lowerDefaultBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Valu
 	return res
 }
 
-func lowerFloorBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerFloorBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	x := b.ensureValue(call.Args[0])
 	res := b.NewTemp(Int64Type)
 	b.Emit(&CallInst{Target: res, Callee: "floor", Args: []Value{x}})
 	return res
 }
 
-func lowerFLTBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerFLTBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	x := b.ensureValue(call.Args[0])
 	res := b.NewTemp(Float32Type)
 	b.Emit(&MoveInst{Target: res, Value: x})
 	return res
 }
 
-func lowerLenBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerLenBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	x := b.ensureAddr(call.Args[0])
 
 	dim := 0
@@ -387,7 +387,7 @@ func lowerLenBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	}
 }
 
-func lowerLongBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerLongBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xVal := b.ensureValue(call.Args[0])
 	switch xTyp := xVal.Type().(type) {
 	case *IntegerType:
@@ -415,7 +415,7 @@ func lowerLongBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	}
 }
 
-func lowerMaxBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerMaxBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	if len(call.Args) == 1 {
 		v := b.ensureValue(call.Args[0])
 		tv, ok := v.(*TypeValue)
@@ -468,7 +468,7 @@ func lowerPredeclaredMAXInt(xExpr, yExpr desugar.Expr, b *IRBuilder) Value {
 	return z
 }
 
-func lowerMinBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerMinBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	if len(call.Args) == 1 {
 		v := b.ensureValue(call.Args[0])
 		tv, ok := v.(*TypeValue)
@@ -519,7 +519,7 @@ func lowerMINInts(xExpr, yExpr desugar.Expr, b *IRBuilder) Value {
 	return z
 }
 
-func lowerOddBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerOddBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xVal := b.ensureValue(call.Args[0])
 	t := b.NewTemp(xVal.Type())
 	b.Emit(&BinaryInst{Op: AND, Target: t, Left: xVal, Right: UInt64Lit(1)})
@@ -528,11 +528,11 @@ func lowerOddBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return result
 }
 
-func lowerOrdBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerOrdBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	return b.ensureValue(call.Args[0])
 }
 
-func lowerShortBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerShortBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xVal := b.ensureValue(call.Args[0])
 	switch xTyp := xVal.Type().(type) {
 	case *IntegerType:
@@ -550,7 +550,7 @@ func lowerShortBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value 
 	}
 }
 
-func lowerSizeBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerSizeBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	tVal := b.ensureValue(call.Args[0])
 	tv, ok := tVal.(*TypeValue)
 	if !ok {
@@ -561,14 +561,14 @@ func lowerSizeBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
 	return sizeTemp
 }
 
-func lowerWCHARBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerWCHARBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	x := b.ensureValue(call.Args[0])
 	target := b.NewTemp(UInt16Type)
 	b.Emit(&BinaryInst{Target: target, Op: AND, Left: x, Right: UInt64Lit(0xFFFF)})
 	return target
 }
 
-func lowerStrLenBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerStrLenBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	addr := b.ensureAddr(call.Args[0])
 	length := b.NewTemp(Int32Type)
 	b.Emit(&LoadInst{Target: length, Addr: addr})
@@ -576,7 +576,7 @@ func lowerStrLenBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value
 	return length
 }
 
-func lowerBitSHRBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerBitSHRBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xVal := b.ensureValue(call.Args[0])
 	yVal := b.ensureValue(call.Args[1])
 	res := b.NewTemp(xVal.Type())
@@ -584,7 +584,7 @@ func lowerBitSHRBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value
 	return res
 }
 
-func lowerBitSHLBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerBitSHLBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xVal := b.ensureValue(call.Args[0])
 	yVal := b.ensureValue(call.Args[1])
 	res := b.NewTemp(xVal.Type())
@@ -592,14 +592,14 @@ func lowerBitSHLBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value
 	return res
 }
 
-func lowerBitsBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerBitsBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xVal := b.ensureValue(call.Args[0])
 	res := b.NewTemp(SetType)
 	b.Emit(&MoveInst{Target: res, Value: xVal})
 	return res
 }
 
-func lowerBitASRBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerBitASRBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xVal := b.ensureValue(call.Args[0])
 	yVal := b.ensureValue(call.Args[1])
 	res := b.NewTemp(xVal.Type())
@@ -607,14 +607,14 @@ func lowerBitASRBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value
 	return res
 }
 
-func lowerBitNotBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerBitNotBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xVal := b.ensureValue(call.Args[0])
 	res := b.NewTemp(xVal.Type())
 	b.Emit(&UnaryInst{Target: res, Op: NOT, Operand: xVal})
 	return res
 }
 
-func lowerBitOrBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerBitOrBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xVal := b.ensureValue(call.Args[0])
 	yVal := b.ensureValue(call.Args[1])
 	res := b.NewTemp(xVal.Type())
@@ -622,7 +622,7 @@ func lowerBitOrBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value 
 	return res
 }
 
-func lowerBitXorBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerBitXorBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xVal := b.ensureValue(call.Args[0])
 	yVal := b.ensureValue(call.Args[1])
 	res := b.NewTemp(xVal.Type())
@@ -630,7 +630,7 @@ func lowerBitXorBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value
 	return res
 }
 
-func lowerBitAndBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerBitAndBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xVal := b.ensureValue(call.Args[0])
 	yVal := b.ensureValue(call.Args[1])
 	res := b.NewTemp(xVal.Type())
@@ -638,7 +638,7 @@ func lowerBitAndBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value
 	return res
 }
 
-func lowerAbsBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerAbsBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	arg := b.ensureValue(call.Args[0])
 	if _, ok := arg.Type().(*IntegerType); ok {
 		return lowerABSInteger(arg, b)
@@ -687,14 +687,15 @@ func lowerABSInteger(x Value, b *IRBuilder) Value {
 	return result
 }
 
-func lowerCapBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerCapBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	xVal := b.ensureValue(call.Args[0])
 	res := b.NewTemp(UInt8Type)
 	b.Emit(&BinaryInst{Target: res, Op: AND, Left: xVal, Right: UInt8Lit(223)})
 	return res
 }
 
-func lowerPrintfBuiltin(b *IRBuilder, fn *Function, call *desugar.FuncCall) Value {
+func lowerPrintfBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
+	fn := b.callee(call)
 	var args []Value
 	b.lowerArgs(fn, call.Args, 0, len(fn.Params), &args)
 	if fn.Variadic {
@@ -705,7 +706,7 @@ func lowerPrintfBuiltin(b *IRBuilder, fn *Function, call *desugar.FuncCall) Valu
 	return ret
 }
 
-func lowerNewBuiltin(b *IRBuilder, _ *Function, call *desugar.FuncCall) Value {
+func lowerNewBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	dst := b.ensureAddr(call.Args[0])
 	args := []Value{dst}
 	for _, a := range call.Args[1:] {

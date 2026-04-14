@@ -900,7 +900,7 @@ func (b *IRBuilder) FuncCall(call *desugar.FuncCall) Value {
 
 	if fn.IsBuiltin {
 		f := builtinLowering[fn.FnName]
-		return f(b, fn, call)
+		return f(b, call)
 	}
 
 	var args []Value
@@ -940,8 +940,24 @@ func (b *IRBuilder) lowerArgs(fn *Function, args []desugar.Expr, start, end int,
 	}
 }
 
-func (b *IRBuilder) lowerVarArgs(args []desugar.Expr, start, end int, out *[]Value) {
-	for idx := start; idx < end; idx++ {
+// callee resolves the *Function for a FuncCall by looking up the callee name
+// in the current function's environment.  It is used by builtin handlers that
+// need the callee's parameter or variadic metadata (e.g. lowerPrintfBuiltin).
+func (b *IRBuilder) callee(call *desugar.FuncCall) *Function {
+	for _, n := range []string{call.Func.Mangled, call.Func.Name, strings.ToLower(call.Func.Name)} {
+		if n == "" {
+			continue
+		}
+		if v, ok := b.Func.Env.Lookup(n); ok {
+			if fn, ok := v.(*Function); ok {
+				return fn
+			}
+		}
+	}
+	panic("callee: function not found in env: " + call.Func.Name)
+}
+
+func (b *IRBuilder) lowerVarArgs(args []desugar.Expr, start, end int, out *[]Value) {	for idx := start; idx < end; idx++ {
 		v := b.ensureValue(args[idx])
 		b.Emit(&Arg{Index: idx, Value: v})
 		*out = append(*out, v)
