@@ -1,9 +1,12 @@
 # Obx — Oberon+ Compiler
 
-Obx is a compiler for the [Oberon+](https://oberon-lang.github.io/) programming language, currently
-targeting **RISC-V (rv64imafd)** on Linux.  It is written in Go and implements the full compilation
-pipeline: module discovery → parsing → semantic analysis → IR lowering → SSA optimisation →
-instruction selection → register allocation → assembly emission.
+Obx is a compiler for the [Oberon+](https://oberon-lang.github.io/) programming language, targeting
+**RISC-V (rv64imafd)** on Linux and **ARM64** on macOS.  It is written in Go and implements the
+full compilation pipeline: module discovery → parsing → semantic analysis → IR lowering →
+SSA optimisation → instruction selection → register allocation → assembly emission.
+
+It also ships a built-in HTTP server (`obx web`) that provides a browser-based editor and a
+JSON API for interactive type-checking and diagnostics.
 
 ---
 
@@ -16,6 +19,7 @@ instruction selection → register allocation → assembly emission.
   - [obx new](#obx-new)
   - [obx check](#obx-check)
   - [obx build](#obx-build)
+  - [obx web](#obx-web)
 - [Standard Library](#standard-library)
 - [Examples](#examples)
 - [Compilation Pipeline](#compilation-pipeline)
@@ -29,7 +33,8 @@ instruction selection → register allocation → assembly emission.
 | Requirement | Version |
 |---|---|
 | [Go toolchain](https://go.dev/doc/install) | ≥ 1.20 |
-| RISC-V GCC cross-toolchain *(optional — only needed to assemble/link output)* | any recent |
+| RISC-V GCC cross-toolchain *(optional — only needed to assemble/link RISC-V output)* | any recent |
+| Apple Clang / `as` *(optional — only needed to assemble/link ARM64 output on macOS)* | any recent |
 
 ---
 
@@ -57,17 +62,19 @@ Every Obx project is described by an `obx.mod` file at its root.  It is a small 
 
 ```json
 {
-  "name":  "calculator",
-  "roots": ["src"],
-  "entry": "Main"
+  "name":   "calculator",
+  "roots":  ["src"],
+  "entry":  "Main",
+  "stdlib": "/opt/obx/stdlib"
 }
 ```
 
-| Field | Description |
-|---|---|
-| `name` | Human-readable project name. |
-| `roots` | List of source root directories (relative to the manifest). All `.obx` files under these roots are part of the project. |
-| `entry` | Default entry module for `obx build`. Can be overridden with `--entry`. |
+| Field | Required | Description |
+|---|---|---|
+| `name` | yes | Human-readable project name. |
+| `roots` | yes | Source root directories (relative to the manifest). All `.obx` files under these roots are part of the project. |
+| `entry` | no | Default entry module for `obx build`. Can be overridden with `--entry`. |
+| `stdlib` | no | Override for the stdlib root directory. Falls back to `$OBX_STDLIB`, then to a `stdlib/` directory alongside the `obx` binary. |
 
 `obx` walks up from the working directory to locate `obx.mod` automatically, so commands can be run
 from any subdirectory of the project.
@@ -131,7 +138,8 @@ obx check [flags]
 | Flag | Short | Default | Description |
 |---|---|---|---|
 | `--path` | `-p` | *(obx.mod)* | Source root directory. Falls back to roots listed in `obx.mod`. |
-| `--tabWidth` | `-t` | `4` | Number of spaces per tab for diagnostic rendering. |
+| `--target` | `-T` | `rv64imafd` | Target architecture — used to inject the correct platform directives (`POSIX`, `LINUX`, `DARWIN`, `WINDOWS`) for stdlib selection. |
+| `--define` | `-d` | | Compile-time directive: `NAME` (bool true) or `NAME=VALUE`. Repeatable. Overrides platform directives. |
 | `--max-errors` | | `32` | Stop after this many errors. |
 | `--quiet` | `-q` | `false` | Suppress progress output; print diagnostics only. |
 
@@ -166,15 +174,64 @@ obx build [flags]
 | `--root` | `-r` | *(obx.mod)* | Source root directory. Repeatable. Falls back to `roots` in `obx.mod`. |
 | `--entry` | `-e` | *(obx.mod)* | Entry module. Falls back to `entry` in `obx.mod`; omit to build all modules. |
 | `--output` | `-o` | | Name of the output file to produce. |
-| `--target` | `-T` | `rv64imafd` | Target architecture. Run `obx build --help` to see all registered targets. |
+| `--target` | `-T` | `rv64imafd` | Target architecture. Run `obx build --help` to see all registered targets. Injects platform directives automatically. |
+| `--define` | `-d` | | Compile-time directive: `NAME` (bool true) or `NAME=VALUE`. Repeatable. Applied after platform directives, so can override them. |
 | `--asm` | `-S` | `false` | Print generated assembly to stdout in addition to writing it to `out/`. |
 | `--optlevel` | `-O` | `2` | Optimisation level `0`–`3` (see [Optimisation Passes](#optimisation-passes)). |
 | `--passes` | `-P` | | Comma-separated passes to enable, overriding `-O`. |
 | `--disable-passes` | `-D` | | Comma-separated passes to disable from the selected level. |
 | `--verbose` | `-V` | `false` | Print per-pass IR diffs and optimisation details. |
-| `--tabWidth` | `-t` | `4` | Number of spaces per tab for diagnostic rendering. |
 
 Assembly is written to `out/<ModuleName>.s` relative to the project root.
+
+---
+
+### `obx web`
+
+Starts an HTTP server with a browser-based Oberon+ editor and a JSON API for
+interactive type-checking.  No project manifest or local files are required —
+source code is submitted in the request body.
+
+```
+obx web [flags]
+```
+
+**Flags**
+
+| Flag | Short | Default | Description |
+|---|---|---|---|
+| `--addr` | `-a` | `:8080` | `host:port` to listen on. |
+| `--max-errors` | | `50` | Stop after this many errors per request. |
+
+**Endpoints**
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Browser-based Oberon+ editor and diagnostic viewer. |
+| `POST` | `/api/check` | JSON API: `{"source":"…","filename":"…"}` → diagnostics array. |
+| `GET` | `/api/version` | Build and runtime information (version, Go version, OS/arch). |
+
+CORS is enabled on all endpoints (`Access-Control-Allow-Origin: *`) so the API can be called
+directly from external editors, scripts, or CI tooling.
+
+**Example**
+
+```shell
+$ obx web
+obx web  →  http://:8080
+```
+
+```shell
+# Type-check a snippet via curl
+$ curl -s -X POST http://localhost:8080/api/check \
+    -H 'Content-Type: application/json' \
+    -d '{"source":"module Hello\nbegin\nend Hello\n","filename":"Hello.obx"}' | jq .
+{
+  "ok": true,
+  "error_count": 0,
+  "diagnostics": []
+}
+```
 
 ---
 
@@ -194,7 +251,7 @@ memory, time, and formatted output:
 | `Math` | `Sin`, `Cos`, `Sqrt`, `Pow`, `Floor`, `Log`, `Pi`, `E` … |
 | `Mem` | `Alloc`, `Free`, `Copy`, `Fill`, `Zero`, `Equal` over `CPOINTER TO VOID` |
 | `Time` | `DateTime` record, `Now`, `Epoch`, `Clock`, `Elapsed`, `Format` |
-| `Fmt` | `snprintf`-backed `Int`, `Real`, `Str`, `SprintI`, `ScanInt` … |
+| `Fmt` | `snprintf`-backed `Int`, `Real`, `Str`, `SprintI`, `ScanInt` … (no `IO` dependency) |
 
 ```oberon
 module Hello
@@ -204,13 +261,52 @@ begin
 end Hello
 ```
 
-The stdlib selects the correct C binding layer automatically:
+### Platform selection
 
-| Target (`--target`) | Platform layer used |
-|---|---|
-| `rv64imafd` *(default)* | `stdlib/posix/` (`libc`, `libm`) |
-| `arm64-apple-macos` | `stdlib/posix/` (`libc`, `libm`) |
-| `x86_64-pc-windows` | `stdlib/win32/` (`msvcrt`, `ucrtbase`, `kernel32`) |
+The stdlib contains two parallel FFI binding layers — `stdlib/posix/` and
+`stdlib/win32/` — that are **both always discovered** by the module resolver
+(dual-root strategy).  Wrapper modules choose between them at parse time via
+`<* IF WINDOWS THEN *> … <* ELSE *> … <* END *>` compile-time directives.
+
+`obx build` and `obx check` inject the correct boolean directives automatically
+from `--target`:
+
+| Target (`--target`) | Directives injected | C libraries linked |
+|---|---|---|
+| `rv64imafd` *(default)* | `POSIX=true`, `LINUX=true` | `libc`, `libm` |
+| `arm64-apple-macos` / `aarch64-apple-darwin` | `POSIX=true`, `DARWIN=true` | `libc`, `libm` |
+| `x86_64-pc-windows` | `WINDOWS=true` | `msvcrt`, `ucrtbase`, `kernel32` |
+
+Platform directives are applied **before** user-supplied `--define` flags, so
+they can always be overridden:
+
+```shell
+# Force the Windows stdlib layer regardless of --target
+obx build --define WINDOWS=true --define POSIX=false
+```
+
+### Stdlib root resolution
+
+The stdlib root is resolved in this order:
+
+1. `"stdlib"` field in `obx.mod`
+2. `$OBX_STDLIB` environment variable
+3. A `stdlib/` directory adjacent to the `obx` binary
+
+```shell
+# Permanent override via environment variable
+export OBX_STDLIB=/opt/obx/stdlib
+
+# Per-project override in obx.mod
+{ "stdlib": "/opt/obx/stdlib", … }
+```
+
+Linker flags for all required native libraries are written to `out/link.flags`
+automatically.  Example link invocation for RISC-V:
+
+```shell
+riscv64-linux-gnu-gcc out/Main.s $(cat out/link.flags) -o myapp
+```
 
 See **[stdlib/README.md](stdlib/README.md)** for the full API reference.
 
@@ -395,8 +491,8 @@ Source files
                           │
                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  5. MIR construction  (src/ir/mir)                               │
-│     IRBuilder lowers the desugared IR into SSA-form MIR:         │
+│  5. ObxIR construction  (src/ir/obxir)                           │
+│     IRBuilder lowers the desugared IR into SSA-form ObxIR:       │
 │     three-address instructions organised into basic blocks with  │
 │     explicit φ-nodes and a CFG.                                  │
 └─────────────────────────┬────────────────────────────────────────┘
@@ -411,8 +507,8 @@ Source files
                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │  7. Instruction selection  (src/codegen/isel)                    │
-│     MIR trees are matched against patterns described in the bud  │
-│     DSL (src/codegen/bud) to produce target instructions.        │
+│     ObxIR trees are matched against patterns described in the    │
+│     bud DSL (src/codegen/bud) to produce target instructions.    │
 └─────────────────────────┬────────────────────────────────────────┘
                           │
                           ▼
@@ -424,9 +520,10 @@ Source files
                           │
                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  9. Assembly emission  (src/codegen/target/riscv)                │
-│     The rv64imafd target formats instructions, computes the      │
-│     frame layout, and writes .s files to out/.                   │
+│  9. Assembly emission  (src/codegen/target)                      │
+│     The active target backend (rv64imafd or arm64-apple-macos)   │
+│     formats instructions, computes the frame layout, and writes  │
+│     .s files to out/.                                            │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -493,10 +590,15 @@ stdlib/                 Standard library (auto-discovered on every build)
 ├── Fmt.obx             Int, Real, Str, SprintI, ScanInt … (snprintf-backed)
 └── README.md           Full stdlib API reference
 
+cmd/
+├── obx.go              Binary entry point
+├── cli/                Cobra command definitions (new, check, build, web)
+└── web/                HTTP server, route handlers, and embedded static UI
+
 src/
 ├── support/            Infrastructure shared across all stages
-│   ├── adt/            Generic data structures (Stack, Queue, Set)
 │   ├── source/         Source-file and source-location tracking
+│   ├── compiler/       Shared compiler context (diagnostics, directives)
 │   ├── diag/           Diagnostic context, buffered reporter, and
 │   │   └── formatter/  formatters (plain text, JSON)
 │   └── testutil/       Shared test helpers for pipeline tests
@@ -516,10 +618,11 @@ src/
 │
 ├── ir/                 Intermediate representations
 │   ├── desugar/        Desugared IR — explicit lowering of AST sugar
-│   └── mir/            MIR — SSA three-address code with basic blocks,
-│                       φ-nodes, and CFG; includes the IRBuilder
+│   └── obxir/          ObxIR — SSA three-address code with basic blocks,
+│                       φ-nodes, CFG, and DOT CFG visualisation; includes
+│                       the IRBuilder and a pretty-printer
 │
-├── opt/                Optimisation passes (all operate on MIR)
+├── opt/                Optimisation passes (all operate on ObxIR)
 │   ├── pass.go         Pass interface, PassManager, pass registry
 │   ├── fold.go         Constant folding
 │   ├── dce.go          Dead-code elimination
@@ -537,7 +640,8 @@ src/
 │   │                    graph colouring)
 │   └── target/         Target machine abstraction
 │       ├── desc/       Machine description files (*.td)
-│       └── riscv/      RISC-V rv64imafd implementation
+│       ├── riscv/      RISC-V rv64imafd implementation
+│       └── arm64/      ARM64 (apple-macos) implementation
 │
 └── project/            Project manifest (obx.mod) — loading, writing,
                         project-root discovery, module-graph resolution
