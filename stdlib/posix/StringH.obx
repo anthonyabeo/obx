@@ -1,0 +1,40 @@
+// POSIX libc — string.h bindings
+// Char* parameters are passed as INTEGER (address of ARRAY OF CHAR).
+DEFINITION StringH [dll "libc"];
+
+// ── Length ────────────────────────────────────────────────────────────────────
+PROCEDURE strlen*(s: INTEGER): INTEGER;
+
+// ── Copy / move ───────────────────────────────────────────────────────────────
+PROCEDURE strcpy*(dst: INTEGER; src: INTEGER): INTEGER;
+PROCEDURE strncpy*(dst: INTEGER; src: INTEGER; n: INTEGER): INTEGER;
+PROCEDURE memmove*(dst: CPOINTER TO VOID; src: CPOINTER TO VOID; n: INTEGER): CPOINTER TO VOID;
+PROCEDURE memcpy*(dst: CPOINTER TO VOID; src: CPOINTER TO VOID; n: INTEGER): CPOINTER TO VOID;
+
+// ── Concatenate ───────────────────────────────────────────────────────────────
+PROCEDURE strcat*(dst: INTEGER; src: INTEGER): INTEGER;
+PROCEDURE strncat*(dst: INTEGER; src: INTEGER; n: INTEGER): INTEGER;
+
+// ── Compare ───────────────────────────────────────────────────────────────────
+PROCEDURE strcmp*(s1: INTEGER; s2: INTEGER): INTEGER;
+PROCEDURE strncmp*(s1: INTEGER; s2: INTEGER; n: INTEGER): INTEGER;
+PROCEDURE memcmp*(s1: CPOINTER TO VOID; s2: CPOINTER TO VOID; n: INTEGER): INTEGER;
+
+// ── Search ────────────────────────────────────────────────────────────────────
+PROCEDURE strchr*(s: INTEGER; c: INTEGER): INTEGER;
+PROCEDURE strrchr*(s: INTEGER; c: INTEGER): INTEGER;
+PROCEDURE strstr*(haystack: INTEGER; needle: INTEGER): INTEGER;
+PROCEDURE strspn*(s: INTEGER; accept: INTEGER): INTEGER;
+PROCEDURE strcspn*(s: INTEGER; reject: INTEGER): INTEGER;
+PROCEDURE strtok*(s: INTEGER; delim: INTEGER): INTEGER;
+
+// ── Memory fill / search ──────────────────────────────────────────────────────
+PROCEDURE memset*(ptr: CPOINTER TO VOID; c: INTEGER; n: INTEGER): CPOINTER TO VOID;
+PROCEDURE memchr*(ptr: CPOINTER TO VOID; c: INTEGER; n: INTEGER): CPOINTER TO VOID;
+
+// ── Case conversion (POSIX extension) ────────────────────────────────────────
+PROCEDURE toupper*(c: INTEGER): INTEGER [alias "toupper"];
+PROCEDURE tolower*(c: INTEGER): INTEGER [alias "tolower"];
+
+END StringH.
+

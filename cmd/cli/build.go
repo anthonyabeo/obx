@@ -74,6 +74,7 @@ precedence over obx.mod values.`,
 		}
 
 		// ── 1. Fall back to obx.mod when no roots are given ───────────────
+		var manifest project.Manifest
 		if len(roots) == 0 {
 			dir, err := project.FindProjectRoot()
 			if err != nil {
@@ -81,14 +82,19 @@ precedence over obx.mod values.`,
 			}
 			projectDir = dir
 
-			m, err := project.LoadManifest(dir)
+			manifest, err = project.LoadManifest(dir)
 			if err != nil {
 				log.Fatalf("build: %v", err)
 			}
-			roots = m.Roots
+			roots = manifest.Roots
 			if entry == "" {
-				entry = m.Entry
+				entry = manifest.Entry
 			}
+		}
+
+		// ── 1a. Prepend the stdlib root (dual-root discovery) ─────────────
+		if stdlibRoot := project.ResolveStdlibRoot(manifest); stdlibRoot != "" {
+			roots = append([]string{stdlibRoot}, roots...)
 		}
 
 		// ── 2. Discover and order modules ─────────────────────────────────
@@ -110,6 +116,9 @@ precedence over obx.mod values.`,
 
 		// ── 3. Parse ──────────────────────────────────────────────────────
 		ctx, _ := newContext(32)
+
+		// Inject platform directives first so --define can still override.
+		injectPlatformDirectives(ctx, buildArgs.Target)
 
 		if err := applyDirectives(ctx, buildArgs.Defines); err != nil {
 			log.Fatalf("build: %v", err)

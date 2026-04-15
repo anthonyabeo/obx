@@ -1,0 +1,166 @@
+// module Fmt — Formatted string building
+//
+// Calls snprintf directly — deliberately independent of IO so programs that
+// only need string formatting do not pull in the console I/O layer.
+//
+// Usage:
+//   import Fmt
+//   var buf: array 128 of char
+//   begin
+//     Fmt.Int(buf, 42)                         // "42"
+//     Fmt.Real(buf, 3.14, 4)                   // "3.1400"
+//     Fmt.Str(buf, "hello", 10)                // "hello     "
+//     Fmt.Sprint(buf, "%s has %d items", ...)  // see SprintI / SprintS
+module Fmt
+
+<* IF WINDOWS THEN *>
+  import S := win32.Stdio
+<* ELSE *>
+  import S := posix.Stdio
+<* END *>
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Primitive formatters — write a single value into buf.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Bool writes "true" or "false" into buf.
+proc Bool*(var buf: array of char; v: boolean)
+begin
+  if v then
+    S.snprintf(system.adr(buf), len(buf), system.adr("%s"), system.adr("true"))
+  else
+    S.snprintf(system.adr(buf), len(buf), system.adr("%s"), system.adr("false"))
+  end
+end Bool
+
+// Int writes the decimal representation of n into buf.
+proc Int*(var buf: array of char; n: integer)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr("%d"), n)
+end Int
+
+// LongInt writes the decimal representation of n (LONGINT) into buf.
+proc LongInt*(var buf: array of char; n: longint)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr("%ld"), n)
+end LongInt
+
+// IntHex writes n as an unsigned hexadecimal number (lower-case) into buf.
+proc IntHex*(var buf: array of char; n: integer)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr("%x"), n)
+end IntHex
+
+// IntHexUpper writes n as upper-case hexadecimal into buf.
+proc IntHexUpper*(var buf: array of char; n: integer)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr("%X"), n)
+end IntHexUpper
+
+// IntPadded writes n right-aligned in a field of width characters into buf.
+proc IntPadded*(var buf: array of char; n: integer; width: integer)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr("%*d"), width, n)
+end IntPadded
+
+// Real writes x with the given number of decimal places into buf.
+proc Real*(var buf: array of char; x: real; decimals: integer)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr("%.*f"), decimals, longreal(x))
+end Real
+
+// LongReal writes x (LONGREAL) with the given decimal places into buf.
+proc LongReal*(var buf: array of char; x: longreal; decimals: integer)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr("%.*f"), decimals, x)
+end LongReal
+
+// RealSci writes x in scientific notation with the given decimal places.
+proc RealSci*(var buf: array of char; x: longreal; decimals: integer)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr("%.*e"), decimals, x)
+end RealSci
+
+// Str writes src into buf, optionally right-padding to width with spaces.
+// If width <= 0, the string is copied without padding.
+proc Str*(var buf: array of char; in src: array of char; width: integer)
+begin
+  if width > 0 then
+    S.snprintf(system.adr(buf), len(buf), system.adr("%-*s"), width, system.adr(src))
+  else
+    S.snprintf(system.adr(buf), len(buf), system.adr("%s"), system.adr(src))
+  end
+end Str
+
+// Char writes a single character c into buf as a one-character string.
+proc Char*(var buf: array of char; c: char)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr("%c"), ord(c))
+end Char
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Composite formatters — accept a printf-style format string.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// SprintI formats one integer argument using fmt (e.g. "%05d") into buf.
+proc SprintI*(var buf: array of char; in fmt: array of char; n: integer)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr(fmt), n)
+end SprintI
+
+// SprintS formats one string argument using fmt (e.g. "%-20s") into buf.
+proc SprintS*(var buf: array of char; in fmt: array of char; in s: array of char)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr(fmt), system.adr(s))
+end SprintS
+
+// SprintR formats one LONGREAL argument using fmt (e.g. "%.4f") into buf.
+proc SprintR*(var buf: array of char; in fmt: array of char; x: longreal)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr(fmt), x)
+end SprintR
+
+// SprintII formats two integer arguments using fmt into buf.
+proc SprintII*(var buf: array of char; in fmt: array of char; a: integer; b: integer)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr(fmt), a, b)
+end SprintII
+
+// SprintSI formats one string and one integer argument into buf.
+proc SprintSI*(var buf: array of char; in fmt: array of char;
+               in s: array of char; n: integer)
+begin
+  S.snprintf(system.adr(buf), len(buf), system.adr(fmt), system.adr(s), n)
+end SprintSI
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scanning — parse values out of a string.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ScanInt parses the first integer in str and stores it in n.
+// Returns true on success.
+proc ScanInt*(in str: array of char; var n: integer): boolean
+begin
+  return S.sscanf(system.adr(str), system.adr("%d"), system.adr(n)) = 1
+end ScanInt
+
+// ScanLongInt parses the first LONGINT in str and stores it in n.
+proc ScanLongInt*(in str: array of char; var n: longint): boolean
+begin
+  return S.sscanf(system.adr(str), system.adr("%ld"), system.adr(n)) = 1
+end ScanLongInt
+
+// ScanReal parses the first LONGREAL in str.
+proc ScanReal*(in str: array of char; var x: longreal): boolean
+begin
+  return S.sscanf(system.adr(str), system.adr("%lf"), system.adr(x)) = 1
+end ScanReal
+
+// ScanStr parses the first whitespace-delimited token from str into tok.
+proc ScanStr*(in str: array of char; var tok: array of char): boolean
+begin
+  return S.sscanf(system.adr(str), system.adr("%s"), system.adr(tok)) = 1
+end ScanStr
+
+end Fmt
+

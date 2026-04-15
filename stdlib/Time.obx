@@ -1,0 +1,153 @@
+// module Time — Date and time utilities
+//
+// Exposes a platform-independent DateTime record and helpers for
+// retrieving the current wall-clock time, measuring elapsed CPU time,
+// and formatting timestamps.
+//
+// Usage:
+//   import Time
+//   var dt: Time.DateTime
+//       buf: array 32 of char
+//   begin
+//     Time.Now(dt)
+//     Time.Format(buf, dt, "%Y-%m-%d %H:%M:%S")
+module Time
+
+<* IF WINDOWS THEN *>
+  import T := win32.TimeH
+  import W := win32.WinAPI
+<* ELSE *>
+  import T := posix.TimeH
+<* END *>
+
+// ── Public types ──────────────────────────────────────────────────────────────
+
+type
+  // DateTime holds a broken-down calendar time in local timezone.
+  DateTime* = record
+    year*  : integer   // full year, e.g. 2026
+    month* : integer   // 1–12
+    day*   : integer   // 1–31
+    hour*  : integer   // 0–23
+    min*   : integer   // 0–59
+    sec*   : integer   // 0–60 (60 = leap second)
+    wday*  : integer   // 0 = Sunday … 6 = Saturday
+    yday*  : integer   // 0–365
+  end
+
+// ── Wall-clock time ───────────────────────────────────────────────────────────
+
+// Now fills dt with the current local time.
+proc Now*(var dt: DateTime)
+<* IF WINDOWS THEN *>
+  var st: W.SystemTime
+begin
+  W.GetLocalTime(system.adr(st))
+  dt.year  := st.wYear
+  dt.month := st.wMonth
+  dt.day   := st.wDay
+  dt.hour  := st.wHour
+  dt.min   := st.wMinute
+  dt.sec   := st.wSecond
+  dt.wday  := st.wDayOfWeek
+  dt.yday  := 0   // not provided by GetLocalTime; omitted
+end Now
+<* ELSE *>
+  var rawt: longint
+      tptr: T.TmPtr
+begin
+  rawt := T.time(0)
+  tptr := T.localtime(system.adr(rawt))
+  if tptr # nil then
+    dt.year  := tptr.tm_year + 1900
+    dt.month := tptr.tm_mon  + 1
+    dt.day   := tptr.tm_mday
+    dt.hour  := tptr.tm_hour
+    dt.min   := tptr.tm_min
+    dt.sec   := tptr.tm_sec
+    dt.wday  := tptr.tm_wday
+    dt.yday  := tptr.tm_yday
+  end
+end Now
+<* END *>
+
+// ── Epoch time ────────────────────────────────────────────────────────────────
+
+// Epoch returns seconds since the Unix epoch (Jan 1 1970 UTC).
+// On Windows this is approximated from the FILETIME 100-ns tick count.
+proc Epoch*(): longint
+<* IF WINDOWS THEN *>
+  var ft: W.FileTime
+      ticks: longint
+begin
+  W.GetSystemTimeAsFileTime(system.adr(ft))
+  // FILETIME is 100-ns intervals since 1601-01-01.
+  // Subtract 116444736000000000 to convert to Unix epoch in 100-ns units.
+  ticks := (longint(ft.dwHighDateTime) * 4294967296) + longint(ft.dwLowDateTime)
+  return (ticks - 116444736000000000) div 10000000
+end Epoch
+<* ELSE *>
+begin
+  return T.time(0)
+end Epoch
+<* END *>
+
+// ── CPU clock ─────────────────────────────────────────────────────────────────
+
+// Clock returns the raw CPU clock counter value.
+// Divide by ClocksPerSec to get seconds of CPU time.
+proc Clock*(): longint
+begin
+  return T.clock()
+end Clock
+
+// ClocksPerSec is the value of CLOCKS_PER_SEC on this platform.
+const ClocksPerSec* = 1000000  // POSIX: 1 000 000; Windows: 1 000
+
+// Elapsed returns the elapsed seconds between two Clock() snapshots.
+proc Elapsed*(start: longint; stop: longint): longreal
+begin
+  return longreal(stop - start) / longreal(ClocksPerSec)
+end Elapsed
+
+// ── Formatting ────────────────────────────────────────────────────────────────
+
+// Format writes a formatted representation of dt into buf using a strftime-
+// compatible format string.  Example formats:
+//   "%Y-%m-%d"         → "2026-04-15"
+//   "%H:%M:%S"         → "14:30:00"
+//   "%a, %d %b %Y"     → "Wed, 15 Apr 2026"
+// Returns the number of characters written (excluding NUL).
+proc Format*(var buf: array of char; in dt: DateTime; in fmt: array of char): integer
+<* IF WINDOWS THEN *>
+  var tm: T.Tm
+begin
+  tm.tm_year  := dt.year - 1900
+  tm.tm_mon   := dt.month - 1
+  tm.tm_mday  := dt.day
+  tm.tm_hour  := dt.hour
+  tm.tm_min   := dt.min
+  tm.tm_sec   := dt.sec
+  tm.tm_wday  := dt.wday
+  tm.tm_yday  := dt.yday
+  tm.tm_isdst := 0
+  return T.strftime(system.adr(buf), len(buf), system.adr(fmt), system.adr(tm))
+end Format
+<* ELSE *>
+  var tm: T.Tm
+begin
+  tm.tm_year  := dt.year - 1900
+  tm.tm_mon   := dt.month - 1
+  tm.tm_mday  := dt.day
+  tm.tm_hour  := dt.hour
+  tm.tm_min   := dt.min
+  tm.tm_sec   := dt.sec
+  tm.tm_wday  := dt.wday
+  tm.tm_yday  := dt.yday
+  tm.tm_isdst := -1  // let mktime determine DST
+  return T.strftime(system.adr(buf), len(buf), system.adr(fmt), system.adr(tm))
+end Format
+<* END *>
+
+end Time
+

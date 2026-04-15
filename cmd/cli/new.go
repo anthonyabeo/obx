@@ -91,6 +91,15 @@ The generated layout is:
 func starterModule(name string) []byte {
 	var b strings.Builder
 	fmt.Fprintf(&b, "module %s\n", name)
+	fmt.Fprintf(&b, "  // Standard library modules available out of the box:\n")
+	fmt.Fprintf(&b, "  //   import IO       — console I/O (Write, WriteLn, WriteInt, ReadLn …)\n")
+	fmt.Fprintf(&b, "  //   import Files    — file open/read/write/seek\n")
+	fmt.Fprintf(&b, "  //   import OS       — exit, env vars, exec\n")
+	fmt.Fprintf(&b, "  //   import Strings  — string length, copy, compare, search, case\n")
+	fmt.Fprintf(&b, "  //   import Math     — sin, cos, sqrt, pow, floor, Pi, E …\n")
+	fmt.Fprintf(&b, "  //   import Mem      — heap alloc/free, block copy/fill\n")
+	fmt.Fprintf(&b, "  //   import Time     — wall-clock time, elapsed, format\n")
+	fmt.Fprintf(&b, "  //   import Fmt      — snprintf-style string formatting\n")
 	fmt.Fprintf(&b, "\nbegin\n")
 	fmt.Fprintf(&b, "  // TODO: add your program here\n")
 	fmt.Fprintf(&b, "end %s\n", name)

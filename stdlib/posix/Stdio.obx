@@ -1,0 +1,59 @@
+// POSIX libc — stdio.h bindings
+// FILE* is modelled as CPOINTER TO VOID (opaque handle).
+// All string parameters that come from C as char* are passed as INTEGER
+// so callers can supply SYSTEM.ADR(arr) or a CPOINTER.
+DEFINITION Stdio [dll "libc"];
+
+TYPE
+  // Opaque FILE handle (FILE* in C).
+  FilePtr*  = CPOINTER TO VOID;
+
+VAR
+  // Pre-opened standard streams (extern FILE* in libc).
+  stdin*  : FilePtr;
+  stdout* : FilePtr;
+  stderr* : FilePtr;
+
+// ── Formatted output ──────────────────────────────────────────────────────────
+PROCEDURE printf*(fmt: INTEGER): INTEGER [varargs];
+PROCEDURE fprintf*(stream: FilePtr; fmt: INTEGER): INTEGER [varargs];
+PROCEDURE sprintf*(buf: INTEGER; fmt: INTEGER): INTEGER [varargs];
+PROCEDURE snprintf*(buf: INTEGER; n: INTEGER; fmt: INTEGER): INTEGER [varargs];
+
+// ── Formatted input ───────────────────────────────────────────────────────────
+PROCEDURE scanf*(fmt: INTEGER): INTEGER [varargs];
+PROCEDURE fscanf*(stream: FilePtr; fmt: INTEGER): INTEGER [varargs];
+PROCEDURE sscanf*(str: INTEGER; fmt: INTEGER): INTEGER [varargs];
+
+// ── Character I/O ─────────────────────────────────────────────────────────────
+PROCEDURE putchar*(c: INTEGER): INTEGER;
+PROCEDURE getchar*(): INTEGER;
+PROCEDURE putc*(c: INTEGER; stream: FilePtr): INTEGER;
+PROCEDURE getc*(stream: FilePtr): INTEGER;
+PROCEDURE puts*(s: INTEGER): INTEGER;
+PROCEDURE fputs*(s: INTEGER; stream: FilePtr): INTEGER;
+PROCEDURE fgets*(buf: INTEGER; n: INTEGER; stream: FilePtr): INTEGER;
+
+// ── Block I/O ─────────────────────────────────────────────────────────────────
+PROCEDURE fread*(ptr: INTEGER; size: INTEGER; nmemb: INTEGER; stream: FilePtr): INTEGER;
+PROCEDURE fwrite*(ptr: INTEGER; size: INTEGER; nmemb: INTEGER; stream: FilePtr): INTEGER;
+
+// ── File management ───────────────────────────────────────────────────────────
+PROCEDURE fopen*(path: INTEGER; mode: INTEGER): FilePtr;
+PROCEDURE fclose*(stream: FilePtr): INTEGER;
+PROCEDURE fflush*(stream: FilePtr): INTEGER;
+PROCEDURE fseek*(stream: FilePtr; offset: LONGINT; whence: INTEGER): INTEGER;
+PROCEDURE ftell*(stream: FilePtr): LONGINT;
+PROCEDURE rewind*(stream: FilePtr);
+PROCEDURE feof*(stream: FilePtr): INTEGER;
+PROCEDURE ferror*(stream: FilePtr): INTEGER;
+
+// ── File system ───────────────────────────────────────────────────────────────
+PROCEDURE remove*(path: INTEGER): INTEGER;
+PROCEDURE rename*(oldpath: INTEGER; newpath: INTEGER): INTEGER;
+
+// ── Seek origins (mirrors SEEK_SET=0, SEEK_CUR=1, SEEK_END=2) ────────────────
+// Consumers should use the integer constants directly.
+
+END Stdio.
+

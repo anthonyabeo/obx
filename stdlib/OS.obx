@@ -1,0 +1,123 @@
+// module OS — Operating-system utilities
+//
+// Provides access to the process environment, command-line arguments,
+// working directory, and process control.
+//
+// Usage:
+//   import OS
+//   var home: array 256 of char
+//   begin
+//     OS.Env("HOME", home)
+//     OS.Exit(0)
+module OS
+
+<* IF WINDOWS THEN *>
+  import Lib := win32.Stdlib
+  import W   := win32.WinAPI
+<* ELSE *>
+  import Lib := posix.Stdlib
+  import U   := posix.Unistd
+<* END *>
+
+// ── Process control ───────────────────────────────────────────────────────────
+
+// Exit terminates the current process with the given exit code.
+proc Exit*(code: integer)
+begin
+<* IF WINDOWS THEN *>
+  W.ExitProcess(code)
+<* ELSE *>
+  Lib.exit(code)
+<* END *>
+end Exit
+
+// Abort terminates the process abnormally (dumps core on POSIX).
+proc Abort*()
+begin
+  Lib.abort()
+end Abort
+
+// ── Environment variables ─────────────────────────────────────────────────────
+
+// Env looks up the environment variable named key and copies its value into
+// buf.  Returns true if the variable exists, false otherwise.
+proc Env*(in key: array of char; var buf: array of char): boolean
+<* IF WINDOWS THEN *>
+  var n: integer
+begin
+  n := W.GetEnvironmentVariableA(system.adr(key), system.adr(buf), len(buf))
+  return n > 0
+end Env
+<* ELSE *>
+  var p: integer
+      i: integer
+begin
+  p := Lib.getenv(system.adr(key))
+  if p = 0 then
+    buf[0] := 0x
+    return false
+  end
+  // Copy from raw C pointer into Oberon array.
+  // (system.copy copies from an integer address until NUL.)
+  system.copy(p, system.adr(buf), len(buf))
+  return true
+end Env
+<* END *>
+
+// ── Working directory ─────────────────────────────────────────────────────────
+
+// GetCwd fills buf with the current working directory path.
+// Returns true on success.
+proc GetCwd*(var buf: array of char): boolean
+begin
+<* IF WINDOWS THEN *>
+  return W.GetCurrentDirectoryA(len(buf), system.adr(buf)) > 0
+<* ELSE *>
+  return U.getcwd(system.adr(buf), len(buf)) # 0
+<* END *>
+end GetCwd
+
+// SetCwd changes the current working directory to path.
+// Returns true on success.
+proc SetCwd*(in path: array of char): boolean
+begin
+<* IF WINDOWS THEN *>
+  return W.SetCurrentDirectoryA(system.adr(path)) # 0
+<* ELSE *>
+  return U.chdir(system.adr(path)) = 0
+<* END *>
+end SetCwd
+
+// ── Miscellaneous ─────────────────────────────────────────────────────────────
+
+// Exec runs cmd via the system shell.
+// Returns the shell exit status, or -1 on error.
+proc Exec*(in cmd: array of char): integer
+begin
+  return Lib.system(system.adr(cmd))
+end Exec
+
+// GetPid returns the process ID of the current process.
+proc GetPid*(): integer
+begin
+<* IF WINDOWS THEN *>
+  // On Windows, GetCurrentProcessId lives in kernel32; use a minimal stub.
+  // For simplicity we return 0 until a full kernel32 binding is wired.
+  return 0
+<* ELSE *>
+  return U.getpid()
+<* END *>
+end GetPid
+
+// Sleep suspends the process for the given number of seconds.
+proc Sleep*(seconds: integer)
+begin
+<* IF WINDOWS THEN *>
+  W.Sleep(seconds * 1000)
+<* ELSE *>
+  U.sleep(seconds)
+<* END *>
+end Sleep
+
+end OS
+

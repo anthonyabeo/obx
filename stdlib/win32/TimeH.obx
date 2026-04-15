@@ -1,0 +1,28 @@
+// Windows msvcrt — time bindings
+DEFINITION TimeH [dll "msvcrt"];
+
+TYPE
+  Tm* = CSTRUCT
+    tm_sec*   : INTEGER;
+    tm_min*   : INTEGER;
+    tm_hour*  : INTEGER;
+    tm_mday*  : INTEGER;
+    tm_mon*   : INTEGER;
+    tm_year*  : INTEGER;
+    tm_wday*  : INTEGER;
+    tm_yday*  : INTEGER;
+    tm_isdst* : INTEGER
+  END;
+
+  TmPtr* = CPOINTER TO Tm;
+
+PROCEDURE time*(tloc: INTEGER): LONGINT;
+PROCEDURE clock*(): LONGINT;
+PROCEDURE difftime*(t1: LONGINT; t0: LONGINT): LONGREAL;
+PROCEDURE localtime*(timer: INTEGER): TmPtr;
+PROCEDURE gmtime*(timer: INTEGER): TmPtr;
+PROCEDURE mktime*(tm: TmPtr): LONGINT;
+PROCEDURE strftime*(s: INTEGER; maxsize: INTEGER; fmt: INTEGER; tm: TmPtr): INTEGER;
+
+END TimeH.
+

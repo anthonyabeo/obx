@@ -1,0 +1,31 @@
+// POSIX libc / unistd.h bindings
+// Process, file-descriptor, and environment utilities.
+DEFINITION Unistd [dll "libc"];
+
+// ── Process information ───────────────────────────────────────────────────────
+PROCEDURE getpid*(): INTEGER;
+PROCEDURE getppid*(): INTEGER;
+
+// ── Directory navigation ──────────────────────────────────────────────────────
+// buf is INTEGER (address of ARRAY OF CHAR); returns 0 on failure.
+PROCEDURE getcwd*(buf: INTEGER; size: INTEGER): INTEGER;
+PROCEDURE chdir*(path: INTEGER): INTEGER;
+
+// ── Low-level file-descriptor I/O ─────────────────────────────────────────────
+PROCEDURE open*(path: INTEGER; flags: INTEGER; mode: INTEGER): INTEGER [varargs];
+PROCEDURE close*(fd: INTEGER): INTEGER;
+PROCEDURE read*(fd: INTEGER; buf: INTEGER; count: INTEGER): INTEGER;
+PROCEDURE write*(fd: INTEGER; buf: INTEGER; count: INTEGER): INTEGER;
+PROCEDURE lseek*(fd: INTEGER; offset: LONGINT; whence: INTEGER): LONGINT;
+PROCEDURE unlink*(path: INTEGER): INTEGER;
+
+// ── Sleep ─────────────────────────────────────────────────────────────────────
+PROCEDURE sleep*(seconds: INTEGER): INTEGER;
+PROCEDURE usleep*(usec: INTEGER): INTEGER;
+
+// ── Command-line arguments via libc (extern char** environ) ──────────────────
+// argc/argv are accessed via main() in the entry module; environ is global.
+PROCEDURE getenv*(name: INTEGER): INTEGER;
+
+END Unistd.
+

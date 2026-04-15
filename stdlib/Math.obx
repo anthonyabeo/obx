@@ -1,0 +1,106 @@
+// module Math — Mathematical functions and constants
+//
+// Thin Oberon+ wrapper around the platform math library.
+// All functions operate on LONGREAL (64-bit double); REAL (32-bit float)
+// variants are available with the "F" suffix.
+//
+// Usage:
+//   import Math
+//   var x: longreal
+//   begin
+//     x := Math.Sqrt(2.0)
+//     assert(Math.Abs(x * x - 2.0) < 1.0E-14)
+module Math
+
+<* IF WINDOWS THEN *>
+  import M := win32.LibM
+<* ELSE *>
+  import M := posix.LibM
+<* END *>
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const
+  Pi*     = 3.14159265358979323846D0
+  E*      = 2.71828182845904523536D0
+  Sqrt2*  = 1.41421356237309504880D0
+  Ln2*    = 0.69314718055994530942D0
+  Ln10*   = 2.30258509299404568402D0
+
+// ── Trigonometric ─────────────────────────────────────────────────────────────
+proc Sin*(x: longreal): longreal  begin return M.sin(x)   end Sin
+proc Cos*(x: longreal): longreal  begin return M.cos(x)   end Cos
+proc Tan*(x: longreal): longreal  begin return M.tan(x)   end Tan
+proc Asin*(x: longreal): longreal begin return M.asin(x)  end Asin
+proc Acos*(x: longreal): longreal begin return M.acos(x)  end Acos
+proc Atan*(x: longreal): longreal begin return M.atan(x)  end Atan
+
+// Atan2 returns the angle (in radians) of the vector (x, y).
+proc Atan2*(y: longreal; x: longreal): longreal begin return M.atan2(y, x) end Atan2
+
+// ── Hyperbolic ────────────────────────────────────────────────────────────────
+proc Sinh*(x: longreal): longreal begin return M.sinh(x) end Sinh
+proc Cosh*(x: longreal): longreal begin return M.cosh(x) end Cosh
+proc Tanh*(x: longreal): longreal begin return M.tanh(x) end Tanh
+
+// ── Exponential / logarithmic ─────────────────────────────────────────────────
+proc Exp*(x: longreal): longreal   begin return M.exp(x)   end Exp
+proc Exp2*(x: longreal): longreal  begin return M.exp2(x)  end Exp2
+proc Log*(x: longreal): longreal   begin return M.log(x)   end Log
+proc Log2*(x: longreal): longreal  begin return M.log2(x)  end Log2
+proc Log10*(x: longreal): longreal begin return M.log10(x) end Log10
+
+// ── Power / root ──────────────────────────────────────────────────────────────
+proc Pow*(base: longreal; exp: longreal): longreal begin return M.pow(base, exp) end Pow
+proc Sqrt*(x: longreal): longreal                  begin return M.sqrt(x)        end Sqrt
+proc Cbrt*(x: longreal): longreal                  begin return M.cbrt(x)        end Cbrt
+proc Hypot*(x: longreal; y: longreal): longreal    begin return M.hypot(x, y)    end Hypot
+
+// ── Rounding ──────────────────────────────────────────────────────────────────
+proc Floor*(x: longreal): longreal begin return M.floor(x) end Floor
+proc Ceil*(x: longreal): longreal  begin return M.ceil(x)  end Ceil
+proc Round*(x: longreal): longreal begin return M.round(x) end Round
+proc Trunc*(x: longreal): longreal begin return M.trunc(x) end Trunc
+
+// ── Absolute value ────────────────────────────────────────────────────────────
+proc Abs*(x: longreal): longreal begin return M.fabs(x) end Abs
+
+// ── Remainder ─────────────────────────────────────────────────────────────────
+proc Mod*(x: longreal; y: longreal): longreal begin return M.fmod(x, y) end Mod
+
+// ── Classification ────────────────────────────────────────────────────────────
+proc IsNaN*(x: longreal): boolean    begin return M.isnan(x) # 0    end IsNaN
+proc IsInf*(x: longreal): boolean    begin return M.isinf(x) # 0    end IsInf
+proc IsFinite*(x: longreal): boolean begin return M.isfinite(x) # 0 end IsFinite
+
+// ── REAL (32-bit float) variants ──────────────────────────────────────────────
+proc SinF*(x: real): real   begin return M.sinf(x)   end SinF
+proc CosF*(x: real): real   begin return M.cosf(x)   end CosF
+proc SqrtF*(x: real): real  begin return M.sqrtf(x)  end SqrtF
+proc PowF*(b: real; e: real): real begin return M.powf(b, e)  end PowF
+proc AbsF*(x: real): real   begin return M.fabsf(x)  end AbsF
+proc FloorF*(x: real): real begin return M.floorf(x) end FloorF
+proc CeilF*(x: real): real  begin return M.ceilf(x)  end CeilF
+
+// ── Integer convenience ───────────────────────────────────────────────────────
+// Min / Max operate on INTEGER only; numeric literals can be passed as INTEGER.
+proc Min*(a: integer; b: integer): integer
+begin
+  if a < b then return a end
+  return b
+end Min
+
+proc Max*(a: integer; b: integer): integer
+begin
+  if a > b then return a end
+  return b
+end Max
+
+proc Clamp*(x: integer; lo: integer; hi: integer): integer
+begin
+  if x < lo then return lo end
+  if x > hi then return hi end
+  return x
+end Clamp
+
+end Math
+

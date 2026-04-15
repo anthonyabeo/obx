@@ -14,6 +14,7 @@ import (
 
 var checkArgs struct {
 	Path      string
+	Target    string   // --target (needed to inject platform directives)
 	MaxErrors int
 	Quiet     bool
 	Defines   []string // --define (repeatable); NAME or NAME=VALUE
@@ -22,6 +23,8 @@ var checkArgs struct {
 func init() {
 	checkCmd.Flags().StringVarP(&checkArgs.Path, "path", "p", "",
 		"source root directory (defaults to roots in obx.mod)")
+	checkCmd.Flags().StringVarP(&checkArgs.Target, "target", "T", "rv64imafd",
+		"target architecture (used to select the stdlib platform layer)")
 	checkCmd.Flags().IntVar(&checkArgs.MaxErrors, "max-errors", 32, "maximum number of errors to report before stopping")
 	checkCmd.Flags().BoolVarP(&checkArgs.Quiet, "quiet", "q", false, "suppress informational output; only show diagnostics")
 	checkCmd.Flags().StringArrayVarP(&checkArgs.Defines, "define", "d", nil,
@@ -45,17 +48,23 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 		label := checkArgs.Path // used in progress output
 
 		// ── 0. Fall back to obx.mod when --path is not given ─────────────
+		var manifest project.Manifest
 		if checkArgs.Path == "" {
 			dir, err := project.FindProjectRoot()
 			if err != nil {
 				log.Fatalf("check: no --path given and %s", err)
 			}
-			m, err := project.LoadManifest(dir)
+			manifest, err = project.LoadManifest(dir)
 			if err != nil {
 				log.Fatalf("check: %v", err)
 			}
-			roots = m.Roots
+			roots = manifest.Roots
 			label = dir
+		}
+
+		// ── 0a. Prepend stdlib root (dual-root discovery) ─────────────────
+		if stdlibRoot := project.ResolveStdlibRoot(manifest); stdlibRoot != "" {
+			roots = append([]string{stdlibRoot}, roots...)
 		}
 
 		// ── 1. Discover and order modules ────────────────────────────────
@@ -75,6 +84,9 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 
 		// ── 2. Parse ─────────────────────────────────────────────────────
 		ctx, _ := newContext(checkArgs.MaxErrors)
+
+		// Inject platform directives first so --define can still override.
+		injectPlatformDirectives(ctx, checkArgs.Target)
 
 		if err := applyDirectives(ctx, checkArgs.Defines); err != nil {
 			fmt.Fprintf(os.Stderr, "check: %v\n", err)

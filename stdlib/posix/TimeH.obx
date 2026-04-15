@@ -1,0 +1,42 @@
+// POSIX libc — time.h bindings
+// struct tm is exposed as a CSTRUCT so Oberon+ code can read its fields.
+DEFINITION TimeH [dll "libc"];
+
+// Calendar time broken down into its components (struct tm in C).
+TYPE
+  Tm* = CSTRUCT
+    tm_sec*   : INTEGER;   // Seconds          [0, 60]
+    tm_min*   : INTEGER;   // Minutes           [0, 59]
+    tm_hour*  : INTEGER;   // Hours             [0, 23]
+    tm_mday*  : INTEGER;   // Day of the month  [1, 31]
+    tm_mon*   : INTEGER;   // Months since Jan  [0, 11]
+    tm_year*  : INTEGER;   // Years since 1900
+    tm_wday*  : INTEGER;   // Days since Sunday [0, 6]
+    tm_yday*  : INTEGER;   // Days since Jan 1  [0, 365]
+    tm_isdst* : INTEGER    // Daylight Saving Time flag
+  END;
+
+  TmPtr* = CPOINTER TO Tm;
+
+// ── Time retrieval ────────────────────────────────────────────────────────────
+// time(NULL) returns seconds since the Epoch.
+PROCEDURE time*(tloc: INTEGER): LONGINT;
+
+// clock() returns CPU time used; divide by CLOCKS_PER_SEC for seconds.
+PROCEDURE clock*(): LONGINT;
+
+// difftime returns the difference between two time_t values.
+PROCEDURE difftime*(t1: LONGINT; t0: LONGINT): LONGREAL;
+
+// ── Conversion ────────────────────────────────────────────────────────────────
+PROCEDURE localtime*(timer: INTEGER): TmPtr;
+PROCEDURE gmtime*(timer: INTEGER): TmPtr;
+PROCEDURE mktime*(tm: TmPtr): LONGINT;
+
+// ── Formatting ────────────────────────────────────────────────────────────────
+// strftime writes at most maxsize bytes into s and returns bytes written.
+// fmt and s are INTEGER (address of ARRAY OF CHAR).
+PROCEDURE strftime*(s: INTEGER; maxsize: INTEGER; fmt: INTEGER; tm: TmPtr): INTEGER;
+
+END TimeH.
+

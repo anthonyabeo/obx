@@ -1,0 +1,173 @@
+// module Strings — String utilities
+//
+// Provides length, copy, search, comparison, and case operations
+// for Oberon+ ARRAY OF CHAR strings (NUL-terminated).
+//
+// Usage:
+//   import Strings
+//   var s: array 64 of char
+//   begin
+//     s := "Hello"
+//     assert(Strings.Len(s) = 5)
+//     Strings.Append(s, ", world!")
+module Strings
+
+<* IF WINDOWS THEN *>
+  import C := win32.StringH
+<* ELSE *>
+  import C := posix.StringH
+<* END *>
+
+// ── Length ────────────────────────────────────────────────────────────────────
+
+// Len returns the number of characters in s before the NUL terminator.
+proc Len*(in s: array of char): integer
+begin
+  return C.strlen(system.adr(s))
+end Len
+
+// ── Copy ──────────────────────────────────────────────────────────────────────
+
+// Copy copies src into dst, truncating to len(dst)-1 and ensuring NUL.
+proc Copy*(var dst: array of char; in src: array of char)
+begin
+  C.strncpy(system.adr(dst), system.adr(src), len(dst) - 1)
+  dst[len(dst) - 1] := 0x
+end Copy
+
+// ── Concatenate ───────────────────────────────────────────────────────────────
+
+// Append appends src to dst.  dst must be large enough to hold the result.
+proc Append*(var dst: array of char; in src: array of char)
+begin
+  C.strncat(system.adr(dst), system.adr(src), len(dst) - C.strlen(system.adr(dst)) - 1)
+end Append
+
+// ── Comparison ────────────────────────────────────────────────────────────────
+
+// Compare returns 0 if a = b, negative if a < b, positive if a > b.
+proc Compare*(in a: array of char; in b: array of char): integer
+begin
+  return C.strcmp(system.adr(a), system.adr(b))
+end Compare
+
+// Equal returns true if a and b contain the same characters.
+proc Equal*(in a: array of char; in b: array of char): boolean
+begin
+  return C.strcmp(system.adr(a), system.adr(b)) = 0
+end Equal
+
+// ── Search ────────────────────────────────────────────────────────────────────
+
+// IndexOf returns the zero-based index of the first occurrence of sub in s,
+// or -1 if not found.
+proc IndexOf*(in s: array of char; in sub: array of char): integer
+  var p: integer
+      base: integer
+begin
+  base := system.adr(s)
+  p := C.strstr(base, system.adr(sub))
+  if p = 0 then return -1 end
+  return p - base
+end IndexOf
+
+// Contains returns true if s contains the substring sub.
+proc Contains*(in s: array of char; in sub: array of char): boolean
+begin
+  return C.strstr(system.adr(s), system.adr(sub)) # 0
+end Contains
+
+// StartsWith returns true if s starts with the prefix pfx.
+proc StartsWith*(in s: array of char; in pfx: array of char): boolean
+begin
+  return C.strncmp(system.adr(s), system.adr(pfx), C.strlen(system.adr(pfx))) = 0
+end StartsWith
+
+// EndsWith returns true if s ends with the suffix sfx.
+proc EndsWith*(in s: array of char; in sfx: array of char): boolean
+  var slen: integer
+      flen: integer
+begin
+  slen := C.strlen(system.adr(s))
+  flen := C.strlen(system.adr(sfx))
+  if flen > slen then return false end
+  return C.strcmp(system.adr(s) + slen - flen, system.adr(sfx)) = 0
+end EndsWith
+
+// IndexOfChar returns the index of the first occurrence of c in s, or -1.
+proc IndexOfChar*(in s: array of char; c: char): integer
+  var p: integer
+      base: integer
+begin
+  base := system.adr(s)
+  p := C.strchr(base, ord(c))
+  if p = 0 then return -1 end
+  return p - base
+end IndexOfChar
+
+// ── Case conversion ───────────────────────────────────────────────────────────
+
+// ToUpper converts all lower-case ASCII letters in s to upper-case in-place.
+proc ToUpper*(var s: array of char)
+  var i: integer
+begin
+  i := 0
+  while (i < len(s)) & (s[i] # 0x) do
+    s[i] := chr(C.toupper(ord(s[i])))
+    inc(i)
+  end
+end ToUpper
+
+// ToLower converts all upper-case ASCII letters in s to lower-case in-place.
+proc ToLower*(var s: array of char)
+  var i: integer
+begin
+  i := 0
+  while (i < len(s)) & (s[i] # 0x) do
+    s[i] := chr(C.tolower(ord(s[i])))
+    inc(i)
+  end
+end ToLower
+
+// ── Trimming ──────────────────────────────────────────────────────────────────
+
+// TrimLeft removes leading space/tab/CR/LF characters from s in-place.
+proc TrimLeft*(var s: array of char)
+  var i: integer
+      j: integer
+begin
+  i := 0
+  while (i < len(s)) & ((s[i] = ' ') or (s[i] = 9x) or (s[i] = 0Dx) or (s[i] = 0Ax)) do
+    inc(i)
+  end
+  if i > 0 then
+    j := 0
+    while (j + i < len(s)) & (s[j + i] # 0x) do
+      s[j] := s[j + i]
+      inc(j)
+    end
+    s[j] := 0x
+  end
+end TrimLeft
+
+// TrimRight removes trailing space/tab/CR/LF characters from s in-place.
+proc TrimRight*(var s: array of char)
+  var i: integer
+begin
+  i := C.strlen(system.adr(s))
+  while (i > 0) & ((s[i-1] = ' ') or (s[i-1] = 9x) or
+                    (s[i-1] = 0Dx) or (s[i-1] = 0Ax)) do
+    dec(i)
+  end
+  s[i] := 0x
+end TrimRight
+
+// Trim removes both leading and trailing whitespace from s in-place.
+proc Trim*(var s: array of char)
+begin
+  TrimRight(s)
+  TrimLeft(s)
+end Trim
+
+end Strings
+

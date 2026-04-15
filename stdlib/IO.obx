@@ -1,0 +1,155 @@
+// module IO — Console and stream I/O
+//
+// Provides formatted reading and writing to the standard streams.
+// Internally bridges to the platform stdio layer selected at compile time.
+//
+// Usage:
+//   import IO
+//   begin
+//     IO.WriteLn("Hello, world!")
+//     IO.WriteInt(42)
+//     IO.WriteLn("")
+//   end
+module IO
+
+<* IF WINDOWS THEN *>
+  import S := win32.Stdio
+<* ELSE *>
+  import S := posix.Stdio
+<* END *>
+
+// ── Exported stream handles ───────────────────────────────────────────────────
+
+var
+  StdOut* : S.FilePtr
+  StdErr* : S.FilePtr
+  StdIn*  : S.FilePtr
+
+// ── Initialise stream handles from libc globals ───────────────────────────────
+// Called from the module body below.
+proc initStreams()
+begin
+  StdOut := S.stdout
+  StdErr := S.stderr
+  StdIn  := S.stdin
+end initStreams
+
+// ── Output ────────────────────────────────────────────────────────────────────
+
+// Write writes a string to stdout (no newline).
+proc Write*(in s: array of char)
+begin
+  S.fputs(system.adr(s), StdOut)
+end Write
+
+// WriteLn writes a string to stdout followed by a newline.
+proc WriteLn*(in s: array of char)
+begin
+  S.fputs(system.adr(s), StdOut)
+  S.putc(10, StdOut) // '\n'
+end WriteLn
+
+// WriteChar writes a single character to stdout.
+proc WriteChar*(c: char)
+begin
+  S.putc(ord(c), StdOut)
+end WriteChar
+
+// WriteInt writes a decimal INTEGER to stdout.
+proc WriteInt*(n: integer)
+begin
+  S.fprintf(StdOut, system.adr("%d"), n)
+end WriteInt
+
+// WriteLongInt writes a decimal LONGINT to stdout.
+proc WriteLongInt*(n: longint)
+begin
+  S.fprintf(StdOut, system.adr("%ld"), n)
+end WriteLongInt
+
+// WriteReal writes a REAL with 6 significant digits to stdout.
+proc WriteReal*(x: real)
+begin
+  S.fprintf(StdOut, system.adr("%g"), x)
+end WriteReal
+
+// WriteLongReal writes a LONGREAL with full precision to stdout.
+proc WriteLongReal*(x: longreal)
+begin
+  S.fprintf(StdOut, system.adr("%.17g"), x)
+end WriteLongReal
+
+// WriteBool writes "true" or "false" to stdout.
+proc WriteBool*(b: boolean)
+begin
+  if b then
+    S.fputs(system.adr("true"), StdOut)
+  else
+    S.fputs(system.adr("false"), StdOut)
+  end
+end WriteBool
+
+// WriteToStream writes a string to an arbitrary FilePtr stream.
+proc WriteToStream*(stream: S.FilePtr; in s: array of char)
+begin
+  S.fputs(system.adr(s), stream)
+end WriteToStream
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+
+// ReadLn reads a line from stdin into buf (strips the trailing newline).
+// Returns true if a line was read, false on EOF.
+proc ReadLn*(var buf: array of char): boolean
+  var p: integer
+      c: integer
+      i: integer
+begin
+  i := 0
+  c := S.getc(StdIn)
+  while (c # -1) & (c # 10) & (i < len(buf) - 1) do
+    buf[i] := chr(c)
+    inc(i)
+    c := S.getc(StdIn)
+  end
+  buf[i] := 0x
+  return c # -1
+end ReadLn
+
+// ReadChar reads one character from stdin.  Returns chr(0) on EOF.
+proc ReadChar*(): char
+  var c: integer
+begin
+  c := S.getc(StdIn)
+  if c = -1 then return chr(0) end
+  return chr(c)
+end ReadChar
+
+// ReadInt reads one decimal integer from stdin into n.
+// Returns true on success, false on parse failure or EOF.
+proc ReadInt*(var n: integer): boolean
+  var r: integer
+begin
+  r := S.fscanf(StdIn, system.adr("%d"), system.adr(n))
+  return r = 1
+end ReadInt
+
+// ReadLongInt reads one decimal LONGINT from stdin.
+proc ReadLongInt*(var n: longint): boolean
+  var r: integer
+begin
+  r := S.fscanf(StdIn, system.adr("%ld"), system.adr(n))
+  return r = 1
+end ReadLongInt
+
+// ReadReal reads one REAL value from stdin.
+proc ReadReal*(var x: real): boolean
+  var r: integer
+begin
+  r := S.fscanf(StdIn, system.adr("%f"), system.adr(x))
+  return r = 1
+end ReadReal
+
+begin
+  initStreams()
+end IO
+

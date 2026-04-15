@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
@@ -15,17 +16,23 @@ const ManifestFile = "obx.mod"
 // Example obx.mod:
 //
 //	{
-//	  "name":  "myproject",
-//	  "roots": ["src", "lib"],
-//	  "entry": "Main"
+//	  "name":   "myproject",
+//	  "roots":  ["src", "lib"],
+//	  "entry":  "Main",
+//	  "stdlib": "/opt/obx/stdlib"
 //	}
 //
 // roots are relative to the directory containing obx.mod and are converted
 // to absolute paths by LoadManifest.
+//
+// stdlib is an optional override for the standard-library root directory.
+// When absent the compiler falls back to the OBX_STDLIB environment variable
+// and then to a "stdlib" directory adjacent to the obx executable.
 type Manifest struct {
-	Name  string   `json:"name"`
-	Roots []string `json:"roots"` // source root directories
-	Entry string   `json:"entry"` // default entry module for build (optional)
+	Name   string   `json:"name"`
+	Roots  []string `json:"roots"`  // source root directories
+	Entry  string   `json:"entry"`  // default entry module for build (optional)
+	Stdlib string   `json:"stdlib"` // optional override for the stdlib root
 }
 
 // LoadManifest reads and parses the obx.mod file in dir.
@@ -84,3 +91,42 @@ func WriteManifest(dir string, m Manifest) error {
 	}
 	return nil
 }
+
+// ResolveStdlibRoot returns the absolute path of the stdlib root directory.
+//
+// Resolution order:
+//  1. m.Stdlib (manifest field), if non-empty.
+//  2. OBX_STDLIB environment variable, if set.
+//  3. A "stdlib" directory adjacent to the obx executable.
+//  4. Empty string — caller should warn but continue (stdlib will be absent).
+func ResolveStdlibRoot(m Manifest) string {
+	// 1. Explicit manifest override.
+	if m.Stdlib != "" {
+		if filepath.IsAbs(m.Stdlib) {
+			return m.Stdlib
+		}
+		// Relative paths in manifest.Stdlib are not resolved here because we
+		// don't have the project dir; callers that care should resolve first.
+		return m.Stdlib
+	}
+
+	// 2. Environment variable.
+	if env := os.Getenv("OBX_STDLIB"); env != "" {
+		return env
+	}
+
+	// 3. Alongside the running executable.
+	exe, err := exec.LookPath(os.Args[0])
+	if err == nil {
+		exe, err = filepath.Abs(exe)
+	}
+	if err == nil {
+		candidate := filepath.Join(filepath.Dir(exe), "stdlib")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+	}
+
+	return ""
+}
+

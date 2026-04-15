@@ -1,0 +1,220 @@
+// StdlibDemo — exercises every stdlib module in a single program.
+//
+// Build:
+//   obx build -r examples/stdlib -e StdlibDemo -S
+//
+// Expected output (dates/times will vary):
+//   === IO ===
+//   Hello, Oberon+!
+//   Integer : 42
+//   Real    : 3.14
+//   Bool    : true
+//   === Strings ===
+//   len("Hello") = 5
+//   upper = HELLO, WORLD
+//   trimmed = "inner"
+//   contains "World" : true
+//   === Math ===
+//   sqrt(2)  = 1.4142135623730951
+//   sin(Pi)  ~ 0
+//   floor(-2.7) = -3
+//   === Fmt ===
+//   padded : |       42|
+//   hex    : 2a
+//   scan   : -99
+//   === Time ===
+//   now    : 2026-04-15 ...
+//   === Files ===
+//   wrote and read back 13 bytes
+//   === OS ===
+//   pid > 0
+module StdlibDemo
+
+import IO
+import Strings
+import Math
+import Fmt
+import Time
+import Files
+import OS
+import Mem
+
+// ── IO ────────────────────────────────────────────────────────────────────────
+proc demoIO()
+  var n: integer
+begin
+  IO.WriteLn("=== IO ===")
+  IO.WriteLn("Hello, Oberon+!")
+  IO.Write("Integer : ")
+  IO.WriteInt(42)
+  IO.WriteLn("")
+  IO.Write("Real    : ")
+  IO.WriteReal(3.14)
+  IO.WriteLn("")
+  IO.Write("Bool    : ")
+  IO.WriteBool(true)
+  IO.WriteLn("")
+end demoIO
+
+// ── Strings ───────────────────────────────────────────────────────────────────
+proc demoStrings()
+  var s: array 64 of char
+      buf: array 16 of char
+begin
+  IO.WriteLn("=== Strings ===")
+
+  s := "Hello"
+  IO.Write("len(\"Hello\") = ")
+  IO.WriteInt(Strings.Len(s))
+  IO.WriteLn("")
+
+  s := "Hello, World"
+  Strings.ToUpper(s)
+  IO.Write("upper = ")
+  IO.WriteLn(s)
+
+  s := "   inner   "
+  Strings.Trim(s)
+  IO.Write("trimmed = \"")
+  IO.Write(s)
+  IO.WriteLn("\"")
+
+  s := "Hello, World"
+  IO.Write("contains \"World\" : ")
+  IO.WriteBool(Strings.Contains(s, "World"))
+  IO.WriteLn("")
+end demoStrings
+
+// ── Math ──────────────────────────────────────────────────────────────────────
+proc demoMath()
+  var x: longreal
+      buf: array 32 of char
+begin
+  IO.WriteLn("=== Math ===")
+
+  x := Math.Sqrt(2.0D0)
+  Fmt.LongReal(buf, x, 16)
+  IO.Write("sqrt(2)  = ")
+  IO.WriteLn(buf)
+
+  x := Math.Sin(Math.Pi)
+  Fmt.LongReal(buf, x, 4)
+  IO.Write("sin(Pi)  ~ ")
+  IO.WriteLn(buf)
+
+  x := Math.Floor(-2.7D0)
+  Fmt.LongReal(buf, x, 1)
+  IO.Write("floor(-2.7) = ")
+  IO.WriteLn(buf)
+end demoMath
+
+// ── Fmt ───────────────────────────────────────────────────────────────────────
+proc demoFmt()
+  var buf: array 32 of char
+      n: integer
+begin
+  IO.WriteLn("=== Fmt ===")
+
+  Fmt.SprintI(buf, "|%8d|", 42)
+  IO.Write("padded : ")
+  IO.WriteLn(buf)
+
+  Fmt.IntHex(buf, 42)
+  IO.Write("hex    : ")
+  IO.WriteLn(buf)
+
+  Fmt.ScanInt("  -99  ", n)
+  IO.Write("scan   : ")
+  IO.WriteInt(n)
+  IO.WriteLn("")
+end demoFmt
+
+// ── Time ──────────────────────────────────────────────────────────────────────
+proc demoTime()
+  var dt: Time.DateTime
+      buf: array 32 of char
+begin
+  IO.WriteLn("=== Time ===")
+  Time.Now(dt)
+  Time.Format(buf, dt, "%Y-%m-%d %H:%M:%S")
+  IO.Write("now    : ")
+  IO.WriteLn(buf)
+end demoTime
+
+// ── Files ─────────────────────────────────────────────────────────────────────
+proc demoFiles()
+  var f: Files.File
+      wbuf: array 14 of byte
+      rbuf: array 14 of byte
+      n: integer
+      i: integer
+begin
+  IO.WriteLn("=== Files ===")
+
+  // Fill write buffer with "Hello, stdlib!" as bytes.
+  wbuf[ 0] := 72; wbuf[ 1] := 101; wbuf[ 2] := 108; wbuf[ 3] := 108
+  wbuf[ 4] := 111; wbuf[ 5] := 44; wbuf[ 6] := 32; wbuf[ 7] := 115
+  wbuf[ 8] := 116; wbuf[ 9] := 100; wbuf[10] := 108; wbuf[11] := 105
+  wbuf[12] := 98; wbuf[13] := 33
+
+  f := Files.Open("_stdlib_demo_tmp.bin", Files.ModeWrite)
+  if Files.IsOpen(f) then
+    n := Files.WriteBytes(f, wbuf)
+    Files.Close(f)
+  end
+
+  n := 0
+  f := Files.Open("_stdlib_demo_tmp.bin", Files.ModeRead)
+  if Files.IsOpen(f) then
+    n := Files.ReadBytes(f, rbuf)
+    Files.Close(f)
+  end
+
+  IO.Write("wrote and read back ")
+  IO.WriteInt(n)
+  IO.WriteLn(" bytes")
+
+  Files.Delete("_stdlib_demo_tmp.bin")
+end demoFiles
+
+// ── OS ────────────────────────────────────────────────────────────────────────
+proc demoOS()
+  var pid: integer
+begin
+  IO.WriteLn("=== OS ===")
+  pid := OS.GetPid()
+  IO.Write("pid > 0 : ")
+  IO.WriteBool(pid > 0)
+  IO.WriteLn("")
+end demoOS
+
+// ── Mem ───────────────────────────────────────────────────────────────────────
+proc demoMem()
+  var p: cpointer to void
+      q: cpointer to void
+begin
+  IO.WriteLn("=== Mem ===")
+  p := Mem.AllocZero(64)
+  assert(p # nil)
+  q := Mem.Alloc(64)
+  assert(q # nil)
+  Mem.Fill(q, 0FFx, 64)
+  assert(~Mem.Equal(p, q, 64))
+  Mem.Copy(q, p, 64)
+  assert(Mem.Equal(p, q, 64))
+  Mem.Free(p)
+  Mem.Free(q)
+  IO.WriteLn("alloc/fill/copy/equal: ok")
+end demoMem
+
+begin
+  demoIO()
+  demoStrings()
+  demoMath()
+  demoFmt()
+  demoTime()
+  demoFiles()
+  demoOS()
+  demoMem()
+end StdlibDemo
+

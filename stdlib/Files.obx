@@ -1,0 +1,204 @@
+// module Files — File system I/O
+//
+// Provides buffered file open/close/read/write/seek/query operations.
+// The File type wraps an opaque platform stream handle.
+//
+// Usage:
+//   import Files
+//   var f: Files.File
+//       buf: array 256 of char
+//       n: integer
+//   begin
+//     f := Files.Open("hello.txt", Files.ModeRead)
+//     if Files.IsOpen(f) then
+//       n := Files.ReadLine(f, buf)
+//       Files.Close(f)
+//     end
+module Files
+
+<* IF WINDOWS THEN *>
+  import S := win32.Stdio
+<* ELSE *>
+  import S := posix.Stdio
+<* END *>
+
+// ── Open mode constants ───────────────────────────────────────────────────────
+const
+  ModeRead*      = 0  // "r"  — open for reading; file must exist
+  ModeWrite*     = 1  // "w"  — open for writing; truncates or creates
+  ModeAppend*    = 2  // "a"  — open for appending; creates if absent
+  ModeReadWrite* = 3  // "r+" — open for reading and writing; file must exist
+  ModeNew*       = 4  // "w+" — open for reading/writing; truncates or creates
+
+  SeekSet* = 0  // seek from beginning
+  SeekCur* = 1  // seek from current position
+  SeekEnd* = 2  // seek from end
+
+// ── File type ─────────────────────────────────────────────────────────────────
+type
+  File* = S.FilePtr  // opaque handle; NIL means not open
+
+// ── Internal mode string helper ───────────────────────────────────────────────
+proc modeStr(mode: integer; var s: array of char)
+begin
+  case mode of
+    ModeRead:      s := "r"
+  | ModeWrite:     s := "w"
+  | ModeAppend:    s := "a"
+  | ModeReadWrite: s := "r+"
+  | ModeNew:       s := "w+"
+  else             s := "r"
+  end
+end modeStr
+
+// ── Open / Close ──────────────────────────────────────────────────────────────
+
+// Open opens or creates the file at path with the given mode.
+// Returns a valid File handle on success, NIL on failure.
+proc Open*(in path: array of char; mode: integer): File
+  var ms: array 4 of char
+begin
+  modeStr(mode, ms)
+  return S.fopen(system.adr(path), system.adr(ms))
+end Open
+
+// IsOpen reports whether f is a valid (non-NIL) handle.
+proc IsOpen*(f: File): boolean
+begin
+  return f # nil
+end IsOpen
+
+// Close flushes and closes f.  Always sets f to NIL afterwards.
+proc Close*(var f: File)
+begin
+  if f # nil then
+    S.fclose(f)
+    f := nil
+  end
+end Close
+
+// Flush flushes any buffered data to the OS.
+proc Flush*(f: File)
+begin
+  if f # nil then S.fflush(f) end
+end Flush
+
+// ── Reading ───────────────────────────────────────────────────────────────────
+
+// ReadBytes reads up to len(buf) bytes from f into buf.
+// Returns the number of bytes actually read (0 on EOF or error).
+proc ReadBytes*(f: File; var buf: array of byte): integer
+begin
+  return S.fread(system.adr(buf), 1, len(buf), f)
+end ReadBytes
+
+// ReadLine reads one text line from f into buf (newline stripped).
+// Returns the number of chars stored (0 on EOF).
+proc ReadLine*(f: File; var buf: array of char): integer
+  var p: integer
+      c: integer
+      i: integer
+begin
+  i := 0
+  c := S.getc(f)
+  while (c # -1) & (c # 10) & (i < len(buf) - 1) do
+    buf[i] := chr(c)
+    inc(i)
+    c := S.getc(f)
+  end
+  buf[i] := 0x
+  return i
+end ReadLine
+
+// ReadChar reads one character from f.  Returns chr(0) on EOF.
+proc ReadChar*(f: File): char
+  var c: integer
+begin
+  c := S.getc(f)
+  if c = -1 then return chr(0) end
+  return chr(c)
+end ReadChar
+
+// Eof reports whether f has reached end-of-file.
+proc Eof*(f: File): boolean
+begin
+  return S.feof(f) # 0
+end Eof
+
+// ── Writing ───────────────────────────────────────────────────────────────────
+
+// WriteBytes writes len(buf) bytes from buf to f.
+// Returns the number of bytes actually written.
+proc WriteBytes*(f: File; in buf: array of byte): integer
+begin
+  return S.fwrite(system.adr(buf), 1, len(buf), f)
+end WriteBytes
+
+// WriteStr writes a null-terminated string to f (no newline).
+proc WriteStr*(f: File; in s: array of char)
+begin
+  S.fputs(system.adr(s), f)
+end WriteStr
+
+// WriteStrLn writes a string to f followed by a newline.
+proc WriteStrLn*(f: File; in s: array of char)
+begin
+  S.fputs(system.adr(s), f)
+  S.putc(10, f) // '\n'
+end WriteStrLn
+
+// WriteChar writes a single character to f.
+proc WriteChar*(f: File; c: char)
+begin
+  S.putc(ord(c), f)
+end WriteChar
+
+// ── Positioning ───────────────────────────────────────────────────────────────
+
+// Seek moves the file position.  origin is one of SeekSet/SeekCur/SeekEnd.
+// Returns 0 on success, non-zero on error.
+proc Seek*(f: File; offset: longint; origin: integer): integer
+begin
+  return S.fseek(f, offset, origin)
+end Seek
+
+// Tell returns the current file position in bytes from the beginning.
+proc Tell*(f: File): longint
+begin
+  return S.ftell(f)
+end Tell
+
+// Rewind moves the file position back to the start.
+proc Rewind*(f: File)
+begin
+  S.rewind(f)
+end Rewind
+
+// ── File-system operations ────────────────────────────────────────────────────
+
+// Delete removes the file at path.  Returns true on success.
+proc Delete*(in path: array of char): boolean
+begin
+  return S.remove(system.adr(path)) = 0
+end Delete
+
+// Rename renames (or moves) oldpath to newpath.  Returns true on success.
+proc Rename*(in oldpath: array of char; in newpath: array of char): boolean
+begin
+  return S.rename(system.adr(oldpath), system.adr(newpath)) = 0
+end Rename
+
+// Exists returns true if a file at path can be opened for reading.
+proc Exists*(in path: array of char): boolean
+  var f: File
+begin
+  f := S.fopen(system.adr(path), system.adr("r"))
+  if f # nil then
+    S.fclose(f)
+    return true
+  end
+  return false
+end Exists
+
+end Files
+

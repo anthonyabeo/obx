@@ -1,0 +1,44 @@
+// POSIX libc — stdlib.h bindings
+// Covers memory allocation, process control, environment, and conversions.
+DEFINITION Stdlib [dll "libc"];
+
+// ── Memory allocation ─────────────────────────────────────────────────────────
+PROCEDURE malloc*(size: INTEGER): CPOINTER TO VOID;
+PROCEDURE calloc*(nmemb: INTEGER; size: INTEGER): CPOINTER TO VOID;
+PROCEDURE realloc*(ptr: CPOINTER TO VOID; size: INTEGER): CPOINTER TO VOID;
+PROCEDURE free*(ptr: CPOINTER TO VOID);
+
+// ── Process control ───────────────────────────────────────────────────────────
+PROCEDURE exit*(status: INTEGER) [alias "exit"];
+PROCEDURE abort*();
+PROCEDURE system*(cmd: INTEGER): INTEGER;
+
+// ── Environment ───────────────────────────────────────────────────────────────
+PROCEDURE getenv*(name: INTEGER): INTEGER;
+PROCEDURE setenv*(name: INTEGER; value: INTEGER; overwrite: INTEGER): INTEGER;
+PROCEDURE unsetenv*(name: INTEGER): INTEGER;
+
+// ── Number conversions ────────────────────────────────────────────────────────
+PROCEDURE atoi*(str: INTEGER): INTEGER;
+PROCEDURE atol*(str: INTEGER): LONGINT;
+PROCEDURE atof*(str: INTEGER): LONGREAL;
+PROCEDURE strtol*(str: INTEGER; endptr: INTEGER; base: INTEGER): LONGINT;
+PROCEDURE strtod*(str: INTEGER; endptr: INTEGER): LONGREAL;
+
+// ── Sorting and searching ─────────────────────────────────────────────────────
+PROCEDURE qsort*(base: CPOINTER TO VOID; nmemb: INTEGER; size: INTEGER;
+                 compar: PROCEDURE(a: CPOINTER TO VOID; b: CPOINTER TO VOID): INTEGER);
+PROCEDURE bsearch*(key: CPOINTER TO VOID; base: CPOINTER TO VOID;
+                   nmemb: INTEGER; size: INTEGER;
+                   compar: PROCEDURE(a: CPOINTER TO VOID; b: CPOINTER TO VOID): INTEGER): CPOINTER TO VOID;
+
+// ── Pseudo-random numbers ─────────────────────────────────────────────────────
+PROCEDURE rand*(): INTEGER;
+PROCEDURE srand*(seed: INTEGER);
+
+// ── Absolute value ────────────────────────────────────────────────────────────
+PROCEDURE abs*(n: INTEGER): INTEGER;
+PROCEDURE llabs*(n: LONGINT): LONGINT;
+
+END Stdlib.
+

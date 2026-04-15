@@ -1,0 +1,86 @@
+// Windows kernel32 — Win32 API bindings
+// Covers file I/O, process control, environment, and time not in msvcrt.
+DEFINITION WinAPI [dll "kernel32"];
+
+TYPE
+  // Generic handle (HANDLE in Win32 = void*).
+  Handle* = CPOINTER TO VOID;
+
+  // FILETIME — 100-nanosecond intervals since January 1, 1601.
+  FileTime* = CSTRUCT
+    dwLowDateTime*  : INTEGER;
+    dwHighDateTime* : INTEGER
+  END;
+
+  // SYSTEMTIME — broken-down wall-clock time.
+  SystemTime* = CSTRUCT
+    wYear*         : INTEGER;
+    wMonth*        : INTEGER;
+    wDayOfWeek*    : INTEGER;
+    wDay*          : INTEGER;
+    wHour*         : INTEGER;
+    wMinute*       : INTEGER;
+    wSecond*       : INTEGER;
+    wMilliseconds* : INTEGER
+  END;
+
+  // SECURITY_ATTRIBUTES — used by CreateFileA; pass 0 (NULL) for default.
+  SecurityAttributes* = CPOINTER TO VOID;
+
+// ── Process control ───────────────────────────────────────────────────────────
+PROCEDURE ExitProcess*(uExitCode: INTEGER);
+
+// ── Environment ───────────────────────────────────────────────────────────────
+// Returns number of chars written (0 on error).
+PROCEDURE GetEnvironmentVariableA*(lpName: INTEGER; lpBuffer: INTEGER;
+                                   nSize: INTEGER): INTEGER;
+PROCEDURE SetEnvironmentVariableA*(lpName: INTEGER; lpValue: INTEGER): INTEGER;
+
+// ── File I/O ──────────────────────────────────────────────────────────────────
+// Access flags: GENERIC_READ=0x80000000, GENERIC_WRITE=0x40000000
+// Share:        FILE_SHARE_READ=1, FILE_SHARE_WRITE=2
+// Creation:     CREATE_ALWAYS=2, CREATE_NEW=1, OPEN_EXISTING=3, OPEN_ALWAYS=4
+// Attrs:        FILE_ATTRIBUTE_NORMAL=128
+PROCEDURE CreateFileA*(lpFileName: INTEGER; dwDesiredAccess: INTEGER;
+                       dwShareMode: INTEGER;
+                       lpSecurityAttributes: SecurityAttributes;
+                       dwCreationDisposition: INTEGER;
+                       dwFlagsAndAttributes: INTEGER;
+                       hTemplateFile: Handle): Handle;
+
+PROCEDURE ReadFile*(hFile: Handle; lpBuffer: INTEGER; nNumberOfBytesToRead: INTEGER;
+                    lpNumberOfBytesRead: INTEGER; lpOverlapped: CPOINTER TO VOID): INTEGER;
+
+PROCEDURE WriteFile*(hFile: Handle; lpBuffer: INTEGER; nNumberOfBytesToWrite: INTEGER;
+                     lpNumberOfBytesWritten: INTEGER; lpOverlapped: CPOINTER TO VOID): INTEGER;
+
+PROCEDURE CloseHandle*(hObject: Handle): INTEGER;
+
+PROCEDURE SetFilePointerEx*(hFile: Handle; liDistanceToMove: LONGINT;
+                             lpNewFilePointer: INTEGER; dwMoveMethod: INTEGER): INTEGER;
+
+PROCEDURE GetFileSizeEx*(hFile: Handle; lpFileSize: INTEGER): INTEGER;
+
+PROCEDURE FlushFileBuffers*(hFile: Handle): INTEGER;
+
+PROCEDURE DeleteFileA*(lpFileName: INTEGER): INTEGER;
+PROCEDURE MoveFileA*(lpExistingFileName: INTEGER; lpNewFileName: INTEGER): INTEGER;
+
+// GetFileAttributes returns INVALID_FILE_ATTRIBUTES (0xFFFFFFFF) if not found.
+PROCEDURE GetFileAttributesA*(lpFileName: INTEGER): INTEGER;
+
+// ── Directory ─────────────────────────────────────────────────────────────────
+PROCEDURE GetCurrentDirectoryA*(nBufferLength: INTEGER; lpBuffer: INTEGER): INTEGER;
+PROCEDURE SetCurrentDirectoryA*(lpPathName: INTEGER): INTEGER;
+
+// ── Time ──────────────────────────────────────────────────────────────────────
+PROCEDURE GetSystemTimeAsFileTime*(lpSystemTimeAsFileTime: CPOINTER TO FileTime);
+PROCEDURE GetLocalTime*(lpSystemTime: CPOINTER TO SystemTime);
+PROCEDURE GetSystemTime*(lpSystemTime: CPOINTER TO SystemTime);
+
+// ── Misc ──────────────────────────────────────────────────────────────────────
+PROCEDURE GetLastError*(): INTEGER;
+PROCEDURE Sleep*(dwMilliseconds: INTEGER);
+
+END WinAPI.
+

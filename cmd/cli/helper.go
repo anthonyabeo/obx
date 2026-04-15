@@ -155,3 +155,39 @@ func applyDirectives(ctx *compiler.Context, defines []string) error {
 	return nil
 }
 
+// injectPlatformDirectives sets compile-time boolean directives that stdlib
+// wrapper modules use inside <* IF WINDOWS THEN *> / <* IF LINUX THEN *>
+// blocks to select the correct FFI binding layer.
+//
+// Mapping:
+//
+//	rv64imafd                          → POSIX=true, LINUX=true
+//	arm64-apple-macos / aarch64-*      → POSIX=true, DARWIN=true
+//	x86_64-pc-windows / *windows*      → WINDOWS=true
+//
+// The platform directives are injected before user-supplied --define values
+// so that explicit --define WINDOWS=false can still override the defaults.
+func injectPlatformDirectives(ctx *compiler.Context, targetName string) {
+	lower := strings.ToLower(targetName)
+	switch {
+	case strings.Contains(lower, "windows"):
+		ctx.SetDirective("WINDOWS", true)
+		ctx.SetDirective("POSIX", false)
+		ctx.SetDirective("LINUX", false)
+		ctx.SetDirective("DARWIN", false)
+	case strings.Contains(lower, "darwin") ||
+		strings.Contains(lower, "macos") ||
+		strings.HasPrefix(lower, "arm64-apple"):
+		ctx.SetDirective("POSIX", true)
+		ctx.SetDirective("DARWIN", true)
+		ctx.SetDirective("LINUX", false)
+		ctx.SetDirective("WINDOWS", false)
+	default:
+		// rv64imafd and any other POSIX/Linux target.
+		ctx.SetDirective("POSIX", true)
+		ctx.SetDirective("LINUX", true)
+		ctx.SetDirective("DARWIN", false)
+		ctx.SetDirective("WINDOWS", false)
+	}
+}
+

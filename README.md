@@ -16,6 +16,7 @@ instruction selection → register allocation → assembly emission.
   - [obx new](#obx-new)
   - [obx check](#obx-check)
   - [obx build](#obx-build)
+- [Standard Library](#standard-library)
 - [Examples](#examples)
 - [Compilation Pipeline](#compilation-pipeline)
 - [Optimisation Passes](#optimisation-passes)
@@ -177,6 +178,44 @@ Assembly is written to `out/<ModuleName>.s` relative to the project root.
 
 ---
 
+## Standard Library
+
+Obx ships a standard library under `stdlib/` that is **automatically
+available** in every project — no `obx.mod` change required.  Eight
+idiomatic modules cover I/O, file access, OS utilities, strings, math,
+memory, time, and formatted output:
+
+| Module | What it provides |
+|---|---|
+| `IO` | Console read/write — `Write`, `WriteLn`, `WriteInt`, `ReadLn`, `ReadInt` … |
+| `Files` | File open/close/read/write/seek/delete/rename/exists |
+| `OS` | `Exit`, `Env`, `GetCwd`, `SetCwd`, `Exec`, `GetPid`, `Sleep` |
+| `Strings` | `Len`, `Copy`, `Append`, `Compare`, `IndexOf`, `Contains`, `ToUpper`, `Trim` … |
+| `Math` | `Sin`, `Cos`, `Sqrt`, `Pow`, `Floor`, `Log`, `Pi`, `E` … |
+| `Mem` | `Alloc`, `Free`, `Copy`, `Fill`, `Zero`, `Equal` over `CPOINTER TO VOID` |
+| `Time` | `DateTime` record, `Now`, `Epoch`, `Clock`, `Elapsed`, `Format` |
+| `Fmt` | `snprintf`-backed `Int`, `Real`, `Str`, `SprintI`, `ScanInt` … |
+
+```oberon
+module Hello
+  import IO
+begin
+  IO.WriteLn("Hello, world!")
+end Hello
+```
+
+The stdlib selects the correct C binding layer automatically:
+
+| Target (`--target`) | Platform layer used |
+|---|---|
+| `rv64imafd` *(default)* | `stdlib/posix/` (`libc`, `libm`) |
+| `arm64-apple-macos` | `stdlib/posix/` (`libc`, `libm`) |
+| `x86_64-pc-windows` | `stdlib/win32/` (`msvcrt`, `ucrtbase`, `kernel32`) |
+
+See **[stdlib/README.md](stdlib/README.md)** for the full API reference.
+
+---
+
 ## Examples
 
 ### Loop — `examples/loop/loop.obx`
@@ -276,6 +315,17 @@ __init_LoopTest_exit:
 ```
 
 </details>
+
+### Stdlib Demo — `examples/stdlib/StdlibDemo.obx`
+
+Exercises all eight stdlib modules in one program (I/O, strings, math, fmt,
+time, files, OS, memory):
+
+```shell
+$ obx build -S -r examples/stdlib -e StdlibDemo
+Building 9 module(s)  (entry: StdlibDemo)
+  ...
+```
 
 ### Fibonacci — `examples/demo/Fibonacci.obx`
 
@@ -418,6 +468,31 @@ $ obx build -O2 --verbose
 ## Source Layout
 
 ```
+stdlib/                 Standard library (auto-discovered on every build)
+├── posix/              POSIX FFI bindings (libc / libm)
+│   ├── Stdio.obx       stdio.h  — FILE*, printf, fopen, fread/fwrite …
+│   ├── Stdlib.obx      stdlib.h — malloc, free, exit, getenv …
+│   ├── StringH.obx     string.h — strlen, strcmp, memcpy …
+│   ├── LibM.obx        math.h   — sin, cos, sqrt, pow …  [-lm]
+│   ├── TimeH.obx       time.h   — time, clock, localtime, strftime, tm
+│   └── Unistd.obx      unistd.h — getpid, getcwd, open, read, write …
+├── win32/              Windows FFI bindings (msvcrt / ucrtbase / kernel32)
+│   ├── Stdio.obx       msvcrt stdio
+│   ├── Stdlib.obx      msvcrt stdlib
+│   ├── StringH.obx     msvcrt string
+│   ├── LibM.obx        ucrtbase math
+│   ├── TimeH.obx       msvcrt time
+│   └── WinAPI.obx      kernel32 — CreateFile, ExitProcess, GetEnvironmentVariable …
+├── IO.obx              Console read / write
+├── Files.obx           File open / read / write / seek
+├── OS.obx              Exit, Env, GetCwd, Exec, GetPid, Sleep
+├── Strings.obx         Len, Copy, Append, Compare, IndexOf, ToUpper, Trim …
+├── Math.obx            Sin, Cos, Sqrt, Pow, Floor, Pi, E …
+├── Mem.obx             Alloc, Free, Copy, Fill, Zero, Equal
+├── Time.obx            DateTime, Now, Epoch, Clock, Elapsed, Format
+├── Fmt.obx             Int, Real, Str, SprintI, ScanInt … (snprintf-backed)
+└── README.md           Full stdlib API reference
+
 src/
 ├── support/            Infrastructure shared across all stages
 │   ├── adt/            Generic data structures (Stack, Queue, Set)
