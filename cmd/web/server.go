@@ -30,6 +30,7 @@ func Start(cfg Config) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.HandleUI)
 	mux.HandleFunc("/api/check", s.HandleCheck)
+	mux.HandleFunc("/api/cfg", s.HandleCFG)
 	mux.HandleFunc("/api/version", s.HandleVersion)
 
 	fmt.Printf("obx web  →  http://%s\n", cfg.Addr)

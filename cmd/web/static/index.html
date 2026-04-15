@@ -42,13 +42,17 @@
 
     .pane {
       display: flex; flex-direction: column;
-      flex: 1; min-width: 0;
+      min-width: 0;
       padding: 12px 14px; gap: 8px;
     }
     .pane + .pane { border-left: 1px solid #2d3148; }
 
+    #editorPane { flex: 0 0 40%; }
+    #diagPane   { flex: 0 0 24%; }
+    #cfgPane    { flex: 1; min-width: 280px; }
+
     /* ── Pane headers ───────────────────────── */
-    .pane-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .pane-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
     .pane-label  { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: #4b5563; flex-shrink: 0; }
     .spacer      { flex: 1; }
 
@@ -122,10 +126,61 @@
     .empty {
       display: flex; align-items: center; justify-content: center;
       height: 100%; color: #374151; font-size: .88rem;
-      user-select: none; gap: 8px;
+      user-select: none; gap: 8px; pointer-events: none;
     }
 
-    ::-webkit-scrollbar { width: 6px; }
+    /* ── CFG canvas ──────────────────────────── */
+    #cfgView {
+      flex: 1; position: relative;
+      background: #141720; border: 1px solid #2d3148; border-radius: 6px;
+      overflow: hidden; cursor: grab;
+      user-select: none;
+    }
+    #cfgView.dragging { cursor: grabbing; }
+
+    #cfgInner {
+      position: absolute; top: 0; left: 0;
+      transform-origin: 0 0;
+    }
+    /* The DOT uses bgcolor="#1a1d27" so the SVG background already matches.
+       We only need display:block to remove the inline-element gap. */
+    #cfgInner { background: #1a1d27; }
+    #cfgInner svg { display: block; }
+
+    #cfgPlaceholder {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #374151; font-size: .88rem; pointer-events: none;
+    }
+
+    /* Function tabs */
+    .fn-tabs {
+      display: flex; flex-wrap: wrap; gap: 4px; flex-shrink: 0;
+      overflow-x: auto;
+    }
+    .fn-tab {
+      font-family: ui-monospace, monospace;
+      font-size: .72rem; padding: 2px 10px;
+      border: 1px solid #2d3148; border-radius: 4px;
+      background: #1a1d27; color: #94a3b8;
+      cursor: pointer; white-space: nowrap;
+      transition: background .1s, color .1s, border-color .1s;
+    }
+    .fn-tab:hover  { background: #252840; color: #c4b5fd; border-color: #4b5563; }
+    .fn-tab.active { background: #312e81; color: #e0e7ff; border-color: #6366f1; }
+
+    /* Toolbar buttons */
+    .cfg-controls { display: flex; align-items: center; gap: 6px; }
+    .icon-btn {
+      background: #1a1d27; border: 1px solid #2d3148;
+      color: #64748b; font-size: .82rem; padding: 2px 8px;
+      border-radius: 4px; cursor: pointer; line-height: 1.5;
+      transition: color .1s, border-color .1s;
+    }
+    .icon-btn:hover { color: #94a3b8; border-color: #4b5563; }
+    .cfg-hint { font-size: .66rem; color: #2d3748; white-space: nowrap; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #2d3148; border-radius: 3px; }
   </style>
@@ -144,7 +199,7 @@
 <div class="workspace">
 
   <!-- ── Editor pane ─────────────────────────── -->
-  <div class="pane">
+  <div class="pane" id="editorPane">
     <div class="pane-header">
       <span class="pane-label">source</span>
       <input id="filename" type="text" value="main.obx" spellcheck="false" title="filename sent to the API" />
@@ -163,7 +218,7 @@ END Main.
   </div>
 
   <!-- ── Diagnostics pane ────────────────────── -->
-  <div class="pane">
+  <div class="pane" id="diagPane">
     <div class="pane-header">
       <span class="pane-label">diagnostics</span>
       <div class="spacer"></div>
@@ -174,94 +229,235 @@ END Main.
     </div>
   </div>
 
+  <!-- ── CFG pane ─────────────────────────────── -->
+  <div class="pane" id="cfgPane">
+    <div class="pane-header">
+      <span class="pane-label">control flow graph</span>
+      <div class="spacer"></div>
+      <div class="cfg-controls">
+        <span class="cfg-hint">scroll&thinsp;·&thinsp;drag&thinsp;·&thinsp;dbl-click to fit</span>
+        <button class="icon-btn" onclick="fitCfg()" title="Fit to view">⊡ fit</button>
+        <button class="icon-btn" onclick="resetCfg()" title="Reset zoom">⊙ 1:1</button>
+      </div>
+    </div>
+    <div class="fn-tabs" id="fnTabs"></div>
+    <div id="cfgView">
+      <div id="cfgInner"></div>
+      <div id="cfgPlaceholder">🔍&nbsp; Press <strong style="color:#4b5563">Check</strong> to see the CFG</div>
+    </div>
+  </div>
+
 </div><!-- .workspace -->
 
-<script>
-const editor   = document.getElementById('editor');
-const results  = document.getElementById('results');
-const statusEl = document.getElementById('statusText');
-const btn      = document.getElementById('checkBtn');
+<!-- viz.js 2.x full renderer — required for HTML-like labels (<B>, <BR/>, <FONT>) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
 
-/* ── fetch version on load ─────────────────── */
+<script>
+const editor      = document.getElementById('editor');
+const results     = document.getElementById('results');
+const statusEl    = document.getElementById('statusText');
+const btn         = document.getElementById('checkBtn');
+const cfgView     = document.getElementById('cfgView');
+const cfgInner    = document.getElementById('cfgInner');
+const cfgHolder   = document.getElementById('cfgPlaceholder');
+const fnTabsEl    = document.getElementById('fnTabs');
+
+/* ── viz.js instance ───────────────────────── */
+let viz = null;
+try { viz = new Viz(); } catch(e) { console.warn('viz.js unavailable:', e); }
+
+/* ── version badge ─────────────────────────── */
 fetch('/api/version')
   .then(r => r.ok ? r.json() : null)
-  .then(d => {
-    if (d) document.getElementById('versionBadge').textContent = `obx ${d.version}  ·  go ${d.go}`;
-  })
+  .then(d => { if (d) document.getElementById('versionBadge').textContent = `obx ${d.version}  ·  go ${d.go}`; })
   .catch(() => {});
 
-/* ── run check ─────────────────────────────── */
+/* ── run check + cfg in parallel ───────────── */
 async function runCheck() {
   const source   = editor.value;
   const filename = document.getElementById('filename').value.trim() || 'main.obx';
   btn.disabled = true; btn.textContent = 'Checking…';
   results.innerHTML = ''; setStatus('idle', '…');
+  setCfgState('loading');
 
-  try {
-    const res = await fetch('/api/check', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ source, filename }),
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + (await res.text()).trim());
-    renderDiags(await res.json());
-  } catch (err) {
-    results.innerHTML = diagHtml('error', 'error', esc(err.message), null);
+  const body = JSON.stringify({ source, filename });
+  const post = url => fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body})
+    .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error('HTTP ' + r.status + ': ' + t.trim()); }))
+    .catch(e => ({_err: e.message}));
+
+  const [checkData, cfgData] = await Promise.all([post('/api/check'), post('/api/cfg')]);
+
+  btn.disabled = false; btn.textContent = 'Check';
+
+  /* diagnostics pane */
+  if (checkData._err) {
+    results.innerHTML = diagHtml('error','error', esc(checkData._err), null);
     setStatus('fail', 'error');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Check';
+  } else {
+    renderDiags(checkData);
+  }
+
+  /* CFG pane */
+  if (cfgData._err || !cfgData.ok) {
+    setCfgState('error', cfgData._err || cfgData.error || 'CFG unavailable');
+  } else {
+    renderCFG(cfgData.graphs || []);
   }
 }
 
-/* ── render diagnostics ────────────────────── */
+/* ── diagnostics ───────────────────────────── */
 function renderDiags(data) {
   const diags = data.diagnostics || [];
   if (!diags.length) {
     results.innerHTML = '<div class="empty">✅&nbsp; No diagnostics — looks clean</div>';
     return setStatus('ok', 'ok');
   }
-
   const counts = {};
-  diags.forEach(d => { counts[d.severity] = (counts[d.severity] || 0) + 1; });
-  const summary = Object.entries(counts)
-    .map(([s, n]) => `${n}\u202f${s}${n !== 1 ? 's' : ''}`)
-    .join(' · ');
+  diags.forEach(d => { counts[d.severity] = (counts[d.severity]||0)+1; });
+  const summary = Object.entries(counts).map(([s,n]) => `${n}\u202f${s}${n!==1?'s':''}`).join(' · ');
   setStatus(data.ok ? 'ok' : 'fail', summary);
-
   results.innerHTML = diags.map(d => {
     const loc = d.location
-      ? `${esc(d.location.file)}:${d.location.start_line}:${d.location.start_col}`
-      : null;
-    return diagHtml(d.severity || 'info', d.severity || 'info', esc(d.message || ''), loc);
+      ? `${esc(d.location.file)}:${d.location.start_line}:${d.location.start_col}` : null;
+    return diagHtml(d.severity||'info', d.severity||'info', esc(d.message||''), loc);
   }).join('');
 }
 
 function diagHtml(cls, sev, msg, loc) {
   const locRow = loc ? `<div class="diag-loc">${loc}</div>` : '';
-  return `<div class="diag-item ${esc(cls)}">
-    <div class="diag-row">
-      <span class="badge ${esc(cls)}">${esc(sev)}</span>
-      <span class="diag-msg">${msg}</span>
-    </div>${locRow}</div>`;
+  return `<div class="diag-item ${esc(cls)}"><div class="diag-row">
+    <span class="badge ${esc(cls)}">${esc(sev)}</span>
+    <span class="diag-msg">${msg}</span></div>${locRow}</div>`;
 }
 
-function setStatus(cls, text) {
-  statusEl.className = 'status ' + cls;
-  statusEl.textContent = text;
+function setStatus(cls, text) { statusEl.className='status '+cls; statusEl.textContent=text; }
+
+/* ── CFG helpers ───────────────────────────── */
+function setCfgState(kind, msg) {
+  cfgInner.innerHTML = '';
+  cfgHolder.style.display = 'flex';
+  fnTabsEl.innerHTML = '';
+  resetPanZoom();
+  if (kind === 'loading') { cfgHolder.innerHTML = '⌛&nbsp; Building CFG…'; return; }
+  if (kind === 'error')   { cfgHolder.innerHTML = '⚠️&nbsp; ' + esc(msg); return; }
+  cfgHolder.innerHTML = '🔍&nbsp; Press <strong style="color:#4b5563">Check</strong> to see the CFG';
 }
 
-function esc(s) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+let allGraphs = [], activeIdx = 0;
+
+function renderCFG(graphs) {
+  allGraphs = graphs; activeIdx = 0;
+  buildTabs();
+  if (!graphs.length) { setCfgState('error', 'no functions found'); return; }
+  showGraph(0);
 }
+
+function buildTabs() {
+  fnTabsEl.innerHTML = '';
+  allGraphs.forEach((g, i) => {
+    const b = document.createElement('button');
+    b.className = 'fn-tab' + (i===activeIdx ? ' active' : '');
+    b.textContent = g.function;
+    b.title = g.module + '.' + g.function;
+    b.onclick = () => { activeIdx=i; buildTabs(); showGraph(i); };
+    fnTabsEl.appendChild(b);
+  });
+}
+
+async function showGraph(idx) {
+  cfgHolder.style.display = 'none';
+  cfgInner.innerHTML = '';
+  resetPanZoom();
+
+  if (!viz) {
+    cfgHolder.style.display = 'flex';
+    cfgHolder.innerHTML = '⚠️&nbsp; viz.js renderer not loaded (check network)';
+    return;
+  }
+  try {
+    const svg = await viz.renderSVGElement(allGraphs[idx].dot);
+    // Keep the SVG's original pt-based width/height so the browser
+    // gives it a proper intrinsic size; do NOT remove those attributes.
+    cfgInner.appendChild(svg);
+    // Wait two animation frames so the browser has finished layout
+    // before we measure getBoundingClientRect.
+    requestAnimationFrame(() => requestAnimationFrame(fitCfg));
+  } catch (err) {
+    viz = new Viz();
+    cfgHolder.style.display = 'flex';
+    cfgHolder.innerHTML = '⚠️&nbsp; Render error: ' + esc(err.message);
+  }
+}
+
+/* ── Zoom / pan ────────────────────────────── */
+let scale=1, tx=0, ty=0, dragging=false, dragX=0, dragY=0;
+
+function applyTransform() {
+  cfgInner.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+}
+function resetPanZoom() { scale=1; tx=0; ty=0; cfgInner.style.transform=''; }
+
+function resetCfg() { scale=1; tx=0; ty=0; applyTransform(); }
+
+function fitCfg() {
+  const svg = cfgInner.querySelector('svg');
+  if (!svg) return;
+  // Read the actual rendered CSS-pixel size.  getBoundingClientRect() accounts
+  // for the pt→px conversion the browser applies to the SVG's width/height
+  // attributes, which is what we need for scale calculations.
+  // Temporarily clear any existing transform so measurements are unscaled.
+  const saved = cfgInner.style.transform;
+  cfgInner.style.transform = '';
+  const r = svg.getBoundingClientRect();
+  const gw = r.width, gh = r.height;
+  cfgInner.style.transform = saved;
+
+  if (!gw || !gh) return;
+  const pad = 24;
+  const cw = cfgView.clientWidth  - pad;
+  const ch = cfgView.clientHeight - pad;
+  scale = Math.min(cw / gw, ch / gh, 1);
+  tx = (cw - gw * scale) / 2 + pad / 2;
+  ty = pad / 2;
+  applyTransform();
+}
+
+/* wheel → zoom toward cursor */
+cfgView.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
+  const rect = cfgView.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  tx = mx - (mx - tx)*factor;
+  ty = my - (my - ty)*factor;
+  scale = Math.max(0.05, Math.min(10, scale*factor));
+  applyTransform();
+}, {passive: false});
+
+/* drag → pan */
+cfgView.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  dragging=true; dragX=e.clientX-tx; dragY=e.clientY-ty;
+  cfgView.classList.add('dragging');
+});
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  tx=e.clientX-dragX; ty=e.clientY-dragY; applyTransform();
+});
+document.addEventListener('mouseup', () => { dragging=false; cfgView.classList.remove('dragging'); });
+
+/* double-click → fit */
+cfgView.addEventListener('dblclick', fitCfg);
 
 /* ── keyboard shortcut ─────────────────────── */
 editor.addEventListener('keydown', e => {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-    e.preventDefault(); runCheck();
-  }
+  if ((e.metaKey||e.ctrlKey) && e.key==='Enter') { e.preventDefault(); runCheck(); }
 });
+
+function esc(s) {
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 </script>
 </body>
 </html>

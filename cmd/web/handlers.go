@@ -8,6 +8,9 @@ import (
 	"net/http"
 	"runtime"
 
+	"github.com/anthonyabeo/obx/src/ir/desugar"
+	"github.com/anthonyabeo/obx/src/ir/obxir"
+	"github.com/anthonyabeo/obx/src/opt"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
@@ -140,6 +143,90 @@ func corsMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+// ── POST /api/cfg ─────────────────────────────────────────────────────────────
+
+// HandleCFG runs the full front-end pipeline (parse → sema → desugar → ObxIR)
+// and returns a Graphviz DOT string for each function's CFG.
+func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Source   string `json:"source"`
+		Filename string `json:"filename"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Filename == "" {
+		req.Filename = "input.obx"
+	}
+
+	// ── in-memory pipeline ────────────────────────────────────────────────
+	srcMgr := source.NewSourceManager()
+	emitter := diag.ToWriter(formatter.NewJSONFormatter(srcMgr), io.Discard)
+	reporter := diag.NewBufferedReporter(srcMgr, s.cfg.MaxErrors, emitter)
+	ctx := compiler.New(req.Filename, srcMgr, reporter, ast.NewEnv(), 8)
+
+	// parse
+	p := parser.NewParser(ctx, req.Filename, []byte(req.Source))
+	unit := p.Parse()
+
+	if reporter.ErrorCount() > 0 {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":    false,
+			"error": "parse errors — fix diagnostics first",
+		})
+		return
+	}
+
+	// sema
+	obx := ast.NewOberonX()
+	obx.AddUnit(unit)
+	sema.NewSema(ctx, obx).Validate()
+
+	if reporter.ErrorCount() > 0 {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":    false,
+			"error": "type errors — fix diagnostics first",
+		})
+		return
+	}
+
+	// desugar → ObxIR → build CFG
+	hirProgram := desugar.NewGenerator(obx).Generate()
+	irProgram := obxir.NewIRBuilder(8).Build(hirProgram)
+
+	type graphEntry struct {
+		Module   string `json:"module"`
+		Function string `json:"function"`
+		Dot      string `json:"dot"`
+	}
+
+	var graphs []graphEntry
+	for _, mod := range irProgram.Modules {
+		for _, fn := range mod.Funcs {
+			if fn.IsExternal {
+				continue
+			}
+			opt.BuildCFG(fn)
+			graphs = append(graphs, graphEntry{
+				Module:   mod.Name,
+				Function: fn.FnName,
+				Dot:      fn.OutputDOT(),
+			})
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":     true,
+		"graphs": graphs,
 	})
 }
 

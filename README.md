@@ -207,8 +207,9 @@ obx web [flags]
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/` | Browser-based Oberon+ editor and diagnostic viewer. |
+| `GET` | `/` | Browser-based Oberon+ editor, diagnostic viewer, and CFG visualiser. |
 | `POST` | `/api/check` | JSON API: `{"source":"…","filename":"…"}` → diagnostics array. |
+| `POST` | `/api/cfg` | JSON API: `{"source":"…","filename":"…"}` → per-function Graphviz DOT strings. |
 | `GET` | `/api/version` | Build and runtime information (version, Go version, OS/arch). |
 
 CORS is enabled on all endpoints (`Access-Control-Allow-Origin: *`) so the API can be called

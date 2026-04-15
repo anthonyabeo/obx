@@ -161,21 +161,21 @@ func (fn *Function) SortedBlocks() []*Block {
 	return blocks
 }
 
-// OutputDOT returns a colorful Graphviz DOT representation of the function's CFG.
+// OutputDOT returns a dark-themed Graphviz DOT representation of the function's CFG.
 //
-// Block colour legend:
+// Block colour legend (dark theme):
 //
-//	entry  – green  (#d4f4dd / #2e7d32)
-//	exit   – red    (#ffd6d6 / #b71c1c)
-//	join   – gold   (#fff9c4 / #f57f17)   (≥2 predecessors)
-//	branch – blue   (#dceefb / #1565c0)   (≥2 successors)
-//	normal – white  (#ffffff / #555555)
+//	entry  – green  (#1a3a27 / #4ade80 / #bbf7d0)
+//	exit   – red    (#3a1a1a / #ef4444 / #fecaca)
+//	join   – amber  (#2d2507 / #f59e0b / #fef3c7)   (≥2 predecessors)
+//	branch – blue   (#0f1e3a / #60a5fa / #dbeafe)   (≥2 successors)
+//	normal – slate  (#1e2234 / #64748b / #e2e8f0)
 func (fn *Function) OutputDOT() string {
 	var sb strings.Builder
 
 	// ── Graph-level styling ───────────────────────────────────────────────
 	sb.WriteString("digraph CFG {\n")
-	sb.WriteString("  graph [fontname=\"Helvetica\" bgcolor=\"#fafafa\" pad=\"0.4\" ranksep=\"0.6\"];\n")
+	sb.WriteString("  graph [fontname=\"Helvetica\" bgcolor=\"#1a1d27\" pad=\"0.5\" ranksep=\"0.7\" nodesep=\"0.4\"];\n")
 	sb.WriteString("  node  [fontname=\"Courier New\" fontsize=11 style=filled penwidth=1.5];\n")
 	sb.WriteString("  edge  [fontname=\"Helvetica\" fontsize=10 penwidth=1.2];\n\n")
 
@@ -184,32 +184,39 @@ func (fn *Function) OutputDOT() string {
 	blockStyle := func(b *Block) style {
 		switch {
 		case fn.Entry != nil && b.ID == fn.Entry.ID:
-			return style{"#d4f4dd", "#2e7d32", "#1b5e20"} // entry – green
+			return style{"#1a3a27", "#4ade80", "#bbf7d0"} // entry – green
 		case fn.Exit != nil && b.ID == fn.Exit.ID:
-			return style{"#ffd6d6", "#b71c1c", "#7f0000"} // exit  – red
+			return style{"#3a1a1a", "#ef4444", "#fecaca"} // exit  – red
 		case len(b.Preds) >= 2:
-			return style{"#fff9c4", "#f57f17", "#4e342e"} // join  – gold
+			return style{"#2d2507", "#f59e0b", "#fef3c7"} // join  – amber
 		case len(b.Succs) >= 2:
-			return style{"#dceefb", "#1565c0", "#0d3c61"} // branch – blue
+			return style{"#0f1e3a", "#60a5fa", "#dbeafe"} // branch – blue
 		default:
-			return style{"#ffffff", "#555555", "#222222"} // normal – white
+			return style{"#1e2234", "#64748b", "#e2e8f0"} // normal – slate
 		}
 	}
 
 	// ── Nodes ─────────────────────────────────────────────────────────────
+	//
+	// We use Graphviz HTML-like labels (full.render.js required) so that the
+	// block name can be rendered in bold and each instruction on its own
+	// left-aligned line.  The entire content is wrapped in an explicit
+	// <FONT COLOR="…"> tag because some renderers do not propagate the
+	// node-level fontcolor to unstyled text that follows a </B> close.
 	for _, b := range fn.SortedBlocks() {
+		s := blockStyle(b)
+
 		var lbl strings.Builder
-		lbl.WriteString(fmt.Sprintf("<B>%s</B>", b.Label))
+		lbl.WriteString(fmt.Sprintf(`<FONT COLOR="%s"><B>%s</B>`, s.font, b.Label))
 		for _, instr := range b.Instrs {
 			line := instr.String()
 			line = strings.ReplaceAll(line, "&", "&amp;")
 			line = strings.ReplaceAll(line, "<", "&lt;")
 			line = strings.ReplaceAll(line, ">", "&gt;")
-			lbl.WriteString(fmt.Sprintf("<BR ALIGN=\"LEFT\"/>  %s", line))
+			lbl.WriteString("<BR ALIGN=\"LEFT\"/>  " + line)
 		}
-		lbl.WriteString("<BR ALIGN=\"LEFT\"/>")
+		lbl.WriteString("<BR ALIGN=\"LEFT\"/></FONT>")
 
-		s := blockStyle(b)
 		sb.WriteString(fmt.Sprintf(
 			"  %q [shape=box fillcolor=%q color=%q fontcolor=%q label=<%s>];\n",
 			b.Label, s.fill, s.border, s.font, lbl.String(),
@@ -230,13 +237,13 @@ func (fn *Function) OutputDOT() string {
 			var attrs string
 			switch {
 			case isExit:
-				attrs = ` [style=dashed color="#999999"]`
+				attrs = ` [style=dashed color="#475569"]`
 			case cond != nil && succ.Label == cond.TrueLabel:
-				attrs = ` [label="T" color="#2e7d32" fontcolor="#2e7d32" penwidth=1.8]`
+				attrs = ` [label="T" color="#4ade80" fontcolor="#4ade80" penwidth=1.8]`
 			case cond != nil && succ.Label == cond.FalseLabel:
-				attrs = ` [label="F" color="#b71c1c" fontcolor="#b71c1c" penwidth=1.8]`
+				attrs = ` [label="F" color="#ef4444" fontcolor="#ef4444" penwidth=1.8]`
 			default:
-				attrs = ` [color="#555555"]`
+				attrs = ` [color="#64748b"]`
 			}
 			sb.WriteString(fmt.Sprintf("  %q -> %q%s;\n", b.Label, succ.Label, attrs))
 		}
