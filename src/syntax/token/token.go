@@ -104,6 +104,13 @@ const (
 	INTEGER
 	SHORTINT
 	LONGINT
+
+	// FFI / C-interop keywords
+	CSTRUCT
+	CUNION
+	CARRAY
+	CPOINTER
+	VOID
 	keyword_end
 
 	operator_beg
@@ -169,6 +176,12 @@ var tokens = [...]string{
 	INTEGER:  "integer",
 	SHORTINT: "shortint",
 	LONGINT:  "longint",
+
+	CSTRUCT:  "cstruct",
+	CUNION:   "cunion",
+	CARRAY:   "carray",
+	CPOINTER: "cpointer",
+	VOID:     "void",
 
 	PLUS:  "+",
 	MINUS: "-",
