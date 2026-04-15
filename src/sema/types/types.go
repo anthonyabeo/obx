@@ -176,6 +176,18 @@ func AssignmentCompatible(exprType, varType Type) bool {
 		}
 	}
 
+	// 7a. Te and Tv are C pointer types and their base types are compatible.
+	// A CPOINTER TO VOID is assignment-compatible with any CPOINTER, allowing
+	// void* to be used as a generic C pointer type.
+	if ep, ok := exprType.(*CPointerType); ok {
+		if vp, ok2 := varType.(*CPointerType); ok2 {
+			// Same base type, or either side is VOID (void* is generic).
+			if SameType(ep.Base, vp.Base) || ep.Base == VoidType || vp.Base == VoidType {
+				return true
+			}
+		}
+	}
+
 	// 8. Tv is pointer or procedure type and expr is NIL
 	if (IsPointer(varType) || IsProcedure(varType)) && IsNil(exprType) {
 		return true
@@ -434,6 +446,9 @@ func Identical(a, b Type) bool {
 		return !a.IsOpen() && !ab.IsOpen() && a.Length == ab.Length && Identical(a.Elem, ab.Elem)
 	case *PointerType:
 		pb, ok := b.(*PointerType)
+		return ok && Identical(a.Base, pb.Base)
+	case *CPointerType:
+		pb, ok := b.(*CPointerType)
 		return ok && Identical(a.Base, pb.Base)
 	case *StringType:
 		str, ok := b.(*StringType)

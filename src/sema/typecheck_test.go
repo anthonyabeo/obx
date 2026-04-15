@@ -3787,6 +3787,22 @@ var predeclaredProcTests = []procTestEntry{
 				shouldPass:  false,
 				expectError: "'CAST' expects first argument to be integer or enum",
 			},
+			// ── C-pointer CAST cases ─────────────────────────────────────────
+			{
+				name:       "Valid_CAST_integer_from_cpointer_to_void",
+				code:       "MODULE Test; VAR p: CPOINTER TO VOID; VAR n: INT64; BEGIN n := CAST(INT64, p) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_CAST_cpointer_to_void_from_integer",
+				code:       "MODULE Test; VAR n: INT64; VAR p: CPOINTER TO VOID; BEGIN p := CAST(CPOINTER TO VOID, n) END Test.",
+				shouldPass: true,
+			},
+			{
+				name:       "Valid_CAST_cpointer_to_void_from_cpointer_to_void",
+				code:       "MODULE Test; VAR p: CPOINTER TO VOID; VAR q: CPOINTER TO VOID; BEGIN q := CAST(CPOINTER TO VOID, p) END Test.",
+				shouldPass: true,
+			},
 		},
 	},
 }

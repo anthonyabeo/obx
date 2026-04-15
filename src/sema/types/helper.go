@@ -17,6 +17,8 @@ var PredefinedTypes = map[token.Kind]Type{
 	token.WCHAR:    WCharType,
 	token.SET:      SetType,
 	token.BOOLEAN:  BooleanType,
+	// VOID is only valid as a CPOINTER base (CPOINTER TO VOID ≡ void*).
+	token.VOID: VoidType,
 }
 
 var integerTypeRank = map[BasicKind]int{
@@ -341,3 +343,40 @@ func IsOrdinal(t Type) bool {
 		return false // Other types are not ordinal
 	}
 }
+
+// ── C-interop type helpers ────────────────────────────────────────────────────
+
+// IsCPointer reports whether t is a CPOINTER type (CPOINTER TO anything).
+func IsCPointer(t Type) bool {
+	_, ok := Underlying(t).(*CPointerType)
+	return ok
+}
+
+// IsCPointerToVoid reports whether t is exactly CPOINTER TO VOID (void*).
+func IsCPointerToVoid(t Type) bool {
+	p, ok := Underlying(t).(*CPointerType)
+	return ok && p.Base == VoidType
+}
+
+// IsCPointerToStruct reports whether t is a CPOINTER TO CSTRUCT.
+func IsCPointerToStruct(t Type) bool {
+	p, ok := Underlying(t).(*CPointerType)
+	if !ok {
+		return false
+	}
+	_, isStruct := Underlying(p.Base).(*CStructType)
+	return isStruct
+}
+
+// IsCStruct reports whether t is a CSTRUCT type.
+func IsCStruct(t Type) bool {
+	_, ok := Underlying(t).(*CStructType)
+	return ok
+}
+
+// IsCArray reports whether t is a CARRAY type.
+func IsCArray(t Type) bool {
+	_, ok := Underlying(t).(*CArrayType)
+	return ok
+}
+

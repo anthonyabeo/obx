@@ -720,6 +720,25 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 			return
 		}
 
+		// Case 1: CPOINTER TO (cstruct|void) ↔ CPOINTER TO (cstruct|void)
+		// Allows reinterpret-casts between any two C pointer types.
+		if types.IsCPointer(T) && types.IsCPointer(exprType) {
+			call.SemaType = T
+			return
+		}
+
+		// Case 2: integer ← CPOINTER TO VOID  (pointer→integer address extraction)
+		if types.IsInteger(T) && types.IsCPointerToVoid(exprType) {
+			call.SemaType = T
+			return
+		}
+
+		// Case 3: CPOINTER TO VOID ← integer  (integer→pointer address injection)
+		if types.IsCPointerToVoid(T) && types.IsInteger(exprType) {
+			call.SemaType = T
+			return
+		}
+
 		if !types.IsEnum(T) && !types.IsInteger(T) {
 			t.ctx.Reporter.Report(diag.Diagnostic{
 				Severity: diag.Error,
@@ -740,10 +759,6 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 
 			return
 		}
-
-		// TODO: T, x: cpointer to cstruct or void -> T
-		// TODO: T: integer type, x: cpointer to void -> T
-		// TODO: T: cpointer to void, x: integer type -> T
 	case "chr":
 		if len(call.ActualParams) != 1 {
 			t.ctx.Reporter.Report(diag.Diagnostic{
@@ -3550,30 +3565,47 @@ func (t *TypeChecker) checkExternProcParams(proc *ast.ProcedureDecl) {
 // ── FFI C-type visitors (§12.2) ───────────────────────────────────────────────
 
 func (t *TypeChecker) VisitCStructType(ty *ast.CStructType) any {
+	cstruct := &types.CStructType{Fields: make([]*types.Field, 0)}
 	for _, field := range ty.Fields {
-		field.Accept(t)
+		field.Env = ty.Env
+		f := field.Accept(t).([]*types.Field)
+		cstruct.Fields = append(cstruct.Fields, f...)
 	}
-	return ty
+	return cstruct
 }
 
 func (t *TypeChecker) VisitCUnionType(ty *ast.CUnionType) any {
+	cunion := &types.CUnionType{Fields: make([]*types.Field, 0)}
 	for _, field := range ty.Fields {
-		field.Accept(t)
+		field.Env = ty.Env
+		f := field.Accept(t).([]*types.Field)
+		cunion.Fields = append(cunion.Fields, f...)
 	}
-	return ty
+	return cunion
 }
 
 func (t *TypeChecker) VisitCArrayType(ty *ast.CArrayType) any {
+	elem := ty.ElemType.Accept(t).(types.Type)
+	length := -1 // open CARRAY by default
 	if ty.LenExpr != nil {
 		ty.LenExpr.Accept(t)
+		val := ast.EvalConstExpr(ty.LenExpr)
+		if n, ok := val.(int64); ok && n >= 0 {
+			length = int(n)
+		} else {
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
+				Message:  "CARRAY length must be a constant non-negative integer",
+				Range:    t.ctx.Source.Span(t.ctx.FileName, ty.LenExpr.Pos(), ty.LenExpr.End()),
+			})
+		}
 	}
-	ty.ElemType.Accept(t)
-	return ty
+	return &types.CArrayType{Length: length, Elem: elem}
 }
 
 func (t *TypeChecker) VisitCPointerType(ty *ast.CPointerType) any {
-	ty.Base.Accept(t)
-	return ty
+	base := ty.Base.Accept(t).(types.Type)
+	return &types.CPointerType{Base: base}
 }
 
 func (t *TypeChecker) isAssignable(e ast.Expression) bool {
