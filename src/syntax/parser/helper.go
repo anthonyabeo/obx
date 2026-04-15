@@ -144,6 +144,13 @@ var typeStart = map[token.Kind]bool{
 	token.SHORTINT:   true,
 	token.LONGINT:    true,
 	token.SET:        true,
+	// FFI C-types
+	token.CSTRUCT:  true,
+	token.CUNION:   true,
+	token.CARRAY:   true,
+	token.CPOINTER: true,
+	token.STAR:     true, // *T shorthand for CPOINTER TO T
+	token.VOID:     true,
 }
 
 func (p *Parser) addOp() bool {
@@ -185,6 +192,11 @@ func (p *Parser) startsImportOrDecl() bool {
 
 func (p *Parser) startsDecl() bool {
 	return declStart[p.tok]
+}
+
+func (p *Parser) startsDecl3() bool {
+	return p.tok == token.CONST || p.tok == token.TYPE ||
+		p.tok == token.PROC || p.tok == token.PROCEDURE
 }
 
 func (p *Parser) copyParamsForProcedureType(FP *ast.FormalParams) *ast.FormalParams {

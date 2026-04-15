@@ -337,7 +337,8 @@ func (p *Parser) parseModule() *ast.Module {
 	}
 }
 
-// definition   = DEFINITION ident [';']  [ ImportList ] DeclarationSequence2 END ident ['.']
+// definition   = DEFINITION ident [attributeList] [';']  [ ImportList ] DeclarationSequence2|3 END ident ['.']
+// External library modules (those with an attribute list) use DeclarationSequence3.
 func (p *Parser) parseDefinition() *ast.Definition {
 	p.ctx.Env.PushScope()
 	defer p.ctx.Env.PopScope()
@@ -355,6 +356,15 @@ func (p *Parser) parseDefinition() *ast.Definition {
 
 	p.match(token.DEFINITION)
 	beginName = p.parseIdent()
+
+	// Optional attribute list distinguishes extern library modules (§12.1).
+	var attrs *ast.AttributeList
+	isExtern := false
+	if p.tok == token.LBRACK {
+		attrs = p.parseAttributeList()
+		isExtern = true
+	}
+
 	if p.tok == token.SEMICOLON {
 		p.next()
 	}
@@ -363,8 +373,13 @@ func (p *Parser) parseDefinition() *ast.Definition {
 		importList = p.parseImportList()
 	}
 
-	for p.startsDecl() {
-		declSeq = p.parseDeclarationSeq2()
+	if isExtern {
+		// DeclarationSequence3: only CONST, TYPE, ProcedureHeading (no VAR, no bodies)
+		declSeq = p.parseDeclarationSeq3()
+	} else {
+		for p.startsDecl() {
+			declSeq = p.parseDeclarationSeq2()
+		}
 	}
 
 	// All declarations have been parsed; bind any deferred type-bound methods.
@@ -395,6 +410,8 @@ func (p *Parser) parseDefinition() *ast.Definition {
 		FileName:    p.fileName,
 		ImportList:  importList,
 		DeclSeq:     declSeq,
+		IsExtern:    isExtern,
+		Attrs:       attrs,
 		StartOffset: startOffset,
 		EndOffset:   endOffset,
 	}
@@ -481,6 +498,118 @@ func (p *Parser) parseImport() *ast.Import {
 	}
 
 	return imp
+}
+
+// ── FFI: attribute list ───────────────────────────────────────────────────────
+
+// attributeList = '[' [ attribute { ',' attribute } ] ']'
+// attribute     = ident { ConstExpression }
+func (p *Parser) parseAttributeList() *ast.AttributeList {
+	pos := p.pos
+	al := &ast.AttributeList{StartOffset: pos}
+	p.match(token.LBRACK)
+
+	if p.tok == token.IDENTIFIER {
+		al.Attrs = append(al.Attrs, p.parseAttribute())
+		for p.tok == token.COMMA {
+			p.next()
+			al.Attrs = append(al.Attrs, p.parseAttribute())
+		}
+	}
+
+	al.EndOffset = p.end
+	p.match(token.RBRACK)
+	return al
+}
+
+func (p *Parser) parseAttribute() ast.Attribute {
+	attr := ast.Attribute{StartOffset: p.pos}
+	attr.Name = strings.ToLower(p.parseIdent())
+
+	// Zero or more constant-expression values (typically a single string literal).
+	for p.tok.IsLiteral() {
+		attr.Values = append(attr.Values, p.parseExpression())
+	}
+
+	if len(attr.Values) > 0 {
+		attr.EndOffset = attr.Values[len(attr.Values)-1].End()
+	} else {
+		attr.EndOffset = p.end
+	}
+	return attr
+}
+
+// ── FFI: DeclarationSequence3 (external library modules only) ─────────────────
+//
+//	DeclarationSequence3 = {
+//	    CONST { ConstDeclaration [';'] }
+//	  | TYPE  { TypeDeclaration  [';'] }
+//	  | ProcedureHeading [ attributeList ] [';']
+//	}
+//
+// VAR sections and procedure bodies are not permitted (§12.1).
+func (p *Parser) parseDeclarationSeq3() (seq []ast.Declaration) {
+	for p.startsDecl3() {
+		switch p.tok {
+		case token.CONST:
+			pos := p.pos
+			p.match(token.CONST)
+			for p.tok == token.IDENTIFIER {
+				decl := p.parseConstantDecl()
+				decl.StartOffset = pos
+				seq = append(seq, decl)
+				if p.tok == token.SEMICOLON {
+					p.next()
+				}
+			}
+		case token.TYPE:
+			pos := p.pos
+			p.match(token.TYPE)
+			for p.tok == token.IDENTIFIER {
+				decl := p.parseTypeDecl()
+				decl.StartOffset = pos
+				seq = append(seq, decl)
+				if p.tok == token.SEMICOLON {
+					p.next()
+				}
+			}
+		case token.PROC, token.PROCEDURE:
+			head := p.parseProcHeading()
+			// Optional per-procedure attribute list.
+			if p.tok == token.LBRACK {
+				head.Attrs = p.parseAttributeList()
+			}
+			// Register in the surrounding scope as an extern procedure symbol.
+			procType := &ast.ProcedureType{FP: &ast.FormalParams{}}
+			if head.FP != nil {
+				procType.FP = p.copyParamsForProcedureType(head.FP)
+			}
+			curScope := p.ctx.Env.CurrentScope()
+			sym := ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, curScope, ast.ProperProcedureKind)
+			sym.IsExternal = true
+			if dup := curScope.Insert(sym); dup != nil {
+				p.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
+					Message:  fmt.Sprintf("duplicate extern procedure declaration: '%s'", head.Name.Name),
+					Range:    p.ctx.Source.Span(p.fileName, head.Name.StartOffset, head.Name.EndOffset),
+				})
+			}
+			seq = append(seq, &ast.ProcedureDecl{
+				Kind: ast.ProperProcedureKind,
+				Head: head,
+				Body: nil, // no body — extern declaration
+			})
+			if p.tok == token.SEMICOLON {
+				p.next()
+			}
+		default:
+			pos := p.pos
+			p.errorExpected("declaration")
+			p.advance(declRecover)
+			seq = append(seq, &ast.BadDecl{StartOffset: pos, EndOffset: p.pos})
+		}
+	}
+	return seq
 }
 
 //	DeclarationSequence2 = {
@@ -699,6 +828,10 @@ func (p *Parser) parseType() (ty ast.Type) {
 		token.INT16, token.INT32, token.INT64, token.WCHAR, token.BYTE, token.SHORTINT, token.LONGINT, token.SET:
 		ty = ast.NewBasicType(p.tok, p.pos, p.end)
 		p.next()
+	case token.VOID:
+		// VOID is only valid as a CPOINTER base; emit a BasicType sentinel.
+		ty = ast.NewBasicType(p.tok, p.pos, p.end)
+		p.next()
 	case token.IDENTIFIER:
 		q := p.parseQualifiedIdent()
 		ty = ast.NewNamedType(q, q.StartOffset, q.EndOffset)
@@ -712,6 +845,19 @@ func (p *Parser) parseType() (ty ast.Type) {
 		ty = p.parsePtrType()
 	case token.LPAREN:
 		ty = p.parseEnumType()
+	// ── FFI C-types (§12.2) ──────────────────────────────────────────────
+	case token.CSTRUCT:
+		ty = p.parseCStructType()
+	case token.CUNION:
+		ty = p.parseCUnionType()
+	case token.CARRAY:
+		ty = p.parseCArrayType()
+	case token.CPOINTER:
+		ty = p.parseCPointerType()
+	case token.STAR:
+		// *T  shorthand for  CPOINTER TO T
+		// *[] shorthand for  CPOINTER TO CARRAY OF …  handled inside parseCPointerShorthand
+		ty = p.parseCPointerShorthand()
 	default:
 		pos := p.pos
 		p.errorExpected("type")
@@ -720,6 +866,99 @@ func (p *Parser) parseType() (ty ast.Type) {
 	}
 
 	return
+}
+
+// ── FFI C-type parsers (§12.2) ────────────────────────────────────────────────
+
+// parseCStructType = CSTRUCT FieldList { [';'] FieldList } END
+func (p *Parser) parseCStructType() *ast.CStructType {
+	pos := p.pos
+	p.match(token.CSTRUCT)
+	env := ast.NewRecordScope(nil)
+	fields := p.parseRecordFields()
+	end := p.end
+	p.match(token.END)
+	rec := ast.NewCStructType(fields, env, pos, end)
+	p.addFieldsToEnv2(rec.Fields, rec.Env)
+	return rec
+}
+
+// parseCUnionType = CUNION FieldList { [';'] FieldList } END
+func (p *Parser) parseCUnionType() *ast.CUnionType {
+	pos := p.pos
+	p.match(token.CUNION)
+	env := ast.NewRecordScope(nil)
+	fields := p.parseRecordFields()
+	end := p.end
+	p.match(token.END)
+	rec := ast.NewCUnionType(fields, env, pos, end)
+	p.addFieldsToEnv2(rec.Fields, rec.Env)
+	return rec
+}
+
+// parseCArrayType = CARRAY [ expression ] OF C_Type
+func (p *Parser) parseCArrayType() *ast.CArrayType {
+	pos := p.pos
+	p.match(token.CARRAY)
+	var lenExpr ast.Expression
+	if p.tok != token.OF {
+		lenExpr = p.parseExpression()
+	}
+	p.match(token.OF)
+	elem := p.parseType()
+	return ast.NewCArrayType(lenExpr, elem, pos, elem.End())
+}
+
+// parseCPointerType = CPOINTER TO ( C_Type | VOID )
+func (p *Parser) parseCPointerType() *ast.CPointerType {
+	pos := p.pos
+	p.match(token.CPOINTER)
+	p.match(token.TO)
+	base := p.parseType()
+	return ast.NewCPointerType(base, pos, base.End())
+}
+
+// parseCPointerShorthand handles:
+//   - *T         → CPOINTER TO T
+//   - *[]T       → CPOINTER TO CARRAY OF T  (open array)
+//   - *[n]T      → CPOINTER TO CARRAY n OF T
+func (p *Parser) parseCPointerShorthand() *ast.CPointerType {
+	pos := p.pos
+	p.match(token.STAR) // consume '*'
+
+	var base ast.Type
+	if p.tok == token.LBRACK {
+		// *[n]T or *[]T  →  CPOINTER TO CARRAY [n] OF T
+		arrPos := p.pos
+		p.next() // consume '['
+		var lenExpr ast.Expression
+		if p.tok != token.RBRACK {
+			lenExpr = p.parseExpression()
+		}
+		p.match(token.RBRACK)
+		elem := p.parseType()
+		base = ast.NewCArrayType(lenExpr, elem, arrPos, elem.End())
+	} else {
+		base = p.parseType()
+	}
+	return ast.NewCPointerType(base, pos, base.End())
+}
+
+// addFieldsToEnv2 inserts field symbols into a RecordScope — shared by
+// CStructType and CUnionType which cannot reuse the existing addFieldsToEnv
+// (that method takes *ast.RecordType).
+func (p *Parser) addFieldsToEnv2(fields []*ast.FieldList, env *ast.RecordScope) {
+	for _, field := range fields {
+		for _, id := range field.List {
+			if sym := env.Insert(ast.NewFieldSymbol(id.Name, id.Props, field.Type)); sym != nil {
+				p.ctx.Reporter.Report(diag.Diagnostic{
+					Severity: diag.Error,
+					Message:  "duplicate field declaration " + id.Name,
+					Range:    p.ctx.Source.Span(p.fileName, id.StartOffset, id.EndOffset),
+				})
+			}
+		}
+	}
 }
 
 func (p *Parser) parseEnumType() *ast.EnumType {
