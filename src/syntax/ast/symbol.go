@@ -100,10 +100,6 @@ type ProcedureSymbol struct {
 	kind  SymbolKind
 	props IdentProps
 	// Env is the procedure's own lexical scope (params + locals).
-	// It is distinct from Parent(), which is the enclosing declaration scope.
-	// Sema visitors use ProcedureDecl.Env to restore lexical context; this
-	// field is retained for tooling that needs to navigate from the symbol
-	// directly to its inner scope (e.g. resolving locals inside a procedure).
 	Env         *LexicalScope
 	parent      *LexicalScope
 	astType     Type
@@ -111,6 +107,12 @@ type ProcedureSymbol struct {
 	mangledName string
 	ProcKind    ProcedureKind
 	Displace    int
+
+	// FFI fields — set only for external procedures declared in extern DEFINITIONs.
+	IsExternal bool
+	IsVarArgs  bool
+	CName      string // effective C symbol name (prefix + alias|procname)
+	DLLName    string // library name from the dll attribute
 }
 
 func NewProcedureSymbol(name string, props IdentProps, ty Type, env *LexicalScope, procKind ProcedureKind) *ProcedureSymbol {

@@ -60,6 +60,10 @@ type (
 		Name *Identifier
 		FP   *FormalParams
 
+		// Attrs holds the optional attribute list on extern procedure headings.
+		// Nil for regular (non-FFI) procedure declarations.
+		Attrs *AttributeList
+
 		StartOffset int
 		EndOffset   int
 	}

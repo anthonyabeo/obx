@@ -77,6 +77,10 @@ type Definition struct {
 	ImportList []*Import
 	DeclSeq    []Declaration
 
+	// FFI fields — non-nil / true only for external library modules (§12.1)
+	IsExtern bool
+	Attrs    *AttributeList
+
 	StartOffset int
 	EndOffset   int
 }

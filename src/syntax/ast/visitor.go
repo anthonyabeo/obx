@@ -51,4 +51,10 @@ type Visitor interface {
 	VisitBadDecl(*BadDecl) any
 	VisitBadStmt(*BadStmt) any
 	VisitBadType(*BadType) any
+
+	// FFI / C-interop type visitors
+	VisitCStructType(*CStructType) any
+	VisitCUnionType(*CUnionType) any
+	VisitCArrayType(*CArrayType) any
+	VisitCPointerType(*CPointerType) any
 }

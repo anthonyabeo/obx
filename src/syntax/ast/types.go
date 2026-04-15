@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/syntax/token"
 	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type (
@@ -74,6 +74,46 @@ type (
 	}
 
 	BadType struct {
+		StartOffset int
+		EndOffset   int
+	}
+
+	// ── FFI / C-interop types ──────────────────────────────────────────────
+
+	// CStructType represents a CSTRUCT in an external library module.
+	// Field types are restricted to C_Types.
+	CStructType struct {
+		Fields []*FieldList
+		Env    *RecordScope
+
+		StartOffset int
+		EndOffset   int
+	}
+
+	// CUnionType represents a CUNION in an external library module.
+	CUnionType struct {
+		Fields []*FieldList
+		Env    *RecordScope
+
+		StartOffset int
+		EndOffset   int
+	}
+
+	// CArrayType represents CARRAY [length] OF C_Type.
+	// LenExpr is nil for an open (length-less) CARRAY.
+	CArrayType struct {
+		LenExpr  Expression // nil → open array
+		ElemType Type
+
+		StartOffset int
+		EndOffset   int
+	}
+
+	// CPointerType represents CPOINTER TO T or the shorthand *T.
+	// Base may be a BasicType{Kind: token.VOID} to represent CPOINTER TO VOID.
+	CPointerType struct {
+		Base Type
+
 		StartOffset int
 		EndOffset   int
 	}
@@ -271,3 +311,84 @@ func (b *BadType) End() int               { return b.EndOffset }
 func (b *BadType) Children() []Node       { return []Node{} }
 func (b *BadType) expr()                  {}
 func (b *BadType) Type() types.Type       { panic("not implemented") }
+
+// ── CStructType ───────────────────────────────────────────────────────────────
+
+func NewCStructType(fields []*FieldList, env *RecordScope, pos, end int) *CStructType {
+	return &CStructType{Fields: fields, Env: env, StartOffset: pos, EndOffset: end}
+}
+func (c *CStructType) String() string {
+	return "CSTRUCT"
+}
+func (c *CStructType) Accept(vst Visitor) any { return vst.VisitCStructType(c) }
+func (c *CStructType) typ()                   {}
+func (c *CStructType) Pos() int               { return c.StartOffset }
+func (c *CStructType) End() int               { return c.EndOffset }
+func (c *CStructType) Children() []Node {
+	children := make([]Node, 0, len(c.Fields))
+	for _, f := range c.Fields {
+		children = append(children, f)
+	}
+	return children
+}
+func (c *CStructType) expr()            {}
+func (c *CStructType) Type() types.Type { panic("not implemented") }
+
+// ── CUnionType ────────────────────────────────────────────────────────────────
+
+func NewCUnionType(fields []*FieldList, env *RecordScope, pos, end int) *CUnionType {
+	return &CUnionType{Fields: fields, Env: env, StartOffset: pos, EndOffset: end}
+}
+func (c *CUnionType) String() string         { return "CUNION" }
+func (c *CUnionType) Accept(vst Visitor) any { return vst.VisitCUnionType(c) }
+func (c *CUnionType) typ()                   {}
+func (c *CUnionType) Pos() int               { return c.StartOffset }
+func (c *CUnionType) End() int               { return c.EndOffset }
+func (c *CUnionType) Children() []Node {
+	children := make([]Node, 0, len(c.Fields))
+	for _, f := range c.Fields {
+		children = append(children, f)
+	}
+	return children
+}
+func (c *CUnionType) expr()            {}
+func (c *CUnionType) Type() types.Type { panic("not implemented") }
+
+// ── CArrayType ────────────────────────────────────────────────────────────────
+
+func NewCArrayType(lenExpr Expression, elem Type, pos, end int) *CArrayType {
+	return &CArrayType{LenExpr: lenExpr, ElemType: elem, StartOffset: pos, EndOffset: end}
+}
+func (c *CArrayType) String() string {
+	if c.LenExpr == nil {
+		return "CARRAY OF " + c.ElemType.String()
+	}
+	return "CARRAY " + c.LenExpr.String() + " OF " + c.ElemType.String()
+}
+func (c *CArrayType) Accept(vst Visitor) any { return vst.VisitCArrayType(c) }
+func (c *CArrayType) typ()                   {}
+func (c *CArrayType) Pos() int               { return c.StartOffset }
+func (c *CArrayType) End() int               { return c.EndOffset }
+func (c *CArrayType) Children() []Node {
+	if c.LenExpr != nil {
+		return []Node{c.LenExpr, c.ElemType}
+	}
+	return []Node{c.ElemType}
+}
+func (c *CArrayType) expr()            {}
+func (c *CArrayType) Type() types.Type { panic("not implemented") }
+
+// ── CPointerType ──────────────────────────────────────────────────────────────
+
+func NewCPointerType(base Type, pos, end int) *CPointerType {
+	return &CPointerType{Base: base, StartOffset: pos, EndOffset: end}
+}
+func (c *CPointerType) String() string         { return "*" + c.Base.String() }
+func (c *CPointerType) Accept(vst Visitor) any { return vst.VisitCPointerType(c) }
+func (c *CPointerType) typ()                   {}
+func (c *CPointerType) Pos() int               { return c.StartOffset }
+func (c *CPointerType) End() int               { return c.EndOffset }
+func (c *CPointerType) Children() []Node       { return []Node{c.Base} }
+func (c *CPointerType) expr()                  {}
+func (c *CPointerType) Type() types.Type       { panic("not implemented") }
+
