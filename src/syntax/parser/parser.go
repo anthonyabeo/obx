@@ -574,31 +574,59 @@ func (p *Parser) parseDeclarationSeq3() (seq []ast.Declaration) {
 				}
 			}
 		case token.PROC, token.PROCEDURE:
+			// Push a dedicated scope for this extern procedure so that the
+			// resolver can look up parameter symbols when visiting formal params.
+			moduleScope := p.ctx.Env.CurrentScope()
+			p.ctx.Env.PushScope()
+			procScope := p.ctx.Env.CurrentScope()
+
 			head := p.parseProcHeading()
+			procScope.Name = head.Name.Name
+
+			// All procedures in an extern DEFINITION are implicitly exported.
+			head.Name.Props = ast.Exported
+
+			// Register formal parameter symbols into the proc scope so that
+			// the name-resolver phase can resolve them later.
+			if head.FP != nil {
+				for _, param := range head.FP.Params {
+					for _, id := range param.Names {
+						p.ctx.Env.Define(ast.NewParamSymbol(id.Name, param.Kind, param.Type))
+					}
+				}
+			}
+
 			// Optional per-procedure attribute list.
 			if p.tok == token.LBRACK {
 				head.Attrs = p.parseAttributeList()
 			}
-			// Register in the surrounding scope as an extern procedure symbol.
+
+			// Build the procedure type and register the symbol in the MODULE
+			// scope (parent of the proc scope), not the proc scope itself.
 			procType := &ast.ProcedureType{FP: &ast.FormalParams{}}
 			if head.FP != nil {
 				procType.FP = p.copyParamsForProcedureType(head.FP)
 			}
-			curScope := p.ctx.Env.CurrentScope()
-			sym := ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, curScope, ast.ProperProcedureKind)
+			sym := ast.NewProcedureSymbol(head.Name.Name, head.Name.Props, procType, procScope, ast.ProperProcedureKind)
 			sym.IsExternal = true
-			if dup := curScope.Insert(sym); dup != nil {
+			if dup := moduleScope.Insert(sym); dup != nil {
 				p.ctx.Reporter.Report(diag.Diagnostic{
 					Severity: diag.Error,
 					Message:  fmt.Sprintf("duplicate extern procedure declaration: '%s'", head.Name.Name),
 					Range:    p.ctx.Source.Span(p.fileName, head.Name.StartOffset, head.Name.EndOffset),
 				})
 			}
+
 			seq = append(seq, &ast.ProcedureDecl{
 				Kind: ast.ProperProcedureKind,
 				Head: head,
-				Body: nil, // no body — extern declaration
+				Body: nil,     // no body — extern declaration
+				Env:  procScope, // gives the resolver a valid scope to switch into
 			})
+
+			// Restore the module scope before processing the next declaration.
+			p.ctx.Env.PopScope()
+
 			if p.tok == token.SEMICOLON {
 				p.next()
 			}

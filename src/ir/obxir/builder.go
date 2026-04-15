@@ -41,10 +41,40 @@ func (b *IRBuilder) lowerModule(hirMod *desugar.Module) *Module {
 	functions := make([]*Function, 0)
 	globals := make(map[string]*GlobalVariable)
 	constants := make(map[string]Constant)
+	var externals []ExternDecl
 
 	for _, decl := range hirMod.Decls {
 		switch d := decl.(type) {
 		case *desugar.Function:
+			if d.IsExternal {
+				// Build a body-less stub so call sites in this module can
+				// resolve the callee symbol.
+				stub := NewFunction(d.FnName(), d.IsExport, b.lowerType(d.Result), NewSymbolTable(env))
+				stub.IsExternal = true
+				stub.Variadic = d.IsVarArgs
+				for _, p := range d.Params {
+					param := &Param{
+						Ident:    p.Name,
+						OrigName: p.Name,
+						Typ:      b.lowerType(p.Typ),
+						Kind:     "VALUE",
+					}
+					stub.Params = append(stub.Params, param)
+				}
+				functions = append(functions, stub)
+				env.Define(d.FnName(), stub)
+				if d.Name != d.FnName() {
+					env.Define(d.Name, stub)
+				}
+				// Also register in GlobalEnv so importing modules can resolve
+				// the callee without knowing the DEFINITION module's env.
+				GlobalEnv.Define(d.FnName(), stub)
+				if d.Name != d.FnName() {
+					GlobalEnv.Define(d.Name, stub)
+				}
+				externals = append(externals, ExternDecl{CName: d.FnName(), DLLName: d.DLLName})
+				continue
+			}
 			fn := b.lowerFunction(d, NewSymbolTable(env))
 			functions = append(functions, fn)
 			env.Define(d.Name, fn)
@@ -70,15 +100,19 @@ func (b *IRBuilder) lowerModule(hirMod *desugar.Module) *Module {
 		}
 	}
 
-	functions = append(functions, b.lowerFunction(hirMod.Init, NewSymbolTable(env)))
+	// Extern DEFINITION modules have no initializer body.
+	if hirMod.Init != nil {
+		functions = append(functions, b.lowerFunction(hirMod.Init, NewSymbolTable(env)))
+	}
 
 	return &Module{
-		Name:    hirMod.Name,
-		IsEntry: hirMod.IsEntry,
-		Globals: globals,
-		Consts:  constants,
-		Funcs:   functions,
-		Env:     env,
+		Name:      hirMod.Name,
+		IsEntry:   hirMod.IsEntry,
+		Globals:   globals,
+		Consts:    constants,
+		Funcs:     functions,
+		Env:       env,
+		Externals: externals,
 	}
 }
 

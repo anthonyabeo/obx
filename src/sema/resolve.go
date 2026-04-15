@@ -596,7 +596,12 @@ func (n *NamesResolver) VisitImport(i *ast.Import) any {
 
 func (n *NamesResolver) VisitProcedureDecl(decl *ast.ProcedureDecl) any {
 	tmp := n.ctx.Env.CurrentScope()
-	n.ctx.Env.SetCurrentScope(decl.Env)
+	// Extern procedure declarations (from DEFINITION modules) may have a nil
+	// Env if they were parsed without a dedicated scope.  Guard against this
+	// so the resolver uses the current module scope instead of nil.
+	if decl.Env != nil {
+		n.ctx.Env.SetCurrentScope(decl.Env)
+	}
 
 	savedInsideTB := n.insideTypeBound
 	savedOuterScopes := n.outerProcScopes
