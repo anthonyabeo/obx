@@ -17,15 +17,23 @@ type Program struct {
 
 // ─── Module ───────────────────────────────────────────────────────────────
 
+// ExternDecl records a single foreign function that must be declared in the
+// output assembly as an external symbol (e.g. .extern printf).
+type ExternDecl struct {
+	CName   string // C symbol name (no Oberon mangling)
+	DLLName string // library name from the dll attribute
+}
+
 // Module is the IR representation of one OBX compilation unit.
 type Module struct {
-	Name    string
-	IsEntry bool
-	Globals map[string]*GlobalVariable
-	Consts  map[string]Constant
-	Funcs   []*Function
-	Env     *SymbolTable
-	Asm     *asm.Module
+	Name     string
+	IsEntry  bool
+	Globals  map[string]*GlobalVariable
+	Consts   map[string]Constant
+	Funcs    []*Function
+	Env      *SymbolTable
+	Asm      *asm.Module
+	Externals []ExternDecl // foreign symbols referenced by this module
 }
 
 // ─── Function ─────────────────────────────────────────────────────────────
@@ -37,6 +45,7 @@ type Function struct {
 	Exported  bool
 	Variadic  bool
 	IsBuiltin bool
+	IsExternal bool // true for foreign functions declared in extern DEFINITIONs
 	Params    []Value
 	Locals    []Value
 	IsLeaf    bool

@@ -401,6 +401,11 @@ func (a ARM64AppleMacos) AssignParams(paramCount int) []target.Location {
 func (a ARM64AppleMacos) Emit(module *asm.Module) string {
 	var buf strings.Builder
 
+	// Emit .extern declarations for all foreign symbols (§12.4).
+	for _, ext := range module.Externals {
+		buf.WriteString(fmt.Sprintf("\t.extern _%s\n", ext.CName))
+	}
+
 	buf.WriteString("\t.section __DATA,__bss\n")
 	for _, global := range module.Globals {
 		buf.WriteString(a.formatGlobal(global))

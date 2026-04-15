@@ -39,8 +39,19 @@ func Compile(module *obxir2.Module, mach target.Machine, targetDescPath string, 
 			Ty:   obxir2.ToAsmType(global.Typ)}
 	}
 
-	// Instruction Selection
+	// Propagate extern declarations from the IR module to the asm module.
+	for _, ext := range module.Externals {
+		asmModule.Externals = append(asmModule.Externals, asm.ExternDecl{
+			CName:   ext.CName,
+			DLLName: ext.DLLName,
+		})
+	}
+
+	// Instruction Selection — skip extern (body-less) functions.
 	for _, fn := range module.Funcs {
+		if fn.IsExternal {
+			continue
+		}
 		iSel(fn, selector, mach)
 		asmModule.Funcs = append(asmModule.Funcs, fn.Asm)
 		mach.Legalize(fn.Asm)

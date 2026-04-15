@@ -154,6 +154,9 @@ precedence over obx.mod values.`,
 
 		// ── 7. Emit assembly ──────────────────────────────────────────────
 		outDir := filepath.Join(projectDir, "out")
+		seenDLL := make(map[string]bool)
+		var linkLibs []string
+
 		for _, module := range MIRProgram.Modules {
 			asmPath := filepath.Join(outDir, module.Name+".s")
 			asmFile, err := os.Create(asmPath)
@@ -175,6 +178,28 @@ precedence over obx.mod values.`,
 
 			if _, err := asmFile.WriteString(ss + "\n\n"); err != nil {
 				log.Printf("failed to write assembly: %v", err)
+			}
+
+			// Collect unique dll names for linker flags.
+			for _, ext := range module.Externals {
+				if ext.DLLName != "" && !seenDLL[ext.DLLName] {
+					seenDLL[ext.DLLName] = true
+					linkLibs = append(linkLibs, ext.DLLName)
+				}
+			}
+		}
+
+		// Write out/link.flags so the downstream linker invocation can read it.
+		if len(linkLibs) > 0 {
+			var flags []string
+			for _, lib := range linkLibs {
+				flags = append(flags, "-l"+lib)
+			}
+			flagsPath := filepath.Join(outDir, "link.flags")
+			if err := os.WriteFile(flagsPath, []byte(strings.Join(flags, "\n")+"\n"), 0644); err != nil {
+				log.Printf("failed to write link.flags: %v", err)
+			} else {
+				fmt.Printf("Linker flags written to %s\n", flagsPath)
 			}
 		}
 	},

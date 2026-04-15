@@ -380,6 +380,11 @@ func (r RV64IMAFD) EmitPrologueEpilogue(fn *asm.Function, layout target.FrameLay
 func (r RV64IMAFD) Emit(module *asm.Module) string {
 	var buf strings.Builder
 
+	// Emit .extern declarations for all foreign symbols (§12.4).
+	for _, ext := range module.Externals {
+		buf.WriteString(fmt.Sprintf("\t.extern %s\n", ext.CName))
+	}
+
 	buf.WriteString("\t.section .bss\n")
 	for _, global := range module.Globals {
 		buf.WriteString(r.formatGlobal(global))

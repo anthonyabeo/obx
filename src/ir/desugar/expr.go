@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
-	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 type ParamKind int
@@ -84,6 +84,9 @@ type (
 		Module     string // name of the module in which it declared/used
 		IsExported bool
 		IsReadOnly bool
+		// FFI fields
+		IsExternal bool
+		IsVarArgs  bool
 	}
 
 	TypeRef struct {

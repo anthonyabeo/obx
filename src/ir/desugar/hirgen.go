@@ -3,9 +3,9 @@ package desugar
 import (
 	"fmt"
 
+	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
-	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
 type Generator struct {
@@ -48,12 +48,41 @@ func (g Generator) VisitMetaSection(section *ast.MetaSection) any { return secti
 
 func (g Generator) VisitDefinition(definition *ast.Definition) any {
 	name := definition.BName
-	decls := g.visitDeclSeq(definition.DeclSeq)
 
-	return &Module{
-		Name:  name,
-		Decls: decls,
+	if definition.IsExtern {
+		// External library module: emit one extern Function per procedure heading.
+		var decls []Decl
+		for _, d := range definition.DeclSeq {
+			proc, ok := d.(*ast.ProcedureDecl)
+			if !ok {
+				continue
+			}
+			sym, _ := proc.Head.Name.Symbol.(*ast.ProcedureSymbol)
+			if sym == nil {
+				continue
+			}
+			var params []*Param
+			if proc.Head.FP != nil {
+				fps := proc.Head.FP.Accept(g)
+				if fps != nil {
+					params = fps.([]*Param)
+				}
+			}
+			decls = append(decls, &Function{
+				Name:       proc.Head.Name.Name,
+				Mangled:    sym.CName,
+				Params:     params,
+				IsExport:   true,
+				IsExternal: true,
+				DLLName:    sym.DLLName,
+				IsVarArgs:  sym.IsVarArgs,
+			})
+		}
+		return &Module{Name: name, Decls: decls}
 	}
+
+	decls := g.visitDeclSeq(definition.DeclSeq)
+	return &Module{Name: name, Decls: decls}
 }
 
 func (g Generator) VisitIdentifier(def *ast.Identifier) any { return def }
@@ -107,6 +136,16 @@ func (g Generator) VisitFunctionCall(call *ast.FunctionCall) any {
 	}
 }
 
+func (g Generator) VisitProcedureCall(call *ast.ProcedureCall) any {
+	callee := call.Callee.Accept(g).(*FunctionRef)
+
+	return &FuncCall{
+		Func:    callee,
+		Args:    g.visitExprList(call.ActualParams),
+		RetType: call.SemaType,
+	}
+}
+
 func (g Generator) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 	return &UnaryExpr{
 		Op:       expr.Op,
@@ -142,15 +181,20 @@ func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 		}
 	case ast.ProcedureSymbolKind:
 		sym := ident.Symbol.(*ast.ProcedureSymbol)
-
+		mangled := sym.MangledName()
+		if sym.IsExternal && sym.CName != "" {
+			mangled = sym.CName
+		}
 		return &FunctionRef{
 			Name:       ident.Name,
-			Mangled:    sym.MangledName(),
+			Mangled:    mangled,
 			Kind:       sym.ProcKind,
 			Module:     ident.Prefix,
 			SemaType:   ident.SemaType,
 			IsExported: sym.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
 			IsReadOnly: sym.Props() == ast.ReadOnly,
+			IsExternal: sym.IsExternal,
+			IsVarArgs:  sym.IsVarArgs,
 		}
 	//case ast.TypeSymbolKind:
 	//case ast.ModuleSymbolKind:
@@ -244,16 +288,6 @@ func (g Generator) VisitReturnStmt(stmt *ast.ReturnStmt) any {
 		result = stmt.Value.Accept(g).(Expr)
 	}
 	return &ReturnStmt{Result: result}
-}
-
-func (g Generator) VisitProcedureCall(call *ast.ProcedureCall) any {
-	callee := call.Callee.Accept(g).(*FunctionRef)
-
-	return &FuncCall{
-		Func:    callee,
-		Args:    g.visitExprList(call.ActualParams),
-		RetType: call.SemaType,
-	}
 }
 
 func (g Generator) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
@@ -613,3 +647,10 @@ func (g Generator) VisitBadDecl(decl *ast.BadDecl) any { return decl }
 func (g Generator) VisitBadStmt(stmt *ast.BadStmt) any { return stmt }
 
 func (g Generator) VisitBadType(ty *ast.BadType) any { return ty }
+
+// ── FFI C-type visitors ───────────────────────────────────────────────────────
+
+func (g Generator) VisitCStructType(ty *ast.CStructType) any   { return ty }
+func (g Generator) VisitCUnionType(ty *ast.CUnionType) any     { return ty }
+func (g Generator) VisitCArrayType(ty *ast.CArrayType) any     { return ty }
+func (g Generator) VisitCPointerType(ty *ast.CPointerType) any { return ty }

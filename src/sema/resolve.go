@@ -912,3 +912,35 @@ func (n *NamesResolver) VisitBadDecl(decl *ast.BadDecl) any { return decl }
 func (n *NamesResolver) VisitBadStmt(stmt *ast.BadStmt) any { return stmt }
 
 func (n *NamesResolver) VisitBadType(ty *ast.BadType) any { return ty }
+
+// ── FFI C-type visitors ───────────────────────────────────────────────────────
+
+func (n *NamesResolver) VisitCStructType(ty *ast.CStructType) any {
+	for _, field := range ty.Fields {
+		field.Env = ty.Env
+		field.Accept(n)
+	}
+	return ty
+}
+
+func (n *NamesResolver) VisitCUnionType(ty *ast.CUnionType) any {
+	for _, field := range ty.Fields {
+		field.Env = ty.Env
+		field.Accept(n)
+	}
+	return ty
+}
+
+func (n *NamesResolver) VisitCArrayType(ty *ast.CArrayType) any {
+	if ty.LenExpr != nil {
+		ty.LenExpr.Accept(n)
+	}
+	ty.ElemType.Accept(n)
+	return ty
+}
+
+func (n *NamesResolver) VisitCPointerType(ty *ast.CPointerType) any {
+	ty.Base.Accept(n)
+	return ty
+}
+

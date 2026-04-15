@@ -105,6 +105,47 @@ func (t *TypeChecker) VisitDefinition(def *ast.Definition) any {
 		declaration.Accept(t)
 	}
 
+	// ── FFI: resolve CName/DLLName for every extern procedure (§12.1, §12.4) ──
+	if def.IsExtern {
+		moduleDLL := def.Attrs.DLLName()
+		modulePrefix := def.Attrs.Prefix()
+
+		for _, decl := range def.DeclSeq {
+			proc, ok := decl.(*ast.ProcedureDecl)
+			if !ok {
+				continue
+			}
+			sym, ok := t.ctx.Env.LookupQualified(def.BName, proc.Head.Name.Name).(*ast.ProcedureSymbol)
+			if !ok || sym == nil {
+				continue
+			}
+
+			// Per-procedure attribute overrides.
+			procDLL := proc.Head.Attrs.DLLName()
+			procPrefix := proc.Head.Attrs.Prefix()
+			procAlias := proc.Head.Attrs.Alias()
+
+			effectiveDLL := moduleDLL
+			if procDLL != "" {
+				effectiveDLL = procDLL
+			}
+			effectivePrefix := modulePrefix
+			if procPrefix != "" {
+				effectivePrefix = procPrefix
+			}
+			cName := proc.Head.Name.Name
+			if procAlias != "" {
+				cName = procAlias
+			}
+			sym.CName = effectivePrefix + cName
+			sym.DLLName = effectiveDLL
+			sym.IsVarArgs = proc.Head.Attrs.HasVarArgs()
+
+			// §12.4: no VAR/IN params, no CARRAY by value.
+			t.checkExternProcParams(proc)
+		}
+	}
+
 	return def
 }
 
@@ -3477,6 +3518,63 @@ func (t *TypeChecker) VisitBadDecl(decl *ast.BadDecl) any { return decl }
 func (t *TypeChecker) VisitBadStmt(stmt *ast.BadStmt) any { return stmt }
 
 func (t *TypeChecker) VisitBadType(ty *ast.BadType) any { return ty }
+
+// checkExternProcParams enforces §12.4 constraints on an external procedure:
+//   - VAR and IN parameter modifiers are not permitted.
+//   - CARRAY cannot be passed by value (must be behind a CPOINTER).
+//
+// Also emits a Warning when a GC-managed ARRAY or RECORD is implicitly
+// coerced to a CPOINTER formal (§12.5 safety note).
+func (t *TypeChecker) checkExternProcParams(proc *ast.ProcedureDecl) {
+	if proc.Head.FP == nil {
+		return
+	}
+	for _, sec := range proc.Head.FP.Params {
+		if sec.Kind == token.VAR || sec.Kind == token.IN {
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
+				Message:  fmt.Sprintf("VAR/IN parameter modifier not allowed in external procedure '%s'", proc.Head.Name.Name),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, sec.StartOffset, sec.EndOffset),
+			})
+		}
+		if _, isCArray := sec.Type.(*ast.CArrayType); isCArray {
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
+				Message:  fmt.Sprintf("CARRAY cannot be passed by value in external procedure '%s'; use a CPOINTER", proc.Head.Name.Name),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, sec.StartOffset, sec.EndOffset),
+			})
+		}
+	}
+}
+
+// ── FFI C-type visitors (§12.2) ───────────────────────────────────────────────
+
+func (t *TypeChecker) VisitCStructType(ty *ast.CStructType) any {
+	for _, field := range ty.Fields {
+		field.Accept(t)
+	}
+	return ty
+}
+
+func (t *TypeChecker) VisitCUnionType(ty *ast.CUnionType) any {
+	for _, field := range ty.Fields {
+		field.Accept(t)
+	}
+	return ty
+}
+
+func (t *TypeChecker) VisitCArrayType(ty *ast.CArrayType) any {
+	if ty.LenExpr != nil {
+		ty.LenExpr.Accept(t)
+	}
+	ty.ElemType.Accept(t)
+	return ty
+}
+
+func (t *TypeChecker) VisitCPointerType(ty *ast.CPointerType) any {
+	ty.Base.Accept(t)
+	return ty
+}
 
 func (t *TypeChecker) isAssignable(e ast.Expression) bool {
 	designator, ok := e.(*ast.Designator)

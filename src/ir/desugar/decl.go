@@ -44,6 +44,10 @@ type (
 		IsExport    bool
 		IsReadOnly  bool
 		IsTypeBound bool
+		// FFI fields
+		IsExternal bool
+		IsVarArgs  bool
+		DLLName    string
 	}
 )
 

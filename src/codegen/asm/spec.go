@@ -11,9 +11,17 @@ import (
 )
 
 type Module struct {
-	Name    string
-	Funcs   []*Function
-	Globals map[string]*Symbol
+	Name      string
+	Funcs     []*Function
+	Globals   map[string]*Symbol
+	Externals []ExternDecl // foreign symbols to be declared with .extern
+}
+
+// ExternDecl is a C symbol that must appear as an external reference in the
+// emitted assembly.
+type ExternDecl struct {
+	CName   string
+	DLLName string
 }
 
 type Constant struct {
