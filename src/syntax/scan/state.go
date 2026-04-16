@@ -11,26 +11,21 @@ import (
 type StateFn func(*Scanner) StateFn
 
 func scanIdentifier(s *Scanner) StateFn {
-	// The first character must be a letter or '_'
-	r := s.peek()
-	if !s.isLetter(r) && !s.isDecDigit(r) && r != '_' {
-		return s.errorf("invalid identifier: must start with letter or '_'")
+	// Consume letters, digits, or underscores
+	for r := s.peek(); s.isLetter(r) || s.isDecDigit(r) || r == '_'; r = s.peek() {
+		s.next()
 	}
 
-	// Consume the rest: letters, digits, or underscores
-	for {
-		r = s.peek()
-		if s.isLetter(r) || s.isDecDigit(r) || r == '_' {
-			s.next()
-		} else {
-			break
-		}
+	raw := string(s.content[s.start:s.pos])
+	lexeme := strings.ToLower(raw)
+	kind := token.IDENTIFIER
+	// A keyword must be written entirely in lowercase or entirely in uppercase.
+	// Mixed-case words (e.g. "Real", "LongInt") are plain identifiers.
+	if raw == lexeme || raw == strings.ToUpper(raw) {
+		kind = token.Lookup(lexeme)
 	}
 
-	lexeme := strings.ToLower(string(s.content[s.start:s.pos]))
-	kind := token.Lookup(lexeme)
-
-	s.emit(kind, s.start, s.pos)
+	s.emitWithValue(kind, raw, s.start, s.pos)
 
 	return scanText
 }
