@@ -39,7 +39,7 @@ begin
   S.snprintf(system.adr(buf), len(buf), system.adr("%d"), n)
 end Int
 
-// LongInt writes the decimal representation of n (LONGINT) into buf.
+// Int64 writes the decimal representation of n (LONGINT) into buf.
 proc LongInt*(var buf: array of char; n: longint)
 begin
   S.snprintf(system.adr(buf), len(buf), system.adr("%ld"), n)
@@ -63,13 +63,13 @@ begin
   S.snprintf(system.adr(buf), len(buf), system.adr("%*d"), width, n)
 end IntPadded
 
-// Real writes x with the given number of decimal places into buf.
+// FloatFmt writes x (REAL) with the given number of decimal places into buf.
 proc Real*(var buf: array of char; x: real; decimals: integer)
 begin
-  S.snprintf(system.adr(buf), len(buf), system.adr("%.*f"), decimals, longreal(x))
+  S.snprintf(system.adr(buf), len(buf), system.adr("%.*f"), decimals, long(x))
 end Real
 
-// LongReal writes x (LONGREAL) with the given decimal places into buf.
+// DoubleFmt writes x (LONGREAL) with the given decimal places into buf.
 proc LongReal*(var buf: array of char; x: longreal; decimals: integer)
 begin
   S.snprintf(system.adr(buf), len(buf), system.adr("%.*f"), decimals, x)
@@ -92,7 +92,7 @@ begin
   end
 end Str
 
-// Char writes a single character c into buf as a one-character string.
+// WriteChar writes a single character c into buf as a one-character string.
 proc Char*(var buf: array of char; c: char)
 begin
   S.snprintf(system.adr(buf), len(buf), system.adr("%c"), ord(c))

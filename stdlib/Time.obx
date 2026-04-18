@@ -107,7 +107,7 @@ const ClocksPerSec* = 1000000  // POSIX: 1 000 000; Windows: 1 000
 // Elapsed returns the elapsed seconds between two Clock() snapshots.
 proc Elapsed*(start: longint; stop: longint): longreal
 begin
-  return longreal(stop - start) / longreal(ClocksPerSec)
+  return flt(stop - start) / flt(ClocksPerSec)
 end Elapsed
 
 // ── Formatting ────────────────────────────────────────────────────────────────

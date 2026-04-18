@@ -9,7 +9,7 @@ PROCEDURE realloc*(ptr: CPOINTER TO VOID; size: INTEGER): CPOINTER TO VOID;
 PROCEDURE free*(ptr: CPOINTER TO VOID);
 
 // ── Process control ───────────────────────────────────────────────────────────
-PROCEDURE exit*(status: INTEGER) [alias "exit"];
+PROCEDURE Halt*(status: INTEGER) [alias "exit"];
 PROCEDURE abort*();
 PROCEDURE system*(cmd: INTEGER): INTEGER;
 

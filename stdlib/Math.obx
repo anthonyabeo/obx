@@ -64,7 +64,7 @@ proc Trunc*(x: longreal): longreal begin return M.trunc(x) end Trunc
 // ── Absolute value ────────────────────────────────────────────────────────────
 proc Abs*(x: longreal): longreal begin return M.fabs(x) end Abs
 
-// ── Remainder ─────────────────────────────────────────────────────────────────
+// ── Mod ───────────────────────────────────────────────────────────────────────
 proc Mod*(x: longreal; y: longreal): longreal begin return M.fmod(x, y) end Mod
 
 // ── Classification ────────────────────────────────────────────────────────────

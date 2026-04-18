@@ -146,7 +146,7 @@ end Main
 func TestParseExpressions(t *testing.T) {
 	input := []byte(`
 module Main
-	type Tree = Record end
+	type Tree = record end
 	type CenterTree = record
 		x,y: integer 
 	end
