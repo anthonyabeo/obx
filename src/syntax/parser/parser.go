@@ -284,7 +284,10 @@ func (p *Parser) parseModule() *ast.Module {
 	for p.startsImportOrDecl() {
 		switch p.tok {
 		case token.IMPORT:
-			importList = p.parseImportList()
+			// Use append so that multiple IMPORT blocks (e.g. produced by
+			// <* IF *> directives that emit separate IMPORT keywords) are all
+			// accumulated rather than the last one overwriting the earlier ones.
+			importList = append(importList, p.parseImportList()...)
 		case token.VAR, token.TYPE, token.CONST, token.PROC, token.PROCEDURE:
 			declSeq = p.parseDeclarationSeq()
 		default:
@@ -573,6 +576,19 @@ func (p *Parser) parseDeclarationSeq3() (seq []ast.Declaration) {
 					p.next()
 				}
 			}
+		case token.VAR:
+			// Extern DEFINITION modules may export C global variables (e.g. stdin/stdout).
+			// Parse them exactly like a normal VAR section; code-gen skips extern vars.
+			pos := p.pos
+			p.match(token.VAR)
+			for p.tok == token.IDENTIFIER {
+				decl := p.parseVariableDecl()
+				decl.StartOffset = pos
+				seq = append(seq, decl)
+				if p.tok == token.SEMICOLON {
+					p.next()
+				}
+			}
 		case token.PROC, token.PROCEDURE:
 			// Push a dedicated scope for this extern procedure so that the
 			// resolver can look up parameter symbols when visiting formal params.
@@ -620,7 +636,7 @@ func (p *Parser) parseDeclarationSeq3() (seq []ast.Declaration) {
 			seq = append(seq, &ast.ProcedureDecl{
 				Kind: ast.ProperProcedureKind,
 				Head: head,
-				Body: nil,     // no body — extern declaration
+				Body: nil,       // no body — extern declaration
 				Env:  procScope, // gives the resolver a valid scope to switch into
 			})
 

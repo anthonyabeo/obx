@@ -195,7 +195,7 @@ func (p *Parser) startsDecl() bool {
 }
 
 func (p *Parser) startsDecl3() bool {
-	return p.tok == token.CONST || p.tok == token.TYPE ||
+	return p.tok == token.CONST || p.tok == token.TYPE || p.tok == token.VAR ||
 		p.tok == token.PROC || p.tok == token.PROCEDURE
 }
 
