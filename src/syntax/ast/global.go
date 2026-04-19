@@ -4,6 +4,10 @@ import "github.com/anthonyabeo/obx/src/sema/types"
 
 var Global *LexicalScope
 
+// SystemScope is the lexical scope for the built-in "system" pseudo-module.
+// It provides low-level SYSTEM.ADR and SYSTEM.COPY operations.
+var SystemScope *LexicalScope
+
 // A PreDeclFuncProc is the id of a predeclared function or procedure.
 type (
 	PreDeclFunc int
@@ -159,10 +163,33 @@ func defPredeclaredTypes() {
 	Global.Insert(ANYREC)
 }
 
+func defSystemModule() {
+	SystemScope = NewLexicalScope(nil, "system")
+
+	// system.adr(x): returns the machine address of any variable as INTEGER.
+	// Accepts one argument of any type (IsVarArgs covers extra/any args).
+	adrSym := NewProcedureSymbol("adr", Exported, nil, SystemScope, FunctionProcedureKind)
+	adrSym.IsVarArgs = true
+	adrSym.IsExternal = true
+	adrSym.SetType(types.NewProcedureType(nil, types.IntegerType))
+	SystemScope.Insert(adrSym)
+
+	// system.copy(src, dst, n): copies n bytes from src to dst (all INTEGER addresses).
+	copySym := NewProcedureSymbol("copy", Exported, nil, SystemScope, ProperProcedureKind)
+	copySym.IsVarArgs = true
+	copySym.IsExternal = true
+	copySym.SetType(types.NewProcedureType(nil, nil))
+	SystemScope.Insert(copySym)
+
+	// Register system as a visible module symbol in the global scope.
+	Global.Insert(NewImportSymbol("system"))
+}
+
 func init() {
 	Global = NewLexicalScope(nil, "global")
 
 	defPredeclaredTypes()
 	defPredeclaredFunctions()
 	defPredeclaredProcedures()
+	defSystemModule()
 }

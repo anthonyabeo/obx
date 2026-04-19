@@ -13,8 +13,8 @@ func NewOberonX() *OberonX {
 	return &OberonX{Units: make([]CompilationUnit, 0)}
 }
 
-func (obx *OberonX) AddUnit(node CompilationUnit) {
-	obx.Units = append(obx.Units, node)
+func (obx *OberonX) AddUnit(node ...CompilationUnit) {
+	obx.Units = append(obx.Units, node...)
 }
 
 func (obx *OberonX) Lookup(name string) (CompilationUnit, bool) {

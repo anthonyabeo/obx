@@ -1,10 +1,14 @@
 package ast
 
 func NewEnv() *Environment {
-	return &Environment{
+	env := &Environment{
 		scope:   Global,
 		modules: make(map[string]*LexicalScope),
 	}
+	// Pre-register the built-in "system" pseudo-module so that
+	// system.adr(x) and system.copy(src,dst,n) are always resolvable.
+	env.modules["system"] = SystemScope
+	return env
 }
 
 type Environment struct {
