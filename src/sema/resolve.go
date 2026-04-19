@@ -589,7 +589,31 @@ func (n *NamesResolver) VisitImport(i *ast.Import) any {
 		return i
 	}
 
-	sym.(*ast.ModuleSymbol).Env = n.ctx.Env.ModuleScope(name)
+	// Resolve the module scope. The module scope is registered under its declared
+	// name (the last element of ImportPath). When an alias or dotted path is used
+	// (e.g. "import S := posix.Stdio"), we try the actual module name and then
+	// register the lookup key so that LookupQualified(alias, symbol) works later.
+	// NOTE: We always overwrite the alias mapping to handle the case where
+	// multiple modules use the same alias for different imports (e.g. both IO and
+	// Mem use alias "S" for different posix modules).
+	scope := n.ctx.Env.ModuleScope(name)
+	actualName := name
+	if len(i.ImportPath) > 0 {
+		actualName = i.ImportPath[len(i.ImportPath)-1]
+	}
+	// Try to resolve the scope from the actual module name.
+	actualScope := n.ctx.Env.ModuleScope(actualName)
+	if actualScope != nil && actualScope != scope {
+		// The alias points to a different module than what's currently registered.
+		// Overwrite so this module's body uses the correct scope.
+		scope = actualScope
+		n.ctx.Env.AddModuleScope(name, scope)
+	} else if scope == nil && actualScope != nil {
+		scope = actualScope
+		n.ctx.Env.AddModuleScope(name, scope)
+	}
+
+	sym.(*ast.ModuleSymbol).Env = scope
 
 	return i
 }

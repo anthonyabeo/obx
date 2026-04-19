@@ -47,5 +47,12 @@ func (r *BufferedReporter) Flush() {
 	r.errorCount = 0
 }
 
-func (r *BufferedReporter) ErrorCount() int  { return r.errorCount }
+func (r *BufferedReporter) ErrorCount() int    { return r.errorCount }
 func (r *BufferedReporter) LimitReached() bool { return r.MaxErrors > 0 && r.errorCount >= r.MaxErrors }
+
+// Reset clears all accumulated diagnostics and resets the error counter.
+// Useful when preloading stdlib so its errors don't appear in user output.
+func (r *BufferedReporter) Reset() {
+	r.diagnostics = nil
+	r.errorCount = 0
+}

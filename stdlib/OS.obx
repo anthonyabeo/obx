@@ -27,7 +27,7 @@ begin
 <* IF WINDOWS THEN *>
   W.ExitProcess(code)
 <* ELSE *>
-  Lib.exit(code)
+  Lib.Halt(code)
 <* END *>
 end Exit
 

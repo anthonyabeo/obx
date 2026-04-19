@@ -176,6 +176,11 @@ func (t *TypeChecker) VisitBinaryExpr(expr *ast.BinaryExpr) any {
 	ty := expr.Right.Type()
 	op := expr.Op
 
+	if tx == nil || ty == nil {
+		expr.SemaType = types.UnknownType
+		return expr
+	}
+
 	ok, typ := types.ExpressionCompatible(op, tx, ty)
 	if !ok {
 		t.ctx.Reporter.Report(diag.Diagnostic{
@@ -252,6 +257,7 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 			}
 		case *ast.DotOp:
 			var rec *types.RecordType
+			var cstruct *types.CStructType
 
 			under := types.Underlying(typ)
 			switch u := under.(type) {
@@ -270,6 +276,20 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				}
 
 				rec = base
+			case *types.CPointerType:
+				// CPOINTER TO CSTRUCT: allow field access like C pointer dereferencing.
+				base, ok := types.Underlying(u.Base).(*types.CStructType)
+				if !ok {
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
+						Message:  fmt.Sprintf("cannot select field '%v' of CPOINTER to non-CSTRUCT type '%v'", s.Field, dsg.QIdent),
+						Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
+					})
+					return dsg
+				}
+				cstruct = base
+			case *types.CStructType:
+				cstruct = u
 			default:
 				t.ctx.Reporter.Report(diag.Diagnostic{
 					Severity: diag.Error,
@@ -280,23 +300,39 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				return dsg
 			}
 
-			field := rec.GetField(s.Field)
-			if field != nil {
+			if cstruct != nil {
+				field := cstruct.GetField(s.Field)
+				if field == nil {
+					t.ctx.Reporter.Report(diag.Diagnostic{
+						Severity: diag.Error,
+						Message:  fmt.Sprintf("field '%v' is not defined in CSTRUCT", s.Field),
+						Range:    t.ctx.Source.Span(t.ctx.FileName, dsg.QIdent.StartOffset, s.EndOffset),
+					})
+					return dsg
+				}
 				typ = field.Type
 				if s.Symbol != nil {
 					s.Symbol.SetType(field.Type)
 				}
 			} else {
-				// Not a regular field – check if it's a type-bound method.
-				// GetMethod searches the record and its base chain so that
-				// inherited methods (and super-calls via ^) are resolved.
-				method := rec.GetMethod(s.Field)
-				if method != nil {
-					typ = method.Type
-					// Don't return early; subsequent selectors (e.g. ^ for a
-					// super-call) still need to be processed.
+				field := rec.GetField(s.Field)
+				if field != nil {
+					typ = field.Type
+					if s.Symbol != nil {
+						s.Symbol.SetType(field.Type)
+					}
 				} else {
-					return dsg
+					// Not a regular field – check if it's a type-bound method.
+					// GetMethod searches the record and its base chain so that
+					// inherited methods (and super-calls via ^) are resolved.
+					method := rec.GetMethod(s.Field)
+					if method != nil {
+						typ = method.Type
+						// Don't return early; subsequent selectors (e.g. ^ for a
+						// super-call) still need to be processed.
+					} else {
+						return dsg
+					}
 				}
 			}
 		case *ast.PtrDeref:
@@ -842,19 +878,21 @@ func (t *TypeChecker) checkPredeclaredFunction(call *ast.FunctionCall, pre *ast.
 		call.ActualParams[0].Accept(t)
 		argType := call.ActualParams[0].Type()
 
-		if argType != types.Int32Type && argType != types.Int64Type {
+		if !types.IsInteger(argType) {
 			t.ctx.Reporter.Report(diag.Diagnostic{
 				Severity: diag.Error,
-				Message: fmt.Sprintf("predeclared procedure '%s' expects an INT32 or INT64 argument, got %s",
+				Message: fmt.Sprintf("predeclared procedure '%s' expects an integer argument, got %s",
 					pre.Name(), argType),
 				Range: t.ctx.Source.Span(t.ctx.FileName, call.ActualParams[0].Pos(), call.ActualParams[0].End()),
 			})
 			return
 		}
 
-		call.SemaType = types.RealType
-		if argType == types.Int64Type {
+		// 64-bit integers produce LONGREAL; smaller integers produce REAL.
+		if argType == types.Int64Type || argType == types.LongIntType {
 			call.SemaType = types.LongRealType
+		} else {
+			call.SemaType = types.RealType
 		}
 	case "ldcmd":
 		if len(call.ActualParams) != 2 {
@@ -2277,7 +2315,11 @@ func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
 		return call
 	}
 
-	if len(call.ActualParams) != len(procType.Params) {
+	// Check whether this is a varargs procedure (e.g. printf, system.adr).
+	calleeSym, _ := call.Callee.Symbol.(*ast.ProcedureSymbol)
+	isVarArgs := calleeSym != nil && calleeSym.IsVarArgs
+
+	if !isVarArgs && len(call.ActualParams) != len(procType.Params) {
 		t.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
 			Message: fmt.Sprintf("wrong number of arguments for '%v'. expected %d arguments, got %d",
@@ -2287,11 +2329,30 @@ func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
 		return call
 	}
 
-	for i, arg := range call.ActualParams {
+	// For varargs calls: visit extra args (beyond the declared params) for
+	// type-checking side-effects but skip formal-parameter compatibility checks.
+	nCheck := len(procType.Params)
+	if isVarArgs {
+		if len(call.ActualParams) < nCheck {
+			nCheck = len(call.ActualParams)
+		}
+		for _, arg := range call.ActualParams[nCheck:] {
+			arg.Accept(t)
+		}
+	}
+
+	for i := 0; i < nCheck; i++ {
+		arg := call.ActualParams[i]
 		arg.Accept(t)
 
 		formal := procType.Params[i]
 		actual := arg.Type()
+
+		// If the argument type is nil the resolver already reported an error;
+		// skip secondary diagnostics to avoid a nil-pointer panic.
+		if actual == nil || types.IsUnknownType(actual) {
+			continue
+		}
 
 		// For VAR parameters the actual argument must be a writable variable;
 		// in particular, a module-level variable exported read-only (v-) may not
@@ -2330,7 +2391,7 @@ func (t *TypeChecker) VisitFunctionCall(call *ast.FunctionCall) any {
 			}
 		}
 
-		if !types.ParameterCompatible(actual, formal) {
+		if formal.Type != nil && !types.ParameterCompatible(actual, formal) {
 			t.ctx.Reporter.Report(diag.Diagnostic{
 				Severity: diag.Error,
 				Message: fmt.Sprintf("argument %d: of type, '%s' incompatible with parameter of type '%s'",
@@ -2465,10 +2526,12 @@ func (t *TypeChecker) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 	}
 
 	if ident.Prefix == "" {
-		if ident.Symbol == nil {
+		sym := t.ctx.Env.Lookup(ident.Name)
+		if ident.Symbol == nil || sym == nil {
 			ident.SemaType = types.UnknownType
 		} else {
-			ident.SemaType = ident.Symbol.Type()
+			//ident.SemaType = ident.Symbol.Type()
+			ident.SemaType = sym.Type()
 		}
 
 		return ident
@@ -2479,7 +2542,7 @@ func (t *TypeChecker) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 	if sym == nil {
 		ident.SemaType = types.UnknownType
 	} else {
-		ident.SemaType = ident.Symbol.Type()
+		ident.SemaType = sym.Type()
 	}
 
 	return ident
@@ -2593,7 +2656,7 @@ func (t *TypeChecker) VisitExprRange(n *ast.ExprRange) any {
 	if !types.EqualType(tLow, tHigh) {
 		t.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
-			Message:  fmt.Sprintf("type mismatchin set range: expected %s but got %s", tLow, tHigh),
+			Message:  fmt.Sprintf("type mismatch in set range: expected %s but got %s", tLow, tHigh),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, n.StartOffset, n.EndOffset),
 		})
 	}
@@ -2771,7 +2834,11 @@ func (t *TypeChecker) VisitProcedureCall(call *ast.ProcedureCall) any {
 		return call
 	}
 
-	if len(call.ActualParams) != len(procType.Params) {
+	// Check whether this is a varargs procedure (e.g. fprintf, system.copy).
+	calleeSym, _ := call.Callee.Symbol.(*ast.ProcedureSymbol)
+	isVarArgs := calleeSym != nil && calleeSym.IsVarArgs
+
+	if !isVarArgs && len(call.ActualParams) != len(procType.Params) {
 		t.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
 			Message: fmt.Sprintf("wrong number of arguments for '%v'. expected %d arguments, got %d",
@@ -2781,11 +2848,30 @@ func (t *TypeChecker) VisitProcedureCall(call *ast.ProcedureCall) any {
 		return call
 	}
 
-	for i, arg := range call.ActualParams {
+	// For varargs calls: visit extra args beyond the declared params for
+	// type-checking side-effects but skip formal-parameter compatibility checks.
+	nCheck := len(procType.Params)
+	if isVarArgs {
+		if len(call.ActualParams) < nCheck {
+			nCheck = len(call.ActualParams)
+		}
+		for _, arg := range call.ActualParams[nCheck:] {
+			arg.Accept(t)
+		}
+	}
+
+	for i := 0; i < nCheck; i++ {
+		arg := call.ActualParams[i]
 		arg.Accept(t)
 
 		formal := procType.Params[i]
 		actual := arg.Type()
+
+		// If the argument type is nil the resolver already reported an error;
+		// skip secondary diagnostics to avoid a nil-pointer panic.
+		if actual == nil || types.IsUnknownType(actual) {
+			continue
+		}
 
 		// For VAR parameters the actual argument must be a writable variable.
 		// In particular, a module-level variable exported with the read-only mark
@@ -2824,7 +2910,7 @@ func (t *TypeChecker) VisitProcedureCall(call *ast.ProcedureCall) any {
 			}
 		}
 
-		if !types.ParameterCompatible(actual, formal) {
+		if formal.Type != nil && !types.ParameterCompatible(actual, formal) {
 			t.ctx.Reporter.Report(diag.Diagnostic{
 				Severity: diag.Error,
 				Message: fmt.Sprintf("argument %d: of type, '%s' is incompatible with parameter of type '%s'",
@@ -2833,6 +2919,8 @@ func (t *TypeChecker) VisitProcedureCall(call *ast.ProcedureCall) any {
 			})
 		}
 	}
+
+	call.SemaType = types.VoidType
 
 	return call
 }

@@ -1,6 +1,8 @@
 package types
 
 import (
+	"strings"
+
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -53,7 +55,24 @@ func SameType(Ta, Tb Type) bool {
 
 	if namedA, ok := Ta.(*NamedType); ok {
 		if namedB, ok := Tb.(*NamedType); ok {
-			return namedA.Name == namedB.Name
+			if namedA.Name == namedB.Name {
+				return true
+			}
+			// Cross-module: qualified name may differ (e.g. "Files.File" vs "File").
+			// Only treat them as the same when one is the qualified form of the other
+			// (i.e. one name is a suffix "<module>.<base>" of the other base name).
+			unqualA := namedA.Name
+			if i := strings.LastIndex(unqualA, "."); i >= 0 {
+				unqualA = unqualA[i+1:]
+			}
+			unqualB := namedB.Name
+			if i := strings.LastIndex(unqualB, "."); i >= 0 {
+				unqualB = unqualB[i+1:]
+			}
+			if unqualA == unqualB && namedA.Def != nil && namedA.Def == namedB.Def {
+				return true
+			}
+			return false
 		}
 	}
 
@@ -155,6 +174,11 @@ func AssignmentCompatible(exprType, varType Type) bool {
 		return true
 	}
 
+	// 4a. Tv is integer, Te is Latin-1 CHAR (CHAR literal is an ordinal byte value)
+	if IsInteger(varType) && IsLatin1Char(exprType) {
+		return true
+	}
+
 	// 5. Tv is integer, Te is enumeration
 	if IsInteger(varType) && IsEnum(exprType) {
 		return true
@@ -188,8 +212,18 @@ func AssignmentCompatible(exprType, varType Type) bool {
 		}
 	}
 
-	// 8. Tv is pointer or procedure type and expr is NIL
-	if (IsPointer(varType) || IsProcedure(varType)) && IsNil(exprType) {
+	// 8. Tv is pointer, C-pointer, or procedure type and expr is NIL
+	if (IsPointer(varType) || IsProcedure(varType) || IsCPointer(varType)) && IsNil(exprType) {
+		return true
+	}
+
+	// 8a. C-interop: an integer value is assignment-compatible with a CPOINTER type
+	// (system.adr() returns INTEGER, which is passed to C functions expecting a pointer).
+	if IsInteger(exprType) && IsCPointer(varType) {
+		return true
+	}
+	// 8b. C-interop: a CPOINTER is assignment-compatible with INTEGER (returned pointer stored as address).
+	if IsCPointer(exprType) && IsInteger(varType) {
 		return true
 	}
 
@@ -205,6 +239,9 @@ func AssignmentCompatible(exprType, varType Type) bool {
 	// 10. Tv is array of WCHAR, Te is suitable string or array, and STRLEN(Te) < LEN(Tv)
 	if IsArrayOf(varType, WCharType) && IsCharArrayOrString(exprType) {
 		TvLen := varType.(*ArrayType).Length
+		if TvLen == -1 {
+			return true // open array: any string fits
+		}
 
 		var TeLen int
 		if str, isStr := exprType.(*StringType); isStr {
@@ -221,6 +258,9 @@ func AssignmentCompatible(exprType, varType Type) bool {
 	// 11. Tv is array of CHAR, Te is Latin-1 string or array, and STRLEN(Te) < LEN(Tv)
 	if IsArrayOf(varType, CharType) && IsLatin1CharArrayOrString(exprType) {
 		TvLen := varType.(*ArrayType).Length
+		if TvLen == -1 {
+			return true // open array: any string fits
+		}
 
 		var TeLen int
 		if str, isStr := exprType.(*StringType); isStr {
@@ -258,7 +298,22 @@ func ParameterCompatible(actual Type, formal *FormalParam) bool {
 		// 2. Value parameters can accept assignment-compatible expressions
 		return AssignmentCompatible(ta, tf)
 
-	case "VAR", "IN", "OUT":
+	case "IN":
+		// IN parameters are read-only reference params. They behave like value
+		// params for compatibility purposes: any expression is acceptable.
+		if SameType(ta, tf) {
+			return true
+		}
+		// Open array IN params accept any compatible array or string.
+		if fArr, ok := tf.(*ArrayType); ok && fArr.IsOpen() {
+			if aArr, ok2 := ta.(*ArrayType); ok2 {
+				return ArrayCompatible(aArr.Elem, fArr.Elem)
+			}
+		}
+		// Fall back to assignment-compatible rules (handles string literals etc.)
+		return AssignmentCompatible(ta, tf)
+
+	case "VAR", "OUT":
 		// 3. Must be the same type
 		if SameType(ta, tf) {
 			return true
@@ -266,6 +321,12 @@ func ParameterCompatible(actual Type, formal *FormalParam) bool {
 		// ... or record type extension
 		if IsRecord(tf) && IsRecord(ta) && IsExtensionOf(ta, tf) {
 			return true
+		}
+		// Open array formal accepts any array of the same element type (Oberon rule).
+		if fArr, ok := tf.(*ArrayType); ok && fArr.IsOpen() {
+			if aArr, ok2 := ta.(*ArrayType); ok2 {
+				return ArrayCompatible(aArr.Elem, fArr.Elem)
+			}
 		}
 		return false
 
@@ -362,13 +423,16 @@ func ExpressionCompatible(op token.Kind, lhs, rhs Type) (bool, Type) {
 		if IsPointer(lhs) && IsPointer(rhs) {
 			return true, BooleanType
 		}
+		if IsCPointer(lhs) && IsCPointer(rhs) {
+			return true, BooleanType
+		}
 		if IsProcedure(lhs) && IsProcedure(rhs) {
 			return true, BooleanType
 		}
-		if IsNil(lhs) && (IsPointer(rhs) || IsProcedure(rhs)) {
+		if IsNil(lhs) && (IsPointer(rhs) || IsProcedure(rhs) || IsCPointer(rhs)) {
 			return true, BooleanType
 		}
-		if IsNil(rhs) && (IsPointer(lhs) || IsProcedure(lhs)) {
+		if IsNil(rhs) && (IsPointer(lhs) || IsProcedure(lhs) || IsCPointer(lhs)) {
 			return true, BooleanType
 		}
 
