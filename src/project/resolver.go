@@ -3,6 +3,8 @@ package project
 import (
 	"fmt"
 	"os"
+
+	"github.com/anthonyabeo/obx/src/syntax/directive"
 )
 
 // Resolver maps ModuleKeys to filesystem paths by searching an ordered list
@@ -53,3 +55,25 @@ func (r *Resolver) DiscoverAll() ([]Header, error) {
 	return headers, nil
 }
 
+// DiscoverAllWithResolver is like DiscoverAll but accepts a directive resolver
+// which is passed to the header scanner so conditional branches can be
+// evaluated during discovery.
+func (r *Resolver) DiscoverAllWithResolver(resolver directive.Resolver) ([]Header, error) {
+	seen := make(map[string]bool)
+	var headers []Header
+	for _, root := range r.Roots {
+		hdrs, err := DiscoverAndScanWithResolver(root, resolver)
+		if err != nil {
+			return nil, fmt.Errorf("root %q: %w", root, err)
+		}
+		for _, h := range hdrs {
+			k := h.Key.String()
+			if !seen[k] {
+				seen[k] = true
+				headers = append(headers, h)
+			}
+		}
+	}
+
+	return headers, nil
+}
