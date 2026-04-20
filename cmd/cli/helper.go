@@ -14,6 +14,7 @@ import (
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/syntax/directive"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
 
@@ -21,10 +22,11 @@ import (
 // derives their ModuleKeys from the filesystem layout, builds the import
 // graph, and returns the headers in topological (dependency-first) order
 // together with the graph (needed for entry-point filtering).
-func resolveModules(roots ...string) ([]project.Header, *project.ImportGraph, error) {
+func resolveModules(ctx *compiler.Context, roots ...string) ([]project.Header, *project.ImportGraph, error) {
 	r := project.NewResolver(roots...)
 
-	headers, err := r.DiscoverAll()
+	//headers, err := r.DiscoverAll()
+	headers, err := r.DiscoverAllWithResolver(directive.ResolverFromContext(ctx))
 	if err != nil {
 		return nil, nil, fmt.Errorf("discover: %w", err)
 	}
@@ -40,39 +42,6 @@ func resolveModules(roots ...string) ([]project.Header, *project.ImportGraph, er
 	}
 
 	return sorted, graph, nil
-}
-
-// reachableFrom filters sorted to the entry module and its transitive
-// dependencies, preserving topological order. Returns sorted unchanged if
-// entry is empty or not found in the graph.
-func reachableFrom(sorted []project.Header, graph *project.ImportGraph, entry string) []project.Header {
-	if entry == "" {
-		return sorted
-	}
-	if _, ok := graph.Headers[entry]; !ok {
-		return sorted
-	}
-
-	reachable := make(map[string]bool)
-	var walk func(string)
-	walk = func(key string) {
-		if reachable[key] {
-			return
-		}
-		reachable[key] = true
-		for _, dep := range graph.Adj[key] {
-			walk(dep)
-		}
-	}
-	walk(entry)
-
-	out := make([]project.Header, 0, len(reachable))
-	for _, h := range sorted {
-		if reachable[h.Key.String()] {
-			out = append(out, h)
-		}
-	}
-	return out
 }
 
 // newContext builds a compiler.Context wired to a fresh SourceManager and a
@@ -190,4 +159,3 @@ func injectPlatformDirectives(ctx *compiler.Context, targetName string) {
 		ctx.SetDirective("WINDOWS", false)
 	}
 }
-

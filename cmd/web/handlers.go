@@ -3,20 +3,25 @@ package web
 import (
 	"embed"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/obxir"
 	"github.com/anthonyabeo/obx/src/opt"
+	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/syntax/directive"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
 
@@ -61,6 +66,7 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Source   string `json:"source"`
 		Filename string `json:"filename"`
+		Entry    string `json:"entry"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
@@ -70,23 +76,28 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 		req.Filename = "input.obx"
 	}
 
-	// ── in-memory pipeline (no file discovery) ────────────────────────────
+	// ── in-memory pipeline ────────────────────────────────────────────────
 	srcMgr := source.NewSourceManager()
-
-	// Diagnostics are buffered and read back directly; nothing needs to be
-	// written by the emitter, so io.Discard is the right destination.
 	emitter := diag.ToWriter(formatter.NewJSONFormatter(srcMgr), io.Discard)
 	reporter := diag.NewBufferedReporter(srcMgr, s.cfg.MaxErrors, emitter)
-
 	ctx := compiler.New(req.Filename, srcMgr, reporter, ast.NewEnv(), 0)
 
-	// parse
+	injectHostPlatformDirectives(ctx)
+
+	obx := ast.NewOberonX()
+
+	// parse stdlib modules first (best-effort; skip if unavailable)
+	if err := loadStdlibInto(ctx, obx, req.Entry, req.Filename, req.Source); err != nil {
+		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// parse the user's source
 	p := parser.NewParser(ctx, req.Filename, []byte(req.Source))
 	unit := p.Parse()
 
 	// sema — only when parsing succeeded
 	if reporter.ErrorCount() == 0 {
-		obx := ast.NewOberonX()
 		obx.AddUnit(unit)
 		sema.NewSema(ctx, obx).Validate()
 	}
@@ -105,9 +116,15 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 		Location *location `json:"location,omitempty"`
 	}
 
+	// Filter to only diagnostics from the user's file (not stdlib internals).
 	raw := reporter.Diagnostics()
 	items := make([]diagItem, 0, len(raw))
+	userErrors := 0
 	for _, d := range raw {
+		// Skip diagnostics from stdlib files (not the user's submitted file).
+		if d.Range != nil && d.Range.Start.File != req.Filename {
+			continue
+		}
 		item := diagItem{Severity: d.Severity.String(), Message: d.Message}
 		if d.Range != nil {
 			item.Location = &location{
@@ -119,11 +136,14 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		items = append(items, item)
+		if d.Severity == diag.Error {
+			userErrors++
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":          reporter.ErrorCount() == 0,
-		"error_count": reporter.ErrorCount(),
+		"ok":          userErrors == 0,
+		"error_count": userErrors,
 		"diagnostics": items,
 	})
 }
@@ -159,6 +179,7 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Source   string `json:"source"`
 		Filename string `json:"filename"`
+		Entry    string `json:"entry"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
@@ -174,6 +195,14 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 	reporter := diag.NewBufferedReporter(srcMgr, s.cfg.MaxErrors, emitter)
 	ctx := compiler.New(req.Filename, srcMgr, reporter, ast.NewEnv(), 8)
 
+	injectHostPlatformDirectives(ctx)
+
+	obx := ast.NewOberonX()
+	if err := loadStdlibInto(ctx, obx, req.Entry, req.Filename, req.Source); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+
 	// parse
 	p := parser.NewParser(ctx, req.Filename, []byte(req.Source))
 	unit := p.Parse()
@@ -186,12 +215,18 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// sema
-	obx := ast.NewOberonX()
+	// sema — run on all units (stdlib + user) so cross-module types resolve.
 	obx.AddUnit(unit)
 	sema.NewSema(ctx, obx).Validate()
 
-	if reporter.ErrorCount() > 0 {
+	// Count only errors in the user's file, not stdlib internals.
+	userSemaErrors := 0
+	for _, d := range reporter.Diagnostics() {
+		if d.Severity == diag.Error && (d.Range == nil || d.Range.Start.File == req.Filename) {
+			userSemaErrors++
+		}
+	}
+	if userSemaErrors > 0 {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok":    false,
 			"error": "type errors — fix diagnostics first",
@@ -230,7 +265,147 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ── shared helper ─────────────────────────────────────────────────────────────
+// ── shared helpers ────────────────────────────────────────────────────────────
+
+// injectHostPlatformDirectives sets POSIX/WINDOWS/DARWIN/LINUX based on the
+// OS the server is currently running on.
+func injectHostPlatformDirectives(ctx *compiler.Context) {
+	switch runtime.GOOS {
+	case "windows":
+		ctx.SetDirective("WINDOWS", true)
+		ctx.SetDirective("POSIX", false)
+		ctx.SetDirective("LINUX", false)
+		ctx.SetDirective("DARWIN", false)
+	case "darwin":
+		ctx.SetDirective("POSIX", true)
+		ctx.SetDirective("DARWIN", true)
+		ctx.SetDirective("LINUX", false)
+		ctx.SetDirective("WINDOWS", false)
+	default:
+		ctx.SetDirective("POSIX", true)
+		ctx.SetDirective("LINUX", true)
+		ctx.SetDirective("DARWIN", false)
+		ctx.SetDirective("WINDOWS", false)
+	}
+}
+
+// loadStdlibInto discovers stdlib modules (via OBX_STDLIB or the executable's
+// adjacent stdlib/ directory) and parses them into obx in dependency order.
+// Errors are silently ignored so the server keeps working without stdlib.
+func loadStdlibInto(ctx *compiler.Context, obx *ast.OberonX, entry, userFilename, userSource string) error {
+	stdlibRoot := project.ResolveStdlibRoot(project.Manifest{})
+	if stdlibRoot == "" {
+		// Try a path relative to the current working directory as a fallback
+		// (useful when running `go run` or tests directly from the repo).
+		if wd, err := os.Getwd(); err == nil {
+			for dir := wd; ; dir = filepath.Dir(dir) {
+				candidate := filepath.Join(dir, "stdlib")
+				if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+					stdlibRoot = candidate
+					break
+				}
+				parent := filepath.Dir(dir)
+				if parent == dir {
+					break
+				}
+			}
+		}
+	}
+
+	var roots []string
+	var tmpDir string
+	if userSource != "" {
+		td, err := os.MkdirTemp("", "obx-web-*")
+		if err != nil {
+			return fmt.Errorf("create temp dir: %w", err)
+		}
+		tmpDir = td
+		// Ensure cleanup
+		defer func() {
+			if err := os.RemoveAll(tmpDir); err != nil {
+				log.Printf("failed to remove temp dir %s: %v", tmpDir, err)
+			}
+		}()
+
+		if filepath.Ext(userFilename) != ".obx" {
+			userFilename = userFilename + ".obx"
+		}
+		target := filepath.Join(tmpDir, userFilename)
+		if err := os.WriteFile(target, []byte(userSource), 0644); err != nil {
+			return fmt.Errorf("write temp file: %w", err)
+		}
+
+		// Place the temp root before stdlib so uploaded files override stdlib.
+		roots = append(roots, tmpDir)
+	}
+
+	if stdlibRoot != "" {
+		roots = append(roots, stdlibRoot)
+	}
+
+	if len(roots) == 0 {
+		// Nothing to discover.
+		return nil
+	}
+
+	r := project.NewResolver(roots...)
+
+	// Use the server's compiler context to supply platform directive flags so
+	// header scanning selects the correct conditional branches.
+	headers, err := r.DiscoverAllWithResolver(directive.ResolverFromContext(ctx))
+	if err != nil {
+		return fmt.Errorf("stdlib discover: %w", err)
+	}
+	graph, err := project.BuildImportGraph(headers)
+	if err != nil {
+		return fmt.Errorf("stdlib import graph: %w", err)
+	}
+	sorted, err := project.TopoSort(graph)
+	if err != nil {
+		return fmt.Errorf("stdlib topo sort: %w", err)
+	}
+
+	// Apply entry filtering (full module key) using the project-level helper.
+	sorted, err = project.ReachableFrom(sorted, graph, entry)
+	if err != nil {
+		return err
+	}
+
+	// Print sorted stdlib file list for debugging/visibility.
+	for i, hdr := range sorted {
+		log.Printf("web: stdlib sorted[%d]: %s", i, filepath.Base(hdr.File))
+	}
+
+	for _, header := range sorted {
+		data, err := os.ReadFile(header.File)
+		if err != nil {
+			continue
+		}
+		fileName := filepath.Base(header.File)
+		content := data[header.StartPos:header.EndPos]
+		p := parser.NewParser(ctx, fileName, content)
+		// Snapshot diagnostics count so we can detect parse errors produced by
+		// this file and avoid adding a partially-parsed unit into the global
+		// OberonX used for later lowering.
+		before := len(ctx.Reporter.Diagnostics())
+		unit := p.Parse()
+		after := len(ctx.Reporter.Diagnostics())
+		if after > before {
+			// Skip adding this unit due to parse errors in the stdlib file.
+			continue
+		}
+		if unit != nil {
+			obx.AddUnit(unit)
+		}
+	}
+
+	// Discard any parse errors from stdlib so they don't pollute the
+	// user's diagnostic output.
+	if r, ok := ctx.Reporter.(*diag.BufferedReporter); ok {
+		r.Reset()
+	}
+	return nil
+}
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

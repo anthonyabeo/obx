@@ -14,7 +14,7 @@ import (
 
 var checkArgs struct {
 	Path      string
-	Target    string   // --target (needed to inject platform directives)
+	Target    string // --target (needed to inject platform directives)
 	MaxErrors int
 	Quiet     bool
 	Defines   []string // --define (repeatable); NAME or NAME=VALUE
@@ -44,8 +44,19 @@ source roots.
 Exit code is 0 when all modules are clean, 1 when errors are found.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
+		entry := buildArgs.Entry
 		roots := []string{checkArgs.Path}
 		label := checkArgs.Path // used in progress output
+
+		ctx, _ := newContext(checkArgs.MaxErrors)
+
+		// Inject platform directives first so --define can still override.
+		injectPlatformDirectives(ctx, checkArgs.Target)
+
+		if err := applyDirectives(ctx, checkArgs.Defines); err != nil {
+			fmt.Fprintf(os.Stderr, "check: %v\n", err)
+			os.Exit(1)
+		}
 
 		// ── 0. Fall back to obx.mod when --path is not given ─────────────
 		var manifest project.Manifest
@@ -60,6 +71,9 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 			}
 			roots = manifest.Roots
 			label = dir
+			if entry == "" {
+				entry = manifest.Entry
+			}
 		}
 
 		// ── 0a. Prepend stdlib root (dual-root discovery) ─────────────────
@@ -68,7 +82,13 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 		}
 
 		// ── 1. Discover and order modules ────────────────────────────────
-		sorted, _, err := resolveModules(roots...)
+		sorted, graph, err := resolveModules(ctx, roots...)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "check: %v\n", err)
+			os.Exit(1)
+		}
+
+		sorted, err = project.ReachableFrom(sorted, graph, entry)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "check: %v\n", err)
 			os.Exit(1)
@@ -83,16 +103,6 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 		}
 
 		// ── 2. Parse ─────────────────────────────────────────────────────
-		ctx, _ := newContext(checkArgs.MaxErrors)
-
-		// Inject platform directives first so --define can still override.
-		injectPlatformDirectives(ctx, checkArgs.Target)
-
-		if err := applyDirectives(ctx, checkArgs.Defines); err != nil {
-			fmt.Fprintf(os.Stderr, "check: %v\n", err)
-			os.Exit(1)
-		}
-
 		obx := ast.NewOberonX()
 
 		if ok := parseModules(sorted, ctx, obx); !ok {
@@ -118,4 +128,3 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 		}
 	},
 }
-

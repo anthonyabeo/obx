@@ -12,8 +12,8 @@ import (
 
 	"github.com/anthonyabeo/obx/src/codegen"
 	"github.com/anthonyabeo/obx/src/codegen/target"
-	_ "github.com/anthonyabeo/obx/src/codegen/target/arm64"  // register arm64-apple-macos + aarch64-apple-darwin
-	_ "github.com/anthonyabeo/obx/src/codegen/target/riscv"  // register rv64imafd
+	_ "github.com/anthonyabeo/obx/src/codegen/target/arm64" // register arm64-apple-macos + aarch64-apple-darwin
+	_ "github.com/anthonyabeo/obx/src/codegen/target/riscv" // register rv64imafd
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/opt"
 	"github.com/anthonyabeo/obx/src/project"
@@ -67,6 +67,15 @@ precedence over obx.mod values.`,
 		entry := buildArgs.Entry
 		projectDir := "."
 
+		ctx, _ := newContext(32)
+
+		// Inject platform directives first so --define can still override.
+		injectPlatformDirectives(ctx, buildArgs.Target)
+
+		if err := applyDirectives(ctx, buildArgs.Defines); err != nil {
+			log.Fatalf("build: %v", err)
+		}
+
 		// ── 0. Resolve target ─────────────────────────────────────────────
 		mach, err := target.Lookup(buildArgs.Target)
 		if err != nil {
@@ -98,12 +107,15 @@ precedence over obx.mod values.`,
 		}
 
 		// ── 2. Discover and order modules ─────────────────────────────────
-		sorted, graph, err := resolveModules(roots...)
+		sorted, graph, err := resolveModules(ctx, roots...)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		sorted = reachableFrom(sorted, graph, entry)
+		sorted, err = project.ReachableFrom(sorted, graph, entry)
+		if err != nil {
+			log.Fatalf("invalid entry: %v", err)
+		}
 
 		fmt.Printf("Building %d module(s)", len(sorted))
 		if entry != "" {
@@ -115,14 +127,6 @@ precedence over obx.mod values.`,
 		}
 
 		// ── 3. Parse ──────────────────────────────────────────────────────
-		ctx, _ := newContext(32)
-
-		// Inject platform directives first so --define can still override.
-		injectPlatformDirectives(ctx, buildArgs.Target)
-
-		if err := applyDirectives(ctx, buildArgs.Defines); err != nil {
-			log.Fatalf("build: %v", err)
-		}
 
 		obx := ast.NewOberonX()
 

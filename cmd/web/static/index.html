@@ -203,6 +203,7 @@
     <div class="pane-header">
       <span class="pane-label">source</span>
       <input id="filename" type="text" value="main.obx" spellcheck="false" title="filename sent to the API" />
+      <input id="entry" type="text" value="" spellcheck="false" placeholder="entry (e.g. Collections.Drawing)" title="optional full module key to filter modules" style="margin-left:8px; width:220px;" />
       <div class="spacer"></div>
       <kbd>⌘ Enter</kbd>
       <button id="checkBtn" onclick="runCheck()">Check</button>
@@ -277,11 +278,12 @@ fetch('/api/version')
 async function runCheck() {
   const source   = editor.value;
   const filename = document.getElementById('filename').value.trim() || 'main.obx';
+  const entry    = document.getElementById('entry').value.trim() || '';
   btn.disabled = true; btn.textContent = 'Checking…';
   results.innerHTML = ''; setStatus('idle', '…');
   setCfgState('loading');
 
-  const body = JSON.stringify({ source, filename });
+  const body = JSON.stringify({ source, filename, entry });
   const post = url => fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body})
     .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error('HTTP ' + r.status + ': ' + t.trim()); }))
     .catch(e => ({_err: e.message}));
