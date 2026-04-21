@@ -88,15 +88,13 @@ func (b *IRBuilder) recreateEnv(astEnv *ast.Environment) {
 				if ps.IsExternal && ps.CName != "" {
 					callee = ps.CName
 				}
-				// Build a minimal Function stub for lookup purposes.
-				fn := &Function{
-					FnName:     callee,
-					Result:     Void,
-					Exported:   ps.Props() == ast.Exported || ps.Props() == ast.ExportedReadOnly,
-					Variadic:   ps.IsVarArgs,
-					IsExternal: ps.IsExternal,
-					Params:     []Value{},
-				}
+
+				export := ps.Props() == ast.Exported || ps.Props() == ast.ExportedReadOnly
+				fn := NewFunction(callee, export, Void, nil)
+				fn.Variadic = ps.IsVarArgs
+				fn.IsExternal = ps.IsExternal
+				fn.Params = []Value{}
+
 				// Try to set return type when available.
 				if ps.Type() != nil {
 					fn.Result = b.lowerType(ps.Type())
