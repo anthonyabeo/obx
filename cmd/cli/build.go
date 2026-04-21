@@ -144,11 +144,11 @@ precedence over obx.mod values.`,
 		}
 
 		// ── 5. Lower: AST → desugar → MIR ────────────────────────────────
-		hirGen := desugar.NewGenerator(obx)
+		hirGen := desugar.NewGenerator(obx, ctx)
 		hirProgram := hirGen.Generate()
 
 		Builder := obxir.NewIRBuilder(ctx.Target.WordSize)
-		MIRProgram := Builder.Build(hirProgram)
+		MIRProgram := Builder.Build(hirProgram, ctx)
 
 		for _, module := range MIRProgram.Modules {
 			for _, function := range module.Funcs {

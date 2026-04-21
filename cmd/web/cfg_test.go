@@ -14,7 +14,7 @@ func newTestServer() *Server {
 }
 
 func TestHandleCFG_SimpleModule(t *testing.T) {
-	body := `{"source":"MODULE Main;\nVAR x: INTEGER;\nBEGIN\n  x := 42\nEND Main.","filename":"main.obx"}`
+	body := `{"source":"MODULE Main;\nVAR x: INTEGER;\nBEGIN\n  x := 42\nEND Main.","filename":"Main.obx", "entry": "Main"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/cfg", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
@@ -65,12 +65,12 @@ BEGIN
     b := Fib(n - 2);
     RETURN a + b
   END
-END Fib;
+END Fib
 BEGIN
   res := Fib(10)
 END Test.`
 
-	body, _ := json.Marshal(map[string]string{"source": src, "filename": "test.obx"})
+	body, _ := json.Marshal(map[string]string{"source": src, "filename": "Test.obx", "entry": "Test"})
 	req := httptest.NewRequest(http.MethodPost, "/api/cfg", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
@@ -102,7 +102,7 @@ END Test.`
 }
 
 func TestHandleCFG_ParseError(t *testing.T) {
-	body := `{"source":"MODULE Bad;\nVAR x: INTEGER\nEND Bad.","filename":"bad.obx"}`
+	body := `{"source":"MODULE Bad;\nVAR x: INTEGER\nEND Bad.","filename":"Bad.obx", "entry": "Bad"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/cfg", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
@@ -113,4 +113,3 @@ func TestHandleCFG_ParseError(t *testing.T) {
 	json.NewDecoder(rr.Body).Decode(&resp)
 	t.Logf("parse-error response: ok=%v error=%v", resp["ok"], resp["error"])
 }
-

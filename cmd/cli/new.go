@@ -105,4 +105,3 @@ func starterModule(name string) []byte {
 	fmt.Fprintf(&b, "end %s\n", name)
 	return []byte(b.String())
 }
-

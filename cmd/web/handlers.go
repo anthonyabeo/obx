@@ -203,10 +203,6 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// parse
-	p := parser.NewParser(ctx, req.Filename, []byte(req.Source))
-	unit := p.Parse()
-
 	if reporter.ErrorCount() > 0 {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok":    false,
@@ -216,7 +212,6 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// sema — run on all units (stdlib + user) so cross-module types resolve.
-	obx.AddUnit(unit)
 	sema.NewSema(ctx, obx).Validate()
 
 	// Count only errors in the user's file, not stdlib internals.
@@ -235,8 +230,8 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// desugar → ObxIR → build CFG
-	hirProgram := desugar.NewGenerator(obx).Generate()
-	irProgram := obxir.NewIRBuilder(8).Build(hirProgram)
+	hirProgram := desugar.NewGenerator(obx, ctx).Generate()
+	irProgram := obxir.NewIRBuilder(ctx.Target.WordSize).Build(hirProgram, ctx)
 
 	type graphEntry struct {
 		Module   string `json:"module"`
