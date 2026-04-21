@@ -38,8 +38,8 @@ func PlacePhiNodes(fn *obxir.Function) {
 
 			for _, y := range fn.Dom.DF[n] {
 				if !placed[y] && !y.HasPhi(v) {
-					value, found := fn.Env.Lookup(v)
-					if !found {
+					value := fn.Env.Lookup(v)
+					if value == nil {
 						continue
 					}
 

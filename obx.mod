@@ -1,6 +1,7 @@
 {
   "name": "obx",
-  "roots": ["src", "examples"],
-  "entry": "Main"
+  "roots": ["out"],
+  "entry": "Main",
+  "stdlib": "/Users/anabila/Documents/Compilers/projects/obx/stdlib"
 }
 
