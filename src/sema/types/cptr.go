@@ -13,9 +13,9 @@ type CPointerType struct {
 	Base Type
 }
 
-func (p *CPointerType) String() string    { return fmt.Sprintf("CPOINTER TO %s", p.Base.String()) }
-func (p *CPointerType) Width() int        { return 8 }
-func (p *CPointerType) Alignment() int    { return 8 }
+func (p *CPointerType) String() string { return fmt.Sprintf("CPOINTER TO %s", p.Base.String()) }
+func (p *CPointerType) Width() int     { return 8 }
+func (p *CPointerType) Alignment() int { return 8 }
 func (p *CPointerType) Equals(other Type) bool {
 	o, ok := other.(*CPointerType)
 	if !ok {
@@ -181,4 +181,3 @@ func (a *CArrayType) Equals(other Type) bool {
 	o, ok := other.(*CArrayType)
 	return ok && a.Length == o.Length && a.Elem.Equals(o.Elem)
 }
-

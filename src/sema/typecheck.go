@@ -87,8 +87,42 @@ func (t *TypeChecker) VisitModule(module *ast.Module) any {
 }
 
 func (t *TypeChecker) VisitMetaSection(section *ast.MetaSection) any {
-	//TODO implement me
-	panic("implement me")
+	var typ types.Type = types.UnknownType
+
+	if section.TyConst != nil {
+		if tt, ok := section.TyConst.Accept(t).(types.Type); ok {
+			typ = tt
+		} else {
+			typ = types.UnknownType
+		}
+	}
+
+	for _, id := range section.Ids {
+		if id.Name == "_" {
+			id.SemaType = typ
+			continue
+		}
+
+		sym := id.Symbol
+		if sym == nil {
+			sym = t.ctx.Env.Lookup(id.Name)
+		}
+
+		if sym == nil {
+			t.ctx.Reporter.Report(diag.Diagnostic{
+				Severity: diag.Error,
+				Message:  fmt.Sprintf("undeclared meta identifier '%s'", id.Name),
+				Range:    t.ctx.Source.Span(t.ctx.FileName, id.StartOffset, id.EndOffset),
+			})
+			continue
+		}
+
+		sym.SetType(typ)
+		id.Symbol = sym
+		id.SemaType = typ
+	}
+
+	return section
 }
 
 func (t *TypeChecker) VisitDefinition(def *ast.Definition) any {

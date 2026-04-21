@@ -320,9 +320,9 @@ func (f *FlowChecker) VisitBadType(badType *ast.BadType) any { return badType }
 
 // ── FFI C-type stubs ──────────────────────────────────────────────────────────
 
-func (f *FlowChecker) VisitCStructType(ty *ast.CStructType) any  { return ty }
-func (f *FlowChecker) VisitCUnionType(ty *ast.CUnionType) any    { return ty }
-func (f *FlowChecker) VisitCArrayType(ty *ast.CArrayType) any    { return ty }
+func (f *FlowChecker) VisitCStructType(ty *ast.CStructType) any   { return ty }
+func (f *FlowChecker) VisitCUnionType(ty *ast.CUnionType) any     { return ty }
+func (f *FlowChecker) VisitCArrayType(ty *ast.CArrayType) any     { return ty }
 func (f *FlowChecker) VisitCPointerType(ty *ast.CPointerType) any { return ty }
 
 func (f *FlowChecker) visitStmtSeq(stmts []ast.Statement) {

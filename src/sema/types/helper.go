@@ -379,4 +379,3 @@ func IsCArray(t Type) bool {
 	_, ok := Underlying(t).(*CArrayType)
 	return ok
 }
-

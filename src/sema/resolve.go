@@ -692,7 +692,7 @@ func (n *NamesResolver) VisitProcedureHeading(heading *ast.ProcedureHeading) any
 	if sym == nil {
 		n.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
-			Message:  fmt.Sprintf("identifier '%s' not found", heading.Name.Name),
+			Message:  fmt.Sprintf("'%s' is not declared as a procedure", heading.Name.Name),
 			Range:    n.ctx.Source.Span(n.ctx.FileName, heading.Name.StartOffset, heading.Name.EndOffset),
 		})
 		return nil
@@ -972,4 +972,3 @@ func (n *NamesResolver) VisitCPointerType(ty *ast.CPointerType) any {
 	ty.Base.Accept(n)
 	return ty
 }
-
