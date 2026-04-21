@@ -737,4 +737,3 @@ func lowerNewBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	b.emitAssign(dst, ptr)
 	return ptr
 }
-

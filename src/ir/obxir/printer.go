@@ -71,4 +71,3 @@ func EmitIR(w io.Writer, p *Program) error {
 	_, err := w.Write([]byte(FormatProgram(p)))
 	return err
 }
-

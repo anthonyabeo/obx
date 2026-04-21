@@ -112,4 +112,3 @@ func (op InstrOp) String() string {
 		return "unknown"
 	}
 }
-

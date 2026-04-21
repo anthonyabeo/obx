@@ -43,6 +43,10 @@ type (
 		Ref Type
 	}
 
+	CPointerType struct {
+		Ref Type
+	}
+
 	VoidType struct{}
 
 	StringType struct {
@@ -153,6 +157,22 @@ func (t *PointerType) Width() int {
 	return 8 // 64-bit pointer
 }
 
+// ─── CPointerType ──────────────────────────────────────────────────────────
+
+func CPointerTo(t Type) *CPointerType { return &CPointerType{Ref: t} }
+func (t *CPointerType) String() string {
+	if t.Ref == nil {
+		return "*void"
+	}
+	return fmt.Sprintf("*%s", t.Ref)
+}
+func (t *CPointerType) Width() int {
+	if t.Ref == nil {
+		return 0
+	}
+	return 8 // 64-bit pointer
+}
+
 // ─── VoidType ─────────────────────────────────────────────────────────────
 
 func (t *VoidType) String() string { return "void" }
@@ -198,4 +218,3 @@ var (
 	Void    = &VoidType{}
 	SetType = &Set{}
 )
-

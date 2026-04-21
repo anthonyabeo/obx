@@ -53,11 +53,11 @@ func buildMIRFromSources(t *testing.T, ctx *compiler.Context, sources []struct{ 
 		t.Fatal("sema errors")
 	}
 
-	gen := desugar.NewGenerator(obx)
+	gen := desugar.NewGenerator(obx, ctx)
 	hirProg := gen.Generate()
 
 	builder := obxir.NewIRBuilder(ctx.Target.WordSize)
-	return builder.Build(hirProg)
+	return builder.Build(hirProg, ctx)
 }
 
 // ─── Extern DEFINITION only ───────────────────────────────────────────────────
@@ -377,7 +377,3 @@ END Main.
 		t.Errorf("CLib.Externals: expected 2, got %d", len(clibMod.Externals))
 	}
 }
-
-
-
-

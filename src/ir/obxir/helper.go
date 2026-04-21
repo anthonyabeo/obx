@@ -107,4 +107,3 @@ func ToAsmType(ty Type) asm.Type {
 		panic("unsupported obxir type to asm type conversion")
 	}
 }
-

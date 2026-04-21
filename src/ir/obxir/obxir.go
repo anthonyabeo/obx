@@ -26,13 +26,13 @@ type ExternDecl struct {
 
 // Module is the IR representation of one OBX compilation unit.
 type Module struct {
-	Name     string
-	IsEntry  bool
-	Globals  map[string]*GlobalVariable
-	Consts   map[string]Constant
-	Funcs    []*Function
-	Env      *SymbolTable
-	Asm      *asm.Module
+	Name      string
+	IsEntry   bool
+	Globals   map[string]*GlobalVariable
+	Consts    map[string]Constant
+	Funcs     []*Function
+	Env       *SymbolTable
+	Asm       *asm.Module
 	Externals []ExternDecl // foreign symbols referenced by this module
 }
 
@@ -40,15 +40,15 @@ type Module struct {
 
 // Function is the IR representation of one procedure/function body.
 type Function struct {
-	FnName    string
-	Result    Type
-	Exported  bool
-	Variadic  bool
-	IsBuiltin bool
+	FnName     string
+	Result     Type
+	Exported   bool
+	Variadic   bool
+	IsBuiltin  bool
 	IsExternal bool // true for foreign functions declared in extern DEFINITIONs
-	Params    []Value
-	Locals    []Value
-	IsLeaf    bool
+	Params     []Value
+	Locals     []Value
+	IsLeaf     bool
 
 	Blocks  map[int]*Block
 	Entry   *Block
@@ -257,12 +257,14 @@ func (fn *Function) OutputDOT() string {
 
 // SymbolTable is a lexically-scoped name → Value mapping.
 type SymbolTable struct {
+	Name    string
 	Parent  *SymbolTable
 	Symbols map[string]Value
 }
 
-func NewSymbolTable(parent *SymbolTable) *SymbolTable {
+func NewSymbolTable(name string, parent *SymbolTable) *SymbolTable {
 	return &SymbolTable{
+		Name:    name,
 		Parent:  parent,
 		Symbols: make(map[string]Value),
 	}
@@ -272,12 +274,11 @@ func (st *SymbolTable) Define(name string, val Value) {
 	st.Symbols[name] = val
 }
 
-func (st *SymbolTable) Lookup(name string) (Value, bool) {
+func (st *SymbolTable) Lookup(name string) Value {
 	for t := st; t != nil; t = t.Parent {
 		if val, ok := t.Symbols[name]; ok {
-			return val, true
+			return val
 		}
 	}
-	return nil, false
+	return nil
 }
-

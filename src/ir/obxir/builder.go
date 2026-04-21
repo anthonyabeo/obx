@@ -8,6 +8,8 @@ import (
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/support/compiler"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -21,23 +23,151 @@ type IRBuilder struct {
 	TempGen    int
 	labelCount int
 	curExit    string
+
+	env *Environment
 }
 
 func NewIRBuilder(wordSize uint64) *IRBuilder {
-	return &IRBuilder{wordSize: wordSize}
+	return &IRBuilder{wordSize: wordSize, env: CreateEnv()}
 }
 
 // Build lowers a complete HIR program to an obxir Program.
-func (b *IRBuilder) Build(hirProgram *desugar.Program) *Program {
+func (b *IRBuilder) Build(hirProgram *desugar.Program, ctx *compiler.Context) *Program {
 	program := &Program{}
+
+	// Pre-create obxir module symbol tables from the AST environment so
+	// lowering can define symbols into those tables and aliasing is preserved.
+	if ctx != nil && ctx.Env != nil {
+		b.recreateEnv(ctx.Env)
+	}
+
 	for _, m := range hirProgram.Modules {
 		program.Modules = append(program.Modules, b.lowerModule(m))
 	}
+
 	return program
 }
 
+// recreateEnv creates an obxir SymbolTable for each module name registered
+// in the AST environment. This ensures PushScope or SetCurrentScope during
+// lowering will have a corresponding table to define symbols into.
+func (b *IRBuilder) recreateEnv(astEnv *ast.Environment) {
+	if astEnv == nil {
+		return
+	}
+	for _, name := range astEnv.ModuleNames() {
+		// Ensure a symbol table exists for the module name/alias.
+		if b.env.ModuleScope(name) == nil {
+			st := NewSymbolTable(name, GlobalEnv)
+			b.env.AddModuleScope(name, st)
+		}
+
+		// If the AST has a lexical scope for this module, iterate its symbols
+		// and create lightweight obxir placeholders so cross-module lookups
+		// during lowering succeed even when the target module is lowered
+		// later in the sequence.
+		astScope := astEnv.ModuleScope(name)
+		if astScope == nil {
+			continue
+		}
+		tbl := b.env.ModuleScope(name)
+
+		for symName, sym := range astScope.Elems() {
+			if sym == nil {
+				continue
+			}
+			switch sym.Kind() {
+			case ast.ProcedureSymbolKind:
+				ps := sym.(*ast.ProcedureSymbol)
+				// Determine callee name: prefer explicit CName for externals,
+				// otherwise use the mangled name if present or bare name.
+				callee := ps.MangledName()
+				if callee == "" {
+					callee = ps.Name()
+				}
+				if ps.IsExternal && ps.CName != "" {
+					callee = ps.CName
+				}
+				// Build a minimal Function stub for lookup purposes.
+				fn := &Function{
+					FnName:     callee,
+					Result:     Void,
+					Exported:   ps.Props() == ast.Exported || ps.Props() == ast.ExportedReadOnly,
+					Variadic:   ps.IsVarArgs,
+					IsExternal: ps.IsExternal,
+					Params:     []Value{},
+				}
+				// Try to set return type when available.
+				if ps.Type() != nil {
+					fn.Result = b.lowerType(ps.Type())
+				}
+				// Register into the module table if not already present.
+				if _, exists := tbl.Symbols[callee]; !exists {
+					tbl.Define(callee, fn)
+				}
+				// Also register under the bare AST name if different.
+				if ps.Name() != callee {
+					if _, exists := tbl.Symbols[ps.Name()]; !exists {
+						tbl.Define(ps.Name(), fn)
+					}
+				}
+			case ast.VariableSymbolKind:
+				vs := sym.(*ast.VariableSymbol)
+				nameKey := vs.MangledName()
+				if nameKey == "" {
+					nameKey = vs.Name()
+				}
+				gv := &GlobalVariable{Ident: nameKey, OrigName: vs.Name(), Typ: Void}
+				if vs.Type() != nil {
+					gv.Typ = b.lowerType(vs.Type())
+					gv.Size = gv.Typ.Width()
+				}
+				if _, exists := tbl.Symbols[nameKey]; !exists {
+					tbl.Define(nameKey, gv)
+				}
+				if vs.Name() != nameKey {
+					if _, exists := tbl.Symbols[vs.Name()]; !exists {
+						tbl.Define(vs.Name(), gv)
+					}
+				}
+			case ast.ConstantSymbolKind:
+				cs := sym.(*ast.ConstantSymbol)
+				nameKey := cs.MangledName()
+				if nameKey == "" {
+					nameKey = cs.Name()
+				}
+				// Create a placeholder NamedConst with a zero init; lowering will
+				// replace or populate real value later.
+				nc := &NamedConst{Ident: nameKey, OrigName: cs.Name(), ConstValue: UInt64Lit(0), Typ: Void}
+				if cs.Type() != nil {
+					nc.Typ = b.lowerType(cs.Type())
+					nc.Size = nc.Typ.Width()
+				}
+				if _, exists := tbl.Symbols[nameKey]; !exists {
+					tbl.Define(nameKey, nc)
+				}
+			default:
+				// Skip other symbol kinds (types, fields, params) — they are not
+				// represented as obxir.Value entries.
+			}
+			_ = symName
+		}
+	}
+}
+
 func (b *IRBuilder) lowerModule(hirMod *desugar.Module) *Module {
-	env := NewSymbolTable(GlobalEnv)
+	// If a module symbol table was pre-created from the AST environment, use
+	// it as the current scope so lowering defines go into the correct table
+	// (preserving aliasing). Otherwise, push a fresh scope as before.
+	if tbl := b.env.ModuleScope(hirMod.Name); tbl != nil {
+		prev := b.env.CurrentScope()
+		b.env.SetCurrentScope(tbl)
+		defer b.env.SetCurrentScope(prev)
+	} else {
+		b.env.PushScope(hirMod.Name)
+		defer b.env.PopScope()
+	}
+
 	functions := make([]*Function, 0)
 	globals := make(map[string]*GlobalVariable)
 	constants := make(map[string]Constant)
@@ -47,11 +177,21 @@ func (b *IRBuilder) lowerModule(hirMod *desugar.Module) *Module {
 		switch d := decl.(type) {
 		case *desugar.Function:
 			if d.IsExternal {
-				// Build a body-less stub so call sites in this module can
-				// resolve the callee symbol.
-				stub := NewFunction(d.FnName(), d.IsExport, b.lowerType(d.Result), NewSymbolTable(env))
+				// Try to reuse a placeholder Function created during the pre-pass.
+				var stub *Function
+				if tbl := b.env.ModuleScope(hirMod.Name); tbl != nil {
+					if v := tbl.Lookup(d.FnName()); v != nil {
+						if ef, ok := v.(*Function); ok {
+							stub = ef
+						}
+					}
+				}
+				if stub == nil {
+					stub = NewFunction(d.FnName(), d.IsExport, b.lowerType(d.Result), NewSymbolTable(d.FnName(), b.env.CurrentScope()))
+				}
 				stub.IsExternal = true
 				stub.Variadic = d.IsVarArgs
+				// populate params
 				for _, p := range d.Params {
 					param := &Param{
 						Ident:    p.Name,
@@ -62,62 +202,105 @@ func (b *IRBuilder) lowerModule(hirMod *desugar.Module) *Module {
 					stub.Params = append(stub.Params, param)
 				}
 				functions = append(functions, stub)
-				env.Define(d.FnName(), stub)
-				if d.Name != d.FnName() {
-					env.Define(d.Name, stub)
-				}
-				// Also register in GlobalEnv so importing modules can resolve
-				// the callee without knowing the DEFINITION module's env.
-				GlobalEnv.Define(d.FnName(), stub)
-				if d.Name != d.FnName() {
-					GlobalEnv.Define(d.Name, stub)
-				}
 				externals = append(externals, ExternDecl{CName: d.FnName(), DLLName: d.DLLName})
 				continue
 			}
-			fn := b.lowerFunction(d, NewSymbolTable(env))
+			// Non-external function: attempt to reuse placeholder if present.
+			var existingFn *Function
+			if tbl := b.env.ModuleScope(hirMod.Name); tbl != nil {
+				if v := tbl.Lookup(d.FnName()); v != nil {
+					if ef, ok := v.(*Function); ok {
+						existingFn = ef
+					}
+				}
+			}
+			fn := b.lowerFunction(d, NewSymbolTable(d.FnName(), b.env.CurrentScope()), existingFn)
 			functions = append(functions, fn)
-			env.Define(d.Name, fn)
 		case *desugar.Constant:
-			nc := &NamedConst{
-				OrigName:   d.Name,
-				Ident:      d.Mangled,
-				Typ:        b.lowerType(d.Type),
-				ConstValue: b.ensureValue(d.Value),
-				Size:       d.Size,
+			// Try to reuse a placeholder NamedConst created during pre-pass.
+			var nc *NamedConst
+			if tbl := b.env.ModuleScope(hirMod.Name); tbl != nil {
+				if v := tbl.Lookup(d.Mangled); v != nil {
+					if pc, ok := v.(*NamedConst); ok {
+						nc = pc
+					}
+				}
 			}
+			if nc == nil {
+				nc = &NamedConst{
+					OrigName: d.Name,
+					Ident:    d.Mangled,
+					Typ:      b.lowerType(d.Type),
+					Size:     d.Size,
+				}
+			}
+			// Populate/overwrite fields from lowering.
+			nc.OrigName = d.Name
+			nc.Ident = d.Mangled
+			nc.Typ = b.lowerType(d.Type)
+			nc.ConstValue = b.ensureValue(d.Value)
+			nc.Size = d.Size
 			constants[nc.Ident] = nc
-			env.Define(nc.Ident, nc)
 		case *desugar.Variable:
-			gv := &GlobalVariable{
-				Ident:    d.Mangled,
-				OrigName: d.Name,
-				Typ:      b.lowerType(d.Type),
-				Size:     d.Size,
+			// Try to reuse placeholder GlobalVariable created during pre-pass.
+			var gv *GlobalVariable
+			if tbl := b.env.ModuleScope(hirMod.Name); tbl != nil {
+				if v := tbl.Lookup(d.Mangled); v != nil {
+					if pg, ok := v.(*GlobalVariable); ok {
+						gv = pg
+					}
+				}
 			}
+			if gv == nil {
+				gv = &GlobalVariable{
+					Ident:    d.Mangled,
+					OrigName: d.Name,
+					Typ:      b.lowerType(d.Type),
+					Size:     d.Size,
+				}
+			}
+			gv.Ident = d.Mangled
+			gv.OrigName = d.Name
+			gv.Typ = b.lowerType(d.Type)
+			gv.Size = d.Size
 			globals[gv.Ident] = gv
-			env.Define(gv.Ident, gv)
 		}
 	}
 
 	// Extern DEFINITION modules have no initializer body.
 	if hirMod.Init != nil {
-		functions = append(functions, b.lowerFunction(hirMod.Init, NewSymbolTable(env)))
+		functions = append(functions, b.lowerFunction(hirMod.Init, NewSymbolTable(hirMod.Init.Name, b.env.CurrentScope())))
 	}
 
 	return &Module{
-		Name:      hirMod.Name,
-		IsEntry:   hirMod.IsEntry,
-		Globals:   globals,
-		Consts:    constants,
-		Funcs:     functions,
-		Env:       env,
+		Name:    hirMod.Name,
+		IsEntry: hirMod.IsEntry,
+		Globals: globals,
+		Consts:  constants,
+		Funcs:   functions,
+		//Env:       env,
 		Externals: externals,
 	}
 }
 
-func (b *IRBuilder) lowerFunction(hirFn *desugar.Function, env *SymbolTable) *Function {
-	fn := NewFunction(hirFn.FnName(), hirFn.IsExport, b.lowerType(hirFn.Result), env)
+func (b *IRBuilder) lowerFunction(hirFn *desugar.Function, env *SymbolTable, existingFn ...*Function) *Function {
+	var fn *Function
+	if len(existingFn) > 0 && existingFn[0] != nil {
+		fn = existingFn[0]
+		// Ensure environment and basic fields are set on the placeholder.
+		fn.Env = env
+		fn.FnName = hirFn.FnName()
+		fn.Result = b.lowerType(hirFn.Result)
+		fn.Exported = hirFn.IsExport
+		if fn.Blocks == nil {
+			fn.Blocks = make(map[int]*Block)
+		}
+		if fn.Constants == nil {
+			fn.Constants = make(map[string]Constant)
+		}
+	} else {
+		fn = NewFunction(hirFn.FnName(), hirFn.IsExport, b.lowerType(hirFn.Result), env)
+	}
 
 	prevFn := b.Func
 	defer func() { b.Func = prevFn }()
@@ -144,10 +327,12 @@ func (b *IRBuilder) lowerFunction(hirFn *desugar.Function, env *SymbolTable) *Fu
 			lcl := &Local{Ident: d.Mangled, OrigName: d.Name, Typ: b.lowerType(d.Type), Size: d.Size}
 			fn.Locals = append(fn.Locals, lcl)
 			fn.Env.Define(lcl.Ident, lcl)
+			fn.Env.Define(lcl.OrigName, lcl)
 		case *desugar.Constant:
 			c := &NamedConst{Ident: d.Name, ConstValue: b.ensureValue(d.Value), Typ: b.lowerType(d.Type), Size: d.Size}
 			fn.Constants[d.Mangled] = c
 			fn.Env.Define(d.Mangled, c)
+			fn.Env.Define(c.OrigName, c)
 		case *desugar.Function:
 			// nested procedures: handled at usage
 		}
@@ -431,8 +616,8 @@ func (b *IRBuilder) ensureValue(expr desugar.Expr) Value {
 	case *desugar.UnaryExpr:
 		return b.lowerUnaryExpr(e)
 	case *desugar.VariableRef:
-		v, found := b.Func.Env.Lookup(e.Mangled)
-		if !found {
+		v := b.env.Find(e.Mangled)
+		if v == nil {
 			panic(fmt.Sprintf("undefined variable: '%s'", e.Name))
 		}
 		t := b.NewTemp(v.Type())
@@ -441,15 +626,15 @@ func (b *IRBuilder) ensureValue(expr desugar.Expr) Value {
 	case *desugar.ConstantRef:
 		return b.Func.Constants[e.Mangled]
 	case *desugar.Param:
-		v, found := b.Func.Env.Lookup(e.Name)
-		if !found {
+		v := b.Func.Env.Lookup(e.Name)
+		if v == nil {
 			panic(fmt.Sprintf("undefined parameter: '%s'", e.Name))
 		}
 		param, ok := v.(*Param)
 		if !ok {
 			panic(fmt.Sprintf("symbol '%s' is not a parameter", e.Name))
 		}
-		if param.Kind == "VALUE" {
+		if param.Kind != "VALUE" {
 			return param
 		}
 		t := b.NewTemp(param.Type())
@@ -486,8 +671,8 @@ func (b *IRBuilder) ensureValue(expr desugar.Expr) Value {
 func (b *IRBuilder) ensureAddr(expr desugar.Expr) Value {
 	switch e := expr.(type) {
 	case *desugar.Param:
-		v, found := b.Func.Env.Lookup(e.Name)
-		if !found {
+		v := b.Func.Env.Lookup(e.Name)
+		if v == nil {
 			panic(fmt.Sprintf("undefined parameter: '%s'", e.Name))
 		}
 		param, ok := v.(*Param)
@@ -496,8 +681,8 @@ func (b *IRBuilder) ensureAddr(expr desugar.Expr) Value {
 		}
 		return param
 	case *desugar.VariableRef:
-		v, found := b.Func.Env.Lookup(e.Mangled)
-		if !found {
+		v := b.env.Find(e.Mangled)
+		if v == nil {
 			panic(fmt.Sprintf("undefined variable: '%s'", e.Name))
 		}
 		return v
@@ -508,6 +693,13 @@ func (b *IRBuilder) ensureAddr(expr desugar.Expr) Value {
 	case *desugar.DerefExpr:
 		addr := b.lowerDerefExpr(e)
 		return &Mem{Base: addr}
+	case *desugar.Literal:
+		if e.Kind == token.STR_LIT {
+			// Address-of a string literal: create a string constant and return its
+			// address as a temp pointer.
+			return b.MakeStringConstant(e.Value)
+		}
+		panic("ensureAddr: literal is not addressable")
 	default:
 		panic("ensureAddr: expr is not addressable: " + fmt.Sprintf("%T", expr))
 	}
@@ -587,6 +779,21 @@ func (b *IRBuilder) lowerConst(c *desugar.Literal) Value {
 
 	t := b.NewTemp(v.Type())
 	b.Emit(&MoveInst{Target: t, Value: v})
+	return t
+}
+
+// MakeStringConstant creates a named string constant in the current function's
+// constant pool and returns a temp containing its address (suitable for
+// passing to external C-style varargs functions like printf).
+func (b *IRBuilder) MakeStringConstant(value string) Value {
+	if b.Func == nil {
+		panic("MakeStringConstant: no current function")
+	}
+	name := "str_const_" + strconv.Itoa(len(b.Func.Constants))
+	str := &StrLit{LitName: name, LitValue: value, Typ: &StringType{Length: len(value)}}
+	b.Func.Constants[name] = str
+	t := b.NewTemp(PointerTo(UInt8Type))
+	b.Emit(&MoveInst{Target: t, Value: str})
 	return t
 }
 
@@ -836,6 +1043,8 @@ func (b *IRBuilder) lowerType(ty types.Type) Type {
 			return Int1Type
 		case types.SET:
 			return SetType
+		case types.VOID:
+			return Void
 		default:
 			panic("unhandled basic type: " + fmt.Sprintf("%v", ty.Kind))
 		}
@@ -858,6 +1067,8 @@ func (b *IRBuilder) lowerType(ty types.Type) Type {
 		return &PointerType{Ref: b.lowerType(ty.Base)}
 	case *types.NamedType:
 		return b.lowerType(ty.Def)
+	case *types.CPointerType:
+		return &CPointerType{Ref: b.lowerType(ty.Base)}
 	default:
 		panic("unhandled type: " + fmt.Sprintf("%T", ty))
 	}
@@ -911,14 +1122,30 @@ func (b *IRBuilder) lowerOp(op token.Kind) InstrOp {
 // ─── Function call lowering ───────────────────────────────────────────────
 
 func (b *IRBuilder) FuncCall(call *desugar.FuncCall) Value {
+	// Some external calls (builtin helpers) have custom lowering handlers.
+	if call.Func.IsExternal {
+		if f, ok := externalsLowering[call.Func.Name]; ok && f != nil {
+			return f(b, call)
+		}
+	}
+
 	var fxn Value
 	var ok bool
 	for _, n := range []string{call.Func.Mangled, call.Func.Name, strings.ToLower(call.Func.Name)} {
 		if n == "" {
 			continue
 		}
-		if fxn, ok = b.Func.Env.Lookup(n); ok {
-			break
+		if call.Func.Module != "" {
+			// Qualified call: look up in the named module table we created.
+			if fxn = b.env.Find(call.Func.Mangled); fxn != nil {
+				ok = true
+				break
+			}
+		} else {
+			if fxn = b.Func.Env.Lookup(n); fxn != nil {
+				ok = true
+				break
+			}
 		}
 	}
 	if !ok {
@@ -982,7 +1209,7 @@ func (b *IRBuilder) callee(call *desugar.FuncCall) *Function {
 		if n == "" {
 			continue
 		}
-		if v, ok := b.Func.Env.Lookup(n); ok {
+		if v := b.Func.Env.Lookup(n); v != nil {
 			if fn, ok := v.(*Function); ok {
 				return fn
 			}
@@ -991,7 +1218,8 @@ func (b *IRBuilder) callee(call *desugar.FuncCall) *Function {
 	panic("callee: function not found in env: " + call.Func.Name)
 }
 
-func (b *IRBuilder) lowerVarArgs(args []desugar.Expr, start, end int, out *[]Value) {	for idx := start; idx < end; idx++ {
+func (b *IRBuilder) lowerVarArgs(args []desugar.Expr, start, end int, out *[]Value) {
+	for idx := start; idx < end; idx++ {
 		v := b.ensureValue(args[idx])
 		b.Emit(&Arg{Index: idx, Value: v})
 		*out = append(*out, v)
@@ -1131,4 +1359,3 @@ func (b *IRBuilder) lowerNEWOpen(dims []Value, elemSize uint64, wordSize uint64)
 
 	return ptr
 }
-
