@@ -14,11 +14,11 @@
 module Mem
 
 <* IF WINDOWS THEN *>
-  import C := win32.Stdlib
-  import S := win32.StringH
+  import Lib := win32.Stdlib
+  import StrH := win32.StringH
 <* ELSE *>
-  import C := posix.Stdlib
-  import S := posix.StringH
+  import Lib := posix.Stdlib
+  import StrH := posix.StringH
 <* END *>
 
 // ── Allocation ────────────────────────────────────────────────────────────────
@@ -27,13 +27,13 @@ module Mem
 // Returns NIL if the allocation fails.
 proc Alloc*(size: integer): cpointer to void
 begin
-  return C.malloc(size)
+  return Lib.malloc(size)
 end Alloc
 
 // AllocZero allocates size bytes initialized to zero.
 proc AllocZero*(size: integer): cpointer to void
 begin
-  return C.calloc(1, size)
+  return Lib.calloc(1, size)
 end AllocZero
 
 // Realloc resizes the block pointed to by ptr to newSize bytes.
@@ -41,13 +41,13 @@ end AllocZero
 // original block is NOT freed in that case.
 proc Realloc*(ptr: cpointer to void; newSize: integer): cpointer to void
 begin
-  return C.realloc(ptr, newSize)
+  return Lib.realloc(ptr, newSize)
 end Realloc
 
 // Free releases a block previously obtained from Alloc/AllocZero/Realloc.
 proc Free*(ptr: cpointer to void)
 begin
-  C.free(ptr)
+  Lib.free(ptr)
 end Free
 
 // ── Block operations ──────────────────────────────────────────────────────────
@@ -56,38 +56,38 @@ end Free
 // The regions must not overlap; use Move for overlapping regions.
 proc Copy*(dst: cpointer to void; src: cpointer to void; n: integer)
 begin
-  S.memcpy(dst, src, n)
+  StrH.memcpy(dst, src, n)
 end Copy
 
 // Move copies n bytes from src to dst, handling overlapping regions correctly.
 proc Move*(dst: cpointer to void; src: cpointer to void; n: integer)
 begin
-  S.memmove(dst, src, n)
+  StrH.memmove(dst, src, n)
 end Move
 
 // Fill sets n bytes starting at ptr to the byte value val (0–255).
 proc Fill*(ptr: cpointer to void; val: integer; n: integer)
 begin
-  S.memset(ptr, val, n)
+  StrH.memset(ptr, val, n)
 end Fill
 
 // Zero sets n bytes starting at ptr to 0.
 proc Zero*(ptr: cpointer to void; n: integer)
 begin
-  S.memset(ptr, 0, n)
+  StrH.memset(ptr, 0, n)
 end Zero
 
 // Compare lexicographically compares n bytes of a and b.
 // Returns 0 if equal, negative if a < b, positive if a > b.
 proc Compare*(a: cpointer to void; b: cpointer to void; n: integer): integer
 begin
-  return S.memcmp(a, b, n)
+  return StrH.memcmp(a, b, n)
 end Compare
 
 // Equal returns true if the first n bytes of a and b are identical.
 proc Equal*(a: cpointer to void; b: cpointer to void; n: integer): boolean
 begin
-  return S.memcmp(a, b, n) = 0
+  return StrH.memcmp(a, b, n) = 0
 end Equal
 
 end Mem
