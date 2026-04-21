@@ -73,7 +73,7 @@ func (a Argument) String() string {
 	}
 	return fmt.Sprintf("arg(#%d)", a.Index)
 }
-func (a Argument) Type() Type     { panic("implement me") }
+func (a Argument) Type() Type { panic("implement me") }
 
 func (s Symbol) String() string { return s.Name }
 func (s Symbol) Type() Type     { return s.Ty }

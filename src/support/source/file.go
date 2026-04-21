@@ -37,7 +37,6 @@ func NewSourceFile(name string, content []byte) *File {
 	}
 }
 
-
 // LineColToOffset converts a (1-based) line/column pair back to a byte offset.
 func (sf *File) LineColToOffset(line, col int) int {
 	if line < 1 || line > len(sf.LineOffsets) {

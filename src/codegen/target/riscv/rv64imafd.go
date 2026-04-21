@@ -439,4 +439,3 @@ func (r RV64IMAFD) AssignParams(paramCount int) []target.Location {
 func init() {
 	target.Register("rv64imafd", func() target.Machine { return NewRV64IMAFDTarget() })
 }
-

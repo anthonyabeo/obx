@@ -309,4 +309,3 @@ func resolveConst(c asm.Constant) string {
 		panic(fmt.Sprintf("arm64: unknown constant type %T", c.Type))
 	}
 }
-

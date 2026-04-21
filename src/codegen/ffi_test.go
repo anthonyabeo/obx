@@ -57,11 +57,11 @@ func buildFFIProgramMIR(t *testing.T, ctx *compiler.Context, sources []struct{ n
 		t.Fatal("sema errors")
 	}
 
-	gen := desugar.NewGenerator(obx)
+	gen := desugar.NewGenerator(obx, ctx)
 	hirProg := gen.Generate()
 
 	builder := obxir.NewIRBuilder(ctx.Target.WordSize)
-	prog := builder.Build(hirProg)
+	prog := builder.Build(hirProg, ctx)
 
 	for _, module := range prog.Modules {
 		for _, function := range module.Funcs {
@@ -345,9 +345,3 @@ END CLib.
 		t.Errorf("asm.Externals: expected 2, got %d", len(clibMod.Asm.Externals))
 	}
 }
-
-
-
-
-
-

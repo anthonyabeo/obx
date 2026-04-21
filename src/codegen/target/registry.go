@@ -34,4 +34,3 @@ func Available() []string {
 	sort.Strings(names)
 	return names
 }
-

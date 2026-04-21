@@ -442,4 +442,3 @@ func regKindFor(name string) asm.RegKind {
 	}
 	return asm.GPR
 }
-

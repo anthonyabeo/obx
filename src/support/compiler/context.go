@@ -67,4 +67,3 @@ func New(
 func (c *Context) SetDirective(name string, val any) {
 	c.Directives[name] = val
 }
-

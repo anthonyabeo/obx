@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/anthonyabeo/obx/src/codegen/asm"
 	"github.com/anthonyabeo/obx/src/codegen/bud"
 	"github.com/anthonyabeo/obx/src/codegen/bud/parser"
-	"github.com/anthonyabeo/obx/src/codegen/asm"
 )
 
 func TestISelect(t *testing.T) {

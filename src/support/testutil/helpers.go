@@ -43,11 +43,11 @@ func ParseSourceAndLowerToMIR(t *testing.T, ctx *compiler.Context, fileName stri
 		t.Fatalf("semantics errors")
 	}
 
-	gen := desugar.NewGenerator(obx)
+	gen := desugar.NewGenerator(obx, ctx)
 	HIRProgram := gen.Generate()
 
 	builder := obxir.NewIRBuilder(ctx.Target.WordSize)
-	return builder.Build(HIRProgram)
+	return builder.Build(HIRProgram, ctx)
 }
 
 // ParseMultipleSourcesAndLowerToMIR parses each SourceUnit in order (e.g.
@@ -77,10 +77,9 @@ func ParseMultipleSourcesAndLowerToMIR(t *testing.T, ctx *compiler.Context, unit
 		t.Fatalf("semantic errors")
 	}
 
-	gen := desugar.NewGenerator(obx)
+	gen := desugar.NewGenerator(obx, ctx)
 	HIRProgram := gen.Generate()
 
 	builder := obxir.NewIRBuilder(ctx.Target.WordSize)
-	return builder.Build(HIRProgram)
+	return builder.Build(HIRProgram, ctx)
 }
-
