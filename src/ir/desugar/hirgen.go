@@ -4,16 +4,18 @@ import (
 	"fmt"
 
 	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 type Generator struct {
 	obx *ast.OberonX
+	ctx *compiler.Context
 }
 
-func NewGenerator(obx *ast.OberonX) *Generator {
-	return &Generator{obx: obx}
+func NewGenerator(obx *ast.OberonX, ctx *compiler.Context) *Generator {
+	return &Generator{obx: obx, ctx: ctx}
 }
 
 func (g Generator) Generate() *Program {
@@ -50,33 +52,54 @@ func (g Generator) VisitDefinition(definition *ast.Definition) any {
 	name := definition.BName
 
 	if definition.IsExtern {
-		// External library module: emit one extern Function per procedure heading.
+		// External library module: emit one extern Function per procedure heading,
+		// and lower variable declarations as exported extern variables.
 		var decls []Decl
 		for _, d := range definition.DeclSeq {
-			proc, ok := d.(*ast.ProcedureDecl)
-			if !ok {
-				continue
-			}
-			sym, _ := proc.Head.Name.Symbol.(*ast.ProcedureSymbol)
-			if sym == nil {
-				continue
-			}
-			var params []*Param
-			if proc.Head.FP != nil {
-				fps := proc.Head.FP.Accept(g)
-				if fps != nil {
-					params = fps.([]*Param)
+			switch decl := d.(type) {
+			case *ast.ProcedureDecl:
+				sym, _ := decl.Head.Name.Symbol.(*ast.ProcedureSymbol)
+				if sym == nil {
+					continue
 				}
+				var params []*Param
+				if decl.Head.FP != nil {
+					fps := decl.Head.FP.Accept(g)
+					if fps != nil {
+						params = fps.([]*Param)
+					}
+				}
+				decls = append(decls, &Function{
+					Name:       decl.Head.Name.Name,
+					Mangled:    sym.CName,
+					Params:     params,
+					IsExport:   true,
+					IsExternal: true,
+					DLLName:    sym.DLLName,
+					IsVarArgs:  sym.IsVarArgs,
+				})
+			case *ast.VariableDecl:
+				// Reuse VisitVariableDecl to create Variable decls, then mark them exported
+				vars := decl.Accept(g).([]Decl)
+				// VisitVariableDecl produces variables in the same order as decl.IdentList, so zip them.
+				for i, id := range decl.IdentList {
+					if i >= len(vars) {
+						break
+					}
+					if vv, ok := vars[i].(*Variable); ok {
+						// If the symbol provides a C name, use it as the mangled name.
+						if sym, _ := id.Symbol.(*ast.VariableSymbol); sym != nil {
+							if sym.CName != "" {
+								vv.Mangled = sym.CName
+							}
+						}
+						vv.IsExport = true
+					}
+				}
+				decls = append(decls, vars...)
+			default:
+				continue
 			}
-			decls = append(decls, &Function{
-				Name:       proc.Head.Name.Name,
-				Mangled:    sym.CName,
-				Params:     params,
-				IsExport:   true,
-				IsExternal: true,
-				DLLName:    sym.DLLName,
-				IsVarArgs:  sym.IsVarArgs,
-			})
 		}
 		return &Module{Name: name, Decls: decls}
 	}

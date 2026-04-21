@@ -49,7 +49,7 @@ func lowerFFIDefinition(t *testing.T, src string) *desugar.Module {
 		t.Fatalf("sema errors")
 	}
 
-	gen := desugar.NewGenerator(obx)
+	gen := desugar.NewGenerator(obx, ctx)
 	prog := gen.Generate()
 	if len(prog.Modules) != 1 {
 		t.Fatalf("expected 1 module, got %d", len(prog.Modules))
@@ -249,9 +249,3 @@ END Mixed.
 		t.Errorf("Bar DLLName: got %q, want %q", bar.DLLName, "libbar")
 	}
 }
-
-
-
-
-
-
