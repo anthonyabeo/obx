@@ -64,7 +64,7 @@ begin
   IO.WriteLn("=== Strings ===")
 
   s := "Hello"
-  IO.Write("len(\"Hello\") = ")
+  IO.Write('len("Hello") = ')
   IO.WriteInt(Strings.Len(s))
   IO.WriteLn("")
 
@@ -75,12 +75,12 @@ begin
 
   s := "   inner   "
   Strings.Trim(s)
-  IO.Write("trimmed = \"")
+  IO.Write('trimmed = "')
   IO.Write(s)
-  IO.WriteLn("\"")
+  IO.WriteLn('"')
 
   s := "Hello, World"
-  IO.Write("contains \"World\" : ")
+  IO.Write('contains "World" : ')
   IO.WriteBool(Strings.Contains(s, "World"))
   IO.WriteLn("")
 end demoStrings
