@@ -53,8 +53,6 @@ type Symbol interface {
 	Props() IdentProps
 	SetMangledName(string)
 	MangledName() string
-	Offset() int
-	SetOffset(int)
 }
 
 type TypeSymbol struct {
@@ -65,7 +63,6 @@ type TypeSymbol struct {
 	astType     Type
 	parent      *LexicalScope
 	mangledName string
-	Displace    int
 }
 
 func (t *TypeSymbol) Name() string                   { return t.name }
@@ -78,8 +75,6 @@ func (t *TypeSymbol) SetParent(parent *LexicalScope) { t.parent = parent }
 func (t *TypeSymbol) Props() IdentProps              { return t.props }
 func (t *TypeSymbol) MangledName() string            { return t.mangledName }
 func (t *TypeSymbol) SetMangledName(name string)     { t.mangledName = name }
-func (t *TypeSymbol) Offset() int                    { return t.Displace }
-func (t *TypeSymbol) SetOffset(disp int)             { t.Displace = disp }
 
 func NewTypeSymbol(name string, props IdentProps, typ Type) *TypeSymbol {
 	return &TypeSymbol{name: name, kind: TypeSymbolKind, props: props, astType: typ}
@@ -87,17 +82,15 @@ func NewTypeSymbol(name string, props IdentProps, typ Type) *TypeSymbol {
 
 // ProcedureSymbol ...
 type ProcedureSymbol struct {
-	name  string
-	kind  SymbolKind
-	props IdentProps
-	// Env is the procedure's own lexical scope (params + locals).
-	Env         *LexicalScope
+	name        string
+	kind        SymbolKind
+	props       IdentProps
+	Env         *LexicalScope // Env is the procedure's own lexical scope (params + locals)
 	parent      *LexicalScope
 	astType     Type
 	semaType    types.Type
 	mangledName string
 	ProcKind    ProcedureKind
-	Displace    int
 
 	// FFI fields — set only for external procedures declared in extern DEFINITIONs.
 	IsExternal bool
@@ -127,8 +120,6 @@ func (p *ProcedureSymbol) SetMangledName(name string)     { p.mangledName = name
 func (p *ProcedureSymbol) Type() types.Type               { return p.semaType }
 func (p *ProcedureSymbol) SetType(ty types.Type)          { p.semaType = ty }
 func (p *ProcedureSymbol) AstType() Type                  { return p.astType }
-func (p *ProcedureSymbol) Offset() int                    { return p.Displace }
-func (p *ProcedureSymbol) SetOffset(disp int)             { p.Displace = disp }
 
 type ModuleSymbol struct {
 	name        string
@@ -138,7 +129,6 @@ type ModuleSymbol struct {
 	parent      *LexicalScope
 	semaType    types.Type
 	mangledName string
-	Displace    int
 }
 
 func NewImportSymbol(name string) *ModuleSymbol {
@@ -155,8 +145,6 @@ func (m *ModuleSymbol) Props() IdentProps              { panic("not implemented"
 func (m *ModuleSymbol) MangledName() string            { return m.mangledName }
 func (m *ModuleSymbol) SetMangledName(name string)     { m.mangledName = name }
 func (m *ModuleSymbol) AstType() Type                  { return nil }
-func (m *ModuleSymbol) Offset() int                    { return m.Displace }
-func (m *ModuleSymbol) SetOffset(disp int)             { m.Displace = disp }
 
 type VariableSymbol struct {
 	name        string
@@ -166,7 +154,6 @@ type VariableSymbol struct {
 	semaType    types.Type
 	parent      *LexicalScope
 	mangledName string
-	Displace    int
 
 	// FFI fields — set only for external procedures declared in extern DEFINITIONs.
 	IsExternal bool
@@ -188,8 +175,6 @@ func (v *VariableSymbol) SetType(ty types.Type)          { v.semaType = ty }
 func (v *VariableSymbol) Props() IdentProps              { return v.props }
 func (v *VariableSymbol) MangledName() string            { return v.mangledName }
 func (v *VariableSymbol) SetMangledName(name string)     { v.mangledName = name }
-func (v *VariableSymbol) Offset() int                    { return v.Displace }
-func (v *VariableSymbol) SetOffset(disp int)             { v.Displace = disp }
 
 type ConstantSymbol struct {
 	name        string
@@ -199,7 +184,6 @@ type ConstantSymbol struct {
 	parent      *LexicalScope
 	semaType    types.Type
 	mangledName string
-	Displace    int
 }
 
 func NewConstantSymbol(name string, props IdentProps, value Expression) *ConstantSymbol {
@@ -215,8 +199,6 @@ func (c *ConstantSymbol) Props() IdentProps              { return c.props }
 func (c *ConstantSymbol) MangledName() string            { return c.mangledName }
 func (c *ConstantSymbol) SetMangledName(name string)     { c.mangledName = name }
 func (c *ConstantSymbol) AstType() Type                  { return nil }
-func (c *ConstantSymbol) Offset() int                    { return c.Displace }
-func (c *ConstantSymbol) SetOffset(disp int)             { c.Displace = disp }
 
 type FieldSymbol struct {
 	name        string
@@ -226,7 +208,6 @@ type FieldSymbol struct {
 	semaType    types.Type
 	parent      *LexicalScope
 	mangledName string
-	Displace    int
 }
 
 func NewFieldSymbol(name string, props IdentProps, typ Type) *FieldSymbol {
@@ -242,8 +223,6 @@ func (f *FieldSymbol) SetType(ty types.Type)         { f.semaType = ty }
 func (f *FieldSymbol) Props() IdentProps             { return f.props }
 func (f *FieldSymbol) MangledName() string           { return f.mangledName }
 func (f *FieldSymbol) SetMangledName(name string)    { f.mangledName = name }
-func (f *FieldSymbol) Offset() int                   { return f.Displace }
-func (f *FieldSymbol) SetOffset(disp int)            { f.Displace = disp }
 
 type ParamSymbol struct {
 	name        string
@@ -253,7 +232,6 @@ type ParamSymbol struct {
 	semaType    types.Type
 	parent      *LexicalScope
 	mangledName string
-	Displace    int
 }
 
 func NewParamSymbol(name string, mod token.Kind, typ Type) *ParamSymbol {
@@ -270,8 +248,6 @@ func (p *ParamSymbol) Props() IdentProps              { panic("not implemented")
 func (p *ParamSymbol) MangledName() string            { return p.mangledName }
 func (p *ParamSymbol) SetMangledName(name string)     { p.mangledName = name }
 func (p *ParamSymbol) AstType() Type                  { return p.astType }
-func (p *ParamSymbol) Offset() int                    { return p.Displace }
-func (p *ParamSymbol) SetOffset(disp int)             { p.Displace = disp }
 
 func Mangle(sym Symbol) string {
 	var parts []string

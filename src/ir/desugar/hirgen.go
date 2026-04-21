@@ -199,7 +199,6 @@ func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 			Module:     ident.Prefix,
 			IsExported: sym.Props() == ast.Exported || ident.Symbol.Props() == ast.ExportedReadOnly,
 			IsReadOnly: sym.Props() == ast.ReadOnly,
-			Offset:     sym.Offset(),
 			Size:       ident.SemaType.Width(),
 		}
 	case ast.ProcedureSymbolKind:
