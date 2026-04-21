@@ -11,11 +11,11 @@ import (
 type Scanner struct {
 	content []byte
 
-	start  int // start position of this item
-	pos    int // current position of the input
-	width  int // width of the last rune read
-	line   int // current line number
-	column int // current column number
+	start  int              // start position of this item
+	pos    int              // current position of the input
+	width  int              // width of the last rune read
+	line   int              // current line number
+	column int              // current column number
 	items  chan token.Token // channel of scanned items
 }
 

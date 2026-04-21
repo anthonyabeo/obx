@@ -3,9 +3,9 @@ package ast
 // Attribute represents a single FFI attribute: a name followed by zero or more
 // constant-expression values.
 //
-//   dll "libm"    → Attribute{Name: "dll",     Values: [BasicLit{"libm"}]}
-//   prefix "OBX_" → Attribute{Name: "prefix",  Values: [BasicLit{"OBX_"}]}
-//   varargs        → Attribute{Name: "varargs", Values: nil}
+//	dll "libm"    → Attribute{Name: "dll",     Values: [BasicLit{"libm"}]}
+//	prefix "OBX_" → Attribute{Name: "prefix",  Values: [BasicLit{"OBX_"}]}
+//	varargs        → Attribute{Name: "varargs", Values: nil}
 type Attribute struct {
 	Name   string
 	Values []Expression
@@ -70,4 +70,3 @@ func (al *AttributeList) stringAttr(name string) string {
 	}
 	return ""
 }
-

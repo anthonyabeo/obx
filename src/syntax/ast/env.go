@@ -48,9 +48,25 @@ func (e *Environment) SetCurrentScope(scope *LexicalScope) {
 }
 
 func (e *Environment) AddModuleScope(name string, scope *LexicalScope) {
+	if name == "" || scope == nil {
+		return
+	}
+	if prev := e.modules[name]; prev != nil {
+		return
+	}
 	e.modules[name] = scope
 }
 
 func (e *Environment) ModuleScope(name string) *LexicalScope {
 	return e.modules[name]
+}
+
+// ModuleNames returns the list of module names registered in the environment.
+// This includes any aliases that were added via AddModuleScope.
+func (e *Environment) ModuleNames() []string {
+	names := make([]string, 0, len(e.modules))
+	for k := range e.modules {
+		names = append(names, k)
+	}
+	return names
 }

@@ -262,10 +262,3 @@ END Multi.
 		t.Errorf("proc alias: got %q", proc.Head.Attrs.Alias())
 	}
 }
-
-
-
-
-
-
-

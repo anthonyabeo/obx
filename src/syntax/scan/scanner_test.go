@@ -61,7 +61,7 @@ func TestScanNumber(t *testing.T) {
 		{"123.456S-2", token.REAL_LIT, false},
 		{"123.456E2147483648", token.LONGREAL_LIT, false},  // exponent larger than 32 bits
 		{"123.456e-2147483649", token.LONGREAL_LIT, false}, // negative exponent larger than 32 bits
-
+		{"2.7D0", token.LONGREAL_LIT, false},               // long real with zero exponent
 		// Error cases
 		{"ABCDH", token.IDENTIFIER, false},
 		{"0H0", token.ILLEGAL, true},         // hex with trailing zero

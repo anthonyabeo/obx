@@ -42,15 +42,6 @@ func (s SymbolKind) String() string {
 	}
 }
 
-func (s SymbolKind) IsProcedure() bool {
-	switch s {
-	case ProcedureSymbolKind:
-		return true
-	default:
-		return false
-	}
-}
-
 type Symbol interface {
 	Name() string
 	Kind() SymbolKind
@@ -176,6 +167,12 @@ type VariableSymbol struct {
 	parent      *LexicalScope
 	mangledName string
 	Displace    int
+
+	// FFI fields — set only for external procedures declared in extern DEFINITIONs.
+	IsExternal bool
+	IsVarArgs  bool
+	CName      string // effective C symbol name (prefix + alias|procname)
+	DLLName    string // library name from the dll attribute
 }
 
 func NewVariableSymbol(name string, props IdentProps, typ Type) *VariableSymbol {

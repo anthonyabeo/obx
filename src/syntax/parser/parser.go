@@ -406,6 +406,7 @@ func (p *Parser) parseDefinition() *ast.Definition {
 	}
 
 	p.ctx.Env.AddModuleScope(beginName, p.ctx.Env.CurrentScope())
+	p.ctx.Env.CurrentScope().Name = beginName
 
 	return &ast.Definition{
 		BName:       beginName,

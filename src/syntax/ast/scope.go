@@ -57,6 +57,12 @@ func (s *LexicalScope) Parent() *LexicalScope {
 	return s.parent
 }
 
+// Elems returns the underlying symbol map for this lexical scope. The map is
+// the internal storage of the scope and callers should not mutate it.
+func (s *LexicalScope) Elems() map[string]Symbol {
+	return s.symbols
+}
+
 // -------------------------------------------------------------
 type RecordScope struct {
 	fields  map[string]Symbol

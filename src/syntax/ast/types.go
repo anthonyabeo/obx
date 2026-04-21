@@ -391,4 +391,3 @@ func (c *CPointerType) End() int               { return c.EndOffset }
 func (c *CPointerType) Children() []Node       { return []Node{c.Base} }
 func (c *CPointerType) expr()                  {}
 func (c *CPointerType) Type() types.Type       { panic("not implemented") }
-
