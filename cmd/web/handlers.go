@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -26,6 +27,17 @@ import (
 
 //go:embed static/*
 var staticFS embed.FS
+
+const (
+	// maxBodyBytes is the maximum bytes accepted by the JSON endpoints. This
+	// is enforced via http.MaxBytesReader and also used to bound the source
+	// payload size.
+	maxBodyBytes   = 256 * 1024 // 256 KB
+	maxSourceBytes = 200 * 1024 // 200 KB
+	maxFilenameLen = 128
+)
+
+var filenameRE = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 // (monarch served via generic /static/ handler)
 
@@ -120,20 +132,35 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
-	const maxBody = 256 * 1024 // 256 KB
+	// limit request size early
 	var req struct {
 		Source   string `json:"source"`
 		Filename string `json:"filename"`
 		Entry    string `json:"entry"`
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(maxBody)))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(maxBodyBytes)))
+	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	if req.Filename == "" {
 		req.Filename = "Main.obx"
+	}
+
+	// validate filename: must be a simple basename with allowed chars
+	if len(req.Filename) == 0 || len(req.Filename) > maxFilenameLen || !filenameRE.MatchString(req.Filename) || filepath.Base(req.Filename) != req.Filename {
+		http.Error(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
+	// validate source size
+	if len(req.Source) == 0 {
+		http.Error(w, "empty source", http.StatusBadRequest)
+		return
+	}
+	if len(req.Source) > maxSourceBytes {
+		http.Error(w, "source too large", http.StatusRequestEntityTooLarge)
+		return
 	}
 
 	// ── in-memory pipeline ────────────────────────────────────────────────
@@ -231,20 +258,33 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
-	const maxBody = 256 * 1024
 	var req struct {
 		Source   string `json:"source"`
 		Filename string `json:"filename"`
 		Entry    string `json:"entry"`
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(maxBody)))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(maxBodyBytes)))
+	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	if req.Filename == "" {
 		req.Filename = "Main.obx"
+	}
+
+	// validate filename and source length similar to HandleCheck
+	if len(req.Filename) == 0 || len(req.Filename) > maxFilenameLen || !filenameRE.MatchString(req.Filename) || filepath.Base(req.Filename) != req.Filename {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid filename"})
+		return
+	}
+	if len(req.Source) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "empty source"})
+		return
+	}
+	if len(req.Source) > maxSourceBytes {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"ok": false, "error": "source too large"})
+		return
 	}
 
 	// ── in-memory pipeline ────────────────────────────────────────────────
@@ -326,19 +366,31 @@ func (s *Server) HandleRun(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
-	const maxBody = 256 * 1024
 	var req struct {
 		Source   string `json:"source"`
 		Filename string `json:"filename"`
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(maxBody)))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(maxBodyBytes)))
+	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	if req.Filename == "" {
 		req.Filename = "Main.obx"
+	}
+
+	if len(req.Filename) == 0 || len(req.Filename) > maxFilenameLen || !filenameRE.MatchString(req.Filename) || filepath.Base(req.Filename) != req.Filename {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid filename"})
+		return
+	}
+	if len(req.Source) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "empty source"})
+		return
+	}
+	if len(req.Source) > maxSourceBytes {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"ok": false, "error": "source too large"})
+		return
 	}
 
 	// build context and run the front-end to collect diagnostics
