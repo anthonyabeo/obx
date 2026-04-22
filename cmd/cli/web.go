@@ -23,6 +23,8 @@ var webArgs struct {
 	MaxBodyBytes   int
 	MaxSourceBytes int
 	MaxFilenameLen int
+	AllowedOrigins  []string
+	APIKey          string
 }
 
 func init() {
@@ -37,6 +39,8 @@ func init() {
 	webCmd.Flags().IntVar(&webArgs.MaxBodyBytes, "max-body-bytes", 256*1024, "maximum JSON request body size in bytes")
 	webCmd.Flags().IntVar(&webArgs.MaxSourceBytes, "max-source-bytes", 200*1024, "maximum 'source' payload size in bytes")
 	webCmd.Flags().IntVar(&webArgs.MaxFilenameLen, "max-filename-len", 128, "maximum filename length")
+	webCmd.Flags().StringSliceVar(&webArgs.AllowedOrigins, "allowed-origin", []string{}, "trusted origin(s) allowed for CORS (repeatable)")
+	webCmd.Flags().StringVar(&webArgs.APIKey, "api-key", "", "optional API key required via X-API-Key header for API access")
 }
 
 var webCmd = &cobra.Command{
@@ -48,8 +52,10 @@ var webCmd = &cobra.Command{
   POST /api/check    JSON API: {"source":"…","filename":"…"} → diagnostics
   GET  /api/version  build / runtime info
 
-CORS is enabled on all endpoints (Access-Control-Allow-Origin: *) so the API
-can be called directly from external editors, scripts, or CI tooling.`,
+CORS is configurable: use --allowed-origin to list trusted origins (repeatable),
+or supply --api-key to require an X-API-Key header for API access. When neither
+option is provided cross-origin requests are denied. This allows safely
+exposing the API to external editors, scripts, or CI tooling when configured.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := web.Config{
@@ -64,6 +70,8 @@ can be called directly from external editors, scripts, or CI tooling.`,
 			MaxBodyBytes:   webArgs.MaxBodyBytes,
 			MaxSourceBytes: webArgs.MaxSourceBytes,
 			MaxFilenameLen: webArgs.MaxFilenameLen,
+			AllowedOrigins: webArgs.AllowedOrigins,
+			APIKey:         webArgs.APIKey,
 		}
 		if err := web.Start(cfg); err != nil {
 			log.Fatalf("web: %v", err)

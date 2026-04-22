@@ -84,6 +84,28 @@ func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", mimeType)
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
+
+	// Security headers for static assets
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	// Permissions-Policy (formerly Feature-Policy) - restrict powerful features
+	w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+	// Content Security Policy: allow resources from self and HTTPS sources; block framing
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data:; connect-src 'self' https:; font-src 'self' https: data:; frame-ancestors 'none';")
+
+	// Cache policy: treat index.html as dynamic (no-cache); other assets may be cached
+	base := path.Base(clean)
+	if base == "index.html" {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+	} else {
+		// conservative caching for static assets (1 hour); operators may supply
+		// fingerprinted assets and use longer lifetimes if desired.
+		w.Header().Set("Cache-Control", "public, max-age=3600, stale-while-revalidate=60")
+	}
+
 	if r.Method == http.MethodGet {
 		_, _ = w.Write(data)
 	}
@@ -238,17 +260,58 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 
 // ── CORS middleware ───────────────────────────────────────────────────────────
 
-// corsMiddleware adds permissive CORS headers to every response so the API
-// can be consumed from external editors, scripts, and CI tooling without a
-// proxy.  OPTIONS pre-flight requests are short-circuited with 204.
-func corsMiddleware(next http.Handler) http.Handler {
+// corsMiddleware enforces CORS according to server config. If AllowedOrigins
+// contains entries, only those origins are permitted. If an API key is
+// configured, clients presenting the X-API-Key header with the matching value
+// are allowed regardless of origin (useful for non-browser clients).
+func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
+		origin := r.Header.Get("Origin")
+
+		// Helper to short-circuit preflight when allowed
+		allowCORS := func() {
+			if origin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Vary", "Origin")
+			}
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept, X-API-Key")
+		}
+
+		// If an Origin is present, evaluate allowed origins list and API key
+		if origin != "" {
+			allowed := false
+			// API key bypass: if configured and presented, allow
+			if s.cfg.APIKey != "" && r.Header.Get("X-API-Key") == s.cfg.APIKey {
+				allowed = true
+			}
+			// Check allowed origins list
+			for _, ao := range s.cfg.AllowedOrigins {
+				if ao == "*" || ao == origin {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				http.Error(w, "origin not allowed", http.StatusForbidden)
+				return
+			}
+			allowCORS()
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
 			return
+		}
+
+		// No Origin header (likely same-origin or non-browser client).
+		// If APIKey is configured require it for non-browser clients; otherwise allow.
+		if s.cfg.APIKey != "" {
+			if r.Header.Get("X-API-Key") != s.cfg.APIKey {
+				http.Error(w, "missing or invalid api key", http.StatusUnauthorized)
+				return
+			}
 		}
 		next.ServeHTTP(w, r)
 	})

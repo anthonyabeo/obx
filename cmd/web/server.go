@@ -49,6 +49,9 @@ type Config struct {
 	MaxBodyBytes   int // maximum allowed request body bytes for JSON endpoints
 	MaxSourceBytes int // maximum allowed length of the 'source' payload
 	MaxFilenameLen int // maximum length of submitted filenames
+	// CORS / auth
+	AllowedOrigins []string // allowed CORS origins (empty = deny all cross-origin)
+	APIKey         string   // optional API key accepted via X-API-Key header
 }
 
 // Server owns the mux and carries Config so every handler can read it.
@@ -85,7 +88,7 @@ func Start(cfg Config) error {
 	mux.HandleFunc("/api/version", s.HandleVersion)
 
 	// wrap with CORS and logging middlewares
-	handler := corsMiddleware(mux)
+	handler := s.corsMiddleware(mux)
 	handler = requestIDMiddleware(handler)
 
 	// create IP rate limiter from config
