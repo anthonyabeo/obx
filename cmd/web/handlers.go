@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/obxir"
@@ -25,8 +28,67 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
 
-//go:embed static/index.html
+//go:embed static/*
 var staticFS embed.FS
+
+// (monarch served via generic /static/ handler)
+
+// HandleStatic serves embedded static files under the `static/` directory.
+// It is a generic safe handler that cleans the requested path, prevents
+// directory traversal, and sets an appropriate Content-Type based on the
+// file extension (falling back to content-sniffing when necessary).
+func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Expect paths like /static/foo.js or /static/css/app.css
+	// Trim the leading /static/ prefix and clean the path
+	reqPath := r.URL.Path
+	if strings.HasPrefix(reqPath, "/static/") {
+		reqPath = strings.TrimPrefix(reqPath, "/static/")
+	} else if strings.HasPrefix(reqPath, "/") {
+		reqPath = strings.TrimPrefix(reqPath, "/")
+	}
+
+	// Clean and disallow traversal outside the static directory
+	clean := path.Clean(reqPath)
+	if clean == "." || clean == "" {
+		http.NotFound(w, r)
+		return
+	}
+	if strings.HasPrefix(clean, "../") || strings.Contains(clean, "../") {
+		http.NotFound(w, r)
+		return
+	}
+
+	embPath := path.Join("static", clean)
+	data, err := staticFS.ReadFile(embPath)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Determine MIME type: prefer extension-based detection, fall back to sniffing
+	ext := filepath.Ext(clean)
+	mimeType := mime.TypeByExtension(ext)
+	if mimeType == "" {
+		mimeType = http.DetectContentType(data)
+	}
+	// Ensure charset for text-like types where appropriate
+	if strings.HasPrefix(mimeType, "text/") || strings.HasPrefix(mimeType, "application/javascript") || strings.HasPrefix(mimeType, "application/json") {
+		if !strings.Contains(mimeType, "charset") {
+			mimeType = mimeType + "; charset=utf-8"
+		}
+	}
+
+	w.Header().Set("Content-Type", mimeType)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
+	if r.Method == http.MethodGet {
+		_, _ = w.Write(data)
+	}
+}
 
 // ── GET / ────────────────────────────────────────────────────────────────────
 
@@ -63,17 +125,19 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	const maxBody = 256 * 1024 // 256 KB
 	var req struct {
 		Source   string `json:"source"`
 		Filename string `json:"filename"`
 		Entry    string `json:"entry"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(maxBody)))
+	if err := dec.Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	if req.Filename == "" {
-		req.Filename = "input.obx"
+		req.Filename = "Main.obx"
 	}
 
 	// ── in-memory pipeline ────────────────────────────────────────────────
@@ -87,18 +151,19 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 	obx := ast.NewOberonX()
 
 	// parse stdlib modules first (best-effort; skip if unavailable)
-	if err := loadStdlibInto(ctx, obx, req.Entry, req.Filename, req.Source); err != nil {
+	entry := deriveEntryFromFilename(req.Filename)
+	if err := loadStdlibInto(ctx, obx, entry, req.Filename, req.Source); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// parse the user's source
-	p := parser.NewParser(ctx, req.Filename, []byte(req.Source))
-	unit := p.Parse()
+	//p := parser.NewParser(ctx, req.Filename, []byte(req.Source))
+	//unit := p.Parse()
 
 	// sema — only when parsing succeeded
 	if reporter.ErrorCount() == 0 {
-		obx.AddUnit(unit)
+		//obx.AddUnit(unit)
 		sema.NewSema(ctx, obx).Validate()
 	}
 
@@ -176,17 +241,19 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	const maxBody = 256 * 1024
 	var req struct {
 		Source   string `json:"source"`
 		Filename string `json:"filename"`
 		Entry    string `json:"entry"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(maxBody)))
+	if err := dec.Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	if req.Filename == "" {
-		req.Filename = "input.obx"
+		req.Filename = "Main.obx"
 	}
 
 	// ── in-memory pipeline ────────────────────────────────────────────────
@@ -198,7 +265,8 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 	injectHostPlatformDirectives(ctx)
 
 	obx := ast.NewOberonX()
-	if err := loadStdlibInto(ctx, obx, req.Entry, req.Filename, req.Source); err != nil {
+	entry := deriveEntryFromFilename(req.Filename)
+	if err := loadStdlibInto(ctx, obx, entry, req.Filename, req.Source); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -400,6 +468,113 @@ func loadStdlibInto(ctx *compiler.Context, obx *ast.OberonX, entry, userFilename
 		r.Reset()
 	}
 	return nil
+}
+
+// deriveEntryFromFilename returns the module entry name from a filename
+// e.g. "Main.obx" -> "Main". Falls back to "Main" when empty.
+func deriveEntryFromFilename(fn string) string {
+	if fn == "" {
+		return "Main"
+	}
+	base := filepath.Base(fn)
+	stem := strings.TrimSuffix(base, filepath.Ext(base))
+	if stem == "" {
+		return "Main"
+	}
+	return stem
+}
+
+// HandleRun executes the user's program (MVP placeholder). Returns diagnostics
+// and a textual output. Real execution/sandboxing is planned for later.
+func (s *Server) HandleRun(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	const maxBody = 256 * 1024
+	var req struct {
+		Source   string `json:"source"`
+		Filename string `json:"filename"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(maxBody)))
+	if err := dec.Decode(&req); err != nil {
+		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Filename == "" {
+		req.Filename = "Main.obx"
+	}
+
+	// build context and run the front-end to collect diagnostics
+	srcMgr := source.NewSourceManager()
+	emitter := diag.ToWriter(formatter.NewJSONFormatter(srcMgr), io.Discard)
+	reporter := diag.NewBufferedReporter(srcMgr, s.cfg.MaxErrors, emitter)
+	ctx := compiler.New(req.Filename, srcMgr, reporter, ast.NewEnv(), 0)
+
+	injectHostPlatformDirectives(ctx)
+
+	obx := ast.NewOberonX()
+	entry := deriveEntryFromFilename(req.Filename)
+	if err := loadStdlibInto(ctx, obx, entry, req.Filename, req.Source); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+
+	p := parser.NewParser(ctx, req.Filename, []byte(req.Source))
+	unit := p.Parse()
+	if reporter.ErrorCount() == 0 {
+		obx.AddUnit(unit)
+		// run semantic checks
+		sema.NewSema(ctx, obx).Validate()
+	}
+
+	// Collect diagnostics (only user's file)
+	type location struct {
+		File      string `json:"file"`
+		StartLine int    `json:"start_line"`
+		StartCol  int    `json:"start_col"`
+		EndLine   int    `json:"end_line"`
+		EndCol    int    `json:"end_col"`
+	}
+	type diagItem struct {
+		Severity string    `json:"severity"`
+		Message  string    `json:"message"`
+		Location *location `json:"location,omitempty"`
+	}
+
+	raw := reporter.Diagnostics()
+	items := make([]diagItem, 0, len(raw))
+	userErrors := 0
+	for _, d := range raw {
+		if d.Range != nil && d.Range.Start.File != req.Filename {
+			continue
+		}
+		item := diagItem{Severity: d.Severity.String(), Message: d.Message}
+		if d.Range != nil {
+			item.Location = &location{
+				File:      d.Range.Start.File,
+				StartLine: d.Range.Start.Line,
+				StartCol:  d.Range.Start.Column,
+				EndLine:   d.Range.End.Line,
+				EndCol:    d.Range.End.Column,
+			}
+		}
+		items = append(items, item)
+		if d.Severity == diag.Error {
+			userErrors++
+		}
+	}
+
+	// Placeholder output — real execution will be implemented later.
+	output := "[run] execution not implemented in playground yet\n"
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":          userErrors == 0,
+		"error_count": userErrors,
+		"diagnostics": items,
+		"output":      output,
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

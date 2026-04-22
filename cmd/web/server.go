@@ -29,8 +29,13 @@ func Start(cfg Config) error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.HandleUI)
+	// serve embedded static assets under /static/
+	// (oberon-monarch.js is now served via /static/oberon-monarch.js)
+	// generic static handler for embedded assets under /static/
+	mux.HandleFunc("/static/", s.HandleStatic)
 	mux.HandleFunc("/api/check", s.HandleCheck)
 	mux.HandleFunc("/api/cfg", s.HandleCFG)
+	mux.HandleFunc("/api/run", s.HandleRun)
 	mux.HandleFunc("/api/version", s.HandleVersion)
 
 	fmt.Printf("obx web  →  http://%s\n", cfg.Addr)

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>obx — Oberon+ Checker</title>
+  <title>obx — Oberon+ Playground</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -38,7 +38,7 @@
     }
 
     /* ── Workspace ──────────────────────────── */
-    .workspace { display: flex; flex: 1; overflow: hidden; }
+    .workspace { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 
     .pane {
       display: flex; flex-direction: column;
@@ -51,6 +51,10 @@
     #diagPane   { flex: 0 0 24%; }
     #cfgPane    { flex: 1; min-width: 280px; }
 
+    /* layout rows: top contains editor/diag/cfg, bottom contains terminal */
+    .topRow { display: flex; flex: 1; overflow: hidden; }
+    .bottomRow { flex: 0 0 28%; border-top: 1px solid #2d3148; }
+
     /* ── Pane headers ───────────────────────── */
     .pane-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
     .pane-label  { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: #4b5563; flex-shrink: 0; }
@@ -60,6 +64,13 @@
       background: #1a1d27; border: 1px solid #2d3148; border-radius: 4px;
       color: #94a3b8; font-size: .8rem; padding: 3px 8px; width: 180px;
     }
+    /* header action buttons */
+    .header-actions { display: flex; align-items: center; }
+    .icon-btn.action { width: 36px; height: 32px; padding: 6px; display:flex; align-items:center; justify-content:center; border-radius:6px; }
+    .icon-btn.action:hover { background: rgba(255,255,255,0.02); }
+    .icon-btn.action.cfg svg { filter: drop-shadow(0 0 4px rgba(167,139,250,0.12)); }
+    .icon-btn.action.run svg { filter: drop-shadow(0 0 6px rgba(96,165,250,0.12)); }
+    .icon-btn.action.check svg { filter: drop-shadow(0 0 6px rgba(16,185,129,0.12)); }
     input#filename:focus { outline: none; border-color: #818cf8; color: #e2e8f0; }
 
     button#checkBtn {
@@ -76,14 +87,18 @@
       border-radius: 3px; padding: 1px 5px; color: #6b7280;
     }
 
-    /* ── Editor ─────────────────────────────── */
-    textarea#editor {
+    /* ── Editor (Monaco) ───────────────────── */
+    #editor {
       flex: 1; background: #141720; border: 1px solid #2d3148; border-radius: 6px;
       color: #e2e8f0; font-family: "JetBrains Mono","Fira Code",ui-monospace,monospace;
-      font-size: .875rem; line-height: 1.65; padding: 12px 14px;
-      resize: none; tab-size: 4; transition: border-color .15s;
+      font-size: .875rem; line-height: 1.65; padding: 0; overflow: hidden;
+      transition: border-color .15s; height: 100%;
     }
-    textarea#editor:focus { outline: none; border-color: #6366f1; }
+    #editor:focus { outline: none; border-color: #6366f1; }
+
+    /* button text next to icons */
+    .btn-text { margin-left: 8px; font-size: .82rem; color: #94a3b8; }
+    .icon-btn:disabled { opacity: 0.6; cursor: default; }
 
     /* ── Results ────────────────────────────── */
     #results {
@@ -189,7 +204,19 @@
 
 <header>
   <h1>obx</h1>
-  <span class="tagline">Oberon+ front-end checker</span>
+  <span class="tagline">Oberon+ Playground</span>
+  <div class="header-actions" style="margin-left:12px; display:flex; gap:8px; align-items:center;">
+    <!-- action buttons: icons only -->
+    <button id="cfgBtn" class="icon-btn action cfg" onclick="toggleCfg()" title="Show CFG" aria-label="Show CFG">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="6" r="3"></circle><path d="M13 6h3"></path><path d="M11 13l-2-2"></path></svg>
+    </button>
+    <button id="runBtn" class="icon-btn action run" onclick="runProgram()" title="Run program" aria-label="Run program">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#60A5FA" stroke="#60A5FA" stroke-width="0" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18l15-9L5 3z"/></svg>
+    </button>
+    <button id="checkBtn" class="icon-btn action check" onclick="runCheck()" title="Check" aria-label="Check">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+    </button>
+  </div>
   <div class="hdr-right">
     <span class="cors-badge">CORS enabled</span>
     <span class="version" id="versionBadge"></span>
@@ -198,55 +225,70 @@
 
 <div class="workspace">
 
-  <!-- ── Editor pane ─────────────────────────── -->
-  <div class="pane" id="editorPane">
-    <div class="pane-header">
-      <span class="pane-label">source</span>
-      <input id="filename" type="text" value="main.obx" spellcheck="false" title="filename sent to the API" />
-      <input id="entry" type="text" value="" spellcheck="false" placeholder="entry (e.g. Collections.Drawing)" title="optional full module key to filter modules" style="margin-left:8px; width:220px;" />
-      <div class="spacer"></div>
-      <kbd>⌘ Enter</kbd>
-      <button id="checkBtn" onclick="runCheck()">Check</button>
+  <div class="topRow">
+    <!-- ── Editor pane ─────────────────────────── -->
+    <div class="pane" id="editorPane">
+      <div class="pane-header">
+        <span class="pane-label">source</span>
+          <input id="filename" type="text" value="Main.obx" spellcheck="false" title="filename sent to the API" aria-label="Filename" />
+          <input id="fileInput" type="file" style="margin-left:8px;" title="Upload a .obx file" aria-label="Upload file" />
+        <div class="spacer"></div>
+        <kbd>⌘ Enter</kbd>
+      </div>
+      <div id="editor" role="region" aria-label="Source editor"></div>
     </div>
-    <textarea id="editor" spellcheck="false">MODULE Main;
 
-VAR x: INTEGER;
-
-BEGIN
-  x := 42
-END Main.
-</textarea>
-  </div>
-
-  <!-- ── Diagnostics pane ────────────────────── -->
-  <div class="pane" id="diagPane">
-    <div class="pane-header">
-      <span class="pane-label">diagnostics</span>
-      <div class="spacer"></div>
-      <span id="statusText" class="status idle">—</span>
-    </div>
-    <div id="results">
-      <div class="empty">🔍&nbsp; Press <strong>Check</strong> or hit ⌘ Enter</div>
-    </div>
-  </div>
-
-  <!-- ── CFG pane ─────────────────────────────── -->
-  <div class="pane" id="cfgPane">
-    <div class="pane-header">
-      <span class="pane-label">control flow graph</span>
-      <div class="spacer"></div>
-      <div class="cfg-controls">
-        <span class="cfg-hint">scroll&thinsp;·&thinsp;drag&thinsp;·&thinsp;dbl-click to fit</span>
-        <button class="icon-btn" onclick="fitCfg()" title="Fit to view">⊡ fit</button>
-        <button class="icon-btn" onclick="resetCfg()" title="Reset zoom">⊙ 1:1</button>
+    <!-- ── Diagnostics pane ────────────────────── -->
+    <div class="pane" id="diagPane">
+      <div class="pane-header">
+        <span class="pane-label">diagnostics</span>
+        <div class="spacer"></div>
+        <span id="statusText" class="status idle">—</span>
+      </div>
+      <div id="results">
+        <div class="empty">🔍&nbsp; Press <strong>Check</strong> or hit ⌘ Enter</div>
       </div>
     </div>
-    <div class="fn-tabs" id="fnTabs"></div>
-    <div id="cfgView">
-      <div id="cfgInner"></div>
-      <div id="cfgPlaceholder">🔍&nbsp; Press <strong style="color:#4b5563">Check</strong> to see the CFG</div>
+
+    <!-- ── CFG pane ─────────────────────────────── -->
+    <div class="pane" id="cfgPane">
+      <div class="pane-header">
+        <span class="pane-label">control flow graph</span>
+        <div class="spacer"></div>
+        <div class="cfg-controls">
+          <span class="cfg-hint">scroll&thinsp;·&thinsp;drag&thinsp;·&thinsp;dbl-click to fit</span>
+          <button class="icon-btn" onclick="fitCfg()" title="Fit to view" aria-label="Fit to view">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
+            <span class="btn-text">fit</span>
+          </button>
+          <button class="icon-btn" onclick="resetCfg()" title="Reset zoom" aria-label="Reset zoom">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+            <span class="btn-text">1:1</span>
+          </button>
+        </div>
+      </div>
+      <div class="fn-tabs" id="fnTabs"></div>
+      <div id="cfgView">
+        <div id="cfgInner"></div>
+        <div id="cfgPlaceholder">🔍&nbsp; Press <strong style="color:#4b5563">Check</strong> to see the CFG</div>
+      </div>
     </div>
-  </div>
+  </div><!-- .topRow -->
+
+  <div class="bottomRow">
+    <!-- ── Terminal pane ────────────────────── -->
+    <div class="pane" id="termPane">
+      <div class="pane-header">
+        <span class="pane-label">terminal</span>
+        <div class="spacer"></div>
+        <button id="clearTermBtn" class="icon-btn" onclick="clearTerminal()" title="Clear" aria-label="Clear terminal">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6v12a2 2 0 0 0 2 2h4"></path></svg>
+          <span class="btn-text">Clear</span>
+        </button>
+      </div>
+      <div id="terminal" style="flex:1; overflow:auto; background:#0b1220; border:1px solid #2d3148; border-radius:6px; padding:10px; font-family: ui-monospace, monospace; font-size:.85rem; white-space:pre-wrap;">$</div>
+    </div>
+  </div><!-- .bottomRow -->
 
 </div><!-- .workspace -->
 
@@ -255,14 +297,127 @@ END Main.
 <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
 
 <script>
-const editor      = document.getElementById('editor');
+// Monaco integration + editor shim
 const results     = document.getElementById('results');
 const statusEl    = document.getElementById('statusText');
-const btn         = document.getElementById('checkBtn');
 const cfgView     = document.getElementById('cfgView');
 const cfgInner    = document.getElementById('cfgInner');
 const cfgHolder   = document.getElementById('cfgPlaceholder');
 const fnTabsEl    = document.getElementById('fnTabs');
+
+const STORAGE_KEY = 'obx.playground.current';
+let monacoEditor = null;
+let pendingSource = null;
+let pendingOnChange = null;
+
+// editor shim used by the rest of the script
+const editor = {
+  getValue() { return monacoEditor ? monacoEditor.getValue() : (pendingSource || ''); },
+  setValue(v) { if (monacoEditor) monacoEditor.setValue(v); else pendingSource = v; },
+  onDidChange(cb) { if (monacoEditor) monacoEditor.onDidChangeModelContent(cb); else pendingOnChange = cb; }
+};
+
+function setButtonText(id, text) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const span = el.querySelector('.btn-text');
+  if (span) span.textContent = text;
+  else el.setAttribute('aria-label', text);
+}
+
+// Load initial content from localStorage (single-file persistence)
+function loadInitialSource() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (obj && obj.source) {
+      const fn = obj.filename || document.getElementById('filename').value || 'Main.obx';
+      document.getElementById('filename').value = fn;
+      return obj.source;
+    }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+function saveCurrentToStorage() {
+  try {
+    const fn = document.getElementById('filename').value.trim() || 'Main.obx';
+    const src = editor.getValue();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ filename: fn, source: src }));
+  } catch (e) { /* ignore */ }
+}
+
+// debounce helper
+function debounce(fn, ms) {
+  let t = null;
+  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+
+// Load Monaco from CDN
+(function loadMonaco() {
+  const loader = document.createElement('script');
+  loader.src = 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs/loader.js';
+  loader.onload = () => {
+    // eslint-disable-next-line no-undef
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs' } });
+    // eslint-disable-next-line no-undef
+    require(['vs/editor/editor.main'], function() {
+      const initial = loadInitialSource() || `MODULE Main;\n\nVAR x: INTEGER;\n\nBEGIN\n  x := 42\nEND Main.`;
+
+      // Register Oberon+ language via external file if available
+      try {
+        if (window.registerOberonLanguage) {
+          window.registerOberonLanguage(monaco);
+        }
+      } catch (e) {
+        console.warn('Oberon language registration failed', e);
+      }
+
+      // define a small theme override so 'type' and hex/float numbers stand out
+      try {
+        monaco.editor.defineTheme('obx-dark', {
+          base: 'vs-dark',
+          inherit: true,
+          rules: [
+            { token: 'type', foreground: 'C792EA' },
+            { token: 'number.hex', foreground: 'F78C6C' },
+            { token: 'number.float', foreground: '89DDFF' },
+            { token: 'number', foreground: 'F78C6C' }
+          ],
+          colors: {}
+        });
+      } catch (e) { /* ignore theme errors */ }
+
+      monacoEditor = monaco.editor.create(document.getElementById('editor'), {
+        value: initial,
+        language: 'oberon',
+        theme: 'obx-dark',
+        automaticLayout: true,
+        fontFamily: 'JetBrains Mono, Fira Code, ui-monospace, monospace',
+        fontSize: 13,
+        minimap: { enabled: false }
+      });
+
+      // wire change -> persist (debounced)
+      monacoEditor.onDidChangeModelContent(debounce(() => saveCurrentToStorage(), 500));
+
+      // expose pending content if any
+      if (pendingSource) monacoEditor.setValue(pendingSource);
+      if (pendingOnChange) monacoEditor.onDidChangeModelContent(pendingOnChange);
+
+      // add keybinding: Cmd/Ctrl+Enter to run check
+      monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => { runCheck(); });
+    });
+  };
+  // Load the external Monarch grammar script (provides registerOberonLanguage)
+  const monarchScript = document.createElement('script');
+  // use the generic static handler path
+  monarchScript.src = '/static/oberon-monarch.js';
+  document.head.appendChild(monarchScript);
+
+  document.head.appendChild(loader);
+})();
 
 /* ── viz.js instance ───────────────────────── */
 let viz = null;
@@ -274,39 +429,117 @@ fetch('/api/version')
   .then(d => { if (d) document.getElementById('versionBadge').textContent = `obx ${d.version}  ·  go ${d.go}`; })
   .catch(() => {});
 
-/* ── run check + cfg in parallel ───────────── */
+/* ── run check (diagnostics only) ───────────── */
 async function runCheck() {
-  const source   = editor.value;
-  const filename = document.getElementById('filename').value.trim() || 'main.obx';
-  const entry    = document.getElementById('entry').value.trim() || '';
-  btn.disabled = true; btn.textContent = 'Checking…';
+  const source   = editor.getValue();
+  const filename = document.getElementById('filename').value.trim() || 'Main.obx';
+  const btn = document.getElementById('checkBtn');
+  btn.disabled = true; setButtonText('checkBtn', 'Checking…');
   results.innerHTML = ''; setStatus('idle', '…');
-  setCfgState('loading');
 
-  const body = JSON.stringify({ source, filename, entry });
-  const post = url => fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body})
+  const body = JSON.stringify({ source, filename });
+  const resp = await fetch('/api/check', {method:'POST', headers:{'Content-Type':'application/json'}, body})
     .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error('HTTP ' + r.status + ': ' + t.trim()); }))
     .catch(e => ({_err: e.message}));
 
-  const [checkData, cfgData] = await Promise.all([post('/api/check'), post('/api/cfg')]);
+  btn.disabled = false; setButtonText('checkBtn', 'Check');
 
-  btn.disabled = false; btn.textContent = 'Check';
-
-  /* diagnostics pane */
-  if (checkData._err) {
-    results.innerHTML = diagHtml('error','error', esc(checkData._err), null);
+  if (resp._err) {
+    results.innerHTML = diagHtml('error','error', esc(resp._err), null);
     setStatus('fail', 'error');
   } else {
-    renderDiags(checkData);
-  }
-
-  /* CFG pane */
-  if (cfgData._err || !cfgData.ok) {
-    setCfgState('error', cfgData._err || cfgData.error || 'CFG unavailable');
-  } else {
-    renderCFG(cfgData.graphs || []);
+    renderDiags(resp);
   }
 }
+
+/* ── CFG (on-demand) ───────────────────────── */
+let cfgShown = false;
+function toggleCfg() {
+  if (!cfgShown) {
+    showCfg();
+  } else {
+    // hide
+    cfgInner.innerHTML = '';
+    cfgHolder.style.display = 'flex';
+    cfgHolder.innerHTML = '🔍&nbsp; Press <strong style="color:#4b5563">Show CFG</strong> to build';
+    cfgShown = false;
+  }
+}
+
+async function showCfg() {
+  const source   = editor.getValue();
+  const filename = document.getElementById('filename').value.trim() || 'Main.obx';
+  const cfgBtn = document.getElementById('cfgBtn');
+  cfgBtn.disabled = true; setButtonText('cfgBtn', 'Loading…');
+  setCfgState('loading');
+
+  const body = JSON.stringify({ source, filename });
+  const resp = await fetch('/api/cfg', {method:'POST', headers:{'Content-Type':'application/json'}, body})
+    .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error('HTTP ' + r.status + ': ' + t.trim()); }))
+    .catch(e => ({_err: e.message}));
+
+  cfgBtn.disabled = false; setButtonText('cfgBtn', 'CFG');
+
+  if (resp._err || !resp.ok) {
+    setCfgState('error', resp._err || resp.error || 'CFG unavailable');
+    cfgShown = false;
+  } else {
+    renderCFG(resp.graphs || []);
+    cfgShown = true;
+  }
+}
+
+/* ── Run (placeholder) ─────────────────────── */
+async function runProgram() {
+  const source   = editor.getValue();
+  const filename = document.getElementById('filename').value.trim() || 'Main.obx';
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true; setButtonText('runBtn', 'Running…');
+  appendTerminal('\n$ Running…\n');
+
+  const body = JSON.stringify({ source, filename });
+  const resp = await fetch('/api/run', {method:'POST', headers:{'Content-Type':'application/json'}, body})
+    .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error('HTTP ' + r.status + ': ' + t.trim()); }))
+    .catch(e => ({_err: e.message}));
+
+  btn.disabled = false; setButtonText('runBtn', 'Run');
+
+  if (resp._err) {
+    appendTerminal('\n[error] ' + resp._err + '\n');
+  } else {
+    appendTerminal('\n' + (resp.output || 'No output') + '\n');
+    if (resp.diagnostics) {
+      renderDiags(resp);
+    }
+  }
+}
+
+function clearTerminal() {
+  const t = document.getElementById('terminal');
+  t.textContent = '$';
+}
+
+function appendTerminal(s) {
+  const t = document.getElementById('terminal');
+  if (t.textContent === '$') t.textContent = '';
+  t.textContent += s;
+  t.scrollTop = t.scrollHeight;
+}
+
+/* ── file upload handling ─────────────────── */
+const fileInput = document.getElementById('fileInput');
+fileInput.addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    editor.setValue(String(ev.target.result));
+    document.getElementById('filename').value = f.name;
+    // persist
+    saveCurrentToStorage();
+  };
+  reader.readAsText(f);
+});
 
 /* ── diagnostics ───────────────────────────── */
 function renderDiags(data) {
@@ -453,7 +686,7 @@ document.addEventListener('mouseup', () => { dragging=false; cfgView.classList.r
 cfgView.addEventListener('dblclick', fitCfg);
 
 /* ── keyboard shortcut ─────────────────────── */
-editor.addEventListener('keydown', e => {
+document.addEventListener('keydown', e => {
   if ((e.metaKey||e.ctrlKey) && e.key==='Enter') { e.preventDefault(); runCheck(); }
 });
 

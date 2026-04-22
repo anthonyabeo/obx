@@ -144,6 +144,7 @@ func (*VariableRef) expr()   {}
 func (*ConstantRef) expr()   {}
 func (*FunctionRef) expr()   {}
 func (*TypeRef) expr()       {}
+func (p *Param) expr()       {}
 
 func (e *Literal) Type() types.Type       { return e.SemaType }
 func (e *BinaryExpr) Type() types.Type    { return e.SemaType }
@@ -159,6 +160,7 @@ func (e *VariableRef) Type() types.Type   { return e.SemaType }
 func (e *ConstantRef) Type() types.Type   { return e.SemaType }
 func (e *FunctionRef) Type() types.Type   { return e.SemaType }
 func (e *TypeRef) Type() types.Type       { return e.UnderType }
+func (p *Param) Type() types.Type         { return p.Typ }
 
 func (e *Literal) String() string    { return fmt.Sprintf("%s(%v)", e.Kind, e.Value) }
 func (e *BinaryExpr) String() string { return fmt.Sprintf("%s %s %s", e.Left, e.Op, e.Right) }
@@ -180,15 +182,29 @@ func (e *IndexExpr) String() string {
 
 	return fmt.Sprintf("%s%s: %s", e.Array, strings.Join(indices, ""), e.SemaType)
 }
-func (e *DerefExpr) String() string     { return fmt.Sprintf("%s^", e.Pointer) }
-func (e *TypeGuardExpr) String() string { panic("not implemented") }
-func (e *SetExpr) String() string       { panic("not implemented") }
-func (e *RangeExpr) String() string     { panic("not implemented") }
-func (e *VariableRef) String() string   { return e.Name }
-func (e *ConstantRef) String() string   { return e.Name }
-func (e *FunctionRef) String() string   { return e.Name }
-func (e *TypeRef) String() string       { return e.Name }
-
-func (p *Param) expr()            {}
-func (p *Param) Type() types.Type { return p.Typ }
-func (p *Param) String() string   { return p.Name }
+func (e *DerefExpr) String() string { return fmt.Sprintf("%s^", e.Pointer) }
+func (e *TypeGuardExpr) String() string {
+	return fmt.Sprintf("%s(%s)", e.Expr, e.Typ)
+}
+func (e *SetExpr) String() string {
+	var elems []string
+	for _, el := range e.Elems {
+		elems = append(elems, el.String())
+	}
+	return fmt.Sprintf("{%s}: %s", strings.Join(elems, ", "), e.SemaType)
+}
+func (e *RangeExpr) String() string {
+	var low, high string
+	if e.Low != nil {
+		low = e.Low.String()
+	}
+	if e.High != nil {
+		high = e.High.String()
+	}
+	return fmt.Sprintf("%s..%s: %s", low, high, e.SemaType)
+}
+func (e *VariableRef) String() string { return e.Name }
+func (e *ConstantRef) String() string { return e.Name }
+func (e *FunctionRef) String() string { return e.Name }
+func (e *TypeRef) String() string     { return e.Name }
+func (p *Param) String() string       { return p.Name }
