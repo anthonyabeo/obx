@@ -1,0 +1,227 @@
+/* Moved from cmd/web/static/index.html <style> block */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #0f1117;
+  color: #e2e8f0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────── */
+header {
+  padding: 10px 20px;
+  background: #1a1d27;
+  border-bottom: 1px solid #2d3148;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+header h1  { font-size: 1.05rem; font-weight: 700; color: #818cf8; letter-spacing: .06em; }
+.tagline   { font-size: .78rem; color: #475569; }
+.hdr-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.version   { font-size: .72rem; color: #374151; font-family: ui-monospace, monospace; }
+.cors-badge {
+  font-size: .65rem; padding: 2px 8px; border-radius: 3px;
+  background: #14532d; color: #4ade80; border: 1px solid #166534;
+  letter-spacing: .05em; font-weight: 600;
+}
+
+/* ── Workspace ──────────────────────────── */
+.workspace { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+
+.pane {
+  display: flex; flex-direction: column;
+  min-width: 0;
+  padding: 12px 14px; gap: 8px;
+}
+.pane + .pane { border-left: 1px solid #2d3148; }
+
+/* Editor fills available width by default; other panes are shown on-demand
+   and will take responsive side widths when visible. */
+:root {
+  --diag-basis: 340px;
+  --diag-max: 40%;
+  --cfg-basis: 480px;
+  --cfg-max: 60%;
+}
+
+#editorPane { flex: 1 1 auto; min-width: 0; }
+
+/* collapsed by default; open state uses fixed/percentage basis. */
+#diagPane, #cfgPane {
+  flex: 0 0 0;
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: flex-basis .28s ease, max-width .28s ease, opacity .18s ease;
+  overflow: hidden;
+}
+
+#diagPane.open {
+  flex: 0 0 var(--diag-basis);
+  max-width: var(--diag-max);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#cfgPane.open {
+  flex: 0 0 var(--cfg-basis);
+  max-width: var(--cfg-max);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Responsive adjustments: use percentage bases on narrower screens */
+@media (max-width: 1100px) {
+  :root { --diag-basis: 34%; --diag-max: 40%; --cfg-basis: 46%; --cfg-max: 60%; }
+}
+@media (max-width: 700px) {
+  :root { --diag-basis: 40%; --diag-max: 60%; --cfg-basis: 60%; --cfg-max: 100%; }
+}
+
+/* layout rows: top contains editor/diag/cfg, bottom contains terminal */
+.topRow { display: flex; flex: 1; overflow: hidden; }
+.bottomRow { flex: 0 0 28%; border-top: 1px solid #2d3148; }
+
+/* ── Pane headers ───────────────────────── */
+.pane-header { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+.pane-label  { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: #4b5563; flex-shrink: 0; }
+.spacer      { flex: 1; }
+
+input#filename {
+  background: #1a1d27; border: 1px solid #2d3148; border-radius: 4px;
+  color: #94a3b8; font-size: .8rem; padding: 3px 8px; width: 180px;
+}
+/* header action buttons */
+.header-actions { display: flex; align-items: center; }
+.icon-btn.action { width: 36px; height: 32px; padding: 6px; display:flex; align-items:center; justify-content:center; border-radius:6px; }
+.icon-btn.action:hover { background: rgba(255,255,255,0.02); }
+.icon-btn.action.cfg svg { filter: drop-shadow(0 0 4px rgba(167,139,250,0.12)); }
+.icon-btn.action.run svg { filter: drop-shadow(0 0 6px rgba(96,165,250,0.12)); }
+.icon-btn.action.check svg { filter: drop-shadow(0 0 6px rgba(16,185,129,0.12)); }
+input#filename:focus { outline: none; border-color: #818cf8; color: #e2e8f0; }
+
+/* check button is icon-only; styling is driven by .icon-btn and .icon-btn.action.check */
+
+kbd {
+  font-size: .65rem; background: #1f2937; border: 1px solid #374151;
+  border-radius: 3px; padding: 1px 5px; color: #6b7280;
+}
+
+/* ── Editor (Monaco) ───────────────────── */
+#editor {
+  flex: 1; background: #141720; border: 1px solid #2d3148; border-radius: 6px;
+  color: #e2e8f0; font-family: "JetBrains Mono","Fira Code",ui-monospace,monospace;
+  font-size: .875rem; line-height: 1.65; padding: 0; overflow: hidden;
+  transition: border-color .15s; height: 100%;
+}
+#editor:focus { outline: none; border-color: #6366f1; }
+
+/* button text next to icons */
+.btn-text { margin-left: 8px; font-size: .82rem; color: #94a3b8; }
+.icon-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* ── Results ────────────────────────────── */
+#results {
+  flex: 1; overflow-y: auto; background: #141720;
+  border: 1px solid #2d3148; border-radius: 6px; padding: 10px;
+}
+
+.status { font-size: .74rem; font-weight: 600; letter-spacing: .04em; }
+.status.ok   { color: #4ade80; }
+.status.fail { color: #f87171; }
+.status.idle { color: #4b5563; }
+
+.diag-item {
+  padding: 8px 10px; border-radius: 5px;
+  margin-bottom: 6px; border-left: 3px solid transparent;
+}
+.diag-item.error   { background: #1c1013; border-color: #ef4444; }
+.diag-item.warning { background: #1a1a0a; border-color: #f59e0b; }
+.diag-item.info    { background: #0d1726; border-color: #3b82f6; }
+.diag-item.debug   { background: #111827; border-color: #6b7280; }
+
+.diag-row { display: flex; align-items: flex-start; gap: 8px; }
+
+.badge {
+  font-size: .65rem; font-weight: 700; letter-spacing: .07em;
+  padding: 2px 7px; border-radius: 3px; text-transform: uppercase;
+  flex-shrink: 0; margin-top: 1px;
+}
+.badge.error   { background: #ef4444; color: #fff; }
+.badge.warning { background: #f59e0b; color: #000; }
+.badge.info    { background: #3b82f6; color: #fff; }
+.badge.debug   { background: #6b7280; color: #fff; }
+
+.diag-msg { color: #e2e8f0; font-size: .84rem; line-height: 1.4; }
+.diag-loc {
+  margin-top: 3px; padding-left: 32px;
+  color: #4b5563; font-size: .76rem; font-family: ui-monospace, monospace;
+}
+
+.empty {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; color: #374151; font-size: .88rem;
+  user-select: none; gap: 8px; pointer-events: none;
+}
+
+/* ── CFG canvas ──────────────────────────── */
+#cfgView {
+  flex: 1; position: relative;
+  background: #141720; border: 1px solid #2d3148; border-radius: 6px;
+  overflow: hidden; cursor: grab;
+  user-select: none;
+}
+#cfgView.dragging { cursor: grabbing; }
+
+#cfgInner {
+  position: absolute; top: 0; left: 0;
+  transform-origin: 0 0;
+}
+/* The DOT uses bgcolor="#1a1d27" so the SVG background already matches.
+   We only need display:block to remove the inline-element gap. */
+#cfgInner { background: #1a1d27; }
+#cfgInner svg { display: block; }
+
+#cfgPlaceholder {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #374151; font-size: .88rem; pointer-events: none;
+}
+
+/* Function tabs */
+.fn-tabs {
+  display: flex; flex-wrap: wrap; gap: 4px; flex-shrink: 0;
+  overflow-x: auto;
+}
+.fn-tab {
+  font-family: ui-monospace, monospace;
+  font-size: .72rem; padding: 2px 10px;
+  border: 1px solid #2d3148; border-radius: 4px;
+  background: #1a1d27; color: #94a3b8;
+  cursor: pointer; white-space: nowrap;
+  transition: background .1s, color .1s, border-color .1s;
+}
+.fn-tab:hover  { background: #252840; color: #c4b5fd; border-color: #4b5563; }
+.fn-tab.active { background: #312e81; color: #e0e7ff; border-color: #6366f1; }
+
+/* Toolbar buttons */
+.cfg-controls { display: flex; align-items: center; gap: 6px; }
+.icon-btn {
+  background: #1a1d27; border: 1px solid #2d3148;
+  color: #64748b; font-size: .82rem; padding: 2px 8px;
+  border-radius: 4px; cursor: pointer; line-height: 1.5;
+  transition: color .1s, border-color .1s;
+}
+.icon-btn:hover { color: #94a3b8; border-color: #4b5563; }
+.cfg-hint { font-size: .66rem; color: #2d3748; white-space: nowrap; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2d3148; border-radius: 3px; }
+
