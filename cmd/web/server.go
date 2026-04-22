@@ -45,6 +45,10 @@ type Config struct {
 	RateLimitBurst int
 	// AdminAddr binds a localhost-only admin listener for metrics/diagnostics (e.g. "127.0.0.1:9090").
 	AdminAddr string
+	// Request limits (bytes / characters)
+	MaxBodyBytes   int // maximum allowed request body bytes for JSON endpoints
+	MaxSourceBytes int // maximum allowed length of the 'source' payload
+	MaxFilenameLen int // maximum length of submitted filenames
 }
 
 // Server owns the mux and carries Config so every handler can read it.

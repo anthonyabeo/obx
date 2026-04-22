@@ -12,14 +12,17 @@ import (
 // ── Command ──────────────────────────────────────────────────────────────────
 
 var webArgs struct {
-	Addr      string
-	MaxErrors int
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
-	IdleTimeout  time.Duration
-	RateLimit    float64
-	RateBurst    int
-	AdminAddr    string
+	Addr           string
+	MaxErrors      int
+	ReadTimeout    time.Duration
+	WriteTimeout   time.Duration
+	IdleTimeout    time.Duration
+	RateLimit      float64
+	RateBurst      int
+	AdminAddr      string
+	MaxBodyBytes   int
+	MaxSourceBytes int
+	MaxFilenameLen int
 }
 
 func init() {
@@ -31,6 +34,9 @@ func init() {
 	webCmd.Flags().Float64Var(&webArgs.RateLimit, "rate", 5.0, "per-IP request rate (requests/sec)")
 	webCmd.Flags().IntVar(&webArgs.RateBurst, "burst", 10, "per-IP rate limit burst")
 	webCmd.Flags().StringVar(&webArgs.AdminAddr, "admin-addr", "127.0.0.1:9090", "localhost-only admin listener for /metrics")
+	webCmd.Flags().IntVar(&webArgs.MaxBodyBytes, "max-body-bytes", 256*1024, "maximum JSON request body size in bytes")
+	webCmd.Flags().IntVar(&webArgs.MaxSourceBytes, "max-source-bytes", 200*1024, "maximum 'source' payload size in bytes")
+	webCmd.Flags().IntVar(&webArgs.MaxFilenameLen, "max-filename-len", 128, "maximum filename length")
 }
 
 var webCmd = &cobra.Command{
@@ -55,10 +61,12 @@ can be called directly from external editors, scripts, or CI tooling.`,
 			RateLimit:      webArgs.RateLimit,
 			RateLimitBurst: webArgs.RateBurst,
 			AdminAddr:      webArgs.AdminAddr,
+			MaxBodyBytes:   webArgs.MaxBodyBytes,
+			MaxSourceBytes: webArgs.MaxSourceBytes,
+			MaxFilenameLen: webArgs.MaxFilenameLen,
 		}
 		if err := web.Start(cfg); err != nil {
 			log.Fatalf("web: %v", err)
 		}
 	},
 }
-

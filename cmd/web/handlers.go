@@ -28,15 +28,6 @@ import (
 //go:embed static/*
 var staticFS embed.FS
 
-const (
-	// maxBodyBytes is the maximum bytes accepted by the JSON endpoints. This
-	// is enforced via http.MaxBytesReader and also used to bound the source
-	// payload size.
-	maxBodyBytes   = 256 * 1024 // 256 KB
-	maxSourceBytes = 200 * 1024 // 200 KB
-	maxFilenameLen = 128
-)
-
 var filenameRE = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 // (monarch served via generic /static/ handler)
@@ -138,7 +129,21 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 		Filename string `json:"filename"`
 		Entry    string `json:"entry"`
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(maxBodyBytes)))
+	// determine effective limits (fallback to defaults if not set)
+	mb := s.cfg.MaxBodyBytes
+	if mb == 0 {
+		mb = 256 * 1024
+	}
+	ms := s.cfg.MaxSourceBytes
+	if ms == 0 {
+		ms = 200 * 1024
+	}
+	mf := s.cfg.MaxFilenameLen
+	if mf == 0 {
+		mf = 128
+	}
+
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(mb)))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
@@ -149,7 +154,7 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// validate filename: must be a simple basename with allowed chars
-	if len(req.Filename) == 0 || len(req.Filename) > maxFilenameLen || !filenameRE.MatchString(req.Filename) || filepath.Base(req.Filename) != req.Filename {
+	if len(req.Filename) == 0 || len(req.Filename) > mf || !filenameRE.MatchString(req.Filename) || filepath.Base(req.Filename) != req.Filename {
 		http.Error(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
@@ -158,7 +163,7 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "empty source", http.StatusBadRequest)
 		return
 	}
-	if len(req.Source) > maxSourceBytes {
+	if len(req.Source) > ms {
 		http.Error(w, "source too large", http.StatusRequestEntityTooLarge)
 		return
 	}
@@ -263,7 +268,21 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 		Filename string `json:"filename"`
 		Entry    string `json:"entry"`
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(maxBodyBytes)))
+	// determine effective limits (fallback to defaults if not set)
+	mb := s.cfg.MaxBodyBytes
+	if mb == 0 {
+		mb = 256 * 1024
+	}
+	ms := s.cfg.MaxSourceBytes
+	if ms == 0 {
+		ms = 200 * 1024
+	}
+	mf := s.cfg.MaxFilenameLen
+	if mf == 0 {
+		mf = 128
+	}
+
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(mb)))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
@@ -274,7 +293,7 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// validate filename and source length similar to HandleCheck
-	if len(req.Filename) == 0 || len(req.Filename) > maxFilenameLen || !filenameRE.MatchString(req.Filename) || filepath.Base(req.Filename) != req.Filename {
+	if len(req.Filename) == 0 || len(req.Filename) > mf || !filenameRE.MatchString(req.Filename) || filepath.Base(req.Filename) != req.Filename {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid filename"})
 		return
 	}
@@ -282,7 +301,7 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "empty source"})
 		return
 	}
-	if len(req.Source) > maxSourceBytes {
+	if len(req.Source) > ms {
 		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"ok": false, "error": "source too large"})
 		return
 	}
@@ -370,7 +389,21 @@ func (s *Server) HandleRun(w http.ResponseWriter, r *http.Request) {
 		Source   string `json:"source"`
 		Filename string `json:"filename"`
 	}
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(maxBodyBytes)))
+	// determine effective limits (fallback to defaults if not set)
+	mb := s.cfg.MaxBodyBytes
+	if mb == 0 {
+		mb = 256 * 1024
+	}
+	ms := s.cfg.MaxSourceBytes
+	if ms == 0 {
+		ms = 200 * 1024
+	}
+	mf := s.cfg.MaxFilenameLen
+	if mf == 0 {
+		mf = 128
+	}
+
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(mb)))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
@@ -380,7 +413,7 @@ func (s *Server) HandleRun(w http.ResponseWriter, r *http.Request) {
 		req.Filename = "Main.obx"
 	}
 
-	if len(req.Filename) == 0 || len(req.Filename) > maxFilenameLen || !filenameRE.MatchString(req.Filename) || filepath.Base(req.Filename) != req.Filename {
+	if len(req.Filename) == 0 || len(req.Filename) > mf || !filenameRE.MatchString(req.Filename) || filepath.Base(req.Filename) != req.Filename {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid filename"})
 		return
 	}
@@ -388,7 +421,7 @@ func (s *Server) HandleRun(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "empty source"})
 		return
 	}
-	if len(req.Source) > maxSourceBytes {
+	if len(req.Source) > ms {
 		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"ok": false, "error": "source too large"})
 		return
 	}
