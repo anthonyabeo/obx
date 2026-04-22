@@ -10,7 +10,6 @@ import (
 
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/compiler"
-	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/directive"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
@@ -68,15 +67,10 @@ func prepareStdlibUnits(ctx *compiler.Context, obx *ast.OberonX, entry, userFile
 	}
 
 	// Parse and add units into the OberonX program
-	if err := parseAndAddStdlibUnits(sorted, ctx, obx); err != nil {
+	if err := parseProgramFiles(sorted, ctx, obx); err != nil {
 		return err
 	}
 
-	// Discard any parse errors from stdlib so they don't pollute the
-	// user's diagnostic output.
-	if r, ok := ctx.Reporter.(*diag.BufferedReporter); ok {
-		r.Reset()
-	}
 	return nil
 }
 
@@ -172,10 +166,10 @@ func buildSortedStdlibHeaders(roots []string, ctx *compiler.Context, entry strin
 	return sorted, nil
 }
 
-// parseAndAddStdlibUnits reads, parses and conditionally adds parsed units
+// parseProgramFiles reads, parses and conditionally adds parsed units
 // into the provided OberonX program. Files that produce parse diagnostics are
 // skipped to avoid adding partially-parsed units.
-func parseAndAddStdlibUnits(sorted []project.Header, ctx *compiler.Context, obx *ast.OberonX) error {
+func parseProgramFiles(sorted []project.Header, ctx *compiler.Context, obx *ast.OberonX) error {
 	for _, header := range sorted {
 		data, err := os.ReadFile(header.File)
 		if err != nil {
@@ -183,20 +177,10 @@ func parseAndAddStdlibUnits(sorted []project.Header, ctx *compiler.Context, obx 
 		}
 		fileName := filepath.Base(header.File)
 		content := data[header.StartPos:header.EndPos]
+
 		p := parser.NewParser(ctx, fileName, content)
-		// Snapshot diagnostics count so we can detect parse errors produced by
-		// this file and avoid adding a partially-parsed unit into the global
-		// OberonX used for later lowering.
-		before := len(ctx.Reporter.Diagnostics())
 		unit := p.Parse()
-		after := len(ctx.Reporter.Diagnostics())
-		if after > before {
-			// Skip adding this unit due to parse errors in the stdlib file.
-			continue
-		}
-		if unit != nil {
-			obx.AddUnit(unit)
-		}
+		obx.AddUnit(unit)
 	}
 	return nil
 }
