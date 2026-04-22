@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,6 +15,17 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/directive"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
+
+// statusRecorder wraps http.ResponseWriter to capture the response status code.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
 
 // ── shared helpers ────────────────────────────────────────────────────────────
 

@@ -10,19 +10,17 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
-	"sync"
 	"syscall"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
 )
 
 // package-level holder for the rate-limited counter so limiter can increment it
@@ -45,6 +43,8 @@ type Config struct {
 	// Rate limiting (requests per second and burst)
 	RateLimit      float64
 	RateLimitBurst int
+	// AdminAddr binds a localhost-only admin listener for metrics/diagnostics (e.g. "127.0.0.1:9090").
+	AdminAddr string
 }
 
 // Server owns the mux and carries Config so every handler can read it.
@@ -129,12 +129,6 @@ func Start(cfg Config) error {
 	// blocked requests as well.
 	handler = metricsMiddleware(handler, reqCounter, reqDuration, respCounter)
 
-	// expose /metrics endpoint
-	// register promhttp handler on the mux so it's protected by the same
-	// middlewares (optionally change if you want it open)
-	// NOTE: register directly on mux to avoid being instrumented twice
-	mux.Handle("/metrics", promhttp.Handler())
-
 	// apply configured timeouts (fallback to reasonable defaults)
 	rt := cfg.ReadTimeout
 	if rt == 0 {
@@ -149,6 +143,28 @@ func Start(cfg Config) error {
 		it = 120 * time.Second
 	}
 
+	// create admin server (localhost-only) for /metrics
+	if cfg.AdminAddr == "" {
+		cfg.AdminAddr = "127.0.0.1:9090"
+	}
+	adminMux := http.NewServeMux()
+	adminMux.Handle("/metrics", promhttp.Handler())
+	adminSrv := &http.Server{
+		Addr:         cfg.AdminAddr,
+		Handler:      adminMux,
+		ReadTimeout:  rt,
+		WriteTimeout: wt,
+		IdleTimeout:  it,
+	}
+
+	adminErrCh := make(chan error, 1)
+	go func() {
+		if err := adminSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			adminErrCh <- err
+		}
+		close(adminErrCh)
+	}()
+
 	srv := &http.Server{
 		Addr:         cfg.Addr,
 		Handler:      handler,
@@ -157,8 +173,9 @@ func Start(cfg Config) error {
 		IdleTimeout:  it,
 	}
 
-	// start server
-	fmt.Printf("obx web  →  http://%s\n", cfg.Addr)
+	// configure zerolog time format and start server
+	zerolog.TimeFieldFormat = time.RFC3339
+	zlog.Info().Str("addr", cfg.Addr).Msg("starting obx web server")
 	errCh := make(chan error, 1)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -172,19 +189,31 @@ func Start(cfg Config) error {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	select {
 	case <-stop:
-		log.Printf("shutdown signal received, shutting down server")
+		zlog.Info().Msg("shutdown signal received, shutting down servers")
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		// shutdown main server
 		if err := srv.Shutdown(ctx); err != nil {
-			return fmt.Errorf("server shutdown: %w", err)
+			zlog.Error().Err(err).Msg("main server shutdown error")
 		}
+		// shutdown admin server
+		if err := adminSrv.Shutdown(ctx); err != nil {
+			zlog.Error().Err(err).Msg("admin server shutdown error")
+		}
+		zlog.Info().Msg("servers shutdown complete")
 		return nil
 	case err := <-errCh:
 		if err != nil {
 			return err
 		}
 		return nil
+	case err := <-adminErrCh:
+		if err != nil {
+			return err
+		}
+		return nil
 	}
+
 }
 
 // requestIDMiddleware injects a X-Request-ID header into each request if not
@@ -217,19 +246,15 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(sr, r)
 		dur := time.Since(start)
 		reqID := r.Header.Get("X-Request-ID")
-		log.Printf("%s %s %s %d %s request_id=%s", r.RemoteAddr, r.Method, r.URL.Path, sr.status, dur, reqID)
+		zlog.Info().
+			Str("remote", r.RemoteAddr).
+			Str("method", r.Method).
+			Str("path", r.URL.Path).
+			Int("status", sr.status).
+			Dur("duration", dur).
+			Str("request_id", reqID).
+			Msg("http_request")
 	})
-}
-
-// statusRecorder wraps http.ResponseWriter to capture the response status code.
-type statusRecorder struct {
-	http.ResponseWriter
-	status int
-}
-
-func (r *statusRecorder) WriteHeader(code int) {
-	r.status = code
-	r.ResponseWriter.WriteHeader(code)
 }
 
 // metricsMiddleware records Prometheus metrics for requests.
@@ -244,130 +269,5 @@ func metricsMiddleware(next http.Handler, reqCounter *prometheus.CounterVec, req
 		reqCounter.WithLabelValues(method, path).Inc()
 		reqDuration.WithLabelValues(method, path).Observe(dur)
 		respCounter.WithLabelValues(fmt.Sprintf("%d", sr.status)).Inc()
-	})
-}
-
-// ipRateLimiter implements a simple token-bucket per-client IP limiter.
-type ipRateLimiter struct {
-	mu      sync.Mutex
-	clients map[string]*bucket
-	rate    float64
-	burst   int
-	// janitor controls
-	janitorQuit chan struct{}
-	janitorWg   sync.WaitGroup
-}
-
-type bucket struct {
-	tokens float64
-	last   time.Time
-}
-
-func newIPRateLimiter(rate float64, burst int) *ipRateLimiter {
-	if rate <= 0 {
-		rate = 5.0
-	}
-	if burst <= 0 {
-		burst = 10
-	}
-	return &ipRateLimiter{clients: make(map[string]*bucket), rate: rate, burst: burst, janitorQuit: make(chan struct{})}
-}
-
-// ClientCount returns the number of client entries currently tracked.
-func (l *ipRateLimiter) ClientCount() int {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return len(l.clients)
-}
-
-// StartJanitor launches a background goroutine that periodically purges
-// client entries that have been idle for longer than idleTTL. It returns
-// immediately; call StopJanitor to stop the background worker.
-func (l *ipRateLimiter) StartJanitor(interval time.Duration, idleTTL time.Duration) {
-	if interval <= 0 {
-		interval = time.Minute
-	}
-	if idleTTL <= 0 {
-		idleTTL = 5 * time.Minute
-	}
-	l.janitorWg.Add(1)
-	go func() {
-		defer l.janitorWg.Done()
-		t := time.NewTicker(interval)
-		defer t.Stop()
-		for {
-			select {
-			case <-t.C:
-				now := time.Now()
-				l.mu.Lock()
-				for ip, b := range l.clients {
-					if now.Sub(b.last) > idleTTL {
-						delete(l.clients, ip)
-					}
-				}
-				l.mu.Unlock()
-			case <-l.janitorQuit:
-				return
-			}
-		}
-	}()
-}
-
-// StopJanitor signals the janitor to stop and waits for it to exit.
-func (l *ipRateLimiter) StopJanitor() {
-	close(l.janitorQuit)
-	l.janitorWg.Wait()
-}
-
-// Middleware returns an http.Handler wrapper enforcing per-IP rate limits.
-func (l *ipRateLimiter) Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// determine client IP (respect X-Forwarded-For if present)
-		ip := r.Header.Get("X-Forwarded-For")
-		if ip != "" {
-			// may contain comma-separated list
-			parts := strings.Split(ip, ",")
-			ip = strings.TrimSpace(parts[0])
-		} else {
-			host, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				ip = r.RemoteAddr
-			} else {
-				ip = host
-			}
-		}
-
-		now := time.Now()
-		l.mu.Lock()
-		b, ok := l.clients[ip]
-		if !ok {
-			b = &bucket{tokens: float64(l.burst), last: now}
-			l.clients[ip] = b
-		}
-		// refill tokens
-		elapsed := now.Sub(b.last).Seconds()
-		b.tokens += elapsed * l.rate
-		if b.tokens > float64(l.burst) {
-			b.tokens = float64(l.burst)
-		}
-
-		allowed := false
-		if b.tokens >= 1.0 {
-			b.tokens -= 1.0
-			allowed = true
-		}
-		b.last = now
-		l.mu.Unlock()
-
-		if !allowed {
-			// Rate limited
-			w.Header().Set("Retry-After", "1")
-			http.Error(w, "too many requests", http.StatusTooManyRequests)
-			// increment global metric if available
-			incrementRateLimitedMetric()
-			return
-		}
-
-		next.ServeHTTP(w, r)
 	})
 }

@@ -19,6 +19,7 @@ var webArgs struct {
 	IdleTimeout  time.Duration
 	RateLimit    float64
 	RateBurst    int
+	AdminAddr    string
 }
 
 func init() {
@@ -29,6 +30,7 @@ func init() {
 	webCmd.Flags().DurationVar(&webArgs.IdleTimeout, "idle-timeout", 120*time.Second, "HTTP server idle timeout (e.g. 2m)")
 	webCmd.Flags().Float64Var(&webArgs.RateLimit, "rate", 5.0, "per-IP request rate (requests/sec)")
 	webCmd.Flags().IntVar(&webArgs.RateBurst, "burst", 10, "per-IP rate limit burst")
+	webCmd.Flags().StringVar(&webArgs.AdminAddr, "admin-addr", "127.0.0.1:9090", "localhost-only admin listener for /metrics")
 }
 
 var webCmd = &cobra.Command{
@@ -52,6 +54,7 @@ can be called directly from external editors, scripts, or CI tooling.`,
 			IdleTimeout:    webArgs.IdleTimeout,
 			RateLimit:      webArgs.RateLimit,
 			RateLimitBurst: webArgs.RateBurst,
+			AdminAddr:      webArgs.AdminAddr,
 		}
 		if err := web.Start(cfg); err != nil {
 			log.Fatalf("web: %v", err)
