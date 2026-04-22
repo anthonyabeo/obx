@@ -73,14 +73,7 @@
     .icon-btn.action.check svg { filter: drop-shadow(0 0 6px rgba(16,185,129,0.12)); }
     input#filename:focus { outline: none; border-color: #818cf8; color: #e2e8f0; }
 
-    button#checkBtn {
-      padding: 5px 18px; background: #6366f1; border: none; border-radius: 5px;
-      color: #fff; font-size: .82rem; font-weight: 600; cursor: pointer;
-      transition: background .12s; flex-shrink: 0;
-    }
-    button#checkBtn:hover    { background: #4f46e5; }
-    button#checkBtn:active   { background: #4338ca; }
-    button#checkBtn:disabled { background: #1f2937; color: #4b5563; cursor: default; }
+    /* check button is icon-only; styling is driven by .icon-btn and .icon-btn.action.check */
 
     kbd {
       font-size: .65rem; background: #1f2937; border: 1px solid #374151;
@@ -218,6 +211,9 @@
     </button>
   </div>
   <div class="hdr-right">
+    <button id="uploadBtn" class="icon-btn" title="Upload file" aria-label="Upload file" style="margin-right:8px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 5 17 10"/><line x1="12" y1="5" x2="12" y2="19"/></svg>
+    </button>
     <span class="cors-badge">CORS enabled</span>
     <span class="version" id="versionBadge"></span>
   </div>
@@ -231,9 +227,7 @@
       <div class="pane-header">
         <span class="pane-label">source</span>
           <input id="filename" type="text" value="Main.obx" spellcheck="false" title="filename sent to the API" aria-label="Filename" />
-          <input id="fileInput" type="file" style="margin-left:8px;" title="Upload a .obx file" aria-label="Upload file" />
         <div class="spacer"></div>
-        <kbd>⌘ Enter</kbd>
       </div>
       <div id="editor" role="region" aria-label="Source editor"></div>
     </div>
@@ -527,7 +521,22 @@ function appendTerminal(s) {
 }
 
 /* ── file upload handling ─────────────────── */
-const fileInput = document.getElementById('fileInput');
+// the visible file input was moved to a header button; we keep a hidden
+// file input element that the upload button triggers.
+let fileInput = document.getElementById('fileInput');
+if (!fileInput) {
+  fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.id = 'fileInput';
+  fileInput.style.display = 'none';
+  fileInput.title = 'Upload a .obx file';
+  fileInput.setAttribute('aria-label','Upload file');
+  document.body.appendChild(fileInput);
+}
+
+const uploadBtn = document.getElementById('uploadBtn');
+if (uploadBtn) uploadBtn.addEventListener('click', () => fileInput.click());
+
 fileInput.addEventListener('change', e => {
   const f = e.target.files && e.target.files[0];
   if (!f) return;
