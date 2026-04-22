@@ -25,6 +25,7 @@ var webArgs struct {
 	MaxFilenameLen int
 	AllowedOrigins []string
 	APIKey         string
+	JWTSecret      string
 }
 
 func init() {
@@ -41,6 +42,7 @@ func init() {
 	webCmd.Flags().IntVar(&webArgs.MaxFilenameLen, "max-filename-len", 128, "maximum filename length")
 	webCmd.Flags().StringSliceVar(&webArgs.AllowedOrigins, "allowed-origin", []string{}, "trusted origin(s) allowed for CORS (repeatable)")
 	webCmd.Flags().StringVar(&webArgs.APIKey, "api-key", "", "optional API key required via X-API-Key header for API access")
+	webCmd.Flags().StringVar(&webArgs.JWTSecret, "jwt-secret", "", "optional HMAC SHA256 secret to require Bearer JWTs for API access")
 }
 
 var webCmd = &cobra.Command{
@@ -72,6 +74,7 @@ exposing the API to external editors, scripts, or CI tooling when configured.`,
 			MaxFilenameLen: webArgs.MaxFilenameLen,
 			AllowedOrigins: webArgs.AllowedOrigins,
 			APIKey:         webArgs.APIKey,
+			JWTSecret:      webArgs.JWTSecret,
 		}
 		if err := web.Start(cfg); err != nil {
 			log.Fatalf("web: %v", err)

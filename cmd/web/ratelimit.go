@@ -123,7 +123,12 @@ func (l *ipRateLimiter) Middleware(next http.Handler) http.Handler {
 		if !allowed {
 			// Rate limited
 			w.Header().Set("Retry-After", "1")
-			http.Error(w, "too many requests", http.StatusTooManyRequests)
+			// For API endpoints return JSON consistent error; otherwise plain text
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				writeJSON(w, http.StatusTooManyRequests, map[string]any{"ok": false, "error": "too many requests"})
+			} else {
+				http.Error(w, "too many requests", http.StatusTooManyRequests)
+			}
 			// increment global metric if available
 			incrementRateLimitedMetric()
 			return

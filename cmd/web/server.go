@@ -11,8 +11,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -52,6 +54,8 @@ type Config struct {
 	// CORS / auth
 	AllowedOrigins []string // allowed CORS origins (empty = deny all cross-origin)
 	APIKey         string   // optional API key accepted via X-API-Key header
+	// JWTSecret, when set, enables HMAC-SHA256 (HS256) bearer token auth for API endpoints.
+	JWTSecret string
 }
 
 // Server owns the mux and carries Config so every handler can read it.
@@ -261,6 +265,94 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			Dur("duration", dur).
 			Str("request_id", reqID).
 			Msg("http_request")
+	})
+}
+
+// ── CORS middleware ───────────────────────────────────────────────────────────
+
+// corsMiddleware enforces CORS according to server config. If AllowedOrigins
+// contains entries, only those origins are permitted. If an API key is
+// configured, clients presenting the X-API-Key header with the matching value
+// are allowed regardless of origin (useful for non-browser clients).
+func (s *Server) corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+
+		// Helper to short-circuit preflight when allowed
+		allowCORS := func() {
+			if origin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Vary", "Origin")
+			}
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept, X-API-Key")
+		}
+
+		// If an Origin is present, evaluate allowed origins list and API key
+		if origin != "" {
+			allowed := false
+			// API key bypass: if configured and presented, allow
+			if s.cfg.APIKey != "" && r.Header.Get("X-API-Key") == s.cfg.APIKey {
+				allowed = true
+			}
+
+			// If no explicit AllowedOrigins configured, allow same-origin requests
+			// (useful for running the UI served by this server in the browser).
+			if !allowed && len(s.cfg.AllowedOrigins) == 0 {
+				if u, err := url.Parse(origin); err == nil {
+					if u.Host == r.Host {
+						allowed = true
+					}
+				}
+			}
+
+			// Check allowed origins list
+			for _, ao := range s.cfg.AllowedOrigins {
+				if ao == "*" || ao == origin {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				http.Error(w, "origin not allowed", http.StatusForbidden)
+				return
+			}
+			allowCORS()
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// No Origin header (likely same-origin or non-browser client).
+		// If APIKey or JWTSecret is configured require auth for API endpoints; otherwise allow.
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.Method == http.MethodPost {
+			// If no auth configured, allow
+			if s.cfg.APIKey != "" || s.cfg.JWTSecret != "" {
+				// Check API key first
+				if s.cfg.APIKey != "" && r.Header.Get("X-API-Key") == s.cfg.APIKey {
+					next.ServeHTTP(w, r)
+					return
+				}
+				// Check Bearer JWT
+				if s.cfg.JWTSecret != "" {
+					auth := r.Header.Get("Authorization")
+					if strings.HasPrefix(strings.ToLower(auth), "bearer ") {
+						token := strings.TrimSpace(auth[len("bearer "):])
+						if validateJWT(token, s.cfg.JWTSecret) {
+							next.ServeHTTP(w, r)
+							return
+						}
+					}
+				}
+				// Unauthorized
+				writeJSON(w, http.StatusUnauthorized, map[string]any{"ok": false, "error": "missing or invalid credentials"})
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 

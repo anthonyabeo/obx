@@ -1,13 +1,19 @@
 package web
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/compiler"
@@ -25,6 +31,72 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("writeJSON: %v", err)
+	}
+}
+
+// validateJWT validates a simple HS256 (HMAC-SHA256) JWT bearer token using the
+// provided secret. It performs signature verification and optional exp claim
+// expiry check. Returns true when token is valid.
+func validateJWT(token string, secret string) bool {
+	// token format: header.payload.signature (base64url)
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return false
+	}
+	signing := parts[0] + "." + parts[1]
+	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		// try standard URLEncoding with padding
+		sig, err = base64.URLEncoding.DecodeString(parts[2])
+		if err != nil {
+			return false
+		}
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(signing))
+	expected := mac.Sum(nil)
+	if !hmac.Equal(sig, expected) {
+		return false
+	}
+	// parse payload and check exp if present
+	payloadB, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		payloadB, err = base64.URLEncoding.DecodeString(parts[1])
+		if err != nil {
+			return false
+		}
+	}
+	var claims map[string]any
+	if err := json.Unmarshal(payloadB, &claims); err != nil {
+		return false
+	}
+	if expv, ok := claims["exp"]; ok {
+		switch t := expv.(type) {
+		case float64:
+			if int64(t) < time.Now().Unix() {
+				return false
+			}
+		case int64:
+			if t < time.Now().Unix() {
+				return false
+			}
+		case string:
+			// try parse as integer string
+			if iv, err := strconv.ParseInt(t, 10, 64); err == nil {
+				if iv < time.Now().Unix() {
+					return false
+				}
+			}
+		}
+	}
+	return true
 }
 
 // ── shared helpers ────────────────────────────────────────────────────────────

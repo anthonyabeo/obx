@@ -7,10 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"mime"
 	"net/http"
-	"net/url"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -101,7 +99,7 @@ func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 		if _, err := rand.Read(b); err != nil {
 			b = []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
 		}
-		nonce := base64.StdEncoding.EncodeToString(b)
+		nonce := base64.RawURLEncoding.EncodeToString(b)
 		csp := fmt.Sprintf("default-src 'self'; script-src 'self' https: 'nonce-%s'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data:; connect-src 'self' https:; font-src 'self' https: data:; frame-ancestors 'none';", nonce)
 		w.Header().Set("Content-Security-Policy", csp)
 
@@ -149,7 +147,7 @@ func (s *Server) HandleUI(w http.ResponseWriter, r *http.Request) {
 	if _, err := rand.Read(b); err != nil {
 		b = []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
 	}
-	nonce := base64.StdEncoding.EncodeToString(b)
+	nonce := base64.RawURLEncoding.EncodeToString(b)
 	csp := fmt.Sprintf("default-src 'self'; script-src 'self' https: 'nonce-%s'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data:; connect-src 'self' https:; font-src 'self' https: data:; frame-ancestors 'none';", nonce)
 	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -179,7 +177,7 @@ func (s *Server) HandleVersion(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method not allowed"})
 		return
 	}
 	// limit request size early
@@ -205,7 +203,7 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(mb)))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad request: " + err.Error()})
 		return
 	}
 	if req.Filename == "" {
@@ -214,16 +212,16 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 
 	// validate filename: must be a simple basename with allowed chars
 	if len(req.Filename) == 0 || len(req.Filename) > mf || !filenameRE.MatchString(req.Filename) || filepath.Base(req.Filename) != req.Filename {
-		http.Error(w, "invalid filename", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid filename"})
 		return
 	}
 	// validate source size
 	if len(req.Source) == 0 {
-		http.Error(w, "empty source", http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "empty source"})
 		return
 	}
 	if len(req.Source) > ms {
-		http.Error(w, "source too large", http.StatusRequestEntityTooLarge)
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"ok": false, "error": "source too large"})
 		return
 	}
 
@@ -240,7 +238,7 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 	// parse stdlib modules first (best-effort; skip if unavailable)
 	entry := deriveEntryFromFilename(req.Filename)
 	if err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source); err != nil {
-		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
 
@@ -295,83 +293,13 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ── CORS middleware ───────────────────────────────────────────────────────────
-
-// corsMiddleware enforces CORS according to server config. If AllowedOrigins
-// contains entries, only those origins are permitted. If an API key is
-// configured, clients presenting the X-API-Key header with the matching value
-// are allowed regardless of origin (useful for non-browser clients).
-func (s *Server) corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-
-		// Helper to short-circuit preflight when allowed
-		allowCORS := func() {
-			if origin != "" {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
-				w.Header().Set("Vary", "Origin")
-			}
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept, X-API-Key")
-		}
-
-		// If an Origin is present, evaluate allowed origins list and API key
-		if origin != "" {
-			allowed := false
-			// API key bypass: if configured and presented, allow
-			if s.cfg.APIKey != "" && r.Header.Get("X-API-Key") == s.cfg.APIKey {
-				allowed = true
-			}
-
-			// If no explicit AllowedOrigins configured, allow same-origin requests
-			// (useful for running the UI served by this server in the browser).
-			if !allowed && len(s.cfg.AllowedOrigins) == 0 {
-				if u, err := url.Parse(origin); err == nil {
-					if u.Host == r.Host {
-						allowed = true
-					}
-				}
-			}
-
-			// Check allowed origins list
-			for _, ao := range s.cfg.AllowedOrigins {
-				if ao == "*" || ao == origin {
-					allowed = true
-					break
-				}
-			}
-			if !allowed {
-				http.Error(w, "origin not allowed", http.StatusForbidden)
-				return
-			}
-			allowCORS()
-			if r.Method == http.MethodOptions {
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		// No Origin header (likely same-origin or non-browser client).
-		// If APIKey is configured require it for non-browser clients; otherwise allow.
-		if s.cfg.APIKey != "" {
-			if r.Header.Get("X-API-Key") != s.cfg.APIKey {
-				http.Error(w, "missing or invalid api key", http.StatusUnauthorized)
-				return
-			}
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
 // ── POST /api/cfg ─────────────────────────────────────────────────────────────
 
 // HandleCFG runs the full front-end pipeline (parse → sema → desugar → ObxIR)
 // and returns a Graphviz DOT string for each function's CFG.
 func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method not allowed"})
 		return
 	}
 	var req struct {
@@ -396,7 +324,7 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(mb)))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad request: " + err.Error()})
 		return
 	}
 	if req.Filename == "" {
@@ -493,7 +421,7 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 // and a textual output. Real execution/sandboxing is planned for later.
 func (s *Server) HandleRun(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method not allowed"})
 		return
 	}
 	var req struct {
@@ -517,7 +445,7 @@ func (s *Server) HandleRun(w http.ResponseWriter, r *http.Request) {
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(mb)))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&req); err != nil {
-		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad request: " + err.Error()})
 		return
 	}
 	if req.Filename == "" {
@@ -603,12 +531,4 @@ func (s *Server) HandleRun(w http.ResponseWriter, r *http.Request) {
 		"diagnostics": items,
 		"output":      output,
 	})
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Printf("writeJSON: %v", err)
-	}
 }
