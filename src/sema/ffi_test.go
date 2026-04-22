@@ -384,4 +384,3 @@ END CLib.
 		t.Error("unexpected errors for extern proc with no params")
 	}
 }
-

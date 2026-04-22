@@ -13,13 +13,13 @@
   <span class="tagline">Oberon+ Playground</span>
   <div class="header-actions" style="margin-left:12px; display:flex; gap:8px; align-items:center;">
     <!-- action buttons: icons only -->
-    <button id="cfgBtn" class="icon-btn action cfg" onclick="toggleCfg()" title="Show CFG" aria-label="Show CFG">
+    <button id="cfgBtn" class="icon-btn action cfg" title="Show CFG" aria-label="Show CFG">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="6" r="3"></circle><path d="M13 6h3"></path><path d="M11 13l-2-2"></path></svg>
     </button>
-    <button id="runBtn" class="icon-btn action run" onclick="runProgram()" title="Run program" aria-label="Run program">
+    <button id="runBtn" class="icon-btn action run" title="Run program" aria-label="Run program">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="#60A5FA" stroke="#60A5FA" stroke-width="0" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v18l15-9L5 3z"/></svg>
     </button>
-    <button id="checkBtn" class="icon-btn action check" onclick="runCheck()" title="Check" aria-label="Check">
+    <button id="checkBtn" class="icon-btn action check" title="Check" aria-label="Check">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
     </button>
   </div>
@@ -64,11 +64,11 @@
         <div class="spacer"></div>
         <div class="cfg-controls">
           <span class="cfg-hint">scroll&thinsp;·&thinsp;drag&thinsp;·&thinsp;dbl-click to fit</span>
-          <button class="icon-btn" onclick="fitCfg()" title="Fit to view" aria-label="Fit to view">
+          <button id="fitCfgBtn" class="icon-btn" onclick="" title="Fit to view" aria-label="Fit to view">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
             <span class="btn-text">fit</span>
           </button>
-          <button class="icon-btn" onclick="resetCfg()" title="Reset zoom" aria-label="Reset zoom">
+          <button id="resetCfgBtn" class="icon-btn" onclick="" title="Reset zoom" aria-label="Reset zoom">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
             <span class="btn-text">1:1</span>
           </button>
@@ -88,7 +88,7 @@
       <div class="pane-header">
         <span class="pane-label">terminal</span>
         <div class="spacer"></div>
-        <button id="clearTermBtn" class="icon-btn" onclick="clearTerminal()" title="Clear" aria-label="Clear terminal">
+        <button id="clearTermBtn" class="icon-btn" title="Clear" aria-label="Clear terminal">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6v12a2 2 0 0 0 2 2h4"></path></svg>
           <span class="btn-text">Clear</span>
         </button>
@@ -103,6 +103,25 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
 <script src="/static/js/playground.js"></script>
+
+<!-- Inline event hookup uses a per-response nonce injected by the server. -->
+<script nonce="%CSP_NONCE%">
+  (function(){
+    function on(id, fn){
+      var el = document.getElementById(id);
+      if(el && fn) el.addEventListener('click', fn);
+    }
+    // Attach handlers — functions (toggleCfg, runProgram, runCheck, clearTerminal,
+    // fitCfg, resetCfg) are defined in /static/js/playground.js and expected to be
+    // available on window.
+    on('cfgBtn', window.toggleCfg);
+    on('runBtn', window.runProgram);
+    on('checkBtn', window.runCheck);
+    on('clearTermBtn', window.clearTerminal);
+    on('fitCfgBtn', window.fitCfg);
+    on('resetCfgBtn', window.resetCfg);
+  })();
+</script>
 </body>
 </html>
 

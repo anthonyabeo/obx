@@ -1,18 +1,22 @@
 package web
 
 import (
+	"crypto/rand"
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"mime"
 	"net/http"
+	"net/url"
 	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/obxir"
@@ -82,30 +86,47 @@ func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", mimeType)
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
-
-	// Security headers for static assets
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 	// Permissions-Policy (formerly Feature-Policy) - restrict powerful features
 	w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
-	// Content Security Policy: allow resources from self and HTTPS sources; block framing
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data:; connect-src 'self' https:; font-src 'self' https: data:; frame-ancestors 'none';")
 
-	// Cache policy: treat index.html as dynamic (no-cache); other assets may be cached
+	// Content Security Policy: for index.html we generate a per-response nonce
+	// and allow scripts from self, https:, and the generated nonce (no 'unsafe-inline').
 	base := path.Base(clean)
 	if base == "index.html" {
+		// generate a per-response nonce and substitute into the HTML body below
+		b := make([]byte, 16)
+		if _, err := rand.Read(b); err != nil {
+			b = []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
+		}
+		nonce := base64.StdEncoding.EncodeToString(b)
+		csp := fmt.Sprintf("default-src 'self'; script-src 'self' https: 'nonce-%s'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data:; connect-src 'self' https:; font-src 'self' https: data:; frame-ancestors 'none';", nonce)
+		w.Header().Set("Content-Security-Policy", csp)
+
+		// Cache control for index
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.Header().Set("Pragma", "no-cache")
 		w.Header().Set("Expires", "0")
-	} else {
-		// conservative caching for static assets (1 hour); operators may supply
-		// fingerprinted assets and use longer lifetimes if desired.
-		w.Header().Set("Cache-Control", "public, max-age=3600, stale-while-revalidate=60")
+
+		// Inject nonce into HTML placeholder and write
+		out := strings.ReplaceAll(string(data), "%CSP_NONCE%", nonce)
+		w.Header().Set("Content-Type", mimeType)
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(out)))
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(out))
+		}
+		return
 	}
 
+	// Default CSP for other static assets (allow scripts from self and HTTPS)
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data:; connect-src 'self' https:; font-src 'self' https: data:; frame-ancestors 'none';")
+
+	// Cache policy for non-index assets: relatively long-lived where appropriate
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Header().Set("Content-Type", mimeType)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 	if r.Method == http.MethodGet {
 		_, _ = w.Write(data)
 	}
@@ -123,8 +144,24 @@ func (s *Server) HandleUI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not read UI", http.StatusInternalServerError)
 		return
 	}
+	// Generate per-response nonce and inject into HTML, then set strong CSP
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		b = []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
+	}
+	nonce := base64.StdEncoding.EncodeToString(b)
+	csp := fmt.Sprintf("default-src 'self'; script-src 'self' https: 'nonce-%s'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data:; connect-src 'self' https:; font-src 'self' https: data:; frame-ancestors 'none';", nonce)
+	w.Header().Set("Content-Security-Policy", csp)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+
+	out := strings.ReplaceAll(string(data), "%CSP_NONCE%", nonce)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write(data)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(out)))
+	_, _ = w.Write([]byte(out))
 }
 
 // ── GET /api/version ─────────────────────────────────────────────────────────
@@ -285,6 +322,17 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 			if s.cfg.APIKey != "" && r.Header.Get("X-API-Key") == s.cfg.APIKey {
 				allowed = true
 			}
+
+			// If no explicit AllowedOrigins configured, allow same-origin requests
+			// (useful for running the UI served by this server in the browser).
+			if !allowed && len(s.cfg.AllowedOrigins) == 0 {
+				if u, err := url.Parse(origin); err == nil {
+					if u.Host == r.Host {
+						allowed = true
+					}
+				}
+			}
+
 			// Check allowed origins list
 			for _, ao := range s.cfg.AllowedOrigins {
 				if ao == "*" || ao == origin {

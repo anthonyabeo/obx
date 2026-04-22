@@ -605,4 +605,3 @@ func processDirective(lex *hLexer, file string, src []byte, start int, resolver 
 		return start + t.Pos, nil
 	}
 }
-

@@ -146,4 +146,3 @@ func (b *Block) HasPhi(v string) bool {
 func (b *Block) AddPhi(p *PhiInst) {
 	b.Instrs = append([]Instr{p}, b.Instrs...)
 }
-

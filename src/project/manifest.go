@@ -129,4 +129,3 @@ func ResolveStdlibRoot(m Manifest) string {
 
 	return ""
 }
-

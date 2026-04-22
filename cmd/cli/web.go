@@ -23,8 +23,8 @@ var webArgs struct {
 	MaxBodyBytes   int
 	MaxSourceBytes int
 	MaxFilenameLen int
-	AllowedOrigins  []string
-	APIKey          string
+	AllowedOrigins []string
+	APIKey         string
 }
 
 func init() {
