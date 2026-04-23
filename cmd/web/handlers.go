@@ -108,8 +108,10 @@ func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Pragma", "no-cache")
 		w.Header().Set("Expires", "0")
 
-		// Inject nonce into HTML placeholder and write
+		// Inject nonce into HTML placeholder and perform asset placeholder
+		// substitution (replacing %VIZ_JS% etc with fingerprinted names).
 		out := strings.ReplaceAll(string(data), "%CSP_NONCE%", nonce)
+		out = replacePlaceholders(out)
 		w.Header().Set("Content-Type", mimeType)
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(out)))
 		if r.Method == http.MethodGet {
@@ -157,6 +159,7 @@ func (s *Server) HandleUI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 
 	out := strings.ReplaceAll(string(data), "%CSP_NONCE%", nonce)
+	out = replacePlaceholders(out)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(out)))
 	_, _ = w.Write([]byte(out))

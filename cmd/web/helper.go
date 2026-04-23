@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/anthonyabeo/obx/src/project"
@@ -21,6 +22,48 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/directive"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
 )
+
+var (
+	assetManifest     map[string]string
+	assetManifestOnce sync.Once
+	assetManifestErr  error
+)
+
+// loadAssetManifest reads static/manifest.json (if present) from the embedded
+// static FS and returns a mapping of placeholder keys → replacement paths.
+func loadAssetManifest() (map[string]string, error) {
+	assetManifestOnce.Do(func() {
+		data, err := staticFS.ReadFile("static/manifest.json")
+		if err != nil {
+			// manifest is optional
+			assetManifest = nil
+			assetManifestErr = nil
+			return
+		}
+		m := make(map[string]string)
+		if err := json.Unmarshal(data, &m); err != nil {
+			assetManifestErr = err
+			return
+		}
+		assetManifest = m
+	})
+	return assetManifest, assetManifestErr
+}
+
+// replacePlaceholders substitutes %KEY% placeholders in HTML with values from
+// the asset manifest (if available). If no manifest is present the HTML is
+// returned unchanged.
+func replacePlaceholders(html string) string {
+	m, _ := loadAssetManifest()
+	if m == nil {
+		return html
+	}
+	for k, v := range m {
+		ph := "%" + k + "%"
+		html = strings.ReplaceAll(html, ph, v)
+	}
+	return html
+}
 
 // statusRecorder wraps http.ResponseWriter to capture the response status code.
 type statusRecorder struct {

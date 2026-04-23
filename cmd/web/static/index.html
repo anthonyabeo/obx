@@ -99,9 +99,10 @@
 
 </div><!-- .workspace -->
 
-<!-- viz.js 2.x full renderer — required for HTML-like labels (<B>, <BR/>, <FONT>) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
+<!-- viz.js 2.x full renderer — vendored locally. Filenames are fingerprinted
+     and injected at runtime via static/manifest.json → placeholders below. -->
+<script src="%VIZ_JS%"></script>
+<script src="%VIZ_FULL_RENDER_JS%"></script>
 <script src="/static/js/playground.js"></script>
 
 <!-- Inline event hookup uses a per-response nonce injected by the server. -->
