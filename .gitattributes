@@ -1,0 +1,7 @@
+# Use Git LFS for large vendored JS under cmd/web/static/js
+# Track all files under that tree (monaco, viz, full.render, etc.)
+/cmd/web/static/js/** filter=lfs diff=lfs merge=lfs -text
+# Keep manifest.json and other small text static files in regular Git
+/cmd/web/static/manifest.json text
+/cmd/web/static/index.html text
+# End of file
