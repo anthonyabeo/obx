@@ -71,12 +71,15 @@ jobs:
         run: |
           if [ -x ./scripts/vendor_static.sh ]; then ./scripts/vendor_static.sh; fi || true
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
       - name: Install Ansible on runner
         run: |
-          python3 -m pip install --upgrade --user pip
-          python3 -m pip install --user ansible
-        env:
-          PATH: ${{ runner.tool_cache }}/python/3.x/bin:${{ env.PATH }}
+          python -m pip install --upgrade pip
+          python -m pip install ansible
 
       - name: Start ssh-agent and add key
         uses: webfactory/ssh-agent@v0.8.0
