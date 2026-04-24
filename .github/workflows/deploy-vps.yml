@@ -99,9 +99,20 @@ jobs:
           TMP_DIR=$(mktemp -d)
           trap 'rm -rf "$TMP_DIR"' EXIT
           
-          # Extract the public key from the PEM secret using process substitution
-          PUBKEY=$(ssh-keygen -y -f <(printf '%s' "${{ secrets.VPS_SSH_KEY }}"))
-          
+          # Try to obtain the public key from the ssh-agent (preferred)
+          PUBKEY="$(ssh-add -L 2>/dev/null | head -n1 || true)"
+
+          # If ssh-agent doesn't have the key (or ssh-add failed), fall back to writing
+          # the PEM secret to a temp file and extracting the public key with ssh-keygen.
+          if [ -z "$PUBKEY" ]; then
+            printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > "$TMP_DIR/vps.pem"
+            chmod 600 "$TMP_DIR/vps.pem"
+            PUBKEY=$(ssh-keygen -y -f "$TMP_DIR/vps.pem") || {
+              echo "Failed to extract public key from PEM" >&2
+              exit 1
+            }
+          fi
+
           # Generate well-formed JSON with the pubkey placed safely via environment variable
           PUBKEY="$PUBKEY" python3 - <<'PY' > "$TMP_DIR/extra_vars.json"
           import os, json
