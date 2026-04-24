@@ -249,7 +249,16 @@ func TestCompile(t *testing.T) {
 					t.Fatalf("failed to find project root: %v", err)
 				}
 
-				path := root + "/out/" + module.Name + ".s"
+				outDir := root + "/out"
+				if _, err := os.Stat(outDir); os.IsNotExist(err) {
+					if err := os.MkdirAll(outDir, 0755); err != nil {
+						t.Fatalf("failed to create out directory: %v", err)
+					}
+				} else if err != nil {
+					t.Fatalf("failed to stat out directory: %v", err)
+				}
+
+				path := outDir + "/" + module.Name + ".s"
 				asmFile, err := os.Create(path)
 				if err != nil {
 					t.Fatalf("failed to create assembly file: %v", err)
