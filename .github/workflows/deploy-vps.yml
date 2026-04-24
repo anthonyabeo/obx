@@ -1,0 +1,137 @@
+name: CI — Build, push image and deploy to VPS
+
+on:
+  push:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+
+      - name: Ensure code is formatted
+        run: |
+          # show any gofmt diffs and fail if there are unformatted files
+          unformatted=$(gofmt -l . | wc -l)
+          if [ "$unformatted" -ne 0 ]; then
+            echo "The following files are not gofmt'ed:" 
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: |
+          go vet ./...
+
+      - name: Run unit tests
+        run: |
+          go test -v ./...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.59.0
+          args: --timeout=5m
+
+      - name: Set up Node (for vendor script)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run vendor script (if present)
+        run: |
+          if [ -x ./scripts/vendor_static.sh ]; then ./scripts/vendor_static.sh; fi || true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.REGISTRY_HOST }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DEPLOY_IMAGE }}
+
+      - name: Ensure deploy directory on VPS
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || '22' }}
+          script: |
+            set -euo pipefail
+            mkdir -p /home/${{ secrets.VPS_USER }}/deploy
+            chown ${{ secrets.VPS_USER }}: /home/${{ secrets.VPS_USER }}/deploy || true
+
+      - name: Upload docker-compose to VPS (managed by Ansible files)
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || '22' }}
+          source: ".ansible/files/docker-compose.yml"
+          target: "/home/${{ secrets.VPS_USER }}/deploy/docker-compose.yml"
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || '22' }}
+          script: |
+            set -euo pipefail
+            echo "Pulling image: ${{ secrets.DEPLOY_IMAGE }}"
+            docker pull "${{ secrets.DEPLOY_IMAGE }}"
+            # update IMAGE env and restart
+            export IMAGE="${{ secrets.DEPLOY_IMAGE }}"
+            cd /home/${{ secrets.VPS_USER }}/deploy
+            # bring up service using the pulled image
+            docker compose pull || true
+            IMAGE="${{ secrets.DEPLOY_IMAGE }}" docker compose up -d --remove-orphans
+
+            # Wait for the service to become healthy by polling the local health endpoint
+            echo "Waiting for service to respond on http://127.0.0.1:8080/api/version"
+            ok=0
+            for i in $(seq 1 12); do
+              if curl -sSf http://127.0.0.1:8080/api/version >/dev/null 2>&1; then
+                echo "Service is healthy"
+                ok=1
+                break
+              else
+                echo "Attempt $i: service not ready yet - sleeping 5s"
+                sleep 5
+              fi
+            done
+            if [ "$ok" -ne 1 ]; then
+              echo "Service failed to become healthy. Showing container logs:" >&2
+              docker compose logs --no-color --tail=200 || true
+              exit 1
+            fi
+
+            # cleanup old images
+            docker image prune -f || true
+
+
+
