@@ -1,0 +1,34 @@
+module OOP;
+
+TYPE
+  A = RECORD
+    x: INTEGER
+  END;
+
+  B = RECORD (A)
+    y: INTEGER
+  END;
+
+PROCEDURE (VAR a: A) foo(): INTEGER;
+BEGIN
+  RETURN a.x
+END foo;
+
+PROCEDURE (VAR b: B) foo(): INTEGER;
+BEGIN
+  RETURN b.x + b.y
+END foo;
+
+PROCEDURE (VAR b: B) bar(): INTEGER;
+BEGIN
+  RETURN b^.foo() + 1
+END bar;
+
+VAR r: B;
+BEGIN
+  NEW(r);
+  r.x := 10;
+  r.y := 20;
+  r.foo();
+  r.bar()
+END OOP.
