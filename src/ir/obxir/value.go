@@ -117,6 +117,57 @@ type (
 	}
 )
 
+// Uint32ArrayConst represents a compile-time array of uint32 values.
+type Uint32ArrayConst struct {
+	Ident  string
+	Values []uint32
+	Typ    Type
+}
+
+// FuncPtrArrayConst represents a compile-time array of function pointer
+// symbol names (module-level function-pointer table). Each entry is the
+// mangled symbol name; an empty string represents a NULL/0 entry.
+type FuncPtrArrayConst struct {
+	Ident     string
+	FuncNames []string
+	Typ       Type
+}
+
+// RTTIConst is a small POD describing RTTI payloads: pointer to name and size.
+type RTTIConst struct {
+	Ident   string
+	NameSym string // symbol name of the string for the type name
+	Size    uint64
+	Typ     Type
+}
+
+// --- Uint32ArrayConst methods ---
+func (o *Uint32ArrayConst) Const()           {}
+func (o *Uint32ArrayConst) Type() Type       { return o.Typ }
+func (o *Uint32ArrayConst) Name() string     { return o.Ident }
+func (o *Uint32ArrayConst) BaseName() string { return o.Ident }
+func (o *Uint32ArrayConst) String() string   { return o.Ident }
+func (o *Uint32ArrayConst) Value() any       { return o.Values }
+func (o *Uint32ArrayConst) IsMem() bool      { return false }
+
+// --- FuncPtrArrayConst methods ---
+func (o *FuncPtrArrayConst) Const()           {}
+func (o *FuncPtrArrayConst) Type() Type       { return o.Typ }
+func (o *FuncPtrArrayConst) Name() string     { return o.Ident }
+func (o *FuncPtrArrayConst) BaseName() string { return o.Ident }
+func (o *FuncPtrArrayConst) String() string   { return o.Ident }
+func (o *FuncPtrArrayConst) Value() any       { return o.FuncNames }
+func (o *FuncPtrArrayConst) IsMem() bool      { return false }
+
+// --- RTTIConst methods ---
+func (o *RTTIConst) Const()           {}
+func (o *RTTIConst) Type() Type       { return o.Typ }
+func (o *RTTIConst) Name() string     { return o.Ident }
+func (o *RTTIConst) BaseName() string { return o.Ident }
+func (o *RTTIConst) String() string   { return o.Ident }
+func (o *RTTIConst) Value() any       { return struct{ Name string; Size uint64 }{o.NameSym, o.Size} }
+func (o *RTTIConst) IsMem() bool      { return false }
+
 // ─── Temp ─────────────────────────────────────────────────────────────────
 
 func (o *Temp) Type() Type       { return o.Typ }

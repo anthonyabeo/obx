@@ -51,7 +51,7 @@ func callExternal(b *IRBuilder, v *desugar.FuncCall, callee string, retType Type
 	} else {
 		ret = b.NewTemp(retType)
 	}
-	b.Emit(&CallInst{Target: ret, Callee: callee, Args: args})
+	b.Emit(&CallInst{Target: ret, Callee: b.lookupCalleeByName(callee), Args: args})
 	return ret
 }
 

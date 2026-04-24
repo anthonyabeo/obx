@@ -25,6 +25,12 @@ type IRBuilder struct {
 	curExit    string
 
 	env *Environment
+	// module-level collection used during lowering to accumulate constants
+	// (vtables, RTTI, module fnptr table) for the current module being lowered.
+	moduleConstants map[string]Constant
+	// mapping of module-level function table indices -> mangled function name
+	moduleFnNames map[uint32]string
+	moduleMaxFnIndex int
 }
 
 func NewIRBuilder(wordSize uint64) *IRBuilder {
@@ -169,6 +175,16 @@ func (b *IRBuilder) lowerModule(hirMod *desugar.Module) *Module {
 	functions := make([]*Function, 0)
 	globals := make(map[string]*GlobalVariable)
 	constants := make(map[string]Constant)
+	// initialize builder module-level collectors so lowerType can register
+	// vtable/RTTI constants and record function index -> name mappings.
+	b.moduleConstants = constants
+	b.moduleFnNames = make(map[uint32]string)
+	b.moduleMaxFnIndex = -1
+	defer func() {
+		b.moduleConstants = nil
+		b.moduleFnNames = nil
+		b.moduleMaxFnIndex = -1
+	}()
 	var externals []ExternDecl
 
 	for _, decl := range hirMod.Decls {
@@ -268,6 +284,43 @@ func (b *IRBuilder) lowerModule(hirMod *desugar.Module) *Module {
 	// Extern DEFINITION modules have no initializer body.
 	if hirMod.Init != nil {
 		functions = append(functions, b.lowerFunction(hirMod.Init, NewSymbolTable(hirMod.Init.Name, b.env.CurrentScope())))
+	}
+
+	// Ensure any GlobalVariable entries defined in the module symbol table
+	// (e.g. vtables/RTTI emitted during type lowering) are included in the
+	// returned module.Globals map.
+	if tbl := b.env.ModuleScope(hirMod.Name); tbl != nil {
+		for name, val := range tbl.Symbols {
+			_ = name
+			if gv, ok := val.(*GlobalVariable); ok {
+				if _, exists := globals[gv.Ident]; !exists {
+					globals[gv.Ident] = gv
+				}
+			}
+		}
+	}
+
+	// Build module-level function-pointer table constant from recorded indices.
+	if b.moduleFnNames != nil && b.moduleMaxFnIndex >= 0 {
+		n := b.moduleMaxFnIndex + 1
+		names := make([]string, n)
+		for i := 0; i < n; i++ {
+			if s, ok := b.moduleFnNames[uint32(i)]; ok {
+				names[i] = s
+			} else {
+				names[i] = ""
+			}
+		}
+		fnptrName := fmt.Sprintf("%s$fnptrs", hirMod.Name)
+		arrTyp := &ArrayType{Len: n, Elem: PointerTo(Void)}
+		arrConst := &FuncPtrArrayConst{Ident: fnptrName, FuncNames: names, Typ: arrTyp}
+		nc := &NamedConst{Ident: fnptrName, OrigName: fnptrName, ConstValue: arrConst, Typ: arrTyp, Size: arrTyp.Width()}
+		constants[nc.Ident] = nc
+		// Also register a GlobalVariable so the emitter can reference its symbol
+		gv := &GlobalVariable{OrigName: fnptrName, Ident: fnptrName, Typ: arrTyp, Size: arrTyp.Width()}
+		if tbl := b.env.ModuleScope(hirMod.Name); tbl != nil {
+			tbl.Define(gv.Ident, gv)
+		}
 	}
 
 	return &Module{
@@ -1052,6 +1105,62 @@ func (b *IRBuilder) lowerType(ty types.Type) Type {
 		return &StringType{Length: ty.Length}
 	case *types.EnumType:
 	case *types.RecordType:
+		// If a runtime layout has been computed, use it (includes vptr at offset 0).
+		if ty.Layout != nil {
+			fields := make(map[string]RecordField)
+			for _, f := range ty.Layout.Fields {
+				ft := b.lowerType(f.Type)
+				fields[f.Name] = RecordField{Name: f.Name, Type: ft, Offset: f.Offset}
+			}
+			// Emit module-level vtable and RTTI globals if names are present.
+			if ty.Layout.VTableName != "" {
+				// VTable: array of uint32 indices
+				vtabTyp := &ArrayType{Len: len(ty.Layout.VTable), Elem: UInt32Type}
+				gv := &GlobalVariable{OrigName: ty.Layout.VTableName, Ident: ty.Layout.VTableName, Typ: vtabTyp, Size: vtabTyp.Width()}
+				// register into current module symbol table so it will be emitted
+				b.env.Define(gv.Ident, gv)
+
+				// If we are lowering a module, register a compile-time constant payload
+				// for the vtable contents so the backend can emit the .rodata entries.
+				if b.moduleConstants != nil {
+					vals := make([]uint32, 0, len(ty.Layout.VTable))
+					for _, ms := range ty.Layout.VTable {
+						vals = append(vals, uint32(ms.FuncIndex))
+						// record module function name for later emission of the module
+						// function-pointer table (index -> mangled name)
+						if ms.FuncIndex > uint32(b.moduleMaxFnIndex) {
+							b.moduleMaxFnIndex = int(ms.FuncIndex)
+						}
+						b.moduleFnNames[ms.FuncIndex] = ms.Mangled
+					}
+					arr := &Uint32ArrayConst{Ident: ty.Layout.VTableName, Values: vals, Typ: vtabTyp}
+					nc := &NamedConst{Ident: ty.Layout.VTableName, OrigName: ty.Layout.VTableName, ConstValue: arr, Typ: vtabTyp, Size: vtabTyp.Width()}
+					b.moduleConstants[nc.Ident] = nc
+				}
+			}
+			if ty.Layout.RTTIName != "" {
+				rttiTyp := PointerTo(Void)
+				rgv := &GlobalVariable{OrigName: ty.Layout.RTTIName, Ident: ty.Layout.RTTIName, Typ: rttiTyp, Size: rttiTyp.Width()}
+				b.env.Define(rgv.Ident, rgv)
+
+				// Create a module-level string constant and an RTTI POD constant
+				if b.moduleConstants != nil {
+					nameSym := ty.Layout.RTTIName + "_name"
+					// string constant
+					str := &StrLit{LitName: nameSym, LitValue: ty.String(), Typ: &StringType{Length: len(ty.String())}}
+					ns := &NamedConst{Ident: nameSym, OrigName: nameSym, ConstValue: str, Typ: str.Typ, Size: str.Typ.Width()}
+					b.moduleConstants[ns.Ident] = ns
+
+					// RTTI POD: pointer to name, size (we represent as RTTIConst and let
+					// backend know how to emit it)
+					rtti := &RTTIConst{Ident: ty.Layout.RTTIName, NameSym: nameSym, Size: uint64(ty.Layout.Size), Typ: PointerTo(Void)}
+					nc := &NamedConst{Ident: ty.Layout.RTTIName, OrigName: ty.Layout.RTTIName, ConstValue: rtti, Typ: rtti.Typ, Size: 16}
+					b.moduleConstants[nc.Ident] = nc
+				}
+			}
+			return &RecordType{Fields: fields, Size: ty.Layout.Size}
+		}
+		// Fallback: no layout available, build structural record from declared fields
 		fields := make(map[string]RecordField)
 		offset := 0
 		for _, f := range ty.Fields {
@@ -1180,7 +1289,44 @@ func (b *IRBuilder) FuncCall(call *desugar.FuncCall) Value {
 		name = call.Func.Name
 	}
 
-	b.Emit(&CallInst{Target: t, Callee: name, Args: args})
+	// Attempt dynamic-dispatch lowering: if this callee corresponds to a
+	// method that has an entry in the module function-index table, lower the
+	// call to an indirect call through the object's vptr + module fnptrs.
+	// Otherwise emit a direct call to the resolved function value.
+	var methodIndex int = -1
+	if b.moduleFnNames != nil {
+		for idx, name := range b.moduleFnNames {
+			if name == fn.FnName {
+				methodIndex = int(idx)
+				break
+			}
+		}
+	}
+	if methodIndex >= 0 && len(args) > 0 {
+		// receiver is first argument
+		recv := args[0]
+		// load vptr from the object (vptr at offset 0)
+		vptr := b.NewTemp(PointerTo(Void))
+		b.Emit(&LoadInst{Target: vptr, Addr: recv})
+
+		// load uint32 method index from vptr + methodIndex*4
+		methodIdxTemp := b.NewTemp(UInt32Type)
+		b.Emit(&LoadInst{Target: methodIdxTemp, Addr: &Mem{Base: vptr, Offs: int64(methodIndex * 4)}})
+
+		// load function pointer from module fnptrs array at index * pointer-size
+		fnptrName := fmt.Sprintf("%s$fnptrs", b.env.CurrentScope().Name)
+		if fnptrGV := b.env.Find(fnptrName); fnptrGV != nil {
+			funcPtr := b.NewTemp(Int64Type)
+			b.Emit(&LoadInst{Target: funcPtr, Addr: &Mem{Base: fnptrGV, Offs: int64(methodIndex * int(b.wordSize))}})
+			// Emit indirect call via loaded function pointer
+			b.Emit(&CallInst{Target: t, Callee: funcPtr, Args: args})
+			return t
+		}
+		// fallthrough to direct call if fnptr table isn't available
+	}
+
+	// Default: direct call using the resolved function value.
+	b.Emit(&CallInst{Target: t, Callee: fxn, Args: args})
 	return t
 }
 
@@ -1284,6 +1430,21 @@ func (b *IRBuilder) NewLabel(prefix string) string {
 	return prefix + "_" + strconv.Itoa(b.labelCount)
 }
 
+// lookupCalleeByName returns a Value suitable for use as a CallInst.Callee for
+// a direct external or runtime helper function name. If the name resolves in
+// any visible symbol table, that value is returned; otherwise a placeholder
+// GlobalVariable is created and defined in the current scope.
+func (b *IRBuilder) lookupCalleeByName(name string) Value {
+	if v := b.env.Find(name); v != nil {
+		return v
+	}
+	gv := &GlobalVariable{OrigName: name, Ident: name, Typ: PointerTo(Void), Size: 8}
+	if tbl := b.env.CurrentScope(); tbl != nil {
+		tbl.Define(gv.Ident, gv)
+	}
+	return gv
+}
+
 // SetTerm appends term to the current block and marks it as the terminator.
 func (b *IRBuilder) SetTerm(term Instr) {
 	b.Emit(term)
@@ -1313,7 +1474,7 @@ func (b *IRBuilder) lowerNEWPtrToRec(allocSize uint64) Value {
 	sizeTemp := b.NewTemp(Int64Type)
 	b.Emit(&MoveInst{Target: sizeTemp, Value: Int64Lit(allocSize)})
 	ptrTemp := b.NewTemp(PointerTo(UInt8Type))
-	b.Emit(&CallInst{Target: ptrTemp, Callee: "malloc", Args: []Value{sizeTemp}})
+	b.Emit(&CallInst{Target: ptrTemp, Callee: b.lookupCalleeByName("malloc"), Args: []Value{sizeTemp}})
 	return ptrTemp
 }
 
@@ -1323,7 +1484,7 @@ func (b *IRBuilder) lowerNEWFixedArray(allocSize uint64) Value {
 	b.Emit(&MoveInst{Target: t, Value: sizeImm})
 	b.Emit(&Arg{Index: 0, Value: t})
 	ptr := b.NewTemp(PointerTo(UInt8Type))
-	b.Emit(&CallInst{Target: ptr, Callee: "malloc", Args: []Value{t}})
+	b.Emit(&CallInst{Target: ptr, Callee: b.lookupCalleeByName("malloc"), Args: []Value{t}})
 	return ptr
 }
 
@@ -1347,7 +1508,7 @@ func (b *IRBuilder) lowerNEWOpen(dims []Value, elemSize uint64, wordSize uint64)
 	b.Emit(&Arg{Index: 0, Value: totalSize})
 
 	ptr := b.NewTemp(Int64Type)
-	b.Emit(&CallInst{Target: ptr, Callee: "malloc", Args: []Value{totalSize}})
+	b.Emit(&CallInst{Target: ptr, Callee: b.lookupCalleeByName("malloc"), Args: []Value{totalSize}})
 
 	for i, d := range dims {
 		offsetImm := int64(i) * int64(wordSize)

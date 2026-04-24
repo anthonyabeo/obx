@@ -92,7 +92,7 @@ func lowerBytesBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	dst := b.ensureAddr(call.Args[0])
 	src := b.ensureAddr(call.Args[1])
 	n := b.ensureValue(call.Args[2])
-	b.Emit(&CallInst{Callee: "__obx_bytes", Args: []Value{dst, src, n}})
+	b.Emit(&CallInst{Callee: b.lookupCalleeByName("__obx_bytes"), Args: []Value{dst, src, n}})
 	return nil
 }
 
@@ -162,7 +162,7 @@ func lowerNumberBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	dst := b.ensureAddr(call.Args[0])
 	src := b.ensureAddr(call.Args[1])
 	size := Int64Lit(uint64(call.Args[0].Type().Width()))
-	b.Emit(&CallInst{Callee: "__obx_bytes", Args: []Value{dst, src, size}})
+	b.Emit(&CallInst{Callee: b.lookupCalleeByName("__obx_bytes"), Args: []Value{dst, src, size}})
 	return nil
 }
 
@@ -173,7 +173,7 @@ func lowerPcallBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 		args = append(args, b.ensureValue(a))
 	}
 	ret := b.NewTemp(Void)
-	b.Emit(&CallInst{Target: ret, Callee: proc.Name(), Args: args})
+	b.Emit(&CallInst{Target: ret, Callee: b.lookupCalleeByName(proc.Name()), Args: args})
 	return ret
 }
 
@@ -186,7 +186,7 @@ func lowerRaiseBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 func lowerCopyBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	src := b.ensureAddr(call.Args[0])
 	dst := b.ensureAddr(call.Args[1])
-	b.Emit(&CallInst{Callee: "__obx_copy", Args: []Value{src, dst}})
+	b.Emit(&CallInst{Callee: b.lookupCalleeByName("__obx_copy"), Args: []Value{src, dst}})
 	return nil
 }
 
@@ -196,7 +196,7 @@ func lowerPackBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	b.Emit(&LoadInst{Target: xVal, Addr: xAddr})
 	n := b.ensureValue(call.Args[1])
 	result := b.NewTemp(Float64Type)
-	b.Emit(&CallInst{Target: result, Callee: "__obx_pack", Args: []Value{xVal, n}})
+	b.Emit(&CallInst{Target: result, Callee: b.lookupCalleeByName("__obx_pack"), Args: []Value{xVal, n}})
 	b.emitAssign(xAddr, result)
 	return result
 }
@@ -208,8 +208,8 @@ func lowerUnpackBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	b.Emit(&LoadInst{Target: xVal, Addr: xAddr})
 	mantissa := b.NewTemp(Float64Type)
 	exponent := b.NewTemp(Int32Type)
-	b.Emit(&CallInst{Target: mantissa, Callee: "__obx_unpack_m", Args: []Value{xVal}})
-	b.Emit(&CallInst{Target: exponent, Callee: "__obx_unpack_e", Args: []Value{xVal}})
+	b.Emit(&CallInst{Target: mantissa, Callee: b.lookupCalleeByName("__obx_unpack_m"), Args: []Value{xVal}})
+	b.Emit(&CallInst{Target: exponent, Callee: b.lookupCalleeByName("__obx_unpack_e"), Args: []Value{xVal}})
 	b.emitAssign(xAddr, mantissa)
 	b.emitAssign(eAddr, exponent)
 	return mantissa
@@ -221,14 +221,14 @@ func lowerLDCMDBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	mod := b.ensureValue(call.Args[0])
 	name := b.ensureValue(call.Args[1])
 	res := b.NewTemp(PointerTo(UInt8Type))
-	b.Emit(&CallInst{Target: res, Callee: "__obx_ldcmd", Args: []Value{mod, name}})
+	b.Emit(&CallInst{Target: res, Callee: b.lookupCalleeByName("__obx_ldcmd"), Args: []Value{mod, name}})
 	return res
 }
 
 func lowerLDMODBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	name := b.ensureValue(call.Args[0])
 	res := b.NewTemp(PointerTo(UInt8Type))
-	b.Emit(&CallInst{Target: res, Callee: "__obx_ldmod", Args: []Value{name}})
+	b.Emit(&CallInst{Target: res, Callee: b.lookupCalleeByName("__obx_ldmod"), Args: []Value{name}})
 	return res
 }
 
@@ -270,7 +270,7 @@ func lowerASRBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 func lowerENTIERBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	x := b.ensureValue(call.Args[0])
 	res := b.NewTemp(Int64Type)
-	b.Emit(&CallInst{Target: res, Callee: "floor", Args: []Value{x}})
+	b.Emit(&CallInst{Target: res, Callee: b.lookupCalleeByName("floor"), Args: []Value{x}})
 	return res
 }
 
@@ -333,7 +333,7 @@ func lowerDefaultBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 func lowerFloorBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 	x := b.ensureValue(call.Args[0])
 	res := b.NewTemp(Int64Type)
-	b.Emit(&CallInst{Target: res, Callee: "floor", Args: []Value{x}})
+	b.Emit(&CallInst{Target: res, Callee: b.lookupCalleeByName("floor"), Args: []Value{x}})
 	return res
 }
 
@@ -702,7 +702,7 @@ func lowerPrintfBuiltin(b *IRBuilder, call *desugar.FuncCall) Value {
 		b.lowerVarArgs(call.Args, len(fn.Params), len(call.Args), &args)
 	}
 	ret := b.NewTemp(Int64Type)
-	b.Emit(&CallInst{Target: ret, Callee: "printf", Args: args})
+	b.Emit(&CallInst{Target: ret, Callee: b.lookupCalleeByName("printf"), Args: args})
 	return ret
 }
 

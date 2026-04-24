@@ -76,7 +76,7 @@ type (
 
 	CallInst struct {
 		Target Value  // nil for void calls
-		Callee string // function name
+		Callee Value  // callee value (direct function symbol or pointer)
 		Args   []Value
 	}
 
@@ -330,19 +330,35 @@ func (u *UnaryInst) Fold() Value {
 // ─── CallInst ─────────────────────────────────────────────────────────────
 
 func (c *CallInst) Def() Value    { return c.Target }
-func (c *CallInst) Uses() []Value { return c.Args }
+func (c *CallInst) Uses() []Value {
+	uses := make([]Value, 0, len(c.Args)+1)
+	if c.Callee != nil {
+		uses = append(uses, c.Callee)
+	}
+	uses = append(uses, c.Args...)
+	return uses
+}
 func (c *CallInst) String() string {
 	var names []string
 	for _, a := range c.Args {
 		names = append(names, a.Name())
 	}
-	call := fmt.Sprintf("CALL @%s(%s)", c.Callee, strings.Join(names, ", "))
+	calleeName := "<nil>"
+	if c.Callee != nil {
+		calleeName = c.Callee.Name()
+	}
+	call := fmt.Sprintf("CALL %s(%s)", calleeName, strings.Join(names, ", "))
 	if c.Target == nil {
 		return call
 	}
 	return fmt.Sprintf("%s := %s", c.Target.Name(), call)
 }
 func (c *CallInst) ReplaceUses(m map[string]Value) {
+	if c.Callee != nil {
+		if nv, ok := m[c.Callee.BaseName()]; ok {
+			c.Callee = nv
+		}
+	}
 	for i, a := range c.Args {
 		if nv, ok := m[a.BaseName()]; ok {
 			c.Args[i] = nv

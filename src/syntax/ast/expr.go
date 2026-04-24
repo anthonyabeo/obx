@@ -210,7 +210,9 @@ func (s *Set) Accept(vst Visitor) any { return vst.VisitSet(s) }
 func (s *Set) Pos() int               { return s.StartOffset }
 func (s *Set) End() int               { return s.EndOffset }
 func (s *Set) Children() []Node {
-	children := make([]Node, len(s.Elem))
+	// Allocate a zero-length slice with capacity equal to number of elements
+	// to avoid introducing nil entries when appending.
+	children := make([]Node, 0, len(s.Elem))
 	for _, expression := range s.Elem {
 		children = append(children, expression)
 	}
