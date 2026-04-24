@@ -15,6 +15,9 @@ type RecordType struct {
 	Fields  []*Field
 	Methods map[string]*Field // type-bound procedure methods keyed by name
 	Base    *RecordType
+	// Layout holds computed runtime layout and dispatch tables.  Populated by
+	// the InheritanceViewPass after type-checking.  Nil until the pass runs.
+	Layout  *RecordLayout
 }
 
 func (r *RecordType) String() string {
@@ -138,6 +141,71 @@ func (r *RecordType) GetMethod(name string) *Field {
 		}
 	}
 	return nil
+}
+
+// RecordLayout contains runtime layout metadata computed after semantic
+// analysis: field offsets, size, alignment, vtable method order (indices), and
+// RTTI names.  The InheritanceViewPass is responsible for filling this in.
+type RecordLayout struct {
+	// FieldOffsets maps field name to its byte offset within the object
+	// instance.  Offsets are measured from the start of the object and the
+	// object includes a per-instance vptr at offset 0.
+	FieldOffsets map[string]int
+
+	// Fields describes the flattened list of fields (including inherited
+	// fields) in declaration order with offsets and GC pointer flag.
+	Fields []FieldLayout
+
+	// Size is the total byte size of the record (including vptr header and
+	// alignment padding).
+	Size int
+
+	// Alignment is the record alignment in bytes.
+	Alignment int
+
+	// VTable is the ordered list of method slots (base first).  Each entry
+	// references a method by its mangled name and module-local function index.
+	VTable []MethodSlot
+
+	// VTableIndex maps method name to index in VTable for quick lookup.
+	VTableIndex map[string]int
+
+	// RTTIName is the mangled symbol name for this record's RTTI global.
+	RTTIName string
+
+	// VTableName is the mangled symbol name for this record's vtable global.
+	VTableName string
+}
+
+type FieldLayout struct {
+	Name   string
+	Type   Type
+	Offset int
+	IsPtr  bool
+}
+
+type MethodSlot struct {
+	Name      string
+	Mangled   string
+	FuncIndex uint32
+}
+
+// GetFieldOffset returns the byte offset of field name if present.
+func (rl *RecordLayout) GetFieldOffset(name string) (int, bool) {
+	if rl == nil || rl.FieldOffsets == nil {
+		return 0, false
+	}
+	off, ok := rl.FieldOffsets[name]
+	return off, ok
+}
+
+// MethodIndex returns the vtable index for method name if present.
+func (rl *RecordLayout) MethodIndex(name string) (int, bool) {
+	if rl == nil || rl.VTableIndex == nil {
+		return 0, false
+	}
+	i, ok := rl.VTableIndex[name]
+	return i, ok
 }
 
 var AnyRec *RecordType
