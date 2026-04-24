@@ -1,0 +1,105 @@
+---
+- name: Deploy obx playground to a VPS
+  hosts: web
+  become: yes
+  vars:
+    deploy_user: "obx"
+    image: "yourregistry/obx:latest"
+    domain: ""
+    email: ""
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      apt:
+        name:
+          - docker.io
+          - docker-compose-plugin
+          - nginx
+          - ufw
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+    - name: Ensure deploy user exists
+      user:
+        name: "{{ deploy_user }}"
+        groups: sudo,docker
+        append: yes
+        shell: /bin/bash
+
+    - name: Ensure deploy directory exists
+      file:
+        path: "/home/{{ deploy_user }}/deploy"
+        state: directory
+        owner: "{{ deploy_user }}"
+        mode: '0755'
+
+    - name: Template docker-compose to remote
+      template:
+        src: templates/docker-compose.yml.j2
+        dest: "/home/{{ deploy_user }}/deploy/docker-compose.yml"
+        owner: "{{ deploy_user }}"
+        mode: '0644'
+
+    - name: Template nginx site configuration
+      template:
+        src: templates/nginx-obx.conf.j2
+        dest: /etc/nginx/sites-available/obx
+        owner: root
+        mode: '0644'
+      notify: Reload nginx
+
+    - name: Ensure nginx site is enabled
+      file:
+        src: /etc/nginx/sites-available/obx
+        dest: /etc/nginx/sites-enabled/obx
+        state: link
+      notify: Reload nginx
+
+    - name: Allow OpenSSH through UFW
+      ufw:
+        rule: allow
+        name: OpenSSH
+
+    - name: Allow Nginx Full (80,443)
+      ufw:
+        rule: allow
+        name: 'Nginx Full'
+
+    - name: Ensure docker service is started
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Pull and start docker-compose service
+      become_user: "{{ deploy_user }}"
+      shell: |
+        set -euo pipefail
+        cd /home/{{ deploy_user }}/deploy
+        docker compose pull || true
+        IMAGE="{{ image }}" docker compose up -d --remove-orphans
+
+    - name: Wait for local health endpoint
+      become: false
+      shell: curl -sSf http://127.0.0.1:8080/api/version
+      register: hc
+      retries: 12
+      delay: 5
+      until: hc.rc == 0
+
+    - name: Obtain TLS certificate with certbot (if domain provided)
+      when: domain != '' and email != ''
+      command: certbot --nginx -d {{ domain }} --non-interactive --agree-tos --email {{ email }}
+
+  handlers:
+    - name: Reload nginx
+      service:
+        name: nginx
+        state: reloaded
+
