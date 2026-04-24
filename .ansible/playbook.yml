@@ -3,7 +3,7 @@
   hosts: web
   become: yes
   vars:
-    deploy_user: "obx"
+    deploy_user: "ubuntu"
     image: "obx:latest"
     domain: "obxplayground.trunkwhorl.com"
     email: "patty.wagers3t@icloud.com"
@@ -15,10 +15,6 @@
       apt:
         update_cache: yes
         cache_valid_time: 3600
-
-    - name: Set deploy_user to the connection user (ansible_user) when available
-      set_fact:
-        deploy_user: "{{ ansible_user | default(deploy_user) }}"
 
     - name: Install required packages
       apt:
@@ -32,15 +28,16 @@
           - python3-certbot-nginx
         state: present
 
-    - name: Ensure deploy user exists
-      user:
-        name: "{{ deploy_user }}"
-        groups: sudo,docker
-        append: yes
-        shell: /bin/bash
-        create_home: yes
-        home: "/home/{{ deploy_user }}"
-      when: deploy_user != (ansible_user | default(''))
+    - name: Ensure app checkout exists (clone or update)
+      ansible.builtin.git:
+        repo: "{{ git_repo }}"
+        dest: "/home/{{ deploy_user }}/deploy/app"
+        version: "{{ git_ref }}"
+        force: yes
+        update: yes
+        accept_hostkey: yes
+      become: yes
+      become_user: "{{ deploy_user }}"
 
     - name: Ensure deploy directory exists
       file:
@@ -104,12 +101,14 @@
         state: started
         enabled: yes
 
-    - name: Build docker image on VPS (build-on-VPS)
+    - name: Pull docker image from registry
       become_user: "{{ deploy_user }}"
       shell: |
         set -euo pipefail
-        cd /home/{{ deploy_user }}/deploy/app
-        docker build --pull -t {{ image }} .
+        # Attempt to pull the image supplied via vars/extra-vars. Ignore
+        # failures so a subsequent docker run/systemd restart can surface
+        # a clearer error message.
+        docker pull {{ image }} || true
       args:
         executable: /bin/bash
 
