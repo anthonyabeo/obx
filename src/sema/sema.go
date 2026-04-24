@@ -26,4 +26,9 @@ func (s *Sema) Validate() {
 		checker.TypeCheck(unit)
 		flow.Analyse(unit)
 	}
+
+	// After all units have been resolved and type-checked, build the
+	// inheritance view (layouts, vtables, RTTI) across the whole program.
+	inv := &InheritanceView{ctx: s.ctx}
+	inv.RunAll(s.obx.Units)
 }
