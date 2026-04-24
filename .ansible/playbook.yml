@@ -3,10 +3,13 @@
   hosts: web
   become: yes
   vars:
-    deploy_user: "obx"
-    image: "yourregistry/obx:latest"
-    domain: ""
-    email: ""
+    deploy_user: "ubuntu"
+    image: "obx:latest"
+    domain: "obxplayground.trunkwhorl.com"
+    email: "patty.wagers3t@icloud.com"
+    git_repo: "https://github.com/anthonyabeo/obx.git"
+    git_ref: "main"
+    compose_version: "v2.21.2"
 
   tasks:
     - name: Update apt cache
@@ -18,7 +21,7 @@
       apt:
         name:
           - docker.io
-          - docker-compose-plugin
+          - git
           - nginx
           - ufw
           - certbot
@@ -38,6 +41,17 @@
         state: directory
         owner: "{{ deploy_user }}"
         mode: '0755'
+
+    - name: Ensure app checkout exists (clone or update)
+      ansible.builtin.git:
+        repo: "{{ git_repo }}"
+        dest: "/home/{{ deploy_user }}/deploy/app"
+        version: "{{ git_ref }}"
+        force: yes
+        update: yes
+        accept_hostkey: yes
+      become: yes
+      become_user: "{{ deploy_user }}"
 
     - name: Template docker-compose to remote
       template:
@@ -77,13 +91,30 @@
         state: started
         enabled: yes
 
-    - name: Pull and start docker-compose service
+    - name: Build docker image on VPS (build-on-VPS)
       become_user: "{{ deploy_user }}"
       shell: |
         set -euo pipefail
-        cd /home/{{ deploy_user }}/deploy
-        docker compose pull || true
-        IMAGE="{{ image }}" docker compose up -d --remove-orphans
+        cd /home/{{ deploy_user }}/deploy/app
+        docker build --pull -t {{ image }} .
+      args:
+        executable: /bin/bash
+
+    - name: Template systemd unit for obx container
+      template:
+        src: templates/obx.service.j2
+        dest: /etc/systemd/system/obx.service
+        owner: root
+        mode: '0644'
+      notify:
+        - Reload systemd
+
+    - name: Ensure obx service is started and enabled
+      systemd:
+        name: obx.service
+        enabled: yes
+        state: restarted
+        daemon_reload: yes
 
     - name: Wait for local health endpoint
       become: false
@@ -93,13 +124,51 @@
       delay: 5
       until: hc.rc == 0
 
+    - name: If healthcheck failed, enable maintenance page and surface logs
+      when: hc is failed
+      block:
+        - name: Copy maintenance page into place
+          copy:
+            src: files/maintenance.html
+            dest: /var/www/maintenance/maintenance.html
+            owner: root
+            mode: '0644'
+        - name: Reload nginx to pick up maintenance page
+          service:
+            name: nginx
+            state: reloaded
+        - name: Show last 200 lines of container logs for debugging
+          become_user: "{{ deploy_user }}"
+          shell: |
+            cd /home/{{ deploy_user }}/deploy
+            docker logs --tail 200 obx || true
+          args:
+            executable: /bin/bash
+          register: logs
+        - name: Fail deployment with logs
+          fail:
+            msg: "Healthcheck failed; maintenance page enabled. Container logs:\n{{ logs.stdout }}"
+
     - name: Obtain TLS certificate with certbot (if domain provided)
       when: domain != '' and email != ''
-      command: certbot --nginx -d {{ domain }} --non-interactive --agree-tos --email {{ email }}
+      block:
+        - name: Validate deploy email looks valid
+          assert:
+            that:
+              - "'@' in email"
+              - "'.' in email"
+              - "'example.com' not in email"
+            fail_msg: "Invalid deploy email '{{ email }}'. Set a real contact email (not a placeholder) before requesting TLS certificates."
+
+        - name: Obtain TLS certificate with certbot
+          command: certbot --nginx -d {{ domain }} --non-interactive --agree-tos --email {{ email }}
 
   handlers:
     - name: Reload nginx
       service:
         name: nginx
         state: reloaded
+    - name: Reload systemd
+      command: systemctl daemon-reload
+      become: yes
 

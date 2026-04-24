@@ -2,6 +2,9 @@ version: "3.8"
 
 services:
   obx:
+    build:
+      context: /home/{{ deploy_user }}/deploy/app
+      dockerfile: Dockerfile
     image: "{{ image }}"
     container_name: obx
     restart: unless-stopped

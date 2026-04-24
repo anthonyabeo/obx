@@ -1,0 +1,16 @@
+[Unit]
+Description=obx playground container
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+RestartSec=5s
+ExecStartPre=-/usr/bin/docker rm -f obx
+ExecStart=/usr/bin/docker run --name obx -p 127.0.0.1:8080:8080 --env PORT=8080 {{ image }}
+ExecStop=/usr/bin/docker stop -t 10 obx
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target
+
