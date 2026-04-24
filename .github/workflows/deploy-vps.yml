@@ -44,6 +44,18 @@ jobs:
         run: |
           go test -v ./...
 
+      - name: Diagnostic show Go and environment info
+        run: |
+          go version
+          go env GOPATH GOMODCACHE GOCACHE GOMOD GOWORK GOFLAGS
+
+      - name: Clear Go build and module cache (avoid stale export data)
+        run: |
+          # Remove cached compiled export data that may have been produced by a different Go toolchain
+          go clean -cache -testcache -modcache || true
+          # also clear module download cache to force fresh downloads
+          rm -rf "$(go env GOPATH)/pkg/mod/cache" || true
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
