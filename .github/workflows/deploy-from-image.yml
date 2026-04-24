@@ -45,18 +45,8 @@ jobs:
           IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/obx:${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          TMP_DIR=$(mktemp -d)
-          trap 'rm -rf "$TMP_DIR"' EXIT
 
-          cat > "$TMP_DIR/extra_vars.json" <<JSON
-          {
-            "image": "${IMAGE}",
-            "build_on_vps": false,
-            "git_ref": "${{ github.event.workflow_run.head_branch }}",
-            "domain": "${{ secrets.DEPLOY_DOMAIN }}",
-            "email": "${{ secrets.DEPLOY_EMAIL }}"
-          }
-          JSON
-
-          ansible-playbook -i .ansible/inventory.ini .ansible/playbook.yml --extra-vars "@$TMP_DIR/extra_vars.json" -vv
+          # Pass extra-vars inline instead of writing a JSON file. This avoids
+          # duplicating/overwriting other vars and keeps the workflow simpler.
+          ansible-playbook -i .ansible/inventory.ini .ansible/playbook.yml -vv
 
