@@ -29,7 +29,7 @@ type IRBuilder struct {
 	// (vtables, RTTI, module fnptr table) for the current module being lowered.
 	moduleConstants map[string]Constant
 	// mapping of module-level function table indices -> mangled function name
-	moduleFnNames map[uint32]string
+	moduleFnNames    map[uint32]string
 	moduleMaxFnIndex int
 }
 

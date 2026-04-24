@@ -75,8 +75,8 @@ type (
 	}
 
 	CallInst struct {
-		Target Value  // nil for void calls
-		Callee Value  // callee value (direct function symbol or pointer)
+		Target Value // nil for void calls
+		Callee Value // callee value (direct function symbol or pointer)
 		Args   []Value
 	}
 
@@ -329,7 +329,7 @@ func (u *UnaryInst) Fold() Value {
 
 // ─── CallInst ─────────────────────────────────────────────────────────────
 
-func (c *CallInst) Def() Value    { return c.Target }
+func (c *CallInst) Def() Value { return c.Target }
 func (c *CallInst) Uses() []Value {
 	uses := make([]Value, 0, len(c.Args)+1)
 	if c.Callee != nil {

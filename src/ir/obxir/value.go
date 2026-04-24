@@ -165,8 +165,13 @@ func (o *RTTIConst) Type() Type       { return o.Typ }
 func (o *RTTIConst) Name() string     { return o.Ident }
 func (o *RTTIConst) BaseName() string { return o.Ident }
 func (o *RTTIConst) String() string   { return o.Ident }
-func (o *RTTIConst) Value() any       { return struct{ Name string; Size uint64 }{o.NameSym, o.Size} }
-func (o *RTTIConst) IsMem() bool      { return false }
+func (o *RTTIConst) Value() any {
+	return struct {
+		Name string
+		Size uint64
+	}{o.NameSym, o.Size}
+}
+func (o *RTTIConst) IsMem() bool { return false }
 
 // ─── Temp ─────────────────────────────────────────────────────────────────
 

@@ -17,7 +17,7 @@ type RecordType struct {
 	Base    *RecordType
 	// Layout holds computed runtime layout and dispatch tables.  Populated by
 	// the InheritanceViewPass after type-checking.  Nil until the pass runs.
-	Layout  *RecordLayout
+	Layout *RecordLayout
 }
 
 func (r *RecordType) String() string {
