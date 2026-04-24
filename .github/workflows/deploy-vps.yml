@@ -34,6 +34,12 @@ jobs:
         run: |
           go vet ./...
 
+      - name: Install Graphviz (dot)
+        # Graphviz provides the `dot` executable used by tests that render graphs.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz
+
       - name: Run unit tests
         run: |
           go test -v ./...
