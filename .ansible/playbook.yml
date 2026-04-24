@@ -3,13 +3,12 @@
   hosts: web
   become: yes
   vars:
-    deploy_user: "ubuntu"
+    deploy_user: "obx"
     image: "obx:latest"
     domain: "obxplayground.trunkwhorl.com"
     email: "patty.wagers3t@icloud.com"
     git_repo: "https://github.com/anthonyabeo/obx.git"
     git_ref: "main"
-    compose_version: "v2.21.2"
 
   tasks:
     - name: Update apt cache
@@ -22,6 +21,7 @@
         name:
           - docker.io
           - git
+          - git-lfs
           - nginx
           - ufw
           - certbot
@@ -34,6 +34,53 @@
         groups: sudo,docker
         append: yes
         shell: /bin/bash
+        create_home: yes
+        home: "/home/{{ deploy_user }}"
+
+    - name: Ensure deploy user's .ssh directory exists
+      file:
+        path: "/home/{{ deploy_user }}/.ssh"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: '0700'
+    - name: Check for deploy public key file in playbook files (deploy_key.pub)
+      stat:
+        path: "{{ playbook_dir }}/files/deploy_key.pub"
+      register: deploy_key_pub_stat
+      delegate_to: localhost
+
+    - name: Check for authorized_keys file in playbook files
+      stat:
+        path: "{{ playbook_dir }}/files/authorized_keys"
+      register: authorized_keys_stat
+      delegate_to: localhost
+
+    - name: Install deploy_user_pubkey into authorized_keys (if provided)
+      ansible.builtin.authorized_key:
+        user: "{{ deploy_user }}"
+        key: "{{ deploy_user_pubkey }}"
+        state: present
+        manage_dir: no
+      when: deploy_user_pubkey | default('') | trim != ''
+
+    - name: Copy deploy public key into authorized_keys (prefer deploy_key.pub)
+      copy:
+        src: "files/deploy_key.pub"
+        dest: "/home/{{ deploy_user }}/.ssh/authorized_keys"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: '0600'
+      when: deploy_key_pub_stat.stat.exists and (deploy_user_pubkey | default('') | trim == '')
+
+    - name: Copy provided authorized_keys file into place (if present and deploy_key.pub missing)
+      copy:
+        src: "files/authorized_keys"
+        dest: "/home/{{ deploy_user }}/.ssh/authorized_keys"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: '0600'
+      when: authorized_keys_stat.stat.exists and not deploy_key_pub_stat.stat.exists and (deploy_user_pubkey | default('') | trim == '')
 
     - name: Ensure deploy directory exists
       file:
@@ -53,12 +100,18 @@
       become: yes
       become_user: "{{ deploy_user }}"
 
-    - name: Template docker-compose to remote
-      template:
-        src: templates/docker-compose.yml.j2
-        dest: "/home/{{ deploy_user }}/deploy/docker-compose.yml"
-        owner: "{{ deploy_user }}"
-        mode: '0644'
+    - name: Ensure Git LFS objects are present (pull LFS files)
+      become: yes
+      become_user: "{{ deploy_user }}"
+      shell: |
+        set -euo pipefail
+        cd /home/{{ deploy_user }}/deploy/app
+        # ensure git-lfs is initialized for this repo
+        git lfs install --local || git lfs install || true
+        # pull all LFS objects (safe even if none)
+        git lfs pull || true
+      args:
+        executable: /bin/bash
 
     - name: Template nginx site configuration
       template:

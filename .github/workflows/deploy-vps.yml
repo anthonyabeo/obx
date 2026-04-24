@@ -72,7 +72,30 @@ jobs:
 
       - name: Run Ansible playbook (deploy)
         run: |
-          ansible-playbook -i .ansible/inventory.ini .ansible/playbook.yml -e "deploy_user=obx domain=obxplayground.trunkwhorl.com email=${{ secrets.DEPLOY_EMAIL }} git_ref=main"
+          set -euo pipefail
+          
+          # Create a secure temporary directory (runner ephemeral)
+          TMP_DIR=$(mktemp -d)
+          trap 'rm -rf "$TMP_DIR"' EXIT
+          
+          # Extract the public key from the PEM secret using process substitution
+          PUBKEY=$(ssh-keygen -y -f <(printf '%s' "${{ secrets.VPS_SSH_KEY }}"))
+          
+          # Generate well-formed JSON with the pubkey placed safely via environment variable
+          PUBKEY="$PUBKEY" python3 - <<'PY' > "$TMP_DIR/extra_vars.json"
+          import os, json
+          data = {
+            "deploy_user": "obx",
+            "git_ref": "main",
+            "domain": "obxplayground.trunkwhorl.com",
+            "email": "${{ secrets.DEPLOY_EMAIL }}",
+            "deploy_user_pubkey": os.environ.get("PUBKEY", "")
+          }
+          print(json.dumps(data))
+          PY
+
+          # Run ansible-playbook using ssh-agent (the private key is already loaded by webfactory/ssh-agent)
+          ansible-playbook -i .ansible/inventory.ini .ansible/playbook.yml --extra-vars "@$TMP_DIR/extra_vars.json" -vv
 
       - name: External healthcheck
         run: |
