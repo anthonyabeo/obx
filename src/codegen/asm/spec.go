@@ -15,6 +15,9 @@ type Module struct {
 	Funcs     []*Function
 	Globals   map[string]*Symbol
 	Externals []ExternDecl // foreign symbols to be declared with .extern
+	// Constants are module-level read-only constants (e.g. string literals,
+	// vtable arrays, RTTI names) that should be emitted in .rodata.
+	Constants []Constant
 }
 
 // ExternDecl is a C symbol that must appear as an external reference in the

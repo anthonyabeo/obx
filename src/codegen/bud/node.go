@@ -3,7 +3,7 @@ package bud
 import (
 	"fmt"
 
-	obxir2 "github.com/anthonyabeo/obx/src/ir/obxir"
+	"github.com/anthonyabeo/obx/src/ir/obxir"
 )
 
 // Node denoted an IR tree node. A MIR instruction/Value will be converted
@@ -58,7 +58,7 @@ type Symbol struct {
 	Name      string
 	Kind      SymbolKind
 	Size      int
-	Ty        obxir2.Type
+	Ty        obxir.Type
 	ParamKind string // if symbol is param, VAR/IN/VALUE
 }
 
@@ -85,9 +85,9 @@ type Mem struct {
 
 // PatMIRInst convert a MIR Instruction into a bud.Node for matching against
 // the target instruction tree patterns
-func PatMIRInst(ins obxir2.Instr) *Node {
+func PatMIRInst(ins obxir.Instr) *Node {
 	switch inst := ins.(type) {
-	case *obxir2.BinaryInst:
+	case *obxir.BinaryInst:
 		dst := patMIRValue(inst.Target)
 		left := patMIRValue(inst.Left)
 		right := patMIRValue(inst.Right)
@@ -98,13 +98,13 @@ func PatMIRInst(ins obxir2.Instr) *Node {
 			Op:   op,
 			Args: []*Node{left, right},
 		}
-	case *obxir2.LoadInst:
+	case *obxir.LoadInst:
 		return &Node{
 			Dst:  patMIRValue(inst.Target),
 			Op:   "load",
 			Args: []*Node{patMIRValue(inst.Addr)},
 		}
-	case *obxir2.StoreInst:
+	case *obxir.StoreInst:
 		return &Node{
 			Op: "store",
 			Args: []*Node{
@@ -112,7 +112,7 @@ func PatMIRInst(ins obxir2.Instr) *Node {
 				patMIRValue(inst.Addr),
 			},
 		}
-	case *obxir2.ICmpInst:
+	case *obxir.ICmpInst:
 		return &Node{
 			Dst: patMIRValue(inst.Target),
 			Op:  patOp(inst.Op),
@@ -121,7 +121,7 @@ func PatMIRInst(ins obxir2.Instr) *Node {
 				patMIRValue(inst.Right),
 			},
 		}
-	case *obxir2.FCmpInst:
+	case *obxir.FCmpInst:
 		return &Node{
 			Dst: patMIRValue(inst.Target),
 			Op:  patOp(inst.Op),
@@ -130,7 +130,7 @@ func PatMIRInst(ins obxir2.Instr) *Node {
 				patMIRValue(inst.Right),
 			},
 		}
-	case *obxir2.CondBrInst:
+	case *obxir.CondBrInst:
 		return &Node{
 			Op: "br",
 			Args: []*Node{
@@ -139,20 +139,20 @@ func PatMIRInst(ins obxir2.Instr) *Node {
 				{Val: &Value{Kind: KindLabel, Label: inst.FalseLabel}},
 			},
 		}
-	case *obxir2.JumpInst:
+	case *obxir.JumpInst:
 		return &Node{
 			Op: "jmp",
 			Args: []*Node{
 				{Val: &Value{Kind: KindLabel, Label: inst.Target}},
 			},
 		}
-	case *obxir2.UnaryInst:
+	case *obxir.UnaryInst:
 		return &Node{
 			Dst:  patMIRValue(inst.Target),
 			Op:   patOp(inst.Op),
 			Args: []*Node{patMIRValue(inst.Operand)},
 		}
-	case *obxir2.ReturnInst:
+	case *obxir.ReturnInst:
 		var args []*Node
 		if inst.Result != nil {
 			args = append(args, patMIRValue(inst.Result))
@@ -162,22 +162,28 @@ func PatMIRInst(ins obxir2.Instr) *Node {
 			Op:   "ret",
 			Args: args,
 		}
-	case *obxir2.MoveInst:
+	case *obxir.MoveInst:
 		return &Node{
 			Op:   "mov",
 			Args: []*Node{patMIRValue(inst.Target), patMIRValue(inst.Value)},
 		}
-	case *obxir2.CallInst:
+	case *obxir.CallInst:
 		var dst *Node
 		if inst.Target != nil {
 			dst = patMIRValue(inst.Target)
 		}
+		var calleeNode *Node
+		if inst.Callee != nil {
+			calleeNode = patMIRValue(inst.Callee)
+		} else {
+			calleeNode = &Node{Val: &Value{Kind: KindLabel, Label: ""}}
+		}
 		return &Node{
 			Dst:  dst,
 			Op:   "call",
-			Args: append([]*Node{{Val: &Value{Kind: KindLabel, Label: inst.Callee}}} /*, args...*/),
+			Args: []*Node{calleeNode},
 		}
-	case *obxir2.Arg:
+	case *obxir.Arg:
 		return &Node{
 			Op: "argument",
 			Args: []*Node{
@@ -185,13 +191,13 @@ func PatMIRInst(ins obxir2.Instr) *Node {
 				{Val: &Value{Kind: KindImm, Imm: int64(inst.Index)}},
 			},
 		}
-	case *obxir2.AddrOf:
+	case *obxir.AddrOf:
 		return &Node{
 			Op:   "addr",
 			Dst:  patMIRValue(inst.Target),
 			Args: []*Node{patMIRValue(inst.Addr)},
 		}
-	case *obxir2.HaltInst:
+	case *obxir.HaltInst:
 		return &Node{
 			Op:   "halt",
 			Args: []*Node{patMIRValue(inst.Code)},
@@ -201,23 +207,23 @@ func PatMIRInst(ins obxir2.Instr) *Node {
 	}
 }
 
-func patMIRValue(value obxir2.Value) *Node {
+func patMIRValue(value obxir.Value) *Node {
 	switch val := value.(type) {
-	case *obxir2.NamedConst:
+	case *obxir.NamedConst:
 		return &Node{Val: &Value{Kind: KindSymbol, Symbol: Symbol{
 			Name: val.Ident,
 			Kind: ConstSK,
 			Size: val.Size,
 			Ty:   val.Typ,
 		}}}
-	case *obxir2.Local:
+	case *obxir.Local:
 		return &Node{Val: &Value{Kind: KindSymbol, Symbol: Symbol{
 			Name: val.Ident,
 			Kind: LocalSK,
 			Size: val.Size,
 			Ty:   val.Typ,
 		}}}
-	case *obxir2.Param:
+	case *obxir.Param:
 		return &Node{Val: &Value{Kind: KindSymbol, Symbol: Symbol{
 			Name:      val.Ident,
 			Kind:      ParamSK,
@@ -225,23 +231,23 @@ func patMIRValue(value obxir2.Value) *Node {
 			Ty:        val.Typ,
 			ParamKind: val.Kind,
 		}}}
-	case *obxir2.Temp:
+	case *obxir.Temp:
 		switch val.Type().(type) {
-		case *obxir2.FloatType:
+		case *obxir.FloatType:
 			return &Node{Val: &Value{Kind: KindFPR, Reg: Reg{Name: val.Ident}}}
 		default:
 			return &Node{Val: &Value{Kind: KindGPR, Reg: Reg{Name: val.Ident}}}
 		}
-	case *obxir2.IntegerLit:
+	case *obxir.IntegerLit:
 		return &Node{
 			Val: &Value{Kind: KindImm, Imm: int64(val.LitValue)},
 		}
-	case *obxir2.StrLit:
+	case *obxir.StrLit:
 		return &Node{Val: &Value{Kind: KindString, Str: String{
 			Name:  val.LitName,
 			Value: val.LitValue,
 		}}}
-	case *obxir2.GlobalVariable:
+	case *obxir.GlobalVariable:
 		return &Node{
 			Val: &Value{Kind: KindSymbol, Symbol: Symbol{
 				Name: val.Ident,
@@ -250,7 +256,10 @@ func patMIRValue(value obxir2.Value) *Node {
 				Ty:   val.Typ,
 			}},
 		}
-	case *obxir2.Mem:
+	case *obxir.Function:
+		// Represent functions as labels for direct calls
+		return &Node{Val: &Value{Kind: KindLabel, Label: val.FnName}}
+	case *obxir.Mem:
 		base := patMIRValue(val.Base)
 
 		return &Node{
@@ -265,57 +274,57 @@ func patMIRValue(value obxir2.Value) *Node {
 	}
 }
 
-func patOp(op obxir2.InstrOp) string {
+func patOp(op obxir.InstrOp) string {
 	switch op {
-	case obxir2.ADD:
+	case obxir.ADD:
 		return "add"
-	case obxir2.SUB:
+	case obxir.SUB:
 		return "sub"
-	case obxir2.RDIV:
+	case obxir.RDIV:
 		return "rdiv"
-	case obxir2.IDIV:
+	case obxir.IDIV:
 		return "idiv"
-	case obxir2.MUL:
+	case obxir.MUL:
 		return "mul"
-	case obxir2.LD:
+	case obxir.LD:
 		return "load"
-	case obxir2.EQ:
+	case obxir.EQ:
 		return "eq"
-	case obxir2.NE:
+	case obxir.NE:
 		return "ne"
-	case obxir2.LT:
+	case obxir.LT:
 		return "lt"
-	case obxir2.LE:
+	case obxir.LE:
 		return "le"
-	case obxir2.GT:
+	case obxir.GT:
 		return "gt"
-	case obxir2.GE:
+	case obxir.GE:
 		return "ge"
-	case obxir2.NEG:
+	case obxir.NEG:
 		return "neg"
-	case obxir2.NOT:
+	case obxir.NOT:
 		return "not"
-	case obxir2.LSHL:
+	case obxir.LSHL:
 		return "lshl"
-	case obxir2.LSHR:
+	case obxir.LSHR:
 		return "lshr"
-	case obxir2.ASHR:
+	case obxir.ASHR:
 		return "ashr"
-	case obxir2.AND:
+	case obxir.AND:
 		return "and"
-	case obxir2.OR:
+	case obxir.OR:
 		return "or"
-	case obxir2.FNEG:
+	case obxir.FNEG:
 		return "fneg"
-	case obxir2.FEQ:
+	case obxir.FEQ:
 		return "feq"
-	case obxir2.FLT:
+	case obxir.FLT:
 		return "flt"
-	case obxir2.FLE:
+	case obxir.FLE:
 		return "fle"
-	case obxir2.FGT:
+	case obxir.FGT:
 		return "fgt"
-	case obxir2.FGE:
+	case obxir.FGE:
 		return "fge"
 	default:
 		panic(fmt.Sprintf("invalid obxir.InstrOp: '%s'", op))

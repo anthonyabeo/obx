@@ -2,10 +2,11 @@ package riscv
 
 import (
 	"fmt"
-	"github.com/anthonyabeo/obx/src/codegen/asm"
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/anthonyabeo/obx/src/codegen/asm"
 )
 
 func alignTo(x, align int) int {
@@ -74,6 +75,31 @@ func formatFunc(fn *asm.Function) string {
 		buf.WriteString("\n")
 	}
 
+	return buf.String()
+}
+
+// formatModuleConstants emits module-level constants (strings, arrays) in
+// .rodata so they are available as global symbols.
+func formatModuleConstants(constants []asm.Constant) string {
+	var buf strings.Builder
+	if len(constants) == 0 {
+		return ""
+	}
+
+	buf.WriteString("\t.section .rodata\n")
+	for _, c := range constants {
+		// Only string constants are currently supported here.
+		switch t := c.Type.(type) {
+		case *asm.StringType:
+			value := c.Value.(string)
+			buf.WriteString(fmt.Sprintf("%s: %s \"%s\"\n", c.Name, toType(c.Type), strings.Trim(strconv.Quote(value), `"`)))
+		default:
+			// Unknown constant types could be extended (arrays, pointers).
+			// For now skip them to avoid emitting invalid data.
+			_ = t
+		}
+	}
+	buf.WriteString("\n")
 	return buf.String()
 }
 

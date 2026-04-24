@@ -2,6 +2,9 @@ package riscv
 
 import (
 	"fmt"
+	"math"
+	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/codegen/asm"
@@ -383,6 +386,84 @@ func (r RV64IMAFD) Emit(module *asm.Module) string {
 	// Emit .extern declarations for all foreign symbols (§12.4).
 	for _, ext := range module.Externals {
 		buf.WriteString(fmt.Sprintf("\t.extern %s\n", ext.CName))
+	}
+
+	// Emit module-level read-only constants (.rodata) before writable globals.
+	if len(module.Constants) > 0 {
+		buf.WriteString("\t.section .rodata\n")
+		for _, c := range module.Constants {
+			// Detect an RTTI POD value by reflection: anonymous struct { Name string; Size uint64 }
+			if c.Value != nil {
+				rv := reflect.TypeOf(c.Value)
+				if rv.Kind() == reflect.Struct && rv.NumField() == 2 {
+					f0 := rv.Field(0)
+					f1 := rv.Field(1)
+					if f0.Type.Kind() == reflect.String && f1.Type.Kind() == reflect.Uint64 {
+						// extract values
+						rvv := reflect.ValueOf(c.Value)
+						nameSym := rvv.Field(0).String()
+						size := rvv.Field(1).Uint()
+						align := int(math.Log2(float64(r.FrameInfo().WordSize)))
+						buf.WriteString(fmt.Sprintf("\t.align %d\n", align))
+						buf.WriteString(fmt.Sprintf("%s:\n", c.Name))
+						buf.WriteString(fmt.Sprintf("\t.quad %s\n", nameSym))
+						buf.WriteString(fmt.Sprintf("\t.quad %d\n", size))
+						continue
+					}
+				}
+			}
+			switch t := c.Type.(type) {
+			case *asm.StringType:
+				value := c.Value.(string)
+				// emit as named string
+				buf.WriteString(fmt.Sprintf("%s: .string \"%s\"\n", c.Name, strings.Trim(strconv.Quote(value), `"`)))
+			case *asm.ArrayType:
+				// handle uint32 arrays and pointer arrays
+				switch elem := t.Element.(type) {
+				case *asm.BasicType:
+					if elem.Kind == asm.U32 {
+						// align to 4 bytes (log2=2)
+						buf.WriteString("\t.align 2\n")
+						buf.WriteString(fmt.Sprintf("%s:\n", c.Name))
+						vals := c.Value.([]uint32)
+						for _, v := range vals {
+							buf.WriteString(fmt.Sprintf("\t.word %d\n", v))
+						}
+					}
+				case *asm.PointerType:
+					// pointer-sized entries (.quad on RV64)
+					align := int(math.Log2(float64(r.FrameInfo().WordSize)))
+					buf.WriteString(fmt.Sprintf("\t.align %d\n", align))
+					buf.WriteString(fmt.Sprintf("%s:\n", c.Name))
+					names := c.Value.([]string)
+					for _, sym := range names {
+						if sym == "" {
+							buf.WriteString("\t.quad 0\n")
+						} else {
+							buf.WriteString(fmt.Sprintf("\t.quad %s\n", sym))
+						}
+					}
+				default:
+					// unknown array element type: skip
+				}
+			case *asm.PointerType:
+				// pointer constant holding a symbol name (emit as .quad <sym> or 0)
+				if sym, ok := c.Value.(string); ok {
+					align := int(math.Log2(float64(r.FrameInfo().WordSize)))
+					buf.WriteString(fmt.Sprintf("\t.align %d\n", align))
+					buf.WriteString(fmt.Sprintf("%s:\n", c.Name))
+					if sym == "" {
+						buf.WriteString("\t.quad 0\n")
+					} else {
+						buf.WriteString(fmt.Sprintf("\t.quad %s\n", sym))
+					}
+				}
+			default:
+				// unknown constant type: skip
+				_ = t
+			}
+		}
+		buf.WriteString("\n")
 	}
 
 	buf.WriteString("\t.section .bss\n")

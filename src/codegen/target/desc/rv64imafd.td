@@ -55,6 +55,26 @@ rule Call_direct {
     }
 }
 
+rule Call_indirect_reg {
+    out GPR:virt:$rd;
+    in  GPR:virt:$target;
+    pattern call($target);
+    cost 3;
+    emit {
+        instr { opcode: "jalr", dst: GPR:phys:ra, src: [GPR:virt:$target] };
+        instr { opcode: "mv", dst: GPR:virt:$rd, src: [GPR:phys:a0], def: GPR:virt:$rd };
+    }
+}
+
+rule Call_indirect_reg {
+    in  GPR:virt:$target;
+    pattern call($target);
+    cost 3;
+    emit {
+        instr { opcode: "jalr", dst: GPR:phys:ra, src: [GPR:virt:$target] };
+    }
+}
+
 rule Mov_r_str_const {
     in str:$name, GPR:virt:$rs;
     pattern mov($rs, $name);

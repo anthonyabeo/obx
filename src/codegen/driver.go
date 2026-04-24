@@ -113,6 +113,16 @@ func Compile(module *obxir2.Module, mach target.Machine, targetDescPath string, 
 
 	module.Asm = asmModule
 
+	// Copy module-level constants (e.g. string literals, RTTI names) into the
+	// asm module so the backend can emit them in .rodata.
+	for _, c := range module.Consts {
+		asmModule.Constants = append(asmModule.Constants, asm.Constant{
+			Name:  c.Name(),
+			Value: c.Value(),
+			Type:  obxir2.ToAsmType(c.Type()),
+		})
+	}
+
 	if opts.Debug {
 		for _, function := range asmModule.Funcs {
 			function.OutputDOT()
