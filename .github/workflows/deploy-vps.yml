@@ -99,32 +99,14 @@ jobs:
           TMP_DIR=$(mktemp -d)
           trap 'rm -rf "$TMP_DIR"' EXIT
           
-          # Try to obtain the public key from the ssh-agent (preferred)
-          PUBKEY="$(ssh-add -L 2>/dev/null | head -n1 || true)"
-
-          # If ssh-agent doesn't have the key (or ssh-add failed), fall back to writing
-          # the PEM secret to a temp file and extracting the public key with ssh-keygen.
-          if [ -z "$PUBKEY" ]; then
-            printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > "$TMP_DIR/vps.pem"
-            chmod 600 "$TMP_DIR/vps.pem"
-            PUBKEY=$(ssh-keygen -y -f "$TMP_DIR/vps.pem") || {
-              echo "Failed to extract public key from PEM" >&2
-              exit 1
-            }
-          fi
-
-          # Generate well-formed JSON with the pubkey placed safely via environment variable
-          PUBKEY="$PUBKEY" python3 - <<'PY' > "$TMP_DIR/extra_vars.json"
-          import os, json
-          data = {
-            "deploy_user": "obx",
-            "git_ref": "main",
-            "domain": "obxplayground.trunkwhorl.com",
-            "email": "${{ secrets.DEPLOY_EMAIL }}",
-            "deploy_user_pubkey": os.environ.get("PUBKEY", "")
+          # Create extra vars file for Ansible (we'll use the connection user as deploy_user)
+          cat > "$TMP_DIR/extra_vars.json" <<JSON
+          {
+            "git_ref": "${{ secrets.GIT_REF }}",
+            "domain": "${{ secrets.DOMAIN }}",
+            "email": "${{ secrets.DEPLOY_EMAIL }}"
           }
-          print(json.dumps(data))
-          PY
+          JSON
 
           # Run ansible-playbook using ssh-agent (the private key is already loaded by webfactory/ssh-agent)
           ansible-playbook -i .ansible/inventory.ini .ansible/playbook.yml --extra-vars "@$TMP_DIR/extra_vars.json" -vv

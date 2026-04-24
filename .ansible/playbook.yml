@@ -16,6 +16,10 @@
         update_cache: yes
         cache_valid_time: 3600
 
+    - name: Set deploy_user to the connection user (ansible_user) when available
+      set_fact:
+        deploy_user: "{{ ansible_user | default(deploy_user) }}"
+
     - name: Install required packages
       apt:
         name:
@@ -36,51 +40,7 @@
         shell: /bin/bash
         create_home: yes
         home: "/home/{{ deploy_user }}"
-
-    - name: Ensure deploy user's .ssh directory exists
-      file:
-        path: "/home/{{ deploy_user }}/.ssh"
-        state: directory
-        owner: "{{ deploy_user }}"
-        group: "{{ deploy_user }}"
-        mode: '0700'
-    - name: Check for deploy public key file in playbook files (deploy_key.pub)
-      stat:
-        path: "{{ playbook_dir }}/files/deploy_key.pub"
-      register: deploy_key_pub_stat
-      delegate_to: localhost
-
-    - name: Check for authorized_keys file in playbook files
-      stat:
-        path: "{{ playbook_dir }}/files/authorized_keys"
-      register: authorized_keys_stat
-      delegate_to: localhost
-
-    - name: Install deploy_user_pubkey into authorized_keys (if provided)
-      ansible.builtin.authorized_key:
-        user: "{{ deploy_user }}"
-        key: "{{ deploy_user_pubkey }}"
-        state: present
-        manage_dir: no
-      when: deploy_user_pubkey | default('') | trim != ''
-
-    - name: Copy deploy public key into authorized_keys (prefer deploy_key.pub)
-      copy:
-        src: "files/deploy_key.pub"
-        dest: "/home/{{ deploy_user }}/.ssh/authorized_keys"
-        owner: "{{ deploy_user }}"
-        group: "{{ deploy_user }}"
-        mode: '0600'
-      when: deploy_key_pub_stat.stat.exists and (deploy_user_pubkey | default('') | trim == '')
-
-    - name: Copy provided authorized_keys file into place (if present and deploy_key.pub missing)
-      copy:
-        src: "files/authorized_keys"
-        dest: "/home/{{ deploy_user }}/.ssh/authorized_keys"
-        owner: "{{ deploy_user }}"
-        group: "{{ deploy_user }}"
-        mode: '0600'
-      when: authorized_keys_stat.stat.exists and not deploy_key_pub_stat.stat.exists and (deploy_user_pubkey | default('') | trim == '')
+      when: deploy_user != (ansible_user | default(''))
 
     - name: Ensure deploy directory exists
       file:
