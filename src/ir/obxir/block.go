@@ -35,6 +35,8 @@ func (r *SSAInfo) NewValue(v Value) Value {
 		return &GlobalVariable{Ident: r.Current(value.OrigName), OrigName: value.OrigName, Typ: value.Typ, Size: value.Size}
 	case *IntegerLit, *FloatLit, *CharLit, *StrLit, *NamedConst:
 		return value
+	case *Function:
+		return value
 	default:
 		panic(fmt.Sprintf("unknown value type in SSA: %T", v))
 	}
