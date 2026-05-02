@@ -66,10 +66,10 @@ func NewPassManager() *PassManager {
 		ctx:    NewPassContext(),
 
 		defaultO: map[int][]string{
-			0: {},
-			1: {"constprop", "dce"},
-			2: {"constprop", "dce", "sccp"},
-			3: {"constprop", "dce", "sccp", "loopunroll"},
+			0: {"verifyir", "verifyssa"},
+			1: {"verifyir", "verifyssa", "constprop", "dce"},
+			2: {"verifyir", "verifyssa", "constprop", "dce", "sccp"},
+			3: {"verifyir", "verifyssa", "constprop", "dce", "sccp", "loopunroll"},
 		},
 	}
 }
@@ -199,4 +199,6 @@ func RegisterPass(p Pass) {
 
 func init() {
 	RegisterPass(ConstantFold{})
+	RegisterPass(VerifyIRPass{})
+	RegisterPass(VerifySSAPass{})
 }
