@@ -805,6 +805,24 @@ rule LDri {
     cond UImmFits12($offs);
 }
 
+// Register-indirect load (address in a register, offset=0): ldr rd, [ra]
+// Produced when a GEPInst or address arithmetic temp is the load address.
+rule LDReg {
+    out GPR:virt:$rd;
+    in  GPR:virt:$ra;
+    pattern load($ra);
+    cost 1;
+    emit {
+        instr {
+            opcode: "load",
+            dst: GPR:virt:$rd,
+            src: [mem:{base=GPR:virt:$ra, offset=imm:0}],
+            def: GPR:virt:$rd,
+            uses: [GPR:virt:$ra]
+        };
+    }
+}
+
 // Load with large offset (> 12 bits):  adrp+add to compute address, then ldr
 rule LD_Large {
     out   GPR:virt:$rd;
@@ -840,6 +858,22 @@ rule STri {
         };
     }
     cond UImmFits12($offs);
+}
+
+// Register-indirect store (address in a register, offset=0): str rs, [ra]
+// Produced when a GEPInst or address arithmetic temp is used as the store target.
+rule STReg {
+    in GPR:virt:$rs, GPR:virt:$ra;
+    pattern store($rs, $ra);
+    cost 1;
+    emit {
+        instr {
+            opcode: "store",
+            dst: mem:{base=GPR:virt:$ra, offset=imm:0},
+            src: [GPR:virt:$rs],
+            uses: [GPR:virt:$rs, GPR:virt:$ra]
+        };
+    }
 }
 
 // Store immediate constant to a global symbol:

@@ -2,6 +2,30 @@ package obxir
 
 import "fmt"
 
+// ─── ParamKind ────────────────────────────────────────────────────────────
+
+// ParamKind classifies how a formal parameter is passed.
+type ParamKind int
+
+const (
+	KindValue ParamKind = iota // passed by value (copy)
+	KindVar                    // passed by reference (mutable alias, VAR)
+	KindIn                     // passed by read-only reference (IN)
+)
+
+func (k ParamKind) String() string {
+	switch k {
+	case KindValue:
+		return "VALUE"
+	case KindVar:
+		return "VAR"
+	case KindIn:
+		return "IN"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 // Value is implemented by every obxir value: temporaries, locals, parameters,
 // global variables, constants, and memory references.
 type Value interface {
@@ -40,15 +64,20 @@ var (
 // ─── Value types ──────────────────────────────────────────────────────────
 
 type (
-	// Temp is an SSA temporary (virtual register).
+	// Temp is a virtual register / SSA temporary.
+	// IsAddr=true marks temps whose value is a computed memory address (e.g.
+	// the result of a GEPInst or an address arithmetic chain).  emitAssign
+	// uses this flag to decide whether to emit StoreInst (address target) or
+	// MoveInst (register target).
 	Temp struct {
 		Ident    string
 		OrigName string
 		Typ      Type
 		Size     int
+		IsAddr   bool // true when this temp holds a computed address
 	}
 
-	// Local is a named local variable (addressable).
+	// Local is a named local variable (addressable stack slot).
 	Local struct {
 		Ident    string
 		OrigName string
@@ -60,7 +89,7 @@ type (
 	Param struct {
 		Ident    string
 		OrigName string
-		Kind     string // "VALUE", "VAR", "IN"
+		Kind     ParamKind // KindValue, KindVar, or KindIn
 		Typ      Type
 		Size     int
 	}
@@ -111,6 +140,8 @@ type (
 	}
 
 	// Mem represents a memory address: Base + Offs.
+	// Prefer GEPInst for structured field/index access; Mem is retained for
+	// raw offset loads (e.g. vtable lookups, open-array length header reads).
 	Mem struct {
 		Base Value
 		Offs int64
@@ -125,8 +156,7 @@ type Uint32ArrayConst struct {
 }
 
 // FuncPtrArrayConst represents a compile-time array of function pointer
-// symbol names (module-level function-pointer table). Each entry is the
-// mangled symbol name; an empty string represents a NULL/0 entry.
+// symbol names (module-level function-pointer table).
 type FuncPtrArrayConst struct {
 	Ident     string
 	FuncNames []string
@@ -136,7 +166,7 @@ type FuncPtrArrayConst struct {
 // RTTIConst is a small POD describing RTTI payloads: pointer to name and size.
 type RTTIConst struct {
 	Ident   string
-	NameSym string // symbol name of the string for the type name
+	NameSym string
 	Size    uint64
 	Typ     Type
 }
@@ -179,7 +209,10 @@ func (o *Temp) Type() Type       { return o.Typ }
 func (o *Temp) Name() string     { return o.Ident }
 func (o *Temp) BaseName() string { return o.OrigName }
 func (o *Temp) String() string   { return o.Ident }
-func (o *Temp) IsMem() bool      { return false }
+
+// IsMem returns true when this temp holds a computed address (IsAddr=true),
+// meaning an assignment to it should be lowered to StoreInst.
+func (o *Temp) IsMem() bool { return o.IsAddr }
 
 // ─── Local ────────────────────────────────────────────────────────────────
 
@@ -195,7 +228,7 @@ func (o *Param) Type() Type       { return o.Typ }
 func (o *Param) Name() string     { return o.Ident }
 func (o *Param) BaseName() string { return o.OrigName }
 func (o *Param) String() string   { return o.Ident }
-func (o *Param) IsMem() bool      { return o.Kind == "VAR" || o.Kind == "IN" }
+func (o *Param) IsMem() bool      { return o.Kind == KindVar || o.Kind == KindIn }
 
 // ─── NamedConst ───────────────────────────────────────────────────────────
 

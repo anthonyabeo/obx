@@ -18,7 +18,7 @@ func simpleBuiltin(name string, ret Type) *Function {
 		Exported:  true,
 		Variadic:  false,
 		IsBuiltin: true,
-		Params:    []Value{},
+		Params:    []*Param{},
 	}
 }
 
@@ -131,7 +131,7 @@ func init() {
 		Exported:  true,
 		Variadic:  true,
 		IsBuiltin: true,
-		Params:    []Value{&Param{Ident: "format", Typ: &ArrayType{Len: -1, Elem: UInt8Type}}},
+		Params:    []*Param{{Ident: "format", Typ: &ArrayType{Len: -1, Elem: UInt8Type}}},
 	})
 
 	// Predeclared functions

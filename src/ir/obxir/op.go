@@ -37,6 +37,7 @@ const (
 	GE
 
 	FEQ
+	FNE
 	FLT
 	FLE
 	FGT
@@ -47,6 +48,7 @@ const (
 )
 
 func (op InstrOp) IsCmpCondCode() bool { return cmp_begin < op && op < cmp_end }
+func (op InstrOp) IsFloatCmp() bool    { return op >= FEQ && op < cmp_end }
 
 func (op InstrOp) String() string {
 	switch op {
@@ -100,6 +102,8 @@ func (op InstrOp) String() string {
 		return "IS"
 	case FEQ:
 		return "FEQ"
+	case FNE:
+		return "FNE"
 	case FLT:
 		return "FLT"
 	case FLE:
@@ -110,5 +114,52 @@ func (op InstrOp) String() string {
 		return "FGE"
 	default:
 		return "unknown"
+	}
+}
+
+// ─── CastOp ───────────────────────────────────────────────────────────────
+
+// CastOp encodes the kind of type conversion a CastInst performs.
+// Using a named enum (rather than a raw InstrOp) keeps the type-conversion
+// vocabulary separate from the arithmetic/comparison opcode space.
+type CastOp int
+
+const (
+	Trunc   CastOp = iota // integer narrowing (drop high bits)
+	ZExt                  // zero-extend to wider integer
+	SExt                  // sign-extend to wider integer
+	FpToSI                // float → signed integer (truncation toward zero)
+	FpToUI                // float → unsigned integer
+	SIToFp                // signed integer → float
+	UIToFp                // unsigned integer → float
+	Bitcast               // reinterpret bits (same width, different type)
+	PtrToInt              // pointer → integer (address as integer)
+	IntToPtr              // integer → pointer
+)
+
+func (c CastOp) String() string {
+	switch c {
+	case Trunc:
+		return "TRUNC"
+	case ZExt:
+		return "ZEXT"
+	case SExt:
+		return "SEXT"
+	case FpToSI:
+		return "FPTOSI"
+	case FpToUI:
+		return "FPTOUI"
+	case SIToFp:
+		return "SITOFP"
+	case UIToFp:
+		return "UITOFP"
+	case Bitcast:
+		return "BITCAST"
+	case PtrToInt:
+		return "PTRTOINT"
+	case IntToPtr:
+		return "INTTOPTR"
+	default:
+		return "UNKNOWN_CAST"
 	}
 }

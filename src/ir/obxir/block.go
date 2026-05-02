@@ -26,19 +26,26 @@ func NewSSAInfo() *SSAInfo {
 func (r *SSAInfo) NewValue(v Value) Value {
 	switch value := v.(type) {
 	case *Temp:
-		return &Temp{Ident: r.Current(value.OrigName), OrigName: value.OrigName, Typ: value.Typ, Size: value.Size}
+		return &Temp{Ident: r.Current(value.OrigName), OrigName: value.OrigName, Typ: value.Typ, Size: value.Size, IsAddr: value.IsAddr}
 	case *Local:
 		return &Local{Ident: r.Current(value.OrigName), OrigName: value.OrigName, Typ: value.Typ, Size: value.Size}
 	case *Param:
-		return value
+		return value // params are not renamed by SSA construction
 	case *GlobalVariable:
 		return &GlobalVariable{Ident: r.Current(value.OrigName), OrigName: value.OrigName, Typ: value.Typ, Size: value.Size}
 	case *IntegerLit, *FloatLit, *CharLit, *StrLit, *NamedConst:
-		return value
+		return value // compile-time constants are immutable; no renaming needed
 	case *Function:
 		return value
+	case *Mem:
+		// Mem holds a computed address; rename the base but not the Mem wrapper itself.
+		// The base will be renamed when it is processed as a separate value.
+		return value
+	case *TypeValue:
+		// TypeValue is a compile-time type operand; never renamed.
+		return value
 	default:
-		panic(fmt.Sprintf("unknown value type in SSA: %T", v))
+		panic(fmt.Sprintf("SSAInfo.NewValue: unhandled value kind %T", v))
 	}
 }
 
@@ -93,23 +100,19 @@ func NewDominatorTree() *DominatorTree {
 
 // ─── Block ────────────────────────────────────────────────────────────────
 
-// BlockID is a package-level counter for unique block IDs.
-// Use NewBlock() rather than constructing Block directly.
-var BlockID int
+// blockIDSeq is a package-level counter for block IDs.  It is intentionally
+// unexported; all block creation should go through IRBuilder.NewBlock so that
+// each build session uses a builder-local counter (IRBuilder.blockIDSeq),
+// keeping IDs deterministic across test runs.
+var blockIDSeq int
 
-type Block struct {
-	ID     int
-	Label  string
-	Instrs []Instr
-	Term   Instr
-	Preds  map[int]*Block
-	Succs  map[int]*Block
-}
-
-func NewBlock(name string) *Block {
-	BlockID++
+// newBlock allocates a Block using the provided counter.  Callers should
+// prefer IRBuilder.NewBlock (which uses a per-builder counter) over calling
+// this directly.
+func newBlock(name string, counter *int) *Block {
+	*counter++
 	return &Block{
-		ID:     BlockID,
+		ID:     *counter,
 		Label:  name,
 		Instrs: make([]Instr, 0),
 		Preds:  make(map[int]*Block),
@@ -117,8 +120,26 @@ func NewBlock(name string) *Block {
 	}
 }
 
+// NewBlock creates a Block using the package-level counter.  Prefer
+// IRBuilder.NewBlock for all builder-driven construction.
+func NewBlock(name string) *Block {
+	return newBlock(name, &blockIDSeq)
+}
+
+type Block struct {
+	ID     int
+	Label  string
+	Instrs []Instr
+	Term   Instr          // terminator; always the last element of Instrs
+	Preds  map[int]*Block
+	Succs  map[int]*Block
+}
+
 func (b *Block) IsJoinBlock() bool { return len(b.Preds) > 1 }
 func (b *Block) IsBrBlock() bool   { return len(b.Succs) > 1 }
+
+// IsTerminated reports whether this block has a terminator instruction set.
+func (b *Block) IsTerminated() bool { return b.Term != nil }
 
 func (b *Block) HasPred(block *Block) bool {
 	_, exists := b.Preds[block.ID]

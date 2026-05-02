@@ -14,6 +14,15 @@ type Instr interface {
 	ReplaceDef(Value)
 }
 
+// Terminator is a marker interface satisfied by every instruction that
+// ends a basic block.  A block's terminator is always its last instruction.
+// Callers can gate terminator-specific logic on this interface rather than
+// exhaustively type-switching on all Instr types.
+type Terminator interface {
+	Instr
+	isTerminator()
+}
+
 // Foldable is an Instr that can be constant-folded.
 type Foldable interface {
 	Instr
@@ -105,11 +114,88 @@ type (
 		Value Value
 	}
 
-	Arg struct {
-		Index int
-		Value Value
+	// ─── GEPInst ──────────────────────────────────────────────────────────
+	//
+	// GEPInst (Get Element Pointer) computes the address of a field within a
+	// record or an element within an array without emitting any explicit ADD
+	// or MUL temporaries.  Each GEPIndex step is either a named record field
+	// (Field != "") or an integer index into an array/pointer (Index != nil).
+	//
+	// The Target temp has IsAddr=true so that emitAssign correctly emits
+	// StoreInst when the GEP result is used as a store destination.
+	//
+	// Example (record field access):
+	//   t3 := GEP base {rec.x}         ; address of field x in record at base
+	//
+	// Example (array element access):
+	//   t5 := GEP arr [i]              ; address of arr[i]
+	//
+	// Example (chained):
+	//   t7 := GEP rec [i].name         ; address of rec[i].name
+
+	GEPInst struct {
+		Target   *Temp      // always has IsAddr=true
+		Base     Value      // base pointer or addressable value
+		ElemType Type       // element/record type being indexed into
+		Indices  []GEPIndex // one or more address steps
+	}
+
+	// ─── CastInst ─────────────────────────────────────────────────────────
+	//
+	// CastInst performs an explicit type conversion.  The Op field encodes
+	// the flavour (truncation, extension, float↔int, bitcast, ptr↔int).
+	// Using a dedicated instruction — rather than overloading MoveInst —
+	// gives the isel a single pattern per conversion kind and enables the
+	// optimizer to reason about value ranges after zero/sign extensions.
+
+	CastInst struct {
+		Target  Value
+		Op      CastOp
+		Operand Value
+		ToType  Type // result type (also carried by Target.Type(), but explicit here)
+	}
+
+	// ─── SwitchInst ───────────────────────────────────────────────────────
+	//
+	// SwitchInst replaces the chain-of-CondBrInst that CaseStmt used to
+	// produce.  Each arm covers an inclusive integer range [Lo, Hi]; when
+	// Lo == Hi it is a single-value match.  The isel can lower this to a
+	// jump table for dense domains or a comparison chain for sparse ones.
+	//
+	// If Selector falls into none of the arms, control jumps to Default.
+
+	SwitchInst struct {
+		Selector Value
+		Default  string
+		Arms     []SwitchArm
 	}
 )
+
+// GEPIndex is one step in a GEP address chain.
+// Exactly one of Field or Index is non-zero/non-nil per GEPIndex:
+//   - Field != ""  → descend into that named field of the current record type.
+//   - Index != nil → step by Index elements into the current array/pointer type.
+type GEPIndex struct {
+	Field string // non-empty → record field step
+	Index Value  // non-nil  → array/pointer element step
+}
+
+// SwitchArm is one branch of a SwitchInst.
+// The arm matches when Lo ≤ Selector ≤ Hi (inclusive).
+// When Hi is nil, the arm is a single-value match (Hi == Lo).
+type SwitchArm struct {
+	Lo    Value  // lower bound (inclusive)
+	Hi    Value  // upper bound (inclusive); nil means same as Lo
+	Label string // target block label
+}
+
+// ─── Terminator marker implementations ───────────────────────────────────
+
+func (*JumpInst) isTerminator()   {}
+func (*CondBrInst) isTerminator() {}
+func (*ReturnInst) isTerminator() {}
+func (*HaltInst) isTerminator()   {}
+func (*SwitchInst) isTerminator() {}
 
 // ─── HaltInst ─────────────────────────────────────────────────────────────
 
@@ -122,18 +208,6 @@ func (h *HaltInst) ReplaceUses(m map[string]Value) {
 	}
 }
 func (h *HaltInst) ReplaceDef(Value) {}
-
-// ─── Arg ──────────────────────────────────────────────────────────────────
-
-func (a *Arg) String() string { return fmt.Sprintf("ARG(%s, %d)", a.Value, a.Index) }
-func (a *Arg) Def() Value     { return nil }
-func (a *Arg) Uses() []Value  { return []Value{a.Value} }
-func (a *Arg) ReplaceUses(m map[string]Value) {
-	if nv, ok := m[a.Value.BaseName()]; ok {
-		a.Value = nv
-	}
-}
-func (a *Arg) ReplaceDef(Value) {}
 
 // ─── MoveInst ─────────────────────────────────────────────────────────────
 
@@ -440,3 +514,105 @@ func (phi *PhiInst) AddArg(block *Block, value Value) {
 	phi.Args = append(phi.Args, &PHIArg{Block: block, Value: value})
 }
 func (phi *PhiInst) ReplaceDef(t Value) { phi.Target = t }
+
+// ─── GEPInst ──────────────────────────────────────────────────────────────
+
+func (g *GEPInst) Def() Value { return g.Target }
+func (g *GEPInst) Uses() []Value {
+	uses := []Value{g.Base}
+	for _, idx := range g.Indices {
+		if idx.Index != nil {
+			uses = append(uses, idx.Index)
+		}
+	}
+	return uses
+}
+func (g *GEPInst) String() string {
+	var steps []string
+	for _, idx := range g.Indices {
+		if idx.Field != "" {
+			steps = append(steps, "."+idx.Field)
+		} else {
+			steps = append(steps, fmt.Sprintf("[%s]", idx.Index.Name()))
+		}
+	}
+	return fmt.Sprintf("%s := GEP %s%s", g.Target.Name(), g.Base.Name(), strings.Join(steps, ""))
+}
+func (g *GEPInst) ReplaceUses(m map[string]Value) {
+	if nv, ok := m[g.Base.BaseName()]; ok {
+		g.Base = nv
+	}
+	for i, idx := range g.Indices {
+		if idx.Index != nil {
+			if nv, ok := m[idx.Index.BaseName()]; ok {
+				g.Indices[i].Index = nv
+			}
+		}
+	}
+}
+func (g *GEPInst) ReplaceDef(t Value) {
+	if temp, ok := t.(*Temp); ok {
+		g.Target = temp
+	}
+}
+
+// ─── CastInst ─────────────────────────────────────────────────────────────
+
+func (c *CastInst) Def() Value    { return c.Target }
+func (c *CastInst) Uses() []Value { return []Value{c.Operand} }
+func (c *CastInst) String() string {
+	return fmt.Sprintf("%s := %s %s %s", c.Target.Name(), c.Op, c.ToType, c.Operand.Name())
+}
+func (c *CastInst) ReplaceUses(m map[string]Value) {
+	if nv, ok := m[c.Operand.BaseName()]; ok {
+		c.Operand = nv
+	}
+}
+func (c *CastInst) ReplaceDef(t Value) { c.Target = t }
+
+// ─── SwitchInst ───────────────────────────────────────────────────────────
+
+func (s *SwitchInst) Def() Value { return nil }
+func (s *SwitchInst) Uses() []Value {
+	uses := []Value{s.Selector}
+	for _, arm := range s.Arms {
+		if arm.Lo != nil {
+			uses = append(uses, arm.Lo)
+		}
+		if arm.Hi != nil {
+			uses = append(uses, arm.Hi)
+		}
+	}
+	return uses
+}
+func (s *SwitchInst) String() string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "SWITCH %s [default → %s]", s.Selector.Name(), s.Default)
+	for _, arm := range s.Arms {
+		if arm.Hi == nil || arm.Hi == arm.Lo {
+			fmt.Fprintf(&sb, " [%s → %s]", arm.Lo.Name(), arm.Label)
+		} else {
+			fmt.Fprintf(&sb, " [%s..%s → %s]", arm.Lo.Name(), arm.Hi.Name(), arm.Label)
+		}
+	}
+	return sb.String()
+}
+func (s *SwitchInst) ReplaceUses(m map[string]Value) {
+	if nv, ok := m[s.Selector.BaseName()]; ok {
+		s.Selector = nv
+	}
+	for i, arm := range s.Arms {
+		if arm.Lo != nil {
+			if nv, ok := m[arm.Lo.BaseName()]; ok {
+				s.Arms[i].Lo = nv
+			}
+		}
+		if arm.Hi != nil {
+			if nv, ok := m[arm.Hi.BaseName()]; ok {
+				s.Arms[i].Hi = nv
+			}
+		}
+	}
+}
+func (s *SwitchInst) ReplaceDef(Value) {}
+

@@ -46,9 +46,17 @@ type Function struct {
 	Variadic   bool
 	IsBuiltin  bool
 	IsExternal bool // true for foreign functions declared in extern DEFINITIONs
-	Params     []Value
-	Locals     []Value
-	IsLeaf     bool
+	// Params holds the formal parameters in declaration order.
+	// Typed as []*Param (not []Value) so callers never need a type assertion.
+	Params []*Param
+	// Locals holds the local variable declarations in declaration order.
+	// Typed as []*Local for the same reason.
+	Locals []*Local
+	IsLeaf bool
+	// IsSSA is set to true by the SSA-construction pass once the function body
+	// satisfies SSA form.  Optimization passes that require SSA should assert
+	// this flag.
+	IsSSA bool
 
 	Blocks  map[int]*Block
 	Entry   *Block
@@ -76,7 +84,8 @@ func NewFunction(name string, exported bool, ret Type, env *SymbolTable) *Functi
 		Env:       env,
 		IsLeaf:    true,
 		Blocks:    make(map[int]*Block),
-		Params:    make([]Value, 0),
+		Params:    make([]*Param, 0),
+		Locals:    make([]*Local, 0),
 		Constants: make(map[string]Constant),
 		Dom:       NewDominatorTree(),
 		SSAInfo:   NewSSAInfo(),

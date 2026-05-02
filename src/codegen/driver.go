@@ -10,7 +10,7 @@ import (
 	"github.com/anthonyabeo/obx/src/codegen/isel"
 	"github.com/anthonyabeo/obx/src/codegen/ralloc"
 	"github.com/anthonyabeo/obx/src/codegen/target"
-	obxir2 "github.com/anthonyabeo/obx/src/ir/obxir"
+	"github.com/anthonyabeo/obx/src/ir/obxir"
 )
 
 // CompileOptions controls optional codegen behavior.
@@ -19,7 +19,7 @@ type CompileOptions struct {
 	Debug bool
 }
 
-func Compile(module *obxir2.Module, mach target.Machine, targetDescPath string, opts CompileOptions) (string, error) {
+func Compile(module *obxir.Module, mach target.Machine, targetDescPath string, opts CompileOptions) (string, error) {
 	// Parse the target description once for the whole module.
 	tdFile := fmt.Sprintf("%s/%s.td", targetDescPath, mach.Name())
 	tdContent, err := os.ReadFile(tdFile)
@@ -36,7 +36,7 @@ func Compile(module *obxir2.Module, mach target.Machine, targetDescPath string, 
 			Name: name,
 			Kind: asm.GlobalSK,
 			Size: global.Size,
-			Ty:   obxir2.ToAsmType(global.Typ)}
+			Ty:   obxir.ToAsmType(global.Typ)}
 	}
 
 	// Propagate extern declarations from the IR module to the asm module.
@@ -63,7 +63,7 @@ func Compile(module *obxir2.Module, mach target.Machine, targetDescPath string, 
 
 			fn.Asm.Locals[local.Name()] = asm.Symbol{
 				Name: local.Name(),
-				Ty:   obxir2.ToAsmType(local.Type()),
+				Ty:   obxir.ToAsmType(local.Type()),
 			}
 		}
 
@@ -71,7 +71,7 @@ func Compile(module *obxir2.Module, mach target.Machine, targetDescPath string, 
 			fn.Asm.Params = append(fn.Asm.Params, &asm.Symbol{
 				Name: value.Name(),
 				Kind: asm.ParamSK,
-				Ty:   obxir2.ToAsmType(value.Type()),
+				Ty:   obxir.ToAsmType(value.Type()),
 			})
 		}
 
@@ -79,7 +79,7 @@ func Compile(module *obxir2.Module, mach target.Machine, targetDescPath string, 
 			fn.Asm.Constant = append(fn.Asm.Constant, asm.Constant{
 				Name:  c.Name(),
 				Value: c.Value(),
-				Type:  obxir2.ToAsmType(c.Type()),
+				Type:  obxir.ToAsmType(c.Type()),
 			})
 		}
 	}
@@ -119,7 +119,7 @@ func Compile(module *obxir2.Module, mach target.Machine, targetDescPath string, 
 		asmModule.Constants = append(asmModule.Constants, asm.Constant{
 			Name:  c.Name(),
 			Value: c.Value(),
-			Type:  obxir2.ToAsmType(c.Type()),
+			Type:  obxir.ToAsmType(c.Type()),
 		})
 	}
 
@@ -134,7 +134,11 @@ func Compile(module *obxir2.Module, mach target.Machine, targetDescPath string, 
 
 // iSel runs instruction selection for fn using a pre-built selector, avoiding
 // repeated TD file reads per function.
-func iSel(fn *obxir2.Function, selector *isel.Selector, mach target.Machine) {
+func iSel(fn *obxir.Function, selector *isel.Selector, mach target.Machine) {
+	// Expand GEP instructions to primitive arithmetic before isel.
+	// GEP is the clean IR representation; isel works with simple ADD/MUL.
+	obxir.ExpandGEP(fn)
+
 	asmFn := &asm.Function{Name: fn.FnName, Exported: fn.Exported, IsLeaf: fn.IsLeaf}
 
 	for _, block := range fn.SortedBlocks() {
@@ -157,7 +161,7 @@ func iSel(fn *obxir2.Function, selector *isel.Selector, mach target.Machine) {
 	fn.Asm = asmFn
 }
 
-func emit(module *obxir2.Module, mach target.Machine) string {
+func emit(module *obxir.Module, mach target.Machine) string {
 	if module.Asm == nil {
 		return ""
 	}

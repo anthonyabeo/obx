@@ -24,6 +24,10 @@ type IRBuilder struct {
 	labelCount int
 	curExit    string
 
+	// blockIDSeq is a per-builder counter for block IDs, making IDs
+	// deterministic within each build session regardless of parallel tests.
+	blockIDSeq int
+
 	env *Environment
 	// module-level collection used during lowering to accumulate constants
 	// (vtables, RTTI, module fnptr table) for the current module being lowered.
@@ -99,7 +103,7 @@ func (b *IRBuilder) recreateEnv(astEnv *ast.Environment) {
 				fn := NewFunction(callee, export, Void, nil)
 				fn.Variadic = ps.IsVarArgs
 				fn.IsExternal = ps.IsExternal
-				fn.Params = []Value{}
+				fn.Params = []*Param{}
 
 				// Try to set return type when available.
 				if ps.Type() != nil {
@@ -211,7 +215,7 @@ func (b *IRBuilder) lowerModule(hirMod *desugar.Module) *Module {
 						Ident:    p.Name,
 						OrigName: p.Name,
 						Typ:      b.lowerType(p.Typ),
-						Kind:     "VALUE",
+						Kind:     KindValue,
 					}
 					stub.Params = append(stub.Params, param)
 				}
@@ -358,14 +362,14 @@ func (b *IRBuilder) lowerFunction(hirFn *desugar.Function, env *SymbolTable, exi
 	b.Func = fn
 
 	for _, param := range hirFn.Params {
-		var kind string
+		var kind ParamKind
 		switch param.Kind {
 		case desugar.ValueParam:
-			kind = "VALUE"
+			kind = KindValue
 		case desugar.InParam:
-			kind = "IN"
+			kind = KindIn
 		case desugar.VarParam:
-			kind = "VAR"
+			kind = KindVar
 		}
 		p := &Param{Ident: param.Name, OrigName: param.Name, Typ: b.lowerType(param.Typ), Kind: kind}
 		fn.Params = append(fn.Params, p)
@@ -389,7 +393,7 @@ func (b *IRBuilder) lowerFunction(hirFn *desugar.Function, env *SymbolTable, exi
 		}
 	}
 
-	entry := NewBlock("entry")
+	entry := b.newBlockWithID("entry")
 	fn.Blocks[entry.ID] = entry
 	fn.Entry = entry
 
@@ -401,7 +405,7 @@ func (b *IRBuilder) lowerFunction(hirFn *desugar.Function, env *SymbolTable, exi
 	b.SetBlock(entry)
 	b.CompoundStmt(hirFn.Body)
 
-	exit := NewBlock(fn.FnName + "_exit")
+	exit := b.newBlockWithID(fn.FnName + "_exit")
 	fn.Blocks[exit.ID] = exit
 	fn.Exit = exit
 
@@ -509,57 +513,52 @@ func (b *IRBuilder) LoopStmt(stmt *desugar.LoopStmt) {
 
 func (b *IRBuilder) CaseStmt(stmt *desugar.CaseStmt) {
 	endLabel := b.NewLabel("case_end")
-	elseLabel := endLabel
+	defaultLabel := endLabel
 	if stmt.Else != nil {
-		elseLabel = b.NewLabel("case_else")
+		defaultLabel = b.NewLabel("case_else")
 	}
 
-	type test struct {
-		testLabel  string
-		bodyLabel  string
-		labelRange *desugar.LabelRange
-		body       *desugar.CompoundStmt
+	// Build body blocks and collect SwitchArms.
+	type bodyEntry struct {
+		label string
+		body  *desugar.CompoundStmt
 	}
+	var arms []SwitchArm
+	bodyMap := make(map[string]*desugar.CompoundStmt)
 
-	var tests []test
-	testCount := 0
 	for bodyCount, c := range stmt.Cases {
-		for i := range c.Labels {
-			tests = append(tests, test{
-				testLabel:  b.NewLabel(fmt.Sprintf("case_test_%d", testCount)),
-				bodyLabel:  b.NewLabel(fmt.Sprintf("case_body_%d", bodyCount)),
-				labelRange: c.Labels[i],
-				body:       c.Body,
-			})
-			testCount++
+		bodyLabel := b.NewLabel(fmt.Sprintf("case_body_%d", bodyCount))
+		bodyMap[bodyLabel] = c.Body
+		for _, lr := range c.Labels {
+			lo := b.ensureValue(lr.Low)
+			var hi Value
+			if lr.High != nil && lr.Low != lr.High {
+				hi = b.ensureValue(lr.High)
+			}
+			arms = append(arms, SwitchArm{Lo: lo, Hi: hi, Label: bodyLabel})
 		}
 	}
 
 	tSel := b.ensureValue(stmt.Expr)
-	b.SetTerm(&JumpInst{Target: tests[0].testLabel})
+	b.SetTerm(&SwitchInst{Selector: tSel, Default: defaultLabel, Arms: arms})
 
-	for i, t := range tests {
-		block := b.NewBlock(t.testLabel)
-		b.SetBlock(block)
-
-		nextTestLabel := elseLabel
-		if i+1 < len(tests) {
-			nextTestLabel = tests[i+1].testLabel
+	// Emit body blocks.
+	emitted := make(map[string]bool)
+	for _, arm := range arms {
+		if emitted[arm.Label] {
+			continue
 		}
-		b.lowerCaseTest(t.labelRange, tSel, t.bodyLabel, nextTestLabel)
-	}
-
-	for _, t := range tests {
-		block := b.NewBlock(t.bodyLabel)
-		b.SetBlock(block)
-		b.CompoundStmt(t.body)
+		emitted[arm.Label] = true
+		bodyBlk := b.NewBlock(arm.Label)
+		b.SetBlock(bodyBlk)
+		b.CompoundStmt(bodyMap[arm.Label])
 		if !b.BlockTermIsSet() {
 			b.SetTerm(&JumpInst{Target: endLabel})
 		}
 	}
 
 	if stmt.Else != nil {
-		elseBlk := b.NewBlock(elseLabel)
+		elseBlk := b.NewBlock(defaultLabel)
 		b.SetBlock(elseBlk)
 		b.CompoundStmt(stmt.Else)
 		if !b.BlockTermIsSet() {
@@ -685,7 +684,7 @@ func (b *IRBuilder) ensureValue(expr desugar.Expr) Value {
 		if !ok {
 			panic(fmt.Sprintf("symbol '%s' is not a parameter", e.Name))
 		}
-		if param.Kind != "VALUE" {
+		if param.Kind != KindValue {
 			return param
 		}
 		t := b.NewTemp(param.Type())
@@ -979,10 +978,11 @@ func (b *IRBuilder) lowerOpenArrayIndex(arr Value, indices []Value, elemSize uin
 	withHeader := b.NewTemp(UInt64Type)
 	b.Emit(&BinaryInst{Target: withHeader, Op: ADD, Left: byteOffset, Right: UInt64Lit(uint64(n) * wordSize)})
 
-	addr := b.NewTemp(UInt64Type)
+	// Produce an addr-tagged temp rather than a Mem wrapper so that
+	// emitAssign correctly emits StoreInst for stores through the result.
+	addr := b.NewAddrTemp(PointerTo(UInt8Type))
 	b.Emit(&BinaryInst{Target: addr, Op: ADD, Left: arr, Right: withHeader})
-
-	return &Mem{Base: addr}
+	return addr
 }
 
 func (b *IRBuilder) lowerIndexExpr(e *desugar.IndexExpr) Value {
@@ -1007,27 +1007,23 @@ func (b *IRBuilder) lowerIndexExpr(e *desugar.IndexExpr) Value {
 	}
 
 	if arrayType.IsOpen() {
-		wordSize := b.wordSize
-		width := uint64(arrayType.Elem.Width())
-		return b.lowerOpenArrayIndex(arr, indices, width, wordSize)
+		return b.lowerOpenArrayIndex(arr, indices, uint64(arrayType.Elem.Width()), b.wordSize)
 	}
 
-	strides := arrayType.Strides()
-	if len(strides) != len(indices) {
-		panic("lowerIndexExpr: index count does not match array rank")
-	}
-
-	acc := b.NewTemp(Int64Type)
-	b.emitAssign(acc, Int64Lit(0))
-
+	// Emit a single GEPInst for fixed-dimension array indexing.
+	// Multidimensional index: chain one GEPIndex step per dimension.
+	gepIndices := make([]GEPIndex, len(indices))
 	for k, idx := range indices {
-		stride := uint64(strides[k])
-		tMul := b.CreateBinary(MUL, idx, Int64Lit(stride), Int64Type)
-		acc = b.CreateBinary(ADD, acc, tMul, Int64Type)
+		gepIndices[k] = GEPIndex{Index: idx}
 	}
-
-	addr := b.CreateBinary(ADD, arr, acc, Int64Type)
-	return &Mem{Base: addr}
+	t := b.NewAddrTemp(PointerTo(arrayType.Elem))
+	b.Emit(&GEPInst{
+		Target:   t,
+		Base:     arr,
+		ElemType: arrayType,
+		Indices:  gepIndices,
+	})
+	return t
 }
 
 func (b *IRBuilder) lowerFieldAccess(e *desugar.FieldAccess) Value {
@@ -1038,7 +1034,10 @@ func (b *IRBuilder) lowerFieldAccess(e *desugar.FieldAccess) Value {
 	case *RecordType:
 		recordType = ty
 	case *PointerType:
-		rec := ty.Ref.(*RecordType)
+		rec, ok := ty.Ref.(*RecordType)
+		if !ok {
+			panic("lowerFieldAccess: pointer does not point to a record type")
+		}
 		tmp := b.NewTemp(UInt64Type)
 		b.Emit(&LoadInst{Target: tmp, Addr: recordAddr})
 		recordAddr = tmp
@@ -1052,12 +1051,16 @@ func (b *IRBuilder) lowerFieldAccess(e *desugar.FieldAccess) Value {
 		panic("lowerFieldAccess: field does not exist in record type")
 	}
 
-	offset := UInt64Lit(uint64(field.Offset))
-	tmp := b.NewTemp(Int64Type)
-	b.Emit(&MoveInst{Target: tmp, Value: offset})
-	fieldAddr := b.CreateBinary(ADD, recordAddr, tmp, Int64Type)
-
-	return &Mem{Base: fieldAddr}
+	// Emit a single GEPInst instead of a MOV + ADD chain.
+	// Result is a pointer to the field; IsAddr=true so emitAssign stores to it.
+	t := b.NewAddrTemp(PointerTo(field.Type))
+	b.Emit(&GEPInst{
+		Target:   t,
+		Base:     recordAddr,
+		ElemType: recordType,
+		Indices:  []GEPIndex{{Field: e.Field}},
+	})
+	return t
 }
 
 func (b *IRBuilder) lowerDerefExpr(e *desugar.DerefExpr) Value {
@@ -1175,7 +1178,7 @@ func (b *IRBuilder) lowerType(ty types.Type) Type {
 	case *types.NamedType:
 		return b.lowerType(ty.Def)
 	case *types.CPointerType:
-		return &CPointerType{Ref: b.lowerType(ty.Base)}
+		return CPointerTo(b.lowerType(ty.Base))
 	default:
 		panic("unhandled type: " + fmt.Sprintf("%T", ty))
 	}
@@ -1332,15 +1335,17 @@ func (b *IRBuilder) FuncCall(call *desugar.FuncCall) Value {
 
 func (b *IRBuilder) lowerArgs(fn *Function, args []desugar.Expr, start, end int, out *[]Value) {
 	for idx := start; idx < end; idx++ {
-		param := fn.Params[idx].(*Param)
+		param := fn.Params[idx]
 		var v Value
 		switch param.Kind {
-		case "VAR", "IN":
+		case KindVar, KindIn:
 			v = b.ensureAddr(args[idx])
 		default:
 			v = b.ensureValue(args[idx])
 		}
-		b.Emit(&Arg{Index: idx, Value: v})
+		// Arguments are carried exclusively in CallInst.Args; no separate Arg
+		// instruction is emitted. Liveness and register allocation derive
+		// argument use-sites from CallInst.Uses().
 		*out = append(*out, v)
 	}
 }
@@ -1365,7 +1370,7 @@ func (b *IRBuilder) callee(call *desugar.FuncCall) *Function {
 func (b *IRBuilder) lowerVarArgs(args []desugar.Expr, start, end int, out *[]Value) {
 	for idx := start; idx < end; idx++ {
 		v := b.ensureValue(args[idx])
-		b.Emit(&Arg{Index: idx, Value: v})
+		// No Arg instruction — see lowerArgs for rationale.
 		*out = append(*out, v)
 	}
 }
@@ -1373,17 +1378,48 @@ func (b *IRBuilder) lowerVarArgs(args []desugar.Expr, start, end int, out *[]Val
 // ─── Builder helpers ──────────────────────────────────────────────────────
 
 // CreateBinary emits a binary instruction and returns its result temp.
+// Float operands with comparison opcodes route to FCmpInst; integer
+// comparisons route to ICmpInst; all others emit BinaryInst.
 func (b *IRBuilder) CreateBinary(op InstrOp, left, right Value, ty Type) *Temp {
 	if right.Type() == SetType || left.Type() == SetType {
 		return b.lowerSet(op, left, right)
 	}
 	t := b.NewTemp(ty)
 	if op.IsCmpCondCode() {
-		b.Emit(&ICmpInst{Target: t, Op: op, Left: left, Right: right})
+		_, lIsFloat := left.Type().(*FloatType)
+		_, rIsFloat := right.Type().(*FloatType)
+		if lIsFloat || rIsFloat {
+			// Map integer comparison opcode to float comparison opcode.
+			fop := intCmpToFloatCmp(op)
+			b.Emit(&FCmpInst{Target: t, Op: fop, Left: left, Right: right})
+		} else {
+			b.Emit(&ICmpInst{Target: t, Op: op, Left: left, Right: right})
+		}
 	} else {
 		b.Emit(&BinaryInst{Target: t, Op: op, Left: left, Right: right})
 	}
 	return t
+}
+
+// intCmpToFloatCmp maps an integer comparison InstrOp to its floating-point
+// counterpart.  Called when at least one operand of a comparison is a float.
+func intCmpToFloatCmp(op InstrOp) InstrOp {
+	switch op {
+	case EQ:
+		return FEQ
+	case NE:
+		return FNE
+	case LT:
+		return FLT
+	case LE:
+		return FLE
+	case GT:
+		return FGT
+	case GE:
+		return FGE
+	default:
+		return op // already a float cmp or unrelated op
+	}
 }
 
 // CreateUnary emits a unary instruction and returns its result temp.
@@ -1410,11 +1446,21 @@ func (b *IRBuilder) Emit(instr Instr) {
 	b.Block.Instrs = append(b.Block.Instrs, instr)
 }
 
-// NewTemp creates a fresh numbered temporary.
+// NewTemp creates a fresh numbered temporary (register value, IsAddr=false).
 func (b *IRBuilder) NewTemp(ty Type) *Temp {
 	b.TempGen++
 	name := fmt.Sprintf("t%d", b.TempGen)
 	return &Temp{Ident: name, OrigName: name, Typ: ty, Size: ty.Width()}
+}
+
+// NewAddrTemp creates a fresh temporary marked as an address (IsAddr=true).
+// emitAssign emits StoreInst when the destination is an addr temp, so this
+// should be used for any temp that holds a computed memory address (GEP
+// results, open-array index results, etc.).
+func (b *IRBuilder) NewAddrTemp(ty Type) *Temp {
+	b.TempGen++
+	name := fmt.Sprintf("t%d", b.TempGen)
+	return &Temp{Ident: name, OrigName: name, Typ: ty, Size: ty.Width(), IsAddr: true}
 }
 
 // NewPrefixTemp creates a fresh temporary with a named prefix.
@@ -1456,11 +1502,18 @@ func (b *IRBuilder) BlockTermIsSet() bool {
 	return b.Block.Term != nil
 }
 
-// NewBlock creates a new basic block and registers it with the current function.
+// NewBlock creates a new basic block using the per-builder counter and registers
+// it with the current function.
 func (b *IRBuilder) NewBlock(label string) *Block {
-	blk := NewBlock(label)
+	blk := b.newBlockWithID(label)
 	b.Func.Blocks[blk.ID] = blk
 	return blk
+}
+
+// newBlockWithID allocates a Block using this builder's private counter,
+// keeping block IDs deterministic per build session (no shared global state).
+func (b *IRBuilder) newBlockWithID(label string) *Block {
+	return newBlock(label, &b.blockIDSeq)
 }
 
 // SetBlock makes block the currently active basic block.
@@ -1482,7 +1535,6 @@ func (b *IRBuilder) lowerNEWFixedArray(allocSize uint64) Value {
 	sizeImm := UInt64Lit(allocSize)
 	t := b.NewTemp(Int64Type)
 	b.Emit(&MoveInst{Target: t, Value: sizeImm})
-	b.Emit(&Arg{Index: 0, Value: t})
 	ptr := b.NewTemp(PointerTo(UInt8Type))
 	b.Emit(&CallInst{Target: ptr, Callee: b.lookupCalleeByName("malloc"), Args: []Value{t}})
 	return ptr
@@ -1504,8 +1556,6 @@ func (b *IRBuilder) lowerNEWOpen(dims []Value, elemSize uint64, wordSize uint64)
 
 	totalSize := b.NewTemp(Int64Type)
 	b.Emit(&BinaryInst{Target: totalSize, Op: ADD, Left: dataBytes, Right: Int64Lit(uint64(n) * wordSize)})
-
-	b.Emit(&Arg{Index: 0, Value: totalSize})
 
 	ptr := b.NewTemp(Int64Type)
 	b.Emit(&CallInst{Target: ptr, Callee: b.lookupCalleeByName("malloc"), Args: []Value{totalSize}})

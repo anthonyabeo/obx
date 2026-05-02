@@ -9,6 +9,8 @@ import "fmt"
 type Type interface {
 	String() string
 	Width() int
+	// Equal reports whether this type is structurally identical to t.
+	Equal(t Type) bool
 }
 
 // ─── Concrete types ────────────────────────────────────────────────────────
@@ -39,12 +41,13 @@ type (
 		Type   Type
 	}
 
+	// PointerType represents both safe OBX pointers and raw C-interop pointers.
+	// IsC=true marks a C-interop pointer (previously CPointerType); the Width
+	// and codegen representation are identical — the flag exists solely for
+	// alias-analysis and FFI-safety annotations.
 	PointerType struct {
 		Ref Type
-	}
-
-	CPointerType struct {
-		Ref Type
+		IsC bool // true for C-interop / unsafe pointers
 	}
 
 	VoidType struct{}
@@ -67,6 +70,12 @@ func (t *IntegerType) String() string {
 	return fmt.Sprintf("u%d", t.Bits)
 }
 func (t *IntegerType) Width() int { return t.Bits / 8 }
+func (t *IntegerType) Equal(o Type) bool {
+	if ot, ok := o.(*IntegerType); ok {
+		return t.Bits == ot.Bits && t.Signed == ot.Signed
+	}
+	return false
+}
 
 // ─── FloatType ────────────────────────────────────────────────────────────
 
@@ -80,6 +89,12 @@ func (t *FloatType) Width() int {
 	default:
 		return -1
 	}
+}
+func (t *FloatType) Equal(o Type) bool {
+	if ot, ok := o.(*FloatType); ok {
+		return t.Bits == ot.Bits
+	}
+	return false
 }
 
 // ─── ArrayType ────────────────────────────────────────────────────────────
@@ -100,6 +115,12 @@ func (a *ArrayType) Width() int {
 		return -1
 	}
 	return base * a.Len
+}
+func (a *ArrayType) Equal(o Type) bool {
+	if ot, ok := o.(*ArrayType); ok {
+		return a.Len == ot.Len && a.Elem.Equal(ot.Elem)
+	}
+	return false
 }
 func (a *ArrayType) Dimensions() []int {
 	if !a.IsOpen() {
@@ -140,43 +161,65 @@ func (r *RecordType) Field(name string) (RecordField, bool) {
 	f, ok := r.Fields[name]
 	return f, ok
 }
+func (r *RecordType) Equal(o Type) bool {
+	ot, ok := o.(*RecordType)
+	if !ok || r.Size != ot.Size || len(r.Fields) != len(ot.Fields) {
+		return false
+	}
+	for name, f := range r.Fields {
+		of, exists := ot.Fields[name]
+		if !exists || f.Offset != of.Offset || !f.Type.Equal(of.Type) {
+			return false
+		}
+	}
+	return true
+}
 
 // ─── PointerType ──────────────────────────────────────────────────────────
 
+// PointerTo creates a safe OBX pointer to t.
 func PointerTo(t Type) *PointerType { return &PointerType{Ref: t} }
+
+// CPointerTo creates a C-interop (unsafe) pointer to t.
+// This replaces the former CPointerType.
+func CPointerTo(t Type) *PointerType { return &PointerType{Ref: t, IsC: true} }
+
 func (t *PointerType) String() string {
-	if t.Ref == nil {
-		return "*void"
+	prefix := "*"
+	if t.IsC {
+		prefix = "c*"
 	}
-	return fmt.Sprintf("*%s", t.Ref)
-}
-func (t *PointerType) Width() int {
 	if t.Ref == nil {
-		return 0
+		return prefix + "void"
 	}
-	return 8 // 64-bit pointer
+	return fmt.Sprintf("%s%s", prefix, t.Ref)
 }
 
-// ─── CPointerType ──────────────────────────────────────────────────────────
+// Width always returns the pointer word size (8 bytes for 64-bit targets).
+// A pointer's storage width is independent of the referent type.
+func (t *PointerType) Width() int { return 8 }
 
-func CPointerTo(t Type) *CPointerType { return &CPointerType{Ref: t} }
-func (t *CPointerType) String() string {
-	if t.Ref == nil {
-		return "*void"
+func (t *PointerType) Equal(o Type) bool {
+	if ot, ok := o.(*PointerType); ok {
+		if t.IsC != ot.IsC {
+			return false
+		}
+		if t.Ref == nil && ot.Ref == nil {
+			return true
+		}
+		if t.Ref == nil || ot.Ref == nil {
+			return false
+		}
+		return t.Ref.Equal(ot.Ref)
 	}
-	return fmt.Sprintf("*%s", t.Ref)
-}
-func (t *CPointerType) Width() int {
-	if t.Ref == nil {
-		return 0
-	}
-	return 8 // 64-bit pointer
+	return false
 }
 
 // ─── VoidType ─────────────────────────────────────────────────────────────
 
-func (t *VoidType) String() string { return "void" }
-func (t *VoidType) Width() int     { return 0 }
+func (t *VoidType) String() string   { return "void" }
+func (t *VoidType) Width() int       { return 0 }
+func (t *VoidType) Equal(o Type) bool { _, ok := o.(*VoidType); return ok }
 
 // ─── StringType ───────────────────────────────────────────────────────────
 
@@ -187,16 +230,25 @@ func (t *StringType) Width() int {
 	}
 	return t.Length
 }
+func (t *StringType) Equal(o Type) bool {
+	if ot, ok := o.(*StringType); ok {
+		return t.Length == ot.Length
+	}
+	return false
+}
 
 // ─── Set ──────────────────────────────────────────────────────────────────
 
-func (t *Set) String() string { return "set" }
-func (t *Set) Width() int     { return 4 }
+func (t *Set) String() string    { return "set" }
+func (t *Set) Width() int        { return 4 }
+func (t *Set) Equal(o Type) bool { _, ok := o.(*Set); return ok }
 
 // ─── EnumType ─────────────────────────────────────────────────────────────
 
 func (t *EnumType) String() string { return "enum" }
-func (t *EnumType) Width() int     { panic("EnumType: Width not implemented") }
+// EnumType is represented as a 32-bit integer at the IR level.
+func (t *EnumType) Width() int { return 4 }
+func (t *EnumType) Equal(o Type) bool { _, ok := o.(*EnumType); return ok }
 
 // ─── Predefined type singletons ───────────────────────────────────────────
 

@@ -37,12 +37,12 @@ func init() {
 	}
 }
 
-// helper that emits Arg instructions, a CallInst and returns a temp of retType
+// helper that emits a CallInst and returns a temp of retType.
+// Arguments are passed directly in CallInst.Args; no separate Arg instruction is emitted.
 func callExternal(b *IRBuilder, v *desugar.FuncCall, callee string, retType Type) Value {
 	var args []Value
-	for i, a := range v.Args {
+	for _, a := range v.Args {
 		val := b.ensureValue(a)
-		b.Emit(&Arg{Index: i, Value: val})
 		args = append(args, val)
 	}
 	var ret Value

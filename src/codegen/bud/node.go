@@ -183,20 +183,44 @@ func PatMIRInst(ins obxir.Instr) *Node {
 			Op:   "call",
 			Args: []*Node{calleeNode},
 		}
-	case *obxir.Arg:
-		return &Node{
-			Op: "argument",
-			Args: []*Node{
-				patMIRValue(inst.Value),
-				{Val: &Value{Kind: KindImm, Imm: int64(inst.Index)}},
-			},
-		}
 	case *obxir.AddrOf:
 		return &Node{
 			Op:   "addr",
 			Dst:  patMIRValue(inst.Target),
 			Args: []*Node{patMIRValue(inst.Addr)},
 		}
+	case *obxir.GEPInst:
+		// Lower GEP to a sequence-of-steps node.  isel patterns that understand
+		// GEP can match it directly; others see it as an "addr" computation.
+		args := []*Node{patMIRValue(inst.Base)}
+		for _, idx := range inst.Indices {
+			if idx.Field != "" {
+				args = append(args, &Node{Val: &Value{Kind: KindLabel, Label: idx.Field}})
+			} else if idx.Index != nil {
+				args = append(args, patMIRValue(idx.Index))
+			}
+		}
+		return &Node{
+			Dst:  patMIRValue(inst.Target),
+			Op:   "gep",
+			Args: args,
+		}
+	case *obxir.CastInst:
+		return &Node{
+			Dst:  patMIRValue(inst.Target),
+			Op:   inst.Op.String(),
+			Args: []*Node{patMIRValue(inst.Operand)},
+		}
+	case *obxir.SwitchInst:
+		args := []*Node{patMIRValue(inst.Selector), {Val: &Value{Kind: KindLabel, Label: inst.Default}}}
+		for _, arm := range inst.Arms {
+			args = append(args, patMIRValue(arm.Lo))
+			if arm.Hi != nil {
+				args = append(args, patMIRValue(arm.Hi))
+			}
+			args = append(args, &Node{Val: &Value{Kind: KindLabel, Label: arm.Label}})
+		}
+		return &Node{Op: "switch", Args: args}
 	case *obxir.HaltInst:
 		return &Node{
 			Op:   "halt",
@@ -229,7 +253,7 @@ func patMIRValue(value obxir.Value) *Node {
 			Kind:      ParamSK,
 			Size:      val.Size,
 			Ty:        val.Typ,
-			ParamKind: val.Kind,
+			ParamKind: val.Kind.String(),
 		}}}
 	case *obxir.Temp:
 		switch val.Type().(type) {
