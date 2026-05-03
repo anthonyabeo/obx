@@ -83,6 +83,122 @@ func (f *FunctionType) Equal(t Type) bool {
 	return false
 }
 
+// RecordField is a single named field slot inside a RecordType.
+type RecordField struct {
+	Name   string // field name
+	Type   Type   // field type (normalized)
+	Offset int    // byte offset within the record
+}
+
+// RecordType is an ordered, named aggregate of fields (struct / record).
+// TypeName is optional; when non-empty it is used in String() for brevity.
+type RecordType struct {
+	TypeName string        // optional symbolic name, e.g. "Point"
+	Fields   []RecordField // in declaration order
+}
+
+func (r *RecordType) String() string {
+	if r.TypeName != "" {
+		return "record." + r.TypeName
+	}
+	s := "record{"
+	for i, f := range r.Fields {
+		if i > 0 {
+			s += ", "
+		}
+		ty := "<nil>"
+		if f.Type != nil {
+			ty = f.Type.String()
+		}
+		s += f.Name + ":" + ty
+	}
+	return s + "}"
+}
+
+func (r *RecordType) Equal(t Type) bool {
+	o, ok := t.(*RecordType)
+	if !ok {
+		return false
+	}
+	// Two named record types are equal when their names match.
+	if r.TypeName != "" || o.TypeName != "" {
+		return r.TypeName == o.TypeName
+	}
+	// Anonymous record types: structural equality.
+	if len(r.Fields) != len(o.Fields) {
+		return false
+	}
+	for i := range r.Fields {
+		a, b := r.Fields[i], o.Fields[i]
+		if a.Name != b.Name || a.Offset != b.Offset {
+			return false
+		}
+		if (a.Type == nil) != (b.Type == nil) {
+			return false
+		}
+		if a.Type != nil && !a.Type.Equal(b.Type) {
+			return false
+		}
+	}
+	return true
+}
+
+// FieldIndex returns the 0-based index of the field named name, or -1 if not found.
+func (r *RecordType) FieldIndex(name string) int {
+	for i, f := range r.Fields {
+		if f.Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
+// NewRecordType constructs a RecordType and normalizes each field's type.
+func NewRecordType(name string, fields []RecordField) *RecordType {
+	norm := make([]RecordField, len(fields))
+	for i, f := range fields {
+		norm[i] = RecordField{Name: f.Name, Type: NormalizeType(f.Type), Offset: f.Offset}
+	}
+	return &RecordType{TypeName: name, Fields: norm}
+}
+
+// ArrayType is a fixed-length array whose elements all have the same type.
+// Len == 0 represents an open / unsized array.
+type ArrayType struct {
+	Len  int  // number of elements
+	Elem Type // element type (normalized)
+}
+
+func (a *ArrayType) String() string {
+	elem := "<nil>"
+	if a.Elem != nil {
+		elem = a.Elem.String()
+	}
+	return fmt.Sprintf("[%d x %s]", a.Len, elem)
+}
+
+func (a *ArrayType) Equal(t Type) bool {
+	o, ok := t.(*ArrayType)
+	if !ok {
+		return false
+	}
+	if a.Len != o.Len {
+		return false
+	}
+	if (a.Elem == nil) != (o.Elem == nil) {
+		return false
+	}
+	if a.Elem != nil && !a.Elem.Equal(o.Elem) {
+		return false
+	}
+	return true
+}
+
+// NewArrayType constructs an ArrayType and normalizes the element type.
+func NewArrayType(length int, elem Type) *ArrayType {
+	return &ArrayType{Len: length, Elem: NormalizeType(elem)}
+}
+
 // Temp is an SSA local / value produced by an instruction.
 type Temp struct {
 	ID      int
@@ -226,6 +342,10 @@ func NormalizeType(t Type) Type {
 		}
 		nr := NormalizeType(tt.Result)
 		return &FunctionType{Params: np, Result: nr}
+	case *RecordType:
+		return NewRecordType(tt.TypeName, tt.Fields)
+	case *ArrayType:
+		return NewArrayType(tt.Len, tt.Elem)
 	default:
 		return t
 	}
