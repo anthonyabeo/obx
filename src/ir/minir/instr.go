@@ -78,14 +78,18 @@ func (l *LoadInst) Uses() []Value  { return []Value{l.Addr} }
 func (l *LoadInst) Def() *Temp     { return l.Dst }
 
 // StoreInst writes a value to an address.
+// Val is Value (not *Temp) so that constant rvalues can be stored directly
+// without a separate materialization instruction.
 type StoreInst struct {
-	Val  *Temp
-	Addr *Temp
+	Val  Value // the value to store (Temp or Constant)
+	Addr *Temp // must be IsAddr=true
 }
 
-func (s *StoreInst) String() string { return fmt.Sprintf("store %s, %s", s.Val.Name(), s.Addr.Name()) }
-func (s *StoreInst) Uses() []Value  { return []Value{s.Val, s.Addr} }
-func (s *StoreInst) Def() *Temp     { return nil }
+func (s *StoreInst) String() string {
+	return fmt.Sprintf("store %s, %s", s.Val.String(), s.Addr.Name())
+}
+func (s *StoreInst) Uses() []Value { return []Value{s.Val, s.Addr} }
+func (s *StoreInst) Def() *Temp    { return nil }
 
 // AllocaInst allocates stack storage and returns an address.
 type AllocaInst struct {
