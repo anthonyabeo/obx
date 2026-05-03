@@ -144,11 +144,11 @@ var (
 	primF64 = &PrimitiveType{Name: "f64"}
 )
 
-func I1() *PrimitiveType  { return primI1 }
-func I32() *PrimitiveType { return primI32 }
-func I64() *PrimitiveType { return primI64 }
-func F32() *PrimitiveType { return primF32 }
-func F64() *PrimitiveType { return primF64 }
+func I1() *PrimitiveType   { return primI1 }
+func I32() *PrimitiveType  { return primI32 }
+func I64() *PrimitiveType  { return primI64 }
+func F32() *PrimitiveType  { return primF32 }
+func F64() *PrimitiveType  { return primF64 }
 func Bool() *PrimitiveType { return primI1 }
 
 // Temp ID generator for NewTemp/NewAnonTemp
@@ -181,7 +181,9 @@ var ptrCache = map[string]*PointerType{}
 
 // Ptr returns a canonical PointerType for elem (normalizes elem first).
 func Ptr(elem Type) *PointerType {
-	if elem == nil { return &PointerType{Elem: nil} }
+	if elem == nil {
+		return &PointerType{Elem: nil}
+	}
 	ne := NormalizeType(elem)
 	key := ne.String()
 	if p, ok := ptrCache[key]; ok {
@@ -195,7 +197,9 @@ func Ptr(elem Type) *PointerType {
 // NormalizeType returns a canonical Type: primitives are mapped to singletons
 // and pointer element types are normalized recursively.
 func NormalizeType(t Type) Type {
-	if t == nil { return nil }
+	if t == nil {
+		return nil
+	}
 	switch tt := t.(type) {
 	case *PrimitiveType:
 		switch tt.String() {
@@ -217,11 +221,12 @@ func NormalizeType(t Type) Type {
 	case *FunctionType:
 		// normalize params and result
 		np := make([]Type, len(tt.Params))
-		for i, p := range tt.Params { np[i] = NormalizeType(p) }
+		for i, p := range tt.Params {
+			np[i] = NormalizeType(p)
+		}
 		nr := NormalizeType(tt.Result)
 		return &FunctionType{Params: np, Result: nr}
 	default:
 		return t
 	}
 }
-
