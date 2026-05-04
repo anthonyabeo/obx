@@ -49,4 +49,3 @@ func (s *SymbolTable) Names() []string {
 
 // Len returns the number of symbols defined in the table.
 func (s *SymbolTable) Len() int { return len(s.table) }
-

@@ -44,8 +44,8 @@ type BinaryInst struct {
 }
 
 func (b *BinaryInst) String() string { return FormatInstr(b) }
-func (b *BinaryInst) Uses() []Value { return []Value{b.Left, b.Right} }
-func (b *BinaryInst) Def() *Temp    { return b.Dst }
+func (b *BinaryInst) Uses() []Value  { return []Value{b.Left, b.Right} }
+func (b *BinaryInst) Def() *Temp     { return b.Dst }
 
 // ICmpInst represents an integer comparison, produces a bool temp.
 type ICmpInst struct {
@@ -55,8 +55,8 @@ type ICmpInst struct {
 }
 
 func (c *ICmpInst) String() string { return FormatInstr(c) }
-func (c *ICmpInst) Uses() []Value { return []Value{c.Left, c.Right} }
-func (c *ICmpInst) Def() *Temp    { return c.Dst }
+func (c *ICmpInst) Uses() []Value  { return []Value{c.Left, c.Right} }
+func (c *ICmpInst) Def() *Temp     { return c.Dst }
 
 // FCmpInst for floating comparisons.
 type FCmpInst struct{ ICmpInst }
@@ -70,8 +70,8 @@ type LoadInst struct {
 }
 
 func (l *LoadInst) String() string { return FormatInstr(l) }
-func (l *LoadInst) Uses() []Value { return []Value{l.Addr} }
-func (l *LoadInst) Def() *Temp    { return l.Dst }
+func (l *LoadInst) Uses() []Value  { return []Value{l.Addr} }
+func (l *LoadInst) Def() *Temp     { return l.Dst }
 
 // StoreInst writes a value to an address.
 // Val is Value so constant rvalues can be stored without a materialization step.
@@ -82,8 +82,8 @@ type StoreInst struct {
 }
 
 func (s *StoreInst) String() string { return FormatInstr(s) }
-func (s *StoreInst) Uses() []Value { return []Value{s.Val, s.Addr} }
-func (s *StoreInst) Def() *Temp    { return nil }
+func (s *StoreInst) Uses() []Value  { return []Value{s.Val, s.Addr} }
+func (s *StoreInst) Def() *Temp     { return nil }
 
 // AllocaInst allocates stack storage and returns an address.
 type AllocaInst struct {
@@ -92,8 +92,8 @@ type AllocaInst struct {
 }
 
 func (a *AllocaInst) String() string { return FormatInstr(a) }
-func (a *AllocaInst) Uses() []Value { return nil }
-func (a *AllocaInst) Def() *Temp    { return a.Dst }
+func (a *AllocaInst) Uses() []Value  { return nil }
+func (a *AllocaInst) Def() *Temp     { return a.Dst }
 
 // GEPInst computes an address from a base and integer offsets.
 type GEPInst struct {
@@ -104,8 +104,8 @@ type GEPInst struct {
 }
 
 func (g *GEPInst) String() string { return FormatInstr(g) }
-func (g *GEPInst) Uses() []Value { return []Value{g.Base} }
-func (g *GEPInst) Def() *Temp    { return g.Dst }
+func (g *GEPInst) Uses() []Value  { return []Value{g.Base} }
+func (g *GEPInst) Def() *Temp     { return g.Dst }
 
 // CallInst represents a function call; optional result stored in Dst.
 type CallInst struct {
@@ -133,8 +133,8 @@ type UnaryInst struct {
 }
 
 func (u *UnaryInst) String() string { return FormatInstr(u) }
-func (u *UnaryInst) Uses() []Value { return []Value{u.Src} }
-func (u *UnaryInst) Def() *Temp    { return u.Dst }
+func (u *UnaryInst) Uses() []Value  { return []Value{u.Src} }
+func (u *UnaryInst) Def() *Temp     { return u.Dst }
 
 // CastInst converts a value to a different type.
 // Op values: "trunc", "zext", "sext", "bitcast", "sitofp", "fptosi", "fpext", "fptrunc".
@@ -145,8 +145,8 @@ type CastInst struct {
 }
 
 func (c *CastInst) String() string { return FormatInstr(c) }
-func (c *CastInst) Uses() []Value { return []Value{c.Src} }
-func (c *CastInst) Def() *Temp    { return c.Dst }
+func (c *CastInst) Uses() []Value  { return []Value{c.Src} }
+func (c *CastInst) Def() *Temp     { return c.Dst }
 
 // HaltInst terminates execution with an integer exit code.
 // It is a terminator — no successor blocks.
@@ -194,9 +194,9 @@ type CondBrInst struct {
 }
 
 func (c *CondBrInst) String() string { return FormatInstr(c) }
-func (c *CondBrInst) Uses() []Value { return []Value{c.Cond} }
-func (c *CondBrInst) Def() *Temp    { return nil }
-func (c *CondBrInst) isTerminator() {}
+func (c *CondBrInst) Uses() []Value  { return []Value{c.Cond} }
+func (c *CondBrInst) Def() *Temp     { return nil }
+func (c *CondBrInst) isTerminator()  {}
 
 type SwitchArm struct {
 	Val   int

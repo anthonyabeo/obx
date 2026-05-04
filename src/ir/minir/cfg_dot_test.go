@@ -22,7 +22,9 @@ func makeIdentity() *desugar.Function {
 
 func TestDOT_Identity(t *testing.T) {
 	prog := Lower(&desugar.Program{Modules: []*desugar.Module{{Decls: []desugar.Decl{makeIdentity()}}}})
-	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 { t.Fatalf("expected 1 module with 1 fn") }
+	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 {
+		t.Fatalf("expected 1 module with 1 fn")
+	}
 	dot := FormatDOT(prog.Modules[0].Functions[0])
 	if !strings.Contains(dot, "digraph") {
 		t.Fatalf("dot output missing digraph: %s", dot)
@@ -58,7 +60,9 @@ func TestDOT_CountedLoop(t *testing.T) {
 		}},
 	}
 	prog := Lower(&desugar.Program{Modules: []*desugar.Module{{Decls: []desugar.Decl{fn}}}})
-	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 { t.Fatalf("expected 1 module with 1 fn") }
+	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 {
+		t.Fatalf("expected 1 module with 1 fn")
+	}
 	dot := FormatDOT(prog.Modules[0].Functions[0])
 	// Expect at least one back-edge with constraint=false attribute
 	if !strings.Contains(dot, "constraint=false") {
@@ -85,7 +89,9 @@ func TestDOT_Case(t *testing.T) {
 		}},
 	}
 	prog := Lower(&desugar.Program{Modules: []*desugar.Module{{Decls: []desugar.Decl{fn}}}})
-	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 { t.Fatalf("expected 1 module with 1 fn") }
+	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 {
+		t.Fatalf("expected 1 module with 1 fn")
+	}
 	dot := FormatDOT(prog.Modules[0].Functions[0])
 	if !strings.Contains(dot, "case_body_") {
 		t.Fatalf("expected case_body nodes in DOT output: %s", dot)
@@ -137,4 +143,3 @@ func TestDOT_NoForbiddenEntities(t *testing.T) {
 		}
 	}
 }
-

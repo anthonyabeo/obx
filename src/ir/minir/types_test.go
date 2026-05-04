@@ -367,4 +367,3 @@ func TestFormatGEP_Array(t *testing.T) {
 		}
 	}
 }
-

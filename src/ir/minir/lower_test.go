@@ -239,4 +239,3 @@ func TestLower_IfNoElse(t *testing.T) {
 	}
 	checkLower(t, "abs", Lower(hirProg(fn)))
 }
-

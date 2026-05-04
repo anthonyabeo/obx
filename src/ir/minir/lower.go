@@ -319,27 +319,37 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 	}
 
 	// body
+	// Create function exit block and result-storage temp before lowering the body
+	// so return sites can jump to the canonical exit and wire Succs/Preds now.
+	exit := l.newBlock(fn.FnName + "_exit")
+	fn.Exit = exit
+	fn.Blocks[exit.ID] = exit
+
 	if hirFn.Body != nil {
 		l.lowerStmts(hirFn.Body)
 	}
 
-	// ensure the current block is terminated
+	// ensure the current block is terminated: jump to the canonical exit
 	if l.curBlock != nil && l.curBlock.Term == nil {
-		ret := &ReturnInst{}
-		l.emit(ret)
-		l.curBlock.Term = ret
+		j := &JumpInst{Target: fn.Exit.Label}
+		l.emit(j)
+		l.curBlock.Term = j
+		// wire succ/pred immediately
+		l.curBlock.AddSucc(fn.Exit)
+		fn.Exit.AddPred(l.curBlock)
 	}
 
-	// exit placeholder block (required by verifier; acts as a sentinel)
-	exit := l.newBlock(fn.FnName + "_exit")
-	fn.Exit = exit
-	fn.Blocks[exit.ID] = exit
-	retExit := &ReturnInst{}
-	exit.Instrs = []Instr{retExit}
-	exit.Term = retExit
-
-	// wire CFG edges from terminators
+	// wire CFG edges from other terminators (linkCFG is idempotent with our
+	// per-site wiring because AddSucc/AddPred are no-ops for existing links).
 	linkCFG(fn)
+
+	l.switchTo(fn.Exit)
+	// Keep the exit as a simple sentinel return; actual return values and
+	// halting semantics remain in their original blocks and are handled
+	// by later phases.
+	ret := &ReturnInst{}
+	l.emit(ret)
+	fn.Exit.Term = ret
 
 	return fn
 }
@@ -385,6 +395,8 @@ func (l *Lowerer) lowerAssign(st *desugar.AssignStmt) {
 }
 
 func (l *Lowerer) lowerReturn(st *desugar.ReturnStmt) {
+	// Emit a ReturnInst in the current block. The return value (if any)
+	// is materialized into a temp so the ReturnInst holds a proper SSA def.
 	var result *Temp
 	if st.Result != nil {
 		v := l.lowerValue(st.Result)

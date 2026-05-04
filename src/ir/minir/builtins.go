@@ -656,6 +656,10 @@ func builtinAssert(l *Lowerer, call *desugar.FuncCall) Value {
 	halt := &HaltInst{Code: codeTemp}
 	l.emit(halt)
 	failBlk.Term = halt
+	if l.fn != nil && l.fn.Exit != nil {
+		failBlk.AddSucc(l.fn.Exit)
+		l.fn.Exit.AddPred(failBlk)
+	}
 
 	passBlk := l.newBlock(passLabel)
 	l.fn.Blocks[passBlk.ID] = passBlk
@@ -709,9 +713,16 @@ func builtinExcl(l *Lowerer, call *desugar.FuncCall) Value {
 func builtinHalt(l *Lowerer, call *desugar.FuncCall) Value {
 	code := l.lowerValue(call.Args[0])
 	codeTemp := l.ensureTemp(code, primI32)
+	// Emit immediate Halt in-place.
 	halt := &HaltInst{Code: codeTemp}
 	l.emit(halt)
 	l.curBlock.Term = halt
+	// Add an explicit CFG edge to the canonical exit so visualizations and
+	// later passes can see that this block leads to the function epilogue.
+	if l.fn != nil && l.fn.Exit != nil {
+		l.curBlock.AddSucc(l.fn.Exit)
+		l.fn.Exit.AddPred(l.curBlock)
+	}
 	// Switch to orphan dead block so subsequent code doesn't hit the terminated block.
 	dead := l.newBlock(l.newLabel("dead"))
 	l.switchTo(dead)
@@ -846,4 +857,3 @@ func builtinUnpk(l *Lowerer, call *desugar.FuncCall) Value {
 	l.emit(&StoreInst{Val: exponent, Addr: eAddr})
 	return nil
 }
-
