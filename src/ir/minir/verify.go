@@ -89,6 +89,8 @@ func VerifyIR(fn *Function) []VerifyError {
 				for _, arm := range t.Arms {
 					checkLabel(arm.Label)
 				}
+			case *HaltInst:
+				// HaltInst is a valid terminator with no successor blocks; nothing to check.
 			}
 		}
 

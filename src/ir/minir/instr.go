@@ -137,6 +137,55 @@ func (c *CallInst) Uses() []Value {
 }
 func (c *CallInst) Def() *Temp { return c.Dst }
 
+// UnaryInst applies a single-operand operation.
+// Op values: "not" (bitwise flip), "neg" (integer negate), "fneg" (float negate).
+type UnaryInst struct {
+	Dst *Temp
+	Op  string
+	Src Value
+}
+
+func (u *UnaryInst) String() string {
+	return fmt.Sprintf("%s = %s %s", u.Dst.Name(), u.Op, u.Src.String())
+}
+func (u *UnaryInst) Uses() []Value { return []Value{u.Src} }
+func (u *UnaryInst) Def() *Temp    { return u.Dst }
+
+// CastInst converts a value to a different type.
+// Op values: "trunc", "zext", "sext", "bitcast", "sitofp", "fptosi", "fpext", "fptrunc".
+type CastInst struct {
+	Dst *Temp
+	Op  string
+	Src Value
+}
+
+func (c *CastInst) String() string {
+	return fmt.Sprintf("%s = %s %s", c.Dst.Name(), c.Op, c.Src.String())
+}
+func (c *CastInst) Uses() []Value { return []Value{c.Src} }
+func (c *CastInst) Def() *Temp    { return c.Dst }
+
+// HaltInst terminates execution with an integer exit code.
+// It is a terminator — no successor blocks.
+type HaltInst struct {
+	Code Value // exit code; may be nil (defaults to 0)
+}
+
+func (h *HaltInst) String() string {
+	if h.Code == nil {
+		return "halt"
+	}
+	return fmt.Sprintf("halt %s", h.Code.String())
+}
+func (h *HaltInst) Uses() []Value {
+	if h.Code == nil {
+		return nil
+	}
+	return []Value{h.Code}
+}
+func (h *HaltInst) Def() *Temp    { return nil }
+func (h *HaltInst) isTerminator() {}
+
 // ReturnInst returns from a function.
 type ReturnInst struct {
 	Result *Temp // nil for void

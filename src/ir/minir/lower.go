@@ -3,6 +3,7 @@ package minir
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/sema/types"
@@ -487,6 +488,11 @@ func (l *Lowerer) emitCaseTest(key *Temp, lr *desugar.LabelRange, bodyLabel, fal
 }
 
 func (l *Lowerer) lowerCallStmt(call *desugar.FuncCall) {
+	// Dispatch to inline builtin lowering first.
+	if fn, ok := builtinLowering[strings.ToLower(call.Func.Name)]; ok {
+		fn(l, call)
+		return
+	}
 	var args []Value
 	for _, a := range call.Args {
 		args = append(args, l.lowerValue(a))
@@ -545,6 +551,19 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 		dst := NewAnonTemp(LowerType(e.SemaType))
 		l.emit(&LoadInst{Dst: dst, Addr: ptrTemp})
 		return dst
+	case *desugar.TypeRef:
+		// A type denotation used as a value (e.g. SIZE(T), DEFAULT(T)).
+		// Return a zero constant of the underlying type; builtins intercept
+		// before this path for type-query forms.
+		ty := LowerType(e.UnderType)
+		if ty == nil {
+			ty = primI32
+		}
+		return NewConst("0", int64(0), ty)
+	case *desugar.ModuleRef:
+		// Module handle: represent as an opaque pointer-sized constant carrying
+		// the module name (used by LDMOD/LDCMD).
+		return NewConst(e.Name, e.Name, Ptr(primI32))
 	default:
 		return NewConst("0", int64(0), primI32)
 	}
@@ -683,6 +702,14 @@ func (l *Lowerer) lowerUnary(e *desugar.UnaryExpr) Value {
 }
 
 func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
+	// Dispatch to inline builtin lowering first.
+	if fn, ok := builtinLowering[strings.ToLower(call.Func.Name)]; ok {
+		v := fn(l, call)
+		if v != nil {
+			return v
+		}
+		return NewConst("0", int64(0), primI32)
+	}
 	var args []Value
 	for _, a := range call.Args {
 		args = append(args, l.lowerValue(a))
