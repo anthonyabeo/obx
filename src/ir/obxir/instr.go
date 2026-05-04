@@ -615,4 +615,3 @@ func (s *SwitchInst) ReplaceUses(m map[string]Value) {
 	}
 }
 func (s *SwitchInst) ReplaceDef(Value) {}
-

@@ -224,4 +224,3 @@ func VerifyIR(fn *Function) []VerifyError {
 
 	return errs
 }
-

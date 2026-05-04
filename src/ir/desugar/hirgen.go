@@ -218,10 +218,40 @@ func (g Generator) VisitQualifiedIdent(ident *ast.QualifiedIdent) any {
 			IsExternal: sym.IsExternal,
 			IsVarArgs:  sym.IsVarArgs,
 		}
-	//case ast.TypeSymbolKind:
-	//case ast.ModuleSymbolKind:
-	//case ast.FieldSymbolKind:
-	//case ast.DefinitionSymbolKind:
+	case ast.TypeSymbolKind:
+		sym := ident.Symbol.(*ast.TypeSymbol)
+		return &TypeRef{
+			Name:       ident.Name,
+			Mangled:    sym.MangledName(),
+			UnderType:  ident.SemaType,
+			Module:     ident.Prefix,
+			IsExported: sym.Props() == ast.Exported || sym.Props() == ast.ExportedReadOnly,
+			IsReadOnly: sym.Props() == ast.ReadOnly,
+		}
+	case ast.ModuleSymbolKind, ast.DefinitionSymbolKind:
+		// Both module imports and definition-module imports are backed by
+		// *ast.ModuleSymbol (NewImportSymbol). DefinitionSymbolKind is a
+		// reserved constant that is never actually assigned, so we treat both
+		// the same. Props() panics on ModuleSymbol so we skip it.
+		sym := ident.Symbol.(*ast.ModuleSymbol)
+		return &ModuleRef{
+			Name:    ident.Name,
+			Mangled: sym.MangledName(),
+			Module:  ident.Prefix,
+		}
+	case ast.FieldSymbolKind:
+		// A field referenced standalone (unusual but possible in guards etc.).
+		// Treat it like a variable reference.
+		sym := ident.Symbol.(*ast.FieldSymbol)
+		return &VariableRef{
+			Name:       ident.Name,
+			Mangled:    sym.MangledName(),
+			SemaType:   ident.SemaType,
+			Module:     ident.Prefix,
+			IsExported: sym.Props() == ast.Exported || sym.Props() == ast.ExportedReadOnly,
+			IsReadOnly: sym.Props() == ast.ReadOnly,
+			Size:       ident.SemaType.Width(),
+		}
 	case ast.ParamSymbolKind:
 		sym := ident.Symbol.(*ast.ParamSymbol)
 		var mod ParamKind

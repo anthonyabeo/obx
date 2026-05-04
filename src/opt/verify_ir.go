@@ -23,4 +23,3 @@ func (VerifyIRPass) Run(fn *obxir.Function, ctx *PassContext) *ChangeSet {
 	cs.changed = false
 	return cs
 }
-

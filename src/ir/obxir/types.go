@@ -217,8 +217,8 @@ func (t *PointerType) Equal(o Type) bool {
 
 // ─── VoidType ─────────────────────────────────────────────────────────────
 
-func (t *VoidType) String() string   { return "void" }
-func (t *VoidType) Width() int       { return 0 }
+func (t *VoidType) String() string    { return "void" }
+func (t *VoidType) Width() int        { return 0 }
 func (t *VoidType) Equal(o Type) bool { _, ok := o.(*VoidType); return ok }
 
 // ─── StringType ───────────────────────────────────────────────────────────
@@ -246,8 +246,9 @@ func (t *Set) Equal(o Type) bool { _, ok := o.(*Set); return ok }
 // ─── EnumType ─────────────────────────────────────────────────────────────
 
 func (t *EnumType) String() string { return "enum" }
+
 // EnumType is represented as a 32-bit integer at the IR level.
-func (t *EnumType) Width() int { return 4 }
+func (t *EnumType) Width() int        { return 4 }
 func (t *EnumType) Equal(o Type) bool { _, ok := o.(*EnumType); return ok }
 
 // ─── Predefined type singletons ───────────────────────────────────────────

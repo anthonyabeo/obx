@@ -173,4 +173,3 @@ func VerifySSA(fn *obxir.Function) []obxir.VerifyError {
 
 	return errs
 }
-

@@ -308,4 +308,3 @@ func contains2(s, sub string) bool {
 			return false
 		}())
 }
-

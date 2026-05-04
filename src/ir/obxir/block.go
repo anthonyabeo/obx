@@ -130,7 +130,7 @@ type Block struct {
 	ID     int
 	Label  string
 	Instrs []Instr
-	Term   Instr          // terminator; always the last element of Instrs
+	Term   Instr // terminator; always the last element of Instrs
 	Preds  map[int]*Block
 	Succs  map[int]*Block
 }

@@ -125,16 +125,16 @@ func (op InstrOp) String() string {
 type CastOp int
 
 const (
-	Trunc   CastOp = iota // integer narrowing (drop high bits)
-	ZExt                  // zero-extend to wider integer
-	SExt                  // sign-extend to wider integer
-	FpToSI                // float → signed integer (truncation toward zero)
-	FpToUI                // float → unsigned integer
-	SIToFp                // signed integer → float
-	UIToFp                // unsigned integer → float
-	Bitcast               // reinterpret bits (same width, different type)
-	PtrToInt              // pointer → integer (address as integer)
-	IntToPtr              // integer → pointer
+	Trunc    CastOp = iota // integer narrowing (drop high bits)
+	ZExt                   // zero-extend to wider integer
+	SExt                   // sign-extend to wider integer
+	FpToSI                 // float → signed integer (truncation toward zero)
+	FpToUI                 // float → unsigned integer
+	SIToFp                 // signed integer → float
+	UIToFp                 // unsigned integer → float
+	Bitcast                // reinterpret bits (same width, different type)
+	PtrToInt               // pointer → integer (address as integer)
+	IntToPtr               // integer → pointer
 )
 
 func (c CastOp) String() string {

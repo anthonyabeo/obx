@@ -100,6 +100,17 @@ type (
 		Size       int
 	}
 
+	// ModuleRef represents a reference to a module or definition module used
+	// as a first-class value (e.g. LDMOD(Fmt)).
+	ModuleRef struct {
+		Name       string
+		Mangled    string
+		Module     string
+		SemaType   types.Type
+		IsExported bool
+		IsReadOnly bool
+	}
+
 	FieldAccess struct {
 		Record   Expr
 		Field    string
@@ -144,7 +155,8 @@ func (*VariableRef) expr()   {}
 func (*ConstantRef) expr()   {}
 func (*FunctionRef) expr()   {}
 func (*TypeRef) expr()       {}
-func (p *Param) expr()       {}
+func (*ModuleRef) expr()     {}
+func (*Param) expr()         {}
 
 func (e *Literal) Type() types.Type       { return e.SemaType }
 func (e *BinaryExpr) Type() types.Type    { return e.SemaType }
@@ -160,6 +172,7 @@ func (e *VariableRef) Type() types.Type   { return e.SemaType }
 func (e *ConstantRef) Type() types.Type   { return e.SemaType }
 func (e *FunctionRef) Type() types.Type   { return e.SemaType }
 func (e *TypeRef) Type() types.Type       { return e.UnderType }
+func (e *ModuleRef) Type() types.Type     { return e.SemaType }
 func (p *Param) Type() types.Type         { return p.Typ }
 
 func (e *Literal) String() string    { return fmt.Sprintf("%s(%v)", e.Kind, e.Value) }
@@ -207,4 +220,5 @@ func (e *VariableRef) String() string { return e.Name }
 func (e *ConstantRef) String() string { return e.Name }
 func (e *FunctionRef) String() string { return e.Name }
 func (e *TypeRef) String() string     { return e.Name }
+func (e *ModuleRef) String() string   { return e.Name }
 func (p *Param) String() string       { return p.Name }
