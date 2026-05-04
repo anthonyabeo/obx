@@ -114,7 +114,6 @@ func (r *RecordType) String() string {
 	}
 	return s + "}"
 }
-
 func (r *RecordType) Equal(t Type) bool {
 	o, ok := t.(*RecordType)
 	if !ok {

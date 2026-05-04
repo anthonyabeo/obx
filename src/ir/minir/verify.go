@@ -21,6 +21,18 @@ func (e VerifyError) Error() string {
 	}
 }
 
+// isAddrValue reports whether v is a valid address operand for a memory
+// instruction: either an IsAddr=true *Temp (stack alloca) or a *GlobalRef.
+func isAddrValue(v Value) bool {
+	switch a := v.(type) {
+	case *Temp:
+		return a.IsAddr
+	case *GlobalRef:
+		return true
+	}
+	return false
+}
+
 // VerifyIR checks structural invariants of the function and returns a slice
 // of VerifyError describing any problems found. An empty slice means OK.
 func VerifyIR(fn *Function) []VerifyError {
@@ -131,12 +143,12 @@ func VerifyIR(fn *Function) []VerifyError {
 
 			switch instr := ins.(type) {
 			case *LoadInst:
-				if instr.Addr != nil && !instr.Addr.IsMem() {
-					add(bl, is, fmt.Sprintf("LoadInst addr %q is not a memory value", instr.Addr.Name()))
+				if instr.Addr != nil && !isAddrValue(instr.Addr) {
+					add(bl, is, fmt.Sprintf("LoadInst addr %q is not a memory value", instr.Addr.String()))
 				}
 			case *StoreInst:
-				if instr.Addr != nil && !instr.Addr.IsMem() {
-					add(bl, is, fmt.Sprintf("StoreInst addr %q is not a memory value", instr.Addr.Name()))
+				if instr.Addr != nil && !isAddrValue(instr.Addr) {
+					add(bl, is, fmt.Sprintf("StoreInst addr %q is not a memory value", instr.Addr.String()))
 				}
 			case *GEPInst:
 				if instr.ElemType == nil {
@@ -145,13 +157,8 @@ func VerifyIR(fn *Function) []VerifyError {
 				if instr.Base == nil {
 					add(bl, is, "GEPInst base is nil")
 				} else {
-					// base should be an address-like Temp
-					if bt, ok := instr.Base.(*Temp); ok {
-						if !bt.IsMem() {
-							add(bl, is, "GEPInst base Temp does not have IsAddr=true")
-						}
-					} else {
-						add(bl, is, "GEPInst base is not a Temp value")
+					if !isAddrValue(instr.Base) {
+						add(bl, is, "GEPInst base is not an address value (IsAddr *Temp or *GlobalRef)")
 					}
 				}
 			case *PhiInst:
@@ -196,6 +203,76 @@ func VerifyIR(fn *Function) []VerifyError {
 				if base.Left != nil && base.Right != nil {
 					if !base.Left.Type().Equal(base.Right.Type()) {
 						add(bl, is, fmt.Sprintf("FCmpInst operand type mismatch: %q vs %q", base.Left.Type(), base.Right.Type()))
+					}
+				}
+			}
+		}
+	}
+	return errs
+}
+
+// VerifyProgram calls VerifyModule on every module in prog and aggregates all
+// errors.  An empty slice means the whole program is structurally valid.
+func VerifyProgram(prog *Program) []VerifyError {
+	var errs []VerifyError
+	for _, mod := range prog.Modules {
+		errs = append(errs, VerifyModule(mod)...)
+	}
+	return errs
+}
+
+// VerifyError describing any problems found.  It calls VerifyIR on each function
+// and also verifies module-level consistency:
+//   - GlobalVar and GlobalConst have non-nil types
+//   - GlobalConst initializers are non-nil
+//   - ExternalFunc declarations have non-nil signatures
+//   - Every *GlobalRef used inside function bodies resolves in Module.SymTab
+func VerifyModule(m *Module) []VerifyError {
+	var errs []VerifyError
+	modName := m.Name
+	if modName == "" {
+		modName = "<module>"
+	}
+	addMod := func(msg string) {
+		errs = append(errs, VerifyError{Func: modName, Msg: msg})
+	}
+
+	for _, gv := range m.Globals {
+		if gv.Ty == nil {
+			addMod(fmt.Sprintf("GlobalVar %q has nil type", gv.Name))
+		}
+	}
+	for _, gc := range m.Constants {
+		if gc.Ty == nil {
+			addMod(fmt.Sprintf("GlobalConst %q has nil type", gc.Name))
+		}
+		if gc.Init == nil {
+			addMod(fmt.Sprintf("GlobalConst %q has nil initializer", gc.Name))
+		}
+	}
+	for _, ef := range m.Externals {
+		if ef.Sig == nil {
+			addMod(fmt.Sprintf("ExternalFunc %q has nil signature", ef.Name))
+		}
+	}
+
+	for _, fn := range m.Functions {
+		errs = append(errs, VerifyIR(fn)...)
+		// Check that all GlobalRef values used in this function resolve in SymTab.
+		for _, b := range fn.Blocks {
+			for _, ins := range b.Instrs {
+				for _, u := range ins.Uses() {
+					gr, ok := u.(*GlobalRef)
+					if !ok {
+						continue
+					}
+					if _, found := m.SymTab.Lookup(gr.GlobalName); !found {
+						errs = append(errs, VerifyError{
+							Func:  fn.FnName,
+							Block: b.Label,
+							Instr: ins.String(),
+							Msg:   fmt.Sprintf("GlobalRef @%s not defined in module SymTab", gr.GlobalName),
+						})
 					}
 				}
 			}

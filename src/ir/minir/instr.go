@@ -68,25 +68,37 @@ func (c *ICmpInst) Def() *Temp    { return c.Dst }
 type FCmpInst struct{ ICmpInst }
 
 // LoadInst reads from memory via an address.
+// Addr may be an IsAddr=true *Temp (stack alloca) or a *GlobalRef (module-scope
+// variable / constant), matching LLVM's load semantics.
 type LoadInst struct {
 	Dst  *Temp
-	Addr *Temp
+	Addr Value // IsAddr-like: either an IsAddr *Temp or a *GlobalRef
 }
 
-func (l *LoadInst) String() string { return fmt.Sprintf("%s = load %s", l.Dst.Name(), l.Addr.Name()) }
-func (l *LoadInst) Uses() []Value  { return []Value{l.Addr} }
-func (l *LoadInst) Def() *Temp     { return l.Dst }
+func (l *LoadInst) String() string {
+	addr := "<nil>"
+	if l.Addr != nil {
+		addr = l.Addr.String()
+	}
+	return fmt.Sprintf("%s = load %s", l.Dst.Name(), addr)
+}
+func (l *LoadInst) Uses() []Value { return []Value{l.Addr} }
+func (l *LoadInst) Def() *Temp    { return l.Dst }
 
 // StoreInst writes a value to an address.
-// Val is Value (not *Temp) so that constant rvalues can be stored directly
-// without a separate materialization instruction.
+// Val is Value so constant rvalues can be stored without a materialization step.
+// Addr is widened to Value so *GlobalRef can be used directly (LLVM-style).
 type StoreInst struct {
 	Val  Value // the value to store (Temp or Constant)
-	Addr *Temp // must be IsAddr=true
+	Addr Value // must satisfy isAddrValue: IsAddr *Temp or *GlobalRef
 }
 
 func (s *StoreInst) String() string {
-	return fmt.Sprintf("store %s, %s", s.Val.String(), s.Addr.Name())
+	addr := "<nil>"
+	if s.Addr != nil {
+		addr = s.Addr.String()
+	}
+	return fmt.Sprintf("store %s, %s", s.Val.String(), addr)
 }
 func (s *StoreInst) Uses() []Value { return []Value{s.Val, s.Addr} }
 func (s *StoreInst) Def() *Temp    { return nil }

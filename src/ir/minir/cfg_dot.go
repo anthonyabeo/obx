@@ -4,12 +4,65 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"html"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
+	"unicode"
 )
+
+// dotEscape sanitises s for safe embedding inside a Graphviz HTML-like label
+// (the << ... >> form).  Graphviz's internal HTML parser only accepts the
+// standard named entities &amp; &lt; &gt; &quot; — numeric references such as
+// &#34; or &#39; produced by Go's html.EscapeString are NOT supported and
+// cause a "Render error: in label of node N" crash in viz.js.
+//
+// Rules applied:
+//   - &  → &amp;
+//   - <  → &lt;
+//   - >  → &gt;
+//   - "  → &quot;  (safe in both text content and attribute values)
+//   - \n → literal backslash-n  (raw newlines break the DOT string parser)
+//   - \r → backslash-r
+//   - \t → backslash-t
+//   - other C0/C1 control chars → \xNN
+//   - strings longer than 120 runes are truncated with "…"
+//
+// Single quotes are left verbatim — they are safe in HTML text content.
+func dotEscape(s string) string {
+	const maxLen = 120
+	var b strings.Builder
+	b.Grow(len(s))
+	for i, r := range s {
+		if i >= maxLen {
+			b.WriteString("…")
+			break
+		}
+		switch r {
+		case '&':
+			b.WriteString("&amp;")
+		case '<':
+			b.WriteString("&lt;")
+		case '>':
+			b.WriteString("&gt;")
+		case '"':
+			b.WriteString("&quot;")
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			if unicode.IsControl(r) {
+				fmt.Fprintf(&b, `\x%02x`, r)
+			} else {
+				b.WriteRune(r)
+			}
+		}
+	}
+	return b.String()
+}
 
 // DotOptions controls DOT output styling.
 type DotOptions struct {
@@ -56,7 +109,7 @@ func WriteDOT(w io.Writer, fn *Function, opts DotOptions) error {
 	buf.WriteString("digraph G {\n")
 	buf.WriteString("  graph [rankdir=LR];\n")
 	if opts.Title != "" {
-		buf.WriteString(fmt.Sprintf("  label=\"%s\"; labelloc=top; fontsize=18;\n", html.EscapeString(opts.Title)))
+		buf.WriteString(fmt.Sprintf("  label=%q; labelloc=top; fontsize=18;\n", opts.Title))
 	}
 
 	// emit nodes
@@ -77,14 +130,14 @@ func WriteDOT(w io.Writer, fn *Function, opts DotOptions) error {
 		if b == fn.Exit {
 			headerBg = opts.ExitColor
 		}
-		rows = append(rows, fmt.Sprintf("<TR><TD BGCOLOR=\"%s\"><B>%s</B></TD></TR>", headerBg, html.EscapeString(b.Label)))
+		rows = append(rows, fmt.Sprintf("<TR><TD BGCOLOR=\"%s\"><B>%s</B></TD></TR>", headerBg, dotEscape(b.Label)))
 
 		if opts.Compact {
 			// show succ count
 			rows = append(rows, fmt.Sprintf("<TR><TD>succ=%d</TD></TR>", len(b.Succs)))
 		} else {
 			for _, ins := range b.Instrs {
-				s := html.EscapeString(FormatInstr(ins))
+				s := dotEscape(FormatInstr(ins))
 				rows = append(rows, fmt.Sprintf("<TR><TD ALIGN=\"LEFT\"><FONT FACE=\"monospace\">%s</FONT></TD></TR>", s))
 			}
 			// ensure terminator printed (if not already last)
@@ -94,7 +147,7 @@ func WriteDOT(w io.Writer, fn *Function, opts DotOptions) error {
 					lastIdx = len(b.Instrs) - 1
 				}
 				if lastIdx < 0 || b.Instrs[lastIdx] != b.Term {
-					s := html.EscapeString(FormatInstr(b.Term))
+					s := dotEscape(FormatInstr(b.Term))
 					rows = append(rows, fmt.Sprintf("<TR><TD ALIGN=\"LEFT\"><I><FONT FACE=\"monospace\">%s</FONT></I></TD></TR>", s))
 				}
 			}

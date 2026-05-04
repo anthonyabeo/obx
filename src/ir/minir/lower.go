@@ -14,6 +14,9 @@ import (
 
 // Lowerer translates desugared HIR functions into minir Functions.
 type Lowerer struct {
+	// module-level state (shared across all functions in the program)
+	mod *Module // the module being built; set by Lower()
+
 	// per-function mutable state, reset by lowerFunction
 	blockSeq int               // monotone block-ID counter
 	labelSeq int               // label-suffix counter
@@ -24,22 +27,157 @@ type Lowerer struct {
 	loopExit map[string]string // loop label → exit-block label; "" = innermost loop
 }
 
-// Lower converts every non-external desugar.Function in prog into a
-// minir.Function. External (FFI) declarations are skipped.
-func Lower(prog *desugar.Program) []*Function {
+// Lower translates a desugar.Program into a *minir.Program, producing one
+// minir.Module per desugar.Module.
+//
+// Within each module, lowering runs in two passes:
+//
+//  1. Module-scope declarations:
+//     - *desugar.Variable             → *GlobalVar   (GlobalRef in Module.SymTab)
+//     - *desugar.Constant             → *GlobalConst (*Constant in Module.SymTab so
+//     ConstantRef resolution returns the immediate value without a load)
+//     - *desugar.Function{IsExternal} → *ExternalFunc (declaration only)
+//
+//  2. Function bodies: each non-external function is lowered; global variables
+//     resolve directly to their *GlobalRef address (true LLVM semantics).
+func Lower(prog *desugar.Program) *Program {
+	outProg := &Program{}
 	l := &Lowerer{}
-	var out []*Function
-	for _, mod := range prog.Modules {
-		for _, decl := range mod.Decls {
-			if fn, ok := decl.(*desugar.Function); ok && !fn.IsExternal {
-				out = append(out, l.lowerFunction(fn))
+
+	for _, hirMod := range prog.Modules {
+		mod := &Module{Name: hirMod.Name}
+		l.mod = mod
+
+		// ── pass 1: module-scope declarations ──────────────────────────
+		for _, decl := range hirMod.Decls {
+			switch d := decl.(type) {
+			case *desugar.Variable:
+				l.lowerGlobalVar(d)
+			case *desugar.Constant:
+				l.lowerGlobalConst(d)
+			case *desugar.Function:
+				if d.IsExternal {
+					l.lowerExternalFunc(d)
+				}
 			}
 		}
-		if mod.Init != nil && mod.Init.Body != nil {
-			out = append(out, l.lowerFunction(mod.Init))
+		// ── pass 2: function bodies ─────────────────────────────────────
+		for _, decl := range hirMod.Decls {
+			if fn, ok := decl.(*desugar.Function); ok && !fn.IsExternal {
+				mod.Functions = append(mod.Functions, l.lowerFunction(fn))
+			}
+		}
+		if hirMod.Init != nil && hirMod.Init.Body != nil {
+			mod.Functions = append(mod.Functions, l.lowerFunction(hirMod.Init))
+		}
+
+		outProg.Modules = append(outProg.Modules, mod)
+	}
+	return outProg
+}
+
+// lowerGlobalVar lowers a module-scope variable declaration into a *GlobalVar
+// and registers its *GlobalRef address in the module SymTab.
+func (l *Lowerer) lowerGlobalVar(d *desugar.Variable) {
+	vt := LowerType(d.Type)
+	if vt == nil {
+		vt = primI32
+	}
+	lk := InternalLinkage
+	if d.IsExport {
+		lk = ExternalLinkage
+	}
+	name := d.Name
+	if d.Mangled != "" {
+		name = d.Mangled
+	}
+	gv := &GlobalVar{Name: name, Ty: vt, Linkage: lk}
+	l.mod.Globals = append(l.mod.Globals, gv)
+	_ = l.mod.SymTab.Define(name, gv.Ref())
+	// Also register the bare (un-mangled) name when it differs.
+	if d.Mangled != "" && d.Mangled != d.Name {
+		_ = l.mod.SymTab.Define(d.Name, gv.Ref())
+	}
+}
+
+// lowerGlobalConst lowers a module-scope constant declaration into a
+// *GlobalConst and registers the immediate *Constant value (not the Ref)
+// in the module SymTab so that ConstantRef resolution inside functions
+// returns the value directly without a load.
+func (l *Lowerer) lowerGlobalConst(d *desugar.Constant) {
+	vt := LowerType(d.Type)
+	if vt == nil {
+		vt = primI32
+	}
+	lk := InternalLinkage
+	if d.IsExport {
+		lk = ExternalLinkage
+	}
+	name := d.Name
+	if d.Mangled != "" {
+		name = d.Mangled
+	}
+	init := lowerConstant(d.Value)
+	gc := &GlobalConst{Name: name, Ty: vt, Init: init, Linkage: lk}
+	l.mod.Constants = append(l.mod.Constants, gc)
+	// Insert the immediate value so ConstantRef does not need a load.
+	if init != nil {
+		_ = l.mod.SymTab.Define(name, init)
+	} else {
+		_ = l.mod.SymTab.Define(name, gc.Ref())
+	}
+	if d.Mangled != "" && d.Mangled != d.Name {
+		if init != nil {
+			_ = l.mod.SymTab.Define(d.Name, init)
+		} else {
+			_ = l.mod.SymTab.Define(d.Name, gc.Ref())
 		}
 	}
-	return out
+}
+
+// lowerExternalFunc lowers an FFI / external function declaration into an
+// *ExternalFunc (no body, only a signature).
+func (l *Lowerer) lowerExternalFunc(d *desugar.Function) {
+	var params []Type
+	for _, p := range d.Params {
+		params = append(params, LowerType(p.Typ))
+	}
+	sig := &FunctionType{Params: params, Result: LowerType(d.Result)}
+	ef := &ExternalFunc{Name: d.FnName(), Sig: sig, Linkage: ExternalLinkage}
+	l.mod.Externals = append(l.mod.Externals, ef)
+}
+
+// lowerConstant evaluates a Literal expression to a *Constant without
+// requiring an active basic block.  Returns nil for non-literal expressions.
+func lowerConstant(expr desugar.Expr) *Constant {
+	lit, ok := expr.(*desugar.Literal)
+	if !ok {
+		return nil
+	}
+	ty := LowerType(lit.SemaType)
+	if ty == nil {
+		ty = primI32
+	}
+	switch lit.Kind {
+	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
+		iv, _ := strconv.ParseInt(lit.Value, 10, 64)
+		return NewConst(lit.Value, iv, ty)
+	case token.REAL_LIT, token.LONGREAL_LIT:
+		fv, _ := strconv.ParseFloat(lit.Value, 64)
+		return NewConst(lit.Value, fv, ty)
+	case token.TRUE:
+		return NewConst("true", int64(1), primI1)
+	case token.FALSE:
+		return NewConst("false", int64(0), primI1)
+	case token.NIL:
+		return NewConst("nil", int64(0), Ptr(primI32))
+	default:
+		iv, err := strconv.ParseInt(lit.Value, 10, 64)
+		if err == nil {
+			return NewConst(lit.Value, iv, ty)
+		}
+		return NewConst(lit.Value, lit.Value, ty)
+	}
 }
 
 // ── type mapping ──────────────────────────────────────────────────────────────
@@ -522,6 +660,17 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 		if cv, ok := l.constEnv[e.Mangled]; ok {
 			return cv
 		}
+		// Fall back to module-scope constants (stored as *Constant in SymTab).
+		if l.mod != nil {
+			if v, ok := l.mod.SymTab.Lookup(e.Name); ok {
+				return v
+			}
+			if e.Mangled != "" {
+				if v, ok := l.mod.SymTab.Lookup(e.Mangled); ok {
+					return v
+				}
+			}
+		}
 		return l.lowerLiteralExpr(e.Value)
 	case *desugar.Param:
 		addr := l.resolveVar(e.Name, e.Name)
@@ -569,8 +718,10 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 	}
 }
 
-// lowerAddr returns an IsAddr=true *Temp representing the address of an lvalue.
-func (l *Lowerer) lowerAddr(expr desugar.Expr) *Temp {
+// lowerAddr returns a Value representing the address of an lvalue.
+// The result is either an IsAddr=true *Temp (stack alloca) or a *GlobalRef
+// (module-scope variable / constant) — both satisfy isAddrValue.
+func (l *Lowerer) lowerAddr(expr desugar.Expr) Value {
 	switch e := expr.(type) {
 	case *desugar.VariableRef:
 		return l.resolveVar(e.Mangled, e.Name)
@@ -596,7 +747,7 @@ func (l *Lowerer) lowerFieldAddr(e *desugar.FieldAccess) *Temp {
 	dst := l.newAddrTemp(e.Field, ft)
 
 	var recTy *RecordType
-	if pt, ok := base.Ty.(*PointerType); ok {
+	if pt, ok := base.Type().(*PointerType); ok {
 		recTy, _ = pt.Elem.(*RecordType)
 	}
 	var elemType Type = ft
@@ -624,7 +775,7 @@ func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *Temp {
 		}
 	}
 	var arrTy *ArrayType
-	if pt, ok := base.Ty.(*PointerType); ok {
+	if pt, ok := base.Type().(*PointerType); ok {
 		arrTy, _ = pt.Elem.(*ArrayType)
 	}
 	var elemType Type = et
@@ -830,7 +981,14 @@ func (l *Lowerer) newAddrTemp(name string, ty Type) *Temp {
 	return t
 }
 
-func (l *Lowerer) resolveVar(mangled, bare string) *Temp {
+// resolveVar resolves a variable name to its address Value.
+// Lookup order:
+//  1. local varEnv (alloca *Temp for function parameters and locals)
+//  2. module SymTab (returns the *GlobalRef for module-scope variables, or the
+//     *Constant value for module-scope constants)
+//
+// Panics when the name is not found in either scope.
+func (l *Lowerer) resolveVar(mangled, bare string) Value {
 	if mangled != "" {
 		if t, ok := l.varEnv[mangled]; ok {
 			return t
@@ -838,6 +996,17 @@ func (l *Lowerer) resolveVar(mangled, bare string) *Temp {
 	}
 	if t, ok := l.varEnv[bare]; ok {
 		return t
+	}
+	// Fall back to module globals.
+	if l.mod != nil {
+		if mangled != "" {
+			if v, ok := l.mod.SymTab.Lookup(mangled); ok {
+				return v
+			}
+		}
+		if v, ok := l.mod.SymTab.Lookup(bare); ok {
+			return v
+		}
 	}
 	panic(fmt.Sprintf("lowerer: undefined variable %q / %q", mangled, bare))
 }

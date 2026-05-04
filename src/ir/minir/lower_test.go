@@ -31,19 +31,26 @@ func hirLit(val string, ty types.Type) *desugar.Literal {
 	return &desugar.Literal{Kind: token.INT32_LIT, Value: val, SemaType: ty}
 }
 
-func checkLower(t *testing.T, label string, fns []*Function) {
+func checkLower(t *testing.T, label string, prog *Program) {
 	t.Helper()
-	if len(fns) != 1 {
-		t.Fatalf("%s: expected 1 function, got %d", label, len(fns))
+	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 {
+		mods := 0
+		fns := 0
+		if len(prog.Modules) > 0 {
+			mods = len(prog.Modules)
+			fns = len(prog.Modules[0].Functions)
+		}
+		t.Fatalf("%s: expected 1 module with 1 function, got %d module(s) / %d function(s)", label, mods, fns)
 	}
-	errs := VerifyIR(fns[0])
+	fn := prog.Modules[0].Functions[0]
+	errs := VerifyIR(fn)
 	for _, e := range errs {
 		t.Logf("%s verify error: %s", label, e.Error())
 	}
 	if len(errs) != 0 {
 		t.Fatalf("%s: expected no verify errors, got %d", label, len(errs))
 	}
-	t.Logf("%s:\n%s", label, FormatFunction(fns[0]))
+	t.Logf("%s:\n%s", label, FormatFunction(fn))
 }
 
 // ── 1. identity(x: INT32): INT32 = RETURN x ──────────────────────────────────

@@ -174,3 +174,96 @@ func PrintFunction(w io.Writer, fn *Function) (int, error) {
 	s := FormatFunction(fn)
 	return w.Write([]byte(s))
 }
+
+// FormatModule returns a textual representation of a Module in a style
+// analogous to LLVM textual IR:
+//
+//	module <name>
+//
+//	@g  = internal  global   i32 0
+//	@C  = private   constant i32 42
+//
+//	declare @printf(ptr.i32, ...) -> i32
+//
+//	func foo(...) -> T
+//	  entry:
+//	    ...
+func FormatModule(m *Module) string {
+	var buf bytes.Buffer
+	name := m.Name
+	if name == "" {
+		name = "<unnamed>"
+	}
+	buf.WriteString(fmt.Sprintf("module %s\n", name))
+
+	if len(m.Globals)+len(m.Constants)+len(m.Externals) > 0 {
+		buf.WriteByte('\n')
+	}
+
+	for _, gv := range m.Globals {
+		ty := "<nil>"
+		if gv.Ty != nil {
+			ty = gv.Ty.String()
+		}
+		init := "zeroinit"
+		if gv.Init != nil {
+			init = ValueString(gv.Init)
+		}
+		buf.WriteString(fmt.Sprintf("@%s = %-8s global    %s %s\n", gv.Name, gv.Linkage, ty, init))
+	}
+
+	for _, gc := range m.Constants {
+		ty := "<nil>"
+		if gc.Ty != nil {
+			ty = gc.Ty.String()
+		}
+		init := "<uninit>"
+		if gc.Init != nil {
+			init = ValueString(gc.Init)
+		}
+		buf.WriteString(fmt.Sprintf("@%s = %-8s constant  %s %s\n", gc.Name, gc.Linkage, ty, init))
+	}
+
+	if len(m.Externals) > 0 {
+		buf.WriteByte('\n')
+	}
+	for _, ef := range m.Externals {
+		buf.WriteString(ef.String())
+		buf.WriteByte('\n')
+	}
+
+	if len(m.Functions) > 0 {
+		buf.WriteByte('\n')
+	}
+	for i, fn := range m.Functions {
+		buf.WriteString(FormatFunction(fn))
+		if i < len(m.Functions)-1 {
+			buf.WriteByte('\n')
+		}
+	}
+	return buf.String()
+}
+
+// PrintModule writes the formatted module to w.
+func PrintModule(w io.Writer, m *Module) (int, error) {
+	return w.Write([]byte(FormatModule(m)))
+}
+
+// FormatProgram returns a textual representation of all modules in prog,
+// separated by a blank line, in order.
+func FormatProgram(prog *Program) string {
+	var buf bytes.Buffer
+	for i, mod := range prog.Modules {
+		buf.WriteString(FormatModule(mod))
+		if i < len(prog.Modules)-1 {
+			buf.WriteString("\n; ────────────────────────────────────────────\n\n")
+		}
+	}
+	return buf.String()
+}
+
+// PrintProgram writes the formatted program to w.
+func PrintProgram(w io.Writer, prog *Program) (int, error) {
+	return w.Write([]byte(FormatProgram(prog)))
+}
+
