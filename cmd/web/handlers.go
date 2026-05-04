@@ -17,8 +17,7 @@ import (
 	"time"
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
-	"github.com/anthonyabeo/obx/src/ir/obxir"
-	"github.com/anthonyabeo/obx/src/opt"
+	"github.com/anthonyabeo/obx/src/ir/minir"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
@@ -71,9 +70,56 @@ func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine MIME type: prefer extension-based detection, fall back to sniffing
-	ext := filepath.Ext(clean)
-	mimeType := mime.TypeByExtension(ext)
+	// For JavaScript files, strip any sourceMappingURL comment that points
+	// outside the embedded tree (e.g. loader.js ships with
+	// "//# sourceMappingURL=../../min-maps/vs/loader.js.map" but we only
+	// vendor the vs/ subtree).  Leaving the comment causes an avalanche of
+	// 404 log lines every page load with no functional impact.
+	ext := strings.ToLower(filepath.Ext(clean))
+	if ext == ".js" || ext == ".mjs" {
+		if idx := strings.LastIndex(string(data), "\n//# sourceMappingURL="); idx >= 0 {
+			mapURL := strings.TrimSpace(string(data[idx+len("\n//# sourceMappingURL="):]))
+			// If the referenced map is NOT served under /static/ (i.e. it is a
+			// relative path that resolves outside our tree), strip the comment.
+			mapPath := path.Clean(path.Join(path.Dir(clean), mapURL))
+			if _, e2 := staticFS.ReadFile(path.Join("static", mapPath)); e2 != nil {
+				data = data[:idx]
+			}
+		}
+	}
+
+	// Determine MIME type: check well-known extensions first (the OS MIME
+	// registry on macOS/Linux may not have .js registered, causing
+	// mime.TypeByExtension to return "" or "text/plain", which is then
+	// rejected by browsers when X-Content-Type-Options: nosniff is set).
+	knownTypes := map[string]string{
+		".js":    "application/javascript",
+		".mjs":   "application/javascript",
+		".cjs":   "application/javascript",
+		".ts":    "application/typescript",
+		".css":   "text/css",
+		".html":  "text/html",
+		".htm":   "text/html",
+		".json":  "application/json",
+		".svg":   "image/svg+xml",
+		".png":   "image/png",
+		".jpg":   "image/jpeg",
+		".jpeg":  "image/jpeg",
+		".gif":   "image/gif",
+		".ico":   "image/x-icon",
+		".woff":  "font/woff",
+		".woff2": "font/woff2",
+		".ttf":   "font/ttf",
+		".otf":   "font/otf",
+		".map":   "application/json",
+		".txt":   "text/plain",
+		".xml":   "application/xml",
+		".webp":  "image/webp",
+	}
+	mimeType, ok := knownTypes[ext]
+	if !ok {
+		mimeType = mime.TypeByExtension(ext)
+	}
 	if mimeType == "" {
 		mimeType = http.DetectContentType(data)
 	}
@@ -100,7 +146,7 @@ func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 			b = []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
 		}
 		nonce := base64.RawURLEncoding.EncodeToString(b)
-		csp := fmt.Sprintf("default-src 'self'; script-src 'self' https: 'nonce-%s'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data:; connect-src 'self' https:; font-src 'self' https: data:; frame-ancestors 'none';", nonce)
+		csp := fmt.Sprintf("default-src 'self'; script-src 'self' https: 'nonce-%s'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data:; connect-src 'self' https:; font-src 'self' https: data:; worker-src 'self' blob:; frame-ancestors 'none';", nonce)
 		w.Header().Set("Content-Security-Policy", csp)
 
 		// Cache control for index
@@ -150,7 +196,7 @@ func (s *Server) HandleUI(w http.ResponseWriter, r *http.Request) {
 		b = []byte(fmt.Sprintf("%d", time.Now().UnixNano()))
 	}
 	nonce := base64.RawURLEncoding.EncodeToString(b)
-	csp := fmt.Sprintf("default-src 'self'; script-src 'self' https: 'nonce-%s'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data:; connect-src 'self' https:; font-src 'self' https: data:; frame-ancestors 'none';", nonce)
+	csp := fmt.Sprintf("default-src 'self'; script-src 'self' https: 'nonce-%s'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data:; connect-src 'self' https:; font-src 'self' https: data:; worker-src 'self' blob:; frame-ancestors 'none';", nonce)
 	w.Header().Set("Content-Security-Policy", csp)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
@@ -389,9 +435,8 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// desugar → ObxIR → build CFG
+	// desugar → minir → DOT (+ optional server-side SVG via dot binary)
 	hirProgram := desugar.NewGenerator(obx, ctx).Generate()
-	irProgram := obxir.NewIRBuilder(ctx.Target.WordSize).Build(hirProgram, ctx)
 
 	type graphEntry struct {
 		Module   string `json:"module"`
@@ -400,17 +445,17 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var graphs []graphEntry
-	for _, mod := range irProgram.Modules {
-		for _, fn := range mod.Funcs {
-			if fn.IsExternal {
-				continue
-			}
-			opt.BuildCFG(fn)
-			graphs = append(graphs, graphEntry{
+	lowered := minir.Lower(hirProgram)
+	for _, mod := range lowered.Modules {
+		for _, fn := range mod.Functions {
+			dotSrc := fn.OutputDOT()
+			graph := graphEntry{
 				Module:   mod.Name,
 				Function: fn.FnName,
-				Dot:      fn.OutputDOT(),
-			})
+				Dot:      dotSrc,
+			}
+
+			graphs = append(graphs, graph)
 		}
 	}
 

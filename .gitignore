@@ -2,3 +2,5 @@
 
 out/
 **/cfg-*
+build/
+!/build/.gitkeep

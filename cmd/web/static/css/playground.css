@@ -46,8 +46,9 @@ header h1  { font-size: 1.05rem; font-weight: 700; color: #818cf8; letter-spacin
 :root {
   --diag-basis: 340px;
   --diag-max: 40%;
-  --cfg-basis: 480px;
-  --cfg-max: 60%;
+  /* Make the CFG pane take half the page when opened. */
+  --cfg-basis: 50%;
+  --cfg-max: 50%;
 }
 
 #editorPane { flex: 1 1 auto; min-width: 0; }
@@ -78,7 +79,7 @@ header h1  { font-size: 1.05rem; font-weight: 700; color: #818cf8; letter-spacin
 
 /* Responsive adjustments: use percentage bases on narrower screens */
 @media (max-width: 1100px) {
-  :root { --diag-basis: 34%; --diag-max: 40%; --cfg-basis: 46%; --cfg-max: 60%; }
+  :root { --diag-basis: 34%; --diag-max: 40%; --cfg-basis: 50%; --cfg-max: 60%; }
 }
 @media (max-width: 700px) {
   :root { --diag-basis: 40%; --diag-max: 60%; --cfg-basis: 60%; --cfg-max: 100%; }

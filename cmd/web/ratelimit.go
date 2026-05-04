@@ -83,6 +83,18 @@ func (l *ipRateLimiter) StopJanitor() {
 // Middleware returns an http.Handler wrapper enforcing per-IP rate limits.
 func (l *ipRateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Static assets and health checks are served entirely from memory with
+		// no per-request computation; exempt them from rate limiting so that
+		// clients loading many assets in parallel (e.g. Monaco editor) are
+		// never throttled with 429.
+		p := r.URL.Path
+		if strings.HasPrefix(p, "/static/") ||
+			p == "/healthz" ||
+			p == "/readyz" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// determine client IP (respect X-Forwarded-For if present)
 		ip := r.Header.Get("X-Forwarded-For")
 		if ip != "" {
