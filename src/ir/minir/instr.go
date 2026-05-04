@@ -1,7 +1,5 @@
 package minir
 
-import "fmt"
-
 // Instr is the common interface for all instructions.
 type Instr interface {
 	String() string
@@ -28,7 +26,7 @@ type PhiInst struct {
 	Args []PhiArm
 }
 
-func (p *PhiInst) String() string { return fmt.Sprintf("%s = phi", p.Dst.Name()) }
+func (p *PhiInst) String() string { return FormatInstr(p) }
 func (p *PhiInst) Uses() []Value {
 	out := make([]Value, 0, len(p.Args))
 	for _, a := range p.Args {
@@ -45,9 +43,7 @@ type BinaryInst struct {
 	Left, Right Value
 }
 
-func (b *BinaryInst) String() string {
-	return fmt.Sprintf("%s = %s %s, %s", b.Dst.Name(), b.Op, b.Left.String(), b.Right.String())
-}
+func (b *BinaryInst) String() string { return FormatInstr(b) }
 func (b *BinaryInst) Uses() []Value { return []Value{b.Left, b.Right} }
 func (b *BinaryInst) Def() *Temp    { return b.Dst }
 
@@ -58,9 +54,7 @@ type ICmpInst struct {
 	Left, Right Value
 }
 
-func (c *ICmpInst) String() string {
-	return fmt.Sprintf("%s = icmp.%s %s, %s", c.Dst.Name(), c.Pred, c.Left.String(), c.Right.String())
-}
+func (c *ICmpInst) String() string { return FormatInstr(c) }
 func (c *ICmpInst) Uses() []Value { return []Value{c.Left, c.Right} }
 func (c *ICmpInst) Def() *Temp    { return c.Dst }
 
@@ -75,13 +69,7 @@ type LoadInst struct {
 	Addr Value // IsAddr-like: either an IsAddr *Temp or a *GlobalRef
 }
 
-func (l *LoadInst) String() string {
-	addr := "<nil>"
-	if l.Addr != nil {
-		addr = l.Addr.String()
-	}
-	return fmt.Sprintf("%s = load %s", l.Dst.Name(), addr)
-}
+func (l *LoadInst) String() string { return FormatInstr(l) }
 func (l *LoadInst) Uses() []Value { return []Value{l.Addr} }
 func (l *LoadInst) Def() *Temp    { return l.Dst }
 
@@ -93,13 +81,7 @@ type StoreInst struct {
 	Addr Value // must satisfy isAddrValue: IsAddr *Temp or *GlobalRef
 }
 
-func (s *StoreInst) String() string {
-	addr := "<nil>"
-	if s.Addr != nil {
-		addr = s.Addr.String()
-	}
-	return fmt.Sprintf("store %s, %s", s.Val.String(), addr)
-}
+func (s *StoreInst) String() string { return FormatInstr(s) }
 func (s *StoreInst) Uses() []Value { return []Value{s.Val, s.Addr} }
 func (s *StoreInst) Def() *Temp    { return nil }
 
@@ -109,9 +91,7 @@ type AllocaInst struct {
 	AllocType Type
 }
 
-func (a *AllocaInst) String() string {
-	return fmt.Sprintf("%s = alloca %s", a.Dst.Name(), a.AllocType.String())
-}
+func (a *AllocaInst) String() string { return FormatInstr(a) }
 func (a *AllocaInst) Uses() []Value { return nil }
 func (a *AllocaInst) Def() *Temp    { return a.Dst }
 
@@ -123,9 +103,9 @@ type GEPInst struct {
 	Offsets  []int
 }
 
-func (g *GEPInst) String() string { return fmt.Sprintf("%s = gep %s", g.Dst.Name(), g.Base.String()) }
-func (g *GEPInst) Uses() []Value  { return []Value{g.Base} }
-func (g *GEPInst) Def() *Temp     { return g.Dst }
+func (g *GEPInst) String() string { return FormatInstr(g) }
+func (g *GEPInst) Uses() []Value { return []Value{g.Base} }
+func (g *GEPInst) Def() *Temp    { return g.Dst }
 
 // CallInst represents a function call; optional result stored in Dst.
 type CallInst struct {
@@ -134,12 +114,7 @@ type CallInst struct {
 	Args   []Value
 }
 
-func (c *CallInst) String() string {
-	if c.Dst == nil {
-		return fmt.Sprintf("call %s", c.Callee)
-	}
-	return fmt.Sprintf("%s = call %s", c.Dst.Name(), c.Callee)
-}
+func (c *CallInst) String() string { return FormatInstr(c) }
 func (c *CallInst) Uses() []Value {
 	out := make([]Value, 0, len(c.Args))
 	for _, a := range c.Args {
@@ -157,9 +132,7 @@ type UnaryInst struct {
 	Src Value
 }
 
-func (u *UnaryInst) String() string {
-	return fmt.Sprintf("%s = %s %s", u.Dst.Name(), u.Op, u.Src.String())
-}
+func (u *UnaryInst) String() string { return FormatInstr(u) }
 func (u *UnaryInst) Uses() []Value { return []Value{u.Src} }
 func (u *UnaryInst) Def() *Temp    { return u.Dst }
 
@@ -171,9 +144,7 @@ type CastInst struct {
 	Src Value
 }
 
-func (c *CastInst) String() string {
-	return fmt.Sprintf("%s = %s %s", c.Dst.Name(), c.Op, c.Src.String())
-}
+func (c *CastInst) String() string { return FormatInstr(c) }
 func (c *CastInst) Uses() []Value { return []Value{c.Src} }
 func (c *CastInst) Def() *Temp    { return c.Dst }
 
@@ -183,12 +154,7 @@ type HaltInst struct {
 	Code Value // exit code; may be nil (defaults to 0)
 }
 
-func (h *HaltInst) String() string {
-	if h.Code == nil {
-		return "halt"
-	}
-	return fmt.Sprintf("halt %s", h.Code.String())
-}
+func (h *HaltInst) String() string { return FormatInstr(h) }
 func (h *HaltInst) Uses() []Value {
 	if h.Code == nil {
 		return nil
@@ -203,12 +169,7 @@ type ReturnInst struct {
 	Result *Temp // nil for void
 }
 
-func (r *ReturnInst) String() string {
-	if r.Result == nil {
-		return "ret"
-	}
-	return fmt.Sprintf("ret %s", r.Result.Name())
-}
+func (r *ReturnInst) String() string { return FormatInstr(r) }
 func (r *ReturnInst) Uses() []Value {
 	if r.Result == nil {
 		return nil
@@ -221,7 +182,7 @@ func (r *ReturnInst) isTerminator() {}
 // JumpInst is an unconditional jump terminator.
 type JumpInst struct{ Target string }
 
-func (j *JumpInst) String() string { return fmt.Sprintf("jmp %s", j.Target) }
+func (j *JumpInst) String() string { return FormatInstr(j) }
 func (j *JumpInst) Uses() []Value  { return nil }
 func (j *JumpInst) Def() *Temp     { return nil }
 func (j *JumpInst) isTerminator()  {}
@@ -232,9 +193,7 @@ type CondBrInst struct {
 	TrueLabel, FalseLabel string
 }
 
-func (c *CondBrInst) String() string {
-	return fmt.Sprintf("br %s, %s, %s", c.Cond.Name(), c.TrueLabel, c.FalseLabel)
-}
+func (c *CondBrInst) String() string { return FormatInstr(c) }
 func (c *CondBrInst) Uses() []Value { return []Value{c.Cond} }
 func (c *CondBrInst) Def() *Temp    { return nil }
 func (c *CondBrInst) isTerminator() {}
@@ -251,7 +210,7 @@ type SwitchInst struct {
 	Arms    []SwitchArm
 }
 
-func (s *SwitchInst) String() string { return fmt.Sprintf("switch %s", s.Key.Name()) }
+func (s *SwitchInst) String() string { return FormatInstr(s) }
 func (s *SwitchInst) Uses() []Value  { return []Value{s.Key} }
 func (s *SwitchInst) Def() *Temp     { return nil }
 func (s *SwitchInst) isTerminator()  {}

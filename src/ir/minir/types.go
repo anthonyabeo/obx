@@ -215,13 +215,7 @@ func (t *Temp) String() string {
 		return "<nil>"
 	}
 	if t.NameStr != "" {
-		if t.Ty != nil {
-			return fmt.Sprintf("%%%s:%s", t.NameStr, t.Ty.String())
-		}
 		return fmt.Sprintf("%%%s", t.NameStr)
-	}
-	if t.Ty != nil {
-		return fmt.Sprintf("%%t%d:%s", t.ID, t.Ty.String())
 	}
 	return fmt.Sprintf("%%t%d", t.ID)
 }
@@ -243,8 +237,11 @@ type Constant struct {
 
 func (c *Constant) Type() Type { return c.Ty }
 func (c *Constant) String() string {
+	if c == nil {
+		return "<nil>"
+	}
 	if c.NameStr != "" {
-		return c.NameStr
+		return fmt.Sprintf("%s", c.NameStr)
 	}
 	return fmt.Sprintf("%v", c.Val)
 }

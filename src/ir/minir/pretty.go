@@ -33,15 +33,29 @@ func ValueString(v Value) string {
 	case *Temp:
 		return TempString(x)
 	case *Constant:
-		// print constant with its type if available
-		ty := "<nil>"
-		if x.Ty != nil {
-			ty = x.Ty.String()
-		}
+		// Constants no longer carry a ":type" suffix in their textual
+		// representation; Constant.String() already returns the short form.
+		return x.String()
+	default:
+		return v.String()
+	}
+}
+
+// ShortValueString returns a compact operand representation without an attached
+// ":<type>" suffix. This is useful when the surrounding formatter prints
+// the operand type separately (LLVM-style: "i32 42", not "42:i32").
+func ShortValueString(v Value) string {
+	if v == nil {
+		return "<nil>"
+	}
+	switch x := v.(type) {
+	case *Temp:
+		return x.String()
+	case *Constant:
 		if x.NameStr != "" {
-			return fmt.Sprintf("%s:%s", x.NameStr, ty)
+			return x.NameStr
 		}
-		return fmt.Sprintf("%v:%s", x.Val, ty)
+		return fmt.Sprintf("%v", x.Val)
 	default:
 		return v.String()
 	}
@@ -52,72 +66,136 @@ func ValueString(v Value) string {
 func FormatInstr(ins Instr) string {
 	switch v := ins.(type) {
 	case *PhiInst:
+		et := "<nil>"
+		if v.Dst != nil && v.Dst.Type() != nil {
+			et = v.Dst.Type().String()
+		}
 		var parts []string
 		for _, a := range v.Args {
-			parts = append(parts, fmt.Sprintf("%s:%s", a.BlockLabel, ValueString(a.Val)))
+			// LLVM style: [ <val>, <label> ]
+			parts = append(parts, fmt.Sprintf("[ %s, %s ]", ShortValueString(a.Val), a.BlockLabel))
 		}
-		return fmt.Sprintf("%s = phi [%s]", TempString(v.Dst), strings.Join(parts, ", "))
+		return fmt.Sprintf("%s = phi %s %s", ShortValueString(v.Dst), et, strings.Join(parts, ", "))
 
 	case *BinaryInst:
-		return fmt.Sprintf("%s = %s %s, %s", TempString(v.Dst), v.Op, ValueString(v.Left), ValueString(v.Right))
+		ty := "<nil>"
+		if v.Dst != nil && v.Dst.Type() != nil {
+			ty = v.Dst.Type().String()
+		}
+		return fmt.Sprintf("%s = %s %s %s, %s", ShortValueString(v.Dst), v.Op, ty, ShortValueString(v.Left), ShortValueString(v.Right))
 
 	case *ICmpInst:
-		return fmt.Sprintf("%s = icmp.%s %s, %s", TempString(v.Dst), v.Pred, ValueString(v.Left), ValueString(v.Right))
+		opTy := "<nil>"
+		if v.Left != nil && v.Left.Type() != nil {
+			opTy = v.Left.Type().String()
+		}
+		return fmt.Sprintf("%s = icmp.%s %s %s, %s", ShortValueString(v.Dst), v.Pred, opTy, ShortValueString(v.Left), ShortValueString(v.Right))
 
 	case *FCmpInst:
 		// FCmpInst embeds ICmpInst
 		base := &v.ICmpInst
-		return fmt.Sprintf("%s = fcmp.%s %s, %s", TempString(base.Dst), base.Pred, ValueString(base.Left), ValueString(base.Right))
+		opTy := "<nil>"
+		if base.Left != nil && base.Left.Type() != nil {
+			opTy = base.Left.Type().String()
+		}
+		return fmt.Sprintf("%s = fcmp.%s %s %s, %s", ShortValueString(base.Dst), base.Pred, opTy, ShortValueString(base.Left), ShortValueString(base.Right))
 
 	case *LoadInst:
-		return fmt.Sprintf("%s = load %s", TempString(v.Dst), ValueString(v.Addr))
+		et := "<nil>"
+		if v.Dst != nil && v.Dst.Type() != nil {
+			et = v.Dst.Type().String()
+		}
+		return fmt.Sprintf("%s = load %s, %s", ShortValueString(v.Dst), et, ShortValueString(v.Addr))
 
 	case *StoreInst:
-		return fmt.Sprintf("store %s, %s", ValueString(v.Val), ValueString(v.Addr))
+		valTy := "<nil>"
+		if v.Val != nil && v.Val.Type() != nil {
+			valTy = v.Val.Type().String()
+		}
+		return fmt.Sprintf("store %s %s, %s", valTy, ShortValueString(v.Val), ShortValueString(v.Addr))
 
 	case *AllocaInst:
 		at := "<nil>"
 		if v.AllocType != nil {
 			at = v.AllocType.String()
 		}
-		return fmt.Sprintf("%s = alloca %s", TempString(v.Dst), at)
+		return fmt.Sprintf("%s = alloca %s", ShortValueString(v.Dst), at)
 
 	case *GEPInst:
-		offs := fmt.Sprint(v.Offsets)
+		// offsets as comma-separated ints
+		offs := ""
+		for i, o := range v.Offsets {
+			if i > 0 {
+				offs += ", "
+			}
+			offs += fmt.Sprintf("%d", o)
+		}
 		et := "<nil>"
 		if v.ElemType != nil {
 			et = v.ElemType.String()
 		}
-		return fmt.Sprintf("%s = gep %s, %s, offsets=%s", TempString(v.Dst), ValueString(v.Base), et, offs)
+		return fmt.Sprintf("%s = gep %s, %s, %s", ShortValueString(v.Dst), et, ShortValueString(v.Base), offs)
+
+	case *UnaryInst:
+		ty := "<nil>"
+		if v.Dst != nil && v.Dst.Type() != nil {
+			ty = v.Dst.Type().String()
+		}
+		return fmt.Sprintf("%s = %s %s %s", ShortValueString(v.Dst), v.Op, ty, ShortValueString(v.Src))
+
+	case *CastInst:
+		srcTy := "<nil>"
+		dstTy := "<nil>"
+		if v.Src != nil && v.Src.Type() != nil {
+			srcTy = v.Src.Type().String()
+		}
+		if v.Dst != nil && v.Dst.Type() != nil {
+			dstTy = v.Dst.Type().String()
+		}
+		return fmt.Sprintf("%s = %s %s %s to %s", ShortValueString(v.Dst), v.Op, srcTy, ShortValueString(v.Src), dstTy)
+
+	case *HaltInst:
+		if v.Code == nil {
+			return "halt"
+		}
+		return fmt.Sprintf("halt %s", ShortValueString(v.Code))
 
 	case *CallInst:
 		var args []string
 		for _, a := range v.Args {
-			args = append(args, ValueString(a))
+			// use short form for args (no ":type" suffix). If you prefer
+			// typed arguments (LLVM style) we can print the type before each
+			// arg instead.
+			args = append(args, ShortValueString(a))
 		}
 		if v.Dst == nil {
 			return fmt.Sprintf("call %s(%s)", v.Callee, strings.Join(args, ", "))
 		}
-		return fmt.Sprintf("%s = call %s(%s)", TempString(v.Dst), v.Callee, strings.Join(args, ", "))
+		// attempt to include result type if available
+		res := "void"
+		if v.Dst != nil && v.Dst.Type() != nil {
+			res = v.Dst.Type().String()
+		}
+		return fmt.Sprintf("%s = call %s %s(%s)", ShortValueString(v.Dst), res, v.Callee, strings.Join(args, ", "))
 
 	case *ReturnInst:
 		if v.Result == nil {
 			return "ret"
 		}
-		return fmt.Sprintf("ret %s", ValueString(v.Result))
+		return fmt.Sprintf("ret %s", ShortValueString(v.Result))
 
 	case *JumpInst:
 		return fmt.Sprintf("jmp %s", v.Target)
 
 	case *CondBrInst:
-		return fmt.Sprintf("br %s, %s, %s", TempString(v.Cond), v.TrueLabel, v.FalseLabel)
+		return fmt.Sprintf("br %s, %s, %s", ShortValueString(v.Cond), v.TrueLabel, v.FalseLabel)
 
 	case *SwitchInst:
 		var arms []string
 		for _, a := range v.Arms {
 			arms = append(arms, fmt.Sprintf("%d:%s", a.Val, a.Label))
 		}
-		return fmt.Sprintf("switch %s, default=%s [%s]", TempString(v.Key), v.Default, strings.Join(arms, ", "))
+		return fmt.Sprintf("switch %s, default=%s [%s]", ShortValueString(v.Key), v.Default, strings.Join(arms, ", "))
 	}
 	// fallback
 	return ins.String()
@@ -266,4 +344,3 @@ func FormatProgram(prog *Program) string {
 func PrintProgram(w io.Writer, prog *Program) (int, error) {
 	return w.Write([]byte(FormatProgram(prog)))
 }
-
