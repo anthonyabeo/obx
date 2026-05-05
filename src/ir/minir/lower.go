@@ -366,6 +366,7 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 		FnName: hirFn.FnName(),
 		Result: LowerType(hirFn.Result),
 		Blocks: make(map[int]*Block),
+		ParamKinds: make([]desugar.ParamKind, 0),
 	}
 	l.fn = fn
 
@@ -374,7 +375,8 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 	fn.Blocks[entry.ID] = entry
 	l.switchTo(entry)
 
-	// parameters: create alloca + store the incoming value
+	// parameters: for ValueParam keep incoming SSA temp (no alloca).
+	// For VarParam/InParam create an addressable alloca and store the incoming value.
 	for _, p := range hirFn.Params {
 		pt := LowerType(p.Typ)
 		if pt == nil {
@@ -382,10 +384,24 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 		}
 		param := NewTemp(p.Name, pt)
 		fn.Params = append(fn.Params, param)
-		addr := l.newAddrTemp(p.Name, pt)
-		l.emit(&AllocaInst{Dst: addr, AllocType: pt})
-		l.varEnv[p.Name] = addr
-		l.emit(&StoreInst{Val: param, Addr: addr})
+		// record original HIR param kind for downstream passes
+		fn.ParamKinds = append(fn.ParamKinds, p.Kind)
+
+		switch p.Kind {
+		case desugar.ValueParam:
+			// Keep incoming param as a register temp; map name -> temp so uses
+			// resolve directly to the SSA value. No Alloca/Store emitted.
+			l.varEnv[p.Name] = param
+		case desugar.VarParam, desugar.InParam:
+			// addressable parameter: allocate stack slot and store incoming value
+			addr := l.newAddrTemp(p.Name, pt)
+			l.emit(&AllocaInst{Dst: addr, AllocType: pt})
+			l.varEnv[p.Name] = addr
+			l.emit(&StoreInst{Val: param, Addr: addr})
+		default:
+			// conservative default: treat as value param
+			l.varEnv[p.Name] = param
+		}
 	}
 
 	// locals: alloca for variables, inline for constants
@@ -778,9 +794,20 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 		}
 		return l.lowerLiteralExpr(e.Value)
 	case *desugar.Param:
-		addr := l.resolveVar(e.Name, e.Name)
+		v := l.resolveVar(e.Name, e.Name)
+		// If v is an address-like value (alloca temp or global), load from it.
+		if isAddrValue(v) {
+			dst := NewTemp(e.Name, LowerType(e.Typ))
+			l.emit(&LoadInst{Dst: dst, Addr: v})
+			return dst
+		}
+		// Otherwise v is a value temp (ValueParam) — return it directly.
+		if t, ok := v.(*Temp); ok {
+			return t
+		}
+		// Fallback: materialize via a load into a temp
 		dst := NewTemp(e.Name, LowerType(e.Typ))
-		l.emit(&LoadInst{Dst: dst, Addr: addr})
+		l.emit(&BinaryInst{Dst: dst, Op: "add", Left: v, Right: NewConst("0", int64(0), dst.Type())})
 		return dst
 	case *desugar.BinaryExpr:
 		return l.lowerBinary(e)
@@ -973,7 +1000,12 @@ func (l *Lowerer) lowerAddr(expr desugar.Expr) Value {
 	case *desugar.VariableRef:
 		return l.resolveVar(e.Mangled, e.Name)
 	case *desugar.Param:
-		return l.resolveVar(e.Name, e.Name)
+		v := l.resolveVar(e.Name, e.Name)
+		// Forbid taking the address of a ValueParam (non-address temp).
+		if !isAddrValue(v) {
+			panic(fmt.Sprintf("lowerAddr: attempt to take address of value parameter '%s'", e.Name))
+		}
+		return v
 	case *desugar.FieldAccess:
 		return l.lowerFieldAddr(e)
 	case *desugar.IndexExpr:

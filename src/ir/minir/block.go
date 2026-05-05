@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/anthonyabeo/obx/src/ir/desugar"
 )
 
 // BasicBlock and Function containers.
@@ -106,11 +108,15 @@ func (b *Block) SortedPreds() []*Block {
 type Function struct {
 	FnName string
 	Params []*Temp
-	Result Type
-	Entry  *Block
-	Exit   *Block
-	Blocks map[int]*Block
-	SymTab SymbolTable // function-local symbol table (params + alloca defs)
+	// ParamKinds mirrors the incoming HIR param kinds (ValueParam / VarParam / InParam)
+	// and is indexed in the same order as Params. Kept minimal so downstream
+	// lowering/passes can inspect parameter semantics.
+	ParamKinds []desugar.ParamKind
+	Result     Type
+	Entry      *Block
+	Exit       *Block
+	Blocks     map[int]*Block
+	SymTab     SymbolTable // function-local symbol table (params + alloca defs)
 }
 
 // GetBlock finds a block by label; returns nil if not found.
