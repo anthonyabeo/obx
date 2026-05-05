@@ -580,3 +580,135 @@ func (s *Server) HandleRun(w http.ResponseWriter, r *http.Request) {
 		"output":      output,
 	})
 }
+
+// ── POST /api/minir ───────────────────────────────────────────────────────────
+
+// HandleMinir runs the full front-end pipeline (parse → sema → desugar →
+// minir.Lower) and returns the textual minir representation of every lowered
+// module.
+//
+// Request body (JSON):
+//
+//	{"source": "<obx source>", "filename": "<basename>", "entry": "<optional>"}
+//
+// Response body (JSON):
+//
+//	{
+//	  "ok": true,
+//	  "modules": [{"name": "Main", "ir": "module Main\n..."}]
+//	}
+func (s *Server) HandleMinir(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"ok": false, "error": "method not allowed"})
+		return
+	}
+
+	var req struct {
+		Source   string `json:"source"`
+		Filename string `json:"filename"`
+		Entry    string `json:"entry"`
+	}
+
+	mb := s.cfg.MaxBodyBytes
+	if mb == 0 {
+		mb = 256 * 1024
+	}
+	ms := s.cfg.MaxSourceBytes
+	if ms == 0 {
+		ms = 200 * 1024
+	}
+	mf := s.cfg.MaxFilenameLen
+	if mf == 0 {
+		mf = 128
+	}
+
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(mb)))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad request: " + err.Error()})
+		return
+	}
+	if req.Filename == "" {
+		req.Filename = "Main.obx"
+	}
+	if len(req.Filename) == 0 || len(req.Filename) > mf || !filenameRE.MatchString(req.Filename) || filepath.Base(req.Filename) != req.Filename {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid filename"})
+		return
+	}
+	if len(req.Source) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "empty source"})
+		return
+	}
+	if len(req.Source) > ms {
+		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]any{"ok": false, "error": "source too large"})
+		return
+	}
+
+	// ── in-memory pipeline ────────────────────────────────────────────────
+	srcMgr := source.NewSourceManager()
+	emitter := diag.ToWriter(formatter.NewJSONFormatter(srcMgr), io.Discard)
+	reporter := diag.NewBufferedReporter(srcMgr, s.cfg.MaxErrors, emitter)
+	ctx := compiler.New(req.Filename, srcMgr, reporter, ast.NewEnv(), 8)
+
+	injectHostPlatformDirectives(ctx)
+
+	obx := ast.NewOberonX()
+	entry := deriveEntryFromFilename(req.Filename)
+	if req.Entry != "" {
+		entry = req.Entry
+	}
+	if err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+
+	if reporter.ErrorCount() > 0 {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":    false,
+			"error": "parse errors — fix diagnostics first",
+		})
+		return
+	}
+
+	sema.NewSema(ctx, obx).Validate()
+
+	userSemaErrors := 0
+	for _, d := range reporter.Diagnostics() {
+		if d.Severity == diag.Error && (d.Range == nil || d.Range.Start.File == req.Filename) {
+			userSemaErrors++
+		}
+	}
+	if userSemaErrors > 0 {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":    false,
+			"error": "type errors — fix diagnostics first",
+		})
+		return
+	}
+
+	// ── lower and emit ────────────────────────────────────────────────────
+	hirProgram := desugar.NewGenerator(obx, ctx).Generate()
+	lowered := minir.Lower(hirProgram)
+
+	type moduleEntry struct {
+		Name string `json:"name"`
+		IR   string `json:"ir"`
+	}
+	modules := make([]moduleEntry, 0, len(lowered.Modules))
+	for _, mod := range lowered.Modules {
+		var sb strings.Builder
+		if _, err := minir.NewEmitter(&sb).EmitModule(mod); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{
+				"ok":    false,
+				"error": "emit failed for module " + mod.Name + ": " + err.Error(),
+			})
+			return
+		}
+		modules = append(modules, moduleEntry{Name: mod.Name, IR: sb.String()})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":      true,
+		"modules": modules,
+	})
+}

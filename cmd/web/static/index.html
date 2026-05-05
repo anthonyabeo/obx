@@ -61,12 +61,17 @@
       </div>
     </div>
 
-    <!-- ── CFG pane ─────────────────────────────── -->
+    <!-- ── CFG / IR pane ─────────────────────────────── -->
     <div class="pane" id="cfgPane">
       <div class="pane-header">
-        <span class="pane-label">control flow graph</span>
+        <span class="pane-label">ir viewer</span>
+        <!-- format toggle: Graph / Text -->
+        <div class="ir-format-toggle" role="group" aria-label="IR format">
+          <button id="irFmtGraph" class="ir-fmt-btn active" title="Show control-flow graph">Graph</button>
+          <button id="irFmtText"  class="ir-fmt-btn"        title="Show textual minir">Text</button>
+        </div>
         <div class="spacer"></div>
-        <div class="cfg-controls">
+        <div class="cfg-controls" id="cfgControls">
           <span class="cfg-hint">scroll&thinsp;·&thinsp;drag&thinsp;·&thinsp;dbl-click to fit</span>
           <button id="fitCfgBtn" class="icon-btn" onclick="" title="Fit to view" aria-label="Fit to view">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
@@ -79,9 +84,15 @@
         </div>
       </div>
       <div class="fn-tabs" id="fnTabs"></div>
+      <!-- Graph view (existing CFG SVG) -->
       <div id="cfgView">
         <div id="cfgInner"></div>
-        <div id="cfgPlaceholder">🔍&nbsp; Press <strong style="color:#4b5563">Check</strong> to see the CFG</div>
+        <div id="cfgPlaceholder">🔍&nbsp; Press <strong style="color:#4b5563">Show CFG</strong> to build</div>
+      </div>
+      <!-- Text view (textual minir) -->
+      <div id="minirView">
+        <div class="fn-tabs" id="minirModTabs"></div>
+        <pre id="minirText" class="minir-text"><span class="minir-placeholder">🔍&nbsp; Switch to <strong>Text</strong> format and press <strong>Show CFG</strong></span></pre>
       </div>
     </div>
   </div><!-- .topRow -->
@@ -117,14 +128,16 @@
       if(el && fn) el.addEventListener('click', fn);
     }
     // Attach handlers — functions (toggleCfg, runProgram, runCheck, clearTerminal,
-    // fitCfg, resetCfg) are defined in /static/js/playground.js and expected to be
-    // available on window.
-    on('cfgBtn', window.toggleCfg);
-    on('runBtn', window.runProgram);
-    on('checkBtn', window.runCheck);
-    on('clearTermBtn', window.clearTerminal);
-    on('fitCfgBtn', window.fitCfg);
+    // fitCfg, resetCfg, setIrFormat) are defined in /static/js/playground.js and
+    // expected to be available on window.
+    on('cfgBtn',      window.toggleCfg);
+    on('runBtn',      window.runProgram);
+    on('checkBtn',    window.runCheck);
+    on('clearTermBtn',window.clearTerminal);
+    on('fitCfgBtn',   window.fitCfg);
     on('resetCfgBtn', window.resetCfg);
+    on('irFmtGraph',  function(){ window.setIrFormat && window.setIrFormat('graph'); });
+    on('irFmtText',   function(){ window.setIrFormat && window.setIrFormat('text'); });
   })();
 </script>
 </body>

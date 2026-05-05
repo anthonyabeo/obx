@@ -28,7 +28,7 @@ func init() {
 	cfgCmd.Flags().StringVarP(&cfgArgs.Path, "path", "p", "", "source root directory (defaults to roots in obx.mod)")
 	cfgCmd.Flags().StringVarP(&cfgArgs.Target, "target", "T", "rv64imafd", "target architecture (used to select the stdlib platform layer)")
 	cfgCmd.Flags().StringVarP(&cfgArgs.Out, "out", "o", "", "output path for CFG; use '-' for stdout when format=dot")
-	cfgCmd.Flags().StringVar(&cfgArgs.Format, "format", "dot", "output format: dot (default), png, or svg")
+	cfgCmd.Flags().StringVar(&cfgArgs.Format, "format", "dot", "output format: dot (default), png, svg, or minir")
 	cfgCmd.Flags().StringVar(&cfgArgs.Fn, "fn", "", "name of function to dump; defaults to module entry or first lowered function")
 	cfgCmd.Flags().StringArrayVarP(&cfgArgs.Defines, "define", "d", nil,
 		"set a compile-time directive constant: NAME (bool true) or NAME=VALUE (bool/int/float)")
@@ -38,9 +38,9 @@ var cfgCmd = &cobra.Command{
 	Use:   "cfg",
 	Short: "generate a control-flow graph (DOT/PNG/SVG) for a lowered function",
 	Long: `Generate a CFG for a lowered function. The command runs parsing and semantic
-analysis, lowers the program to minir, then emits a DOT, PNG, or SVG file for a
-selected function. Use --fn to select a function by name; otherwise the module
-entry or the first lowered function is used.`,
+analysis, lowers the program to minir, then emits a DOT, PNG, SVG, or textual
+minir file for a selected function. Use --fn to select a function by name;
+otherwise the module entry or the first lowered function is used.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		entry := buildArgs.Entry
 		roots := []string{cfgArgs.Path}
@@ -181,11 +181,30 @@ entry or the first lowered function is used.`,
 					os.Exit(1)
 				}
 			}
+		case "minir":
+			// Emit the textual minir representation of the selected function.
+			if cfgArgs.Out == "" || cfgArgs.Out == "-" {
+				if _, err := minir.NewEmitter(os.Stdout).EmitFunction(target); err != nil {
+					fmt.Fprintf(os.Stderr, "cfg: emit minir: %v\n", err)
+					os.Exit(1)
+				}
+			} else {
+				f, err := os.Create(cfgArgs.Out)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "cfg: %v\n", err)
+					os.Exit(1)
+				}
+				defer f.Close()
+				if _, err := minir.NewEmitter(f).EmitFunction(target); err != nil {
+					fmt.Fprintf(os.Stderr, "cfg: emit minir: %v\n", err)
+					os.Exit(1)
+				}
+			}
 		default:
 			fmt.Fprintf(os.Stderr, "cfg: unsupported format %q\n", format)
 			os.Exit(1)
 		}
-		if cfgArgs.Out != "" {
+		if cfgArgs.Out != "" && cfgArgs.Out != "-" {
 			fmt.Fprintf(os.Stderr, "cfg: wrote %s (format=%s)\n", cfgArgs.Out, format)
 		}
 	},

@@ -122,18 +122,31 @@ func (e *Emitter) EmitFunction(fn *Function) (int, error) {
 		return total, err
 	}
 
-	// blocks in ascending ID order
-	ids := make([]int, 0, len(fn.Blocks))
-	for id := range fn.Blocks {
-		ids = append(ids, id)
+	// Emit blocks in reverse-postorder (a natural order for CFGs). If the
+	// function has no entry/graph structure fall back to ascending ID order.
+	ids := fn.ReversePostOrder()
+	if len(ids) == 0 {
+		ids = make([]int, 0, len(fn.Blocks))
+		for id := range fn.Blocks {
+			ids = append(ids, id)
+		}
+		sort.Ints(ids)
 	}
-	sort.Ints(ids)
 
-	for _, id := range ids {
+	for i, id := range ids {
 		n, err = e.EmitBlock(fn.Blocks[id])
 		total += n
 		if err != nil {
 			return total, err
+		}
+		// separate blocks with a blank line for readability (but not after
+		// the last block).
+		if i < len(ids)-1 {
+			n, err = e.write("\n")
+			total += n
+			if err != nil {
+				return total, err
+			}
 		}
 	}
 

@@ -226,3 +226,69 @@ kbd {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2d3148; border-radius: 3px; }
 
+/* ── IR format toggle (Graph / Text pill) ─── */
+.ir-format-toggle {
+  display: flex;
+  background: #0f1117;
+  border: 1px solid #2d3148;
+  border-radius: 5px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ir-fmt-btn {
+  background: transparent;
+  border: none;
+  color: #4b5563;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  padding: 3px 11px;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+  text-transform: uppercase;
+}
+.ir-fmt-btn:hover { color: #94a3b8; background: #1a1d27; }
+.ir-fmt-btn.active { background: #312e81; color: #e0e7ff; }
+.ir-fmt-btn + .ir-fmt-btn { border-left: 1px solid #2d3148; }
+
+/* ── Textual minir view ──────────────────────── */
+#minirView {
+  flex: 1;
+  display: flex;        /* toggled by JS */
+  flex-direction: column;
+  overflow: hidden;
+  gap: 6px;
+}
+
+#minirModTabs {
+  display: flex; flex-wrap: wrap; gap: 4px; flex-shrink: 0;
+}
+
+.minir-text {
+  flex: 1;
+  margin: 0;
+  padding: 10px 12px;
+  background: #141720;
+  border: 1px solid #2d3148;
+  border-radius: 6px;
+  overflow: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  font-size: .82rem;
+  line-height: 1.7;
+  color: #c4b5fd;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.minir-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  color: #374151;
+  font-size: .88rem;
+  font-family: system-ui, -apple-system, sans-serif;
+  user-select: none;
+  pointer-events: none;
+  white-space: normal;
+}

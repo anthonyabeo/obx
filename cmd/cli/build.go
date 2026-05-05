@@ -14,6 +14,7 @@ import (
 	_ "github.com/anthonyabeo/obx/src/codegen/target/arm64" // register arm64-apple-macos + aarch64-apple-darwin
 	_ "github.com/anthonyabeo/obx/src/codegen/target/riscv" // register rv64imafd
 	"github.com/anthonyabeo/obx/src/ir/desugar"
+	"github.com/anthonyabeo/obx/src/ir/minir"
 	"github.com/anthonyabeo/obx/src/ir/obxir"
 	"github.com/anthonyabeo/obx/src/opt"
 	"github.com/anthonyabeo/obx/src/project"
@@ -33,6 +34,10 @@ var buildArgs struct {
 	DisablePasses string
 	Verbose       bool
 	Asm           bool
+
+	// minir text emission
+	EmitMinir bool   // --emit-minir: write textual minir for every module
+	MinirOut  string // --minir-out: directory to write .minir files (defaults to out/)
 }
 
 func init() {
@@ -50,6 +55,10 @@ func init() {
 	buildCmd.Flags().StringVarP(&buildArgs.DisablePasses, "disable-passes", "D", "", "comma-separated optimisation passes to disable")
 	buildCmd.Flags().BoolVarP(&buildArgs.Verbose, "verbose", "V", false, "output detailed optimisation info")
 	buildCmd.Flags().BoolVarP(&buildArgs.Asm, "asm", "S", false, "print assembly to stdout")
+	buildCmd.Flags().BoolVarP(&buildArgs.EmitMinir, "emit-minir", "I", false,
+		"write textual minir for every lowered module to --minir-out (or out/)")
+	buildCmd.Flags().StringVar(&buildArgs.MinirOut, "minir-out", "",
+		"directory to write .minir files when --emit-minir is set (defaults to out/)")
 }
 
 var buildCmd = &cobra.Command{
@@ -153,6 +162,32 @@ precedence over obx.mod values.`,
 		for _, module := range MIRProgram.Modules {
 			for _, function := range module.Funcs {
 				opt.BuildCFG(function)
+			}
+		}
+
+		// ── 5a. Optionally emit textual minir ─────────────────────────────
+		if buildArgs.EmitMinir {
+			minirDir := buildArgs.MinirOut
+			if minirDir == "" {
+				minirDir = filepath.Join(projectDir, "out")
+			}
+			if err := os.MkdirAll(minirDir, 0755); err != nil {
+				log.Printf("build: cannot create minir output dir %s: %v", minirDir, err)
+			} else {
+				lowered := minir.Lower(hirProgram)
+				for _, mod := range lowered.Modules {
+					outPath := filepath.Join(minirDir, mod.Name+".minir")
+					f, err := os.Create(outPath)
+					if err != nil {
+						log.Printf("build: create %s: %v", outPath, err)
+						continue
+					}
+					if _, err := minir.NewEmitter(f).EmitModule(mod); err != nil {
+						log.Printf("build: emit minir for %s: %v", mod.Name, err)
+					}
+					f.Close()
+					fmt.Printf("  minir: wrote %s\n", outPath)
+				}
 			}
 		}
 

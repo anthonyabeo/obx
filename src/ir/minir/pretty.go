@@ -200,8 +200,9 @@ func FormatInstr(ins Instr) string {
 }
 
 // FormatFunction returns a textual representation of fn suitable for
-// debugging/printing. Blocks are printed in ascending ID order.
-// It is a thin wrapper over Emitter.EmitFunction writing into a strings.Builder.
+// debugging/printing. Blocks are printed in reverse-postorder (a natural CFG
+// traversal order). It is a thin wrapper over Emitter.EmitFunction writing
+// into a strings.Builder.
 func FormatFunction(fn *Function) string {
 	var sb strings.Builder
 	_, _ = NewEmitter(&sb).EmitFunction(fn) // strings.Builder never errors

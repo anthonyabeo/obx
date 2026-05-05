@@ -88,6 +88,7 @@ func Start(cfg Config) error {
 	mux.HandleFunc("/static/", s.HandleStatic)
 	mux.HandleFunc("/api/check", s.HandleCheck)
 	mux.HandleFunc("/api/cfg", s.HandleCFG)
+	mux.HandleFunc("/api/minir", s.HandleMinir)
 	mux.HandleFunc("/api/run", s.HandleRun)
 	mux.HandleFunc("/api/version", s.HandleVersion)
 
