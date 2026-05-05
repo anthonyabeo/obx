@@ -218,11 +218,38 @@ func lowerConstant(expr desugar.Expr) *Constant {
 	}
 	switch lit.Kind {
 	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
-		iv, _ := strconv.ParseInt(lit.Value, 10, 64)
-		return NewConst(lit.Value, iv, ty)
+		// Handle hex literals ending with 'H'/'h' (scanner may leave the
+		// original lexeme intact). Convert them to numeric value and store a
+		// canonical decimal textual name so minir prints a normalized form.
+		v := lit.Value
+		var iv int64
+		var err error
+		if strings.HasSuffix(v, "h") || strings.HasSuffix(v, "H") {
+			// strip trailing H and parse as base-16
+			v2 := v[:len(v)-1]
+			iv, err = strconv.ParseInt(v2, 16, 64)
+		} else {
+			iv, err = strconv.ParseInt(v, 10, 64)
+		}
+		if err != nil {
+			// fallback: keep original lexeme as name and try to store raw value
+			return NewConst(lit.Value, lit.Value, ty)
+		}
+		return NewConst(fmt.Sprintf("%d", iv), iv, ty)
 	case token.REAL_LIT, token.LONGREAL_LIT:
-		fv, _ := strconv.ParseFloat(lit.Value, 64)
-		return NewConst(lit.Value, fv, ty)
+		// Normalize exponent letter: allow 'D'/'d' and 'S'/'s' by converting
+		// them to 'E' before parsing with strconv.
+		v := lit.Value
+		norm := strings.ReplaceAll(v, "D", "E")
+		norm = strings.ReplaceAll(norm, "d", "E")
+		norm = strings.ReplaceAll(norm, "S", "E")
+		norm = strings.ReplaceAll(norm, "s", "E")
+		fv, _ := strconv.ParseFloat(norm, 64)
+		// Use a canonical textual representation for the constant name so
+		// textual emitters print a normalized form. Use strconv's shortest
+		// representation that preserves value.
+		name := strconv.FormatFloat(fv, 'g', -1, 64)
+		return NewConst(name, fv, ty)
 	case token.TRUE:
 		return NewConst("true", int64(1), primI1)
 	case token.FALSE:
@@ -394,9 +421,9 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 	l.loopExit = make(map[string]string)
 
 	fn := &Function{
-		FnName: hirFn.FnName(),
-		Result: LowerType(hirFn.Result),
-		Blocks: make(map[int]*Block),
+		FnName:     hirFn.FnName(),
+		Result:     LowerType(hirFn.Result),
+		Blocks:     make(map[int]*Block),
 		ParamKinds: make([]desugar.ParamKind, 0),
 	}
 	l.fn = fn
@@ -942,7 +969,7 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 
 		// Pre-declare temps defined in later blocks (for phi referencing)
 		nextRTTIPtr := NewAnonTemp(Ptr(primI32)) // defined in mismatchBlk
-		nextID := NewAnonTemp(primI64)            // defined in loadNextBlk
+		nextID := NewAnonTemp(primI64)           // defined in loadNextBlk
 
 		// ── start block: phis + compare ─────────────────────────────────────
 		l.switchTo(startBlk)
@@ -1298,7 +1325,7 @@ func (l *Lowerer) lowerISCheck(obj Value, rttiName string) *Temp {
 	// Pre-declare temps that will be defined in later blocks so phi arms can
 	// reference them before their defining blocks are emitted.
 	nextRTTIPtr := NewAnonTemp(Ptr(primI32)) // defined in mismatchBlk
-	nextID := NewAnonTemp(primI64)            // defined in loadNextBlk
+	nextID := NewAnonTemp(primI64)           // defined in loadNextBlk
 
 	// ── start block: phis + compare ─────────────────────────────────────────
 	l.switchTo(startBlk)
@@ -1494,11 +1521,28 @@ func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) Value {
 	}
 	switch lit.Kind {
 	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
-		iv, _ := strconv.ParseInt(lit.Value, 10, 64)
-		return NewConst(lit.Value, iv, ty)
+		v := lit.Value
+		var iv int64
+		var err error
+		if strings.HasSuffix(v, "h") || strings.HasSuffix(v, "H") {
+			v2 := v[:len(v)-1]
+			iv, err = strconv.ParseInt(v2, 16, 64)
+		} else {
+			iv, err = strconv.ParseInt(v, 10, 64)
+		}
+		if err != nil {
+			return NewConst(lit.Value, lit.Value, ty)
+		}
+		return NewConst(fmt.Sprintf("%d", iv), iv, ty)
 	case token.REAL_LIT, token.LONGREAL_LIT:
-		fv, _ := strconv.ParseFloat(lit.Value, 64)
-		return NewConst(lit.Value, fv, ty)
+		v := lit.Value
+		norm := strings.ReplaceAll(v, "D", "E")
+		norm = strings.ReplaceAll(norm, "d", "E")
+		norm = strings.ReplaceAll(norm, "S", "E")
+		norm = strings.ReplaceAll(norm, "s", "E")
+		fv, _ := strconv.ParseFloat(norm, 64)
+		name := strconv.FormatFloat(fv, 'g', -1, 64)
+		return NewConst(name, fv, ty)
 	case token.TRUE:
 		return NewConst("true", int64(1), primI1)
 	case token.FALSE:

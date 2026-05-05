@@ -293,4 +293,3 @@ func (prog *Program) WriteTo(w io.Writer) (int64, error) {
 	n, err := NewEmitter(w).EmitProgram(prog)
 	return int64(n), err
 }
-

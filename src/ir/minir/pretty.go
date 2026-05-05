@@ -253,4 +253,3 @@ func FormatProgram(prog *Program) string {
 func PrintProgram(w io.Writer, prog *Program) (int, error) {
 	return NewEmitter(w).EmitProgram(prog)
 }
-

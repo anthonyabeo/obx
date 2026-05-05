@@ -89,7 +89,13 @@ func canFitInFloat32FromString(fullNum, scaleChar string) bool {
 		return false // out of float32 range
 	}
 
-	val, err := strconv.ParseFloat(fullNum, 64)
+	// Normalize scale letters 'D'/'d' and 'S'/'s' to 'E' so strconv can parse.
+	norm := strings.ReplaceAll(fullNum, "D", "E")
+	norm = strings.ReplaceAll(norm, "d", "E")
+	norm = strings.ReplaceAll(norm, "S", "E")
+	norm = strings.ReplaceAll(norm, "s", "E")
+
+	val, err := strconv.ParseFloat(norm, 64)
 	if err != nil {
 		return false
 	}

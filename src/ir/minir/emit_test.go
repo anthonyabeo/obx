@@ -401,5 +401,3 @@ func TestEmitProgram_File(t *testing.T) {
 	}
 	t.Logf("wrote %d bytes to %s", n64, outPath)
 }
-
-
