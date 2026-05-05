@@ -50,6 +50,37 @@ const (
 	rttiSizeOff    = 32
 )
 
+// rttiPODRecordType returns a RecordType descriptor matching the RTTI POD
+// layout: { ID uint64, Base *i32, VTable *i32, Name *i32, Size uint64 }.
+// Field indices: 0=ID, 1=Base, 2=VTable, 3=Name, 4=Size.
+func rttiPODRecordType() *RecordType {
+	return NewRecordType("", []RecordField{
+		{Name: "ID", Type: primI64, Offset: 0},
+		{Name: "Base", Type: Ptr(primI32), Offset: 8},
+		{Name: "VTable", Type: Ptr(primI32), Offset: 16},
+		{Name: "Name", Type: Ptr(primI32), Offset: 24},
+		{Name: "Size", Type: primI64, Offset: 32},
+	})
+}
+
+// rttiNameForType extracts the RTTI symbol name from a sema type,
+// unwrapping NamedType → RecordType (and optionally PointerType base) if needed.
+func rttiNameForType(ty types.Type) string {
+	switch tt := ty.(type) {
+	case *types.NamedType:
+		if rec, ok := tt.Def.(*types.RecordType); ok && rec.Layout != nil {
+			return rec.Layout.RTTIName
+		}
+	case *types.RecordType:
+		if tt.Layout != nil {
+			return tt.Layout.RTTIName
+		}
+	case *types.PointerType:
+		return rttiNameForType(tt.Base)
+	}
+	return ""
+}
+
 // Lower translates a desugar.Program into a *minir.Program, producing one
 // minir.Module per desugar.Module.
 //
@@ -493,7 +524,7 @@ func (l *Lowerer) lowerStmt(s desugar.Stmt) {
 	case *desugar.CaseStmt:
 		l.lowerCase(st)
 	case *desugar.WithStmt:
-		// TODO: runtime type dispatch (requires vtable support)
+		l.lowerWith(st)
 	}
 }
 
@@ -849,18 +880,8 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 		// ensure a pointer-like temp for passing to the runtime helper
 		obj := l.ensureTemp(subj, Ptr(primI32))
 
-		// Resolve target RTTI symbol name from the sema type (unwrap named types).
-		var rttiName string
-		switch tt := e.Typ.(type) {
-		case *types.NamedType:
-			if rec, ok := tt.Def.(*types.RecordType); ok && rec.Layout != nil {
-				rttiName = rec.Layout.RTTIName
-			}
-		case *types.RecordType:
-			if tt.Layout != nil {
-				rttiName = tt.Layout.RTTIName
-			}
-		}
+		// Resolve target RTTI symbol name using the shared helper.
+		rttiName := rttiNameForType(e.Typ)
 		if rttiName == "" || l.mod == nil {
 			// no runtime layout available — conservatively continue (no-op)
 			return obj
@@ -876,15 +897,10 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 		// Treat obj as an address (pointer-to-object) for the load.
 		obj.IsAddr = true
 		l.emit(&LoadInst{Dst: instRTTIPtr, Addr: obj})
+		instRTTIPtr.IsAddr = true // it points into RTTI memory; mark addressable for GEP
 
-		// Create an RTTI record type to address fields by index and load the ID.
-		rttiRec := NewRecordType("", []RecordField{
-			{Name: "ID", Type: primI64, Offset: 0},
-			{Name: "Base", Type: Ptr(primI32), Offset: 8},
-			{Name: "VTable", Type: Ptr(primI32), Offset: 16},
-			{Name: "Name", Type: Ptr(primI32), Offset: 24},
-			{Name: "Size", Type: primI64, Offset: 32},
-		})
+		// Use the shared RTTI POD record type descriptor.
+		rttiRec := rttiPODRecordType()
 		// GEP to field 0 (ID)
 		idAddr := l.newAddrTemp("rtti.id", rttiRec)
 		l.emit(&GEPInst{Dst: idAddr, Base: instRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
@@ -899,71 +915,77 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 		}
 		targetConst := NewConst(fmt.Sprintf("%d", tid), int64(tid), primI64)
 
-		// Prepare basic blocks for loop: check, load-base, pass, fail.
+		// Prepare basic blocks: check-loop, mismatch, load-next-id, pass, fail.
 		startLabel := l.newLabel("tg.check")
 		passLabel := l.newLabel("tg.pass")
 		failLabel := l.newLabel("tg.fail")
-		loadBaseLabel := l.newLabel("tg.loadbase")
+		mismatchLabel := l.newLabel("tg.mismatch")
+		loadNextLabel := l.newLabel("tg.loadnext")
 
 		// Jump into the check block
 		j := &JumpInst{Target: startLabel}
 		l.emit(j)
 		l.curBlock.Term = j
 
-		// Create start/check block
+		// Allocate all blocks up-front
 		startBlk := l.newBlock(startLabel)
 		l.fn.Blocks[startBlk.ID] = startBlk
-
-		// We'll need phi values for instID and instRTTIPtr; create phi temps
-		phiID := NewAnonTemp(primI64)
-		phiPtr := NewAnonTemp(Ptr(primI32))
-
-		// Create the block we'll jump from when loading base so phi arms can reference it
-		loadBaseBlk := l.newBlock(loadBaseLabel)
-		l.fn.Blocks[loadBaseBlk.ID] = loadBaseBlk
-
-		// Create fail block (halts)
+		mismatchBlk := l.newBlock(mismatchLabel)
+		l.fn.Blocks[mismatchBlk.ID] = mismatchBlk
+		loadNextBlk := l.newBlock(loadNextLabel)
+		l.fn.Blocks[loadNextBlk.ID] = loadNextBlk
 		failBlk := l.newBlock(failLabel)
 		l.fn.Blocks[failBlk.ID] = failBlk
 
-		// Capture predecessor label (the block that emitted the jump)
+		// Capture predecessor label before switching away
 		prevLabel := l.curBlock.Label
 
-		// switch to start block to emit phis and comparisons
-		l.switchTo(startBlk)
-		// Phi arms: from prevLabel (initial instID/instRTTIPtr) and from loadBaseBlk
-		// We'll create temps for base values that will be defined in loadBaseBlk.
-		basePtrTemp := NewAnonTemp(Ptr(primI32))
-		baseIDTemp := NewAnonTemp(primI64)
-		l.emit(&PhiInst{Dst: phiPtr, Args: []PhiArm{{BlockLabel: prevLabel, Val: instRTTIPtr}, {BlockLabel: loadBaseBlk.Label, Val: basePtrTemp}}})
-		l.emit(&PhiInst{Dst: phiID, Args: []PhiArm{{BlockLabel: prevLabel, Val: instID}, {BlockLabel: loadBaseBlk.Label, Val: baseIDTemp}}})
+		// Pre-declare temps defined in later blocks (for phi referencing)
+		nextRTTIPtr := NewAnonTemp(Ptr(primI32)) // defined in mismatchBlk
+		nextID := NewAnonTemp(primI64)            // defined in loadNextBlk
 
-		// Compare phiID == targetConst
+		// ── start block: phis + compare ─────────────────────────────────────
+		l.switchTo(startBlk)
+		phiID := NewAnonTemp(primI64)
+		phiPtr := NewAnonTemp(Ptr(primI32))
+		phiPtr.IsAddr = true // mark addressable so it can be used as GEP base in mismatch
+		l.emit(&PhiInst{Dst: phiPtr, Args: []PhiArm{
+			{BlockLabel: prevLabel, Val: instRTTIPtr},
+			{BlockLabel: loadNextLabel, Val: nextRTTIPtr},
+		}})
+		l.emit(&PhiInst{Dst: phiID, Args: []PhiArm{
+			{BlockLabel: prevLabel, Val: instID},
+			{BlockLabel: loadNextLabel, Val: nextID},
+		}})
 		cmp := NewAnonTemp(primI1)
 		l.emit(&ICmpInst{Dst: cmp, Pred: "eq", Left: phiID, Right: targetConst})
-		cbr := &CondBrInst{Cond: cmp, TrueLabel: passLabel, FalseLabel: loadBaseLabel}
+		cbr := &CondBrInst{Cond: cmp, TrueLabel: passLabel, FalseLabel: mismatchLabel}
 		l.emit(cbr)
 		l.curBlock.Term = cbr
 
-		// load-base block: load base RTTI pointer and its ID, then jump back to check
-		l.switchTo(loadBaseBlk)
-		// load base ptr from phiPtr (field index 1)
+		// ── mismatch block: load base ptr, check null ────────────────────────
+		l.switchTo(mismatchBlk)
 		baseAddr := l.newAddrTemp("rtti.base", rttiRec)
 		l.emit(&GEPInst{Dst: baseAddr, Base: phiPtr, ElemType: rttiRec, Offsets: []int{1}})
-		l.emit(&LoadInst{Dst: basePtrTemp, Addr: baseAddr})
-		// if basePtr == 0 -> fail
+		l.emit(&LoadInst{Dst: nextRTTIPtr, Addr: baseAddr})
 		zeroPtr := NewConst("0", int64(0), Ptr(primI32))
 		isNull := NewAnonTemp(primI1)
-		l.emit(&ICmpInst{Dst: isNull, Pred: "eq", Left: basePtrTemp, Right: zeroPtr})
-		// load base ID (so phi can receive it)
-		baseIDAddr := l.newAddrTemp("rtti.id", rttiRec)
-		l.emit(&GEPInst{Dst: baseIDAddr, Base: basePtrTemp, ElemType: rttiRec, Offsets: []int{0}})
-		l.emit(&LoadInst{Dst: baseIDTemp, Addr: baseIDAddr})
-		brNull := &CondBrInst{Cond: isNull, TrueLabel: failLabel, FalseLabel: startLabel}
+		l.emit(&ICmpInst{Dst: isNull, Pred: "eq", Left: nextRTTIPtr, Right: zeroPtr})
+		brNull := &CondBrInst{Cond: isNull, TrueLabel: failLabel, FalseLabel: loadNextLabel}
 		l.emit(brNull)
 		l.curBlock.Term = brNull
 
-		// fail block: emit Halt
+		// ── loadNext block: load base ID, jump back to check ────────────────
+		l.switchTo(loadNextBlk)
+		nextRTTIPtr.IsAddr = true // mark addressable for GEP in this block
+		baseIDAddr := l.newAddrTemp("rtti.id2", rttiRec)
+		l.emit(&GEPInst{Dst: baseIDAddr, Base: nextRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
+		l.emit(&LoadInst{Dst: nextID, Addr: baseIDAddr})
+		jBack := &JumpInst{Target: startLabel}
+		l.emit(jBack)
+		l.curBlock.Term = jBack
+
+		// ── fail block: emit Halt ────────────────────────────────────────────
 		l.switchTo(failBlk)
 		halt := &HaltInst{Code: NewConst("1", int64(1), primI32)}
 		l.emit(halt)
@@ -973,7 +995,7 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 			l.fn.Exit.AddPred(failBlk)
 		}
 
-		// pass block
+		// ── pass block: continue ─────────────────────────────────────────────
 		passBlk := l.newBlock(passLabel)
 		l.fn.Blocks[passBlk.ID] = passBlk
 		l.switchTo(passBlk)
@@ -1066,6 +1088,14 @@ func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *Temp {
 }
 
 func (l *Lowerer) lowerBinary(e *desugar.BinaryExpr) Value {
+	// IS must be handled before lowering both operands as values because the
+	// right-hand side is a type denotation (TypeRef), not a runtime value.
+	if e.Op == token.IS {
+		left := l.lowerValue(e.Left)
+		rttiName := rttiNameForType(e.Right.Type())
+		return l.lowerISCheck(left, rttiName)
+	}
+
 	left := l.lowerValue(e.Left)
 	right := l.lowerValue(e.Right)
 	ty := LowerType(e.SemaType)
@@ -1129,6 +1159,235 @@ func (l *Lowerer) lowerUnary(e *desugar.UnaryExpr) Value {
 	default:
 		return operand
 	}
+}
+
+// lowerISCheck emits an inline RTTI-based subtype-check for `obj IS T`, where
+// rttiName is the RTTI symbol of the target type T.  It returns a *Temp of
+// type i1 (true = obj's dynamic type IS T or an extension of T, false = not).
+// After returning, l.curBlock is the merge/continuation block that the caller
+// can continue emitting into.  Returns a conservative i1 false constant temp
+// when RTTI metadata is unavailable.
+func (l *Lowerer) lowerISCheck(obj Value, rttiName string) *Temp {
+	falseTemp := func() *Temp {
+		dst := NewAnonTemp(primI1)
+		l.emit(&BinaryInst{Dst: dst, Op: "xor",
+			Left:  NewConst("false", int64(0), primI1),
+			Right: NewConst("false", int64(0), primI1),
+		})
+		return dst
+	}
+	if rttiName == "" || l.mod == nil || l.fn == nil {
+		return falseTemp()
+	}
+	if _, ok := l.mod.SymTab.Lookup(rttiName); !ok {
+		return falseTemp()
+	}
+	tid := rttiID[rttiName]
+	if tid == 0 {
+		return falseTemp()
+	}
+	targetConst := NewConst(fmt.Sprintf("%d", tid), int64(tid), primI64)
+
+	rttiRec := rttiPODRecordType()
+
+	// Load the RTTI pointer from the object header (vptr at offset 0).
+	objTemp := l.ensureTemp(obj, Ptr(primI32))
+	objTemp.IsAddr = true
+	instRTTIPtr := NewAnonTemp(Ptr(primI32))
+	l.emit(&LoadInst{Dst: instRTTIPtr, Addr: objTemp})
+	instRTTIPtr.IsAddr = true // points into RTTI memory
+
+	// Load initial ID field.
+	idAddr0 := l.newAddrTemp("is.id", rttiRec)
+	l.emit(&GEPInst{Dst: idAddr0, Base: instRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
+	instID := NewAnonTemp(primI64)
+	l.emit(&LoadInst{Dst: instID, Addr: idAddr0})
+
+	// Labels.
+	preludeLabel := l.curBlock.Label
+	startLabel := l.newLabel("is.check")
+	mismatchLabel := l.newLabel("is.mismatch")
+	loadNextLabel := l.newLabel("is.loadnext")
+	foundLabel := l.newLabel("is.found")
+	notFoundLabel := l.newLabel("is.nofound")
+	mergeLabel := l.newLabel("is.merge")
+
+	// Jump from prelude into the loop header.
+	jPre := &JumpInst{Target: startLabel}
+	l.emit(jPre)
+	l.curBlock.Term = jPre
+
+	// Allocate all blocks up-front.
+	startBlk := l.newBlock(startLabel)
+	l.fn.Blocks[startBlk.ID] = startBlk
+	mismatchBlk := l.newBlock(mismatchLabel)
+	l.fn.Blocks[mismatchBlk.ID] = mismatchBlk
+	loadNextBlk := l.newBlock(loadNextLabel)
+	l.fn.Blocks[loadNextBlk.ID] = loadNextBlk
+	foundBlk := l.newBlock(foundLabel)
+	l.fn.Blocks[foundBlk.ID] = foundBlk
+	notFoundBlk := l.newBlock(notFoundLabel)
+	l.fn.Blocks[notFoundBlk.ID] = notFoundBlk
+	mergeBlk := l.newBlock(mergeLabel)
+	l.fn.Blocks[mergeBlk.ID] = mergeBlk
+
+	// Pre-declare temps that will be defined in later blocks so phi arms can
+	// reference them before their defining blocks are emitted.
+	nextRTTIPtr := NewAnonTemp(Ptr(primI32)) // defined in mismatchBlk
+	nextID := NewAnonTemp(primI64)            // defined in loadNextBlk
+
+	// ── start block: phis + compare ─────────────────────────────────────────
+	l.switchTo(startBlk)
+	phiPtr := NewAnonTemp(Ptr(primI32))
+	phiPtr.IsAddr = true // will be used as GEP base in mismatch
+	phiID := NewAnonTemp(primI64)
+	l.emit(&PhiInst{Dst: phiPtr, Args: []PhiArm{
+		{BlockLabel: preludeLabel, Val: instRTTIPtr},
+		{BlockLabel: loadNextLabel, Val: nextRTTIPtr},
+	}})
+	l.emit(&PhiInst{Dst: phiID, Args: []PhiArm{
+		{BlockLabel: preludeLabel, Val: instID},
+		{BlockLabel: loadNextLabel, Val: nextID},
+	}})
+	cmp := NewAnonTemp(primI1)
+	l.emit(&ICmpInst{Dst: cmp, Pred: "eq", Left: phiID, Right: targetConst})
+	cbrStart := &CondBrInst{Cond: cmp, TrueLabel: foundLabel, FalseLabel: mismatchLabel}
+	l.emit(cbrStart)
+	l.curBlock.Term = cbrStart
+
+	// ── mismatch block: load base ptr, null-check ───────────────────────────
+	l.switchTo(mismatchBlk)
+	baseAddr := l.newAddrTemp("is.base", rttiRec)
+	l.emit(&GEPInst{Dst: baseAddr, Base: phiPtr, ElemType: rttiRec, Offsets: []int{1}})
+	l.emit(&LoadInst{Dst: nextRTTIPtr, Addr: baseAddr})
+	zeroPtr := NewConst("0", int64(0), Ptr(primI32))
+	isNull := NewAnonTemp(primI1)
+	l.emit(&ICmpInst{Dst: isNull, Pred: "eq", Left: nextRTTIPtr, Right: zeroPtr})
+	cbrMismatch := &CondBrInst{Cond: isNull, TrueLabel: notFoundLabel, FalseLabel: loadNextLabel}
+	l.emit(cbrMismatch)
+	l.curBlock.Term = cbrMismatch
+
+	// ── loadNext block: load next ID, jump back to check ───────────────────
+	l.switchTo(loadNextBlk)
+	nextRTTIPtr.IsAddr = true // mark addressable for GEP
+	baseIDAddr := l.newAddrTemp("is.id2", rttiRec)
+	l.emit(&GEPInst{Dst: baseIDAddr, Base: nextRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
+	l.emit(&LoadInst{Dst: nextID, Addr: baseIDAddr})
+	jBack := &JumpInst{Target: startLabel}
+	l.emit(jBack)
+	l.curBlock.Term = jBack
+
+	// ── found block: jump to merge ──────────────────────────────────────────
+	l.switchTo(foundBlk)
+	jFound := &JumpInst{Target: mergeLabel}
+	l.emit(jFound)
+	foundBlk.Term = jFound
+
+	// ── notFound block: jump to merge ───────────────────────────────────────
+	l.switchTo(notFoundBlk)
+	jNotFound := &JumpInst{Target: mergeLabel}
+	l.emit(jNotFound)
+	notFoundBlk.Term = jNotFound
+
+	// ── merge block: phi boolean result ─────────────────────────────────────
+	l.switchTo(mergeBlk)
+	result := NewAnonTemp(primI1)
+	l.emit(&PhiInst{Dst: result, Args: []PhiArm{
+		{BlockLabel: foundLabel, Val: NewConst("true", int64(1), primI1)},
+		{BlockLabel: notFoundLabel, Val: NewConst("false", int64(0), primI1)},
+	}})
+	// l.curBlock is now mergeBlk; caller continues here.
+	return result
+}
+
+// lowerWith lowers a WITH statement performing runtime type dispatch:
+//
+//	WITH v IS T1 DO body1
+//	   | v IS T2 DO body2
+//	   ...
+//	   ELSE elseBody
+//	END
+//
+// Each guard emits an inline IS check (RTTI chain walk).  A matched guard
+// executes its body and then jumps to the common end block; an unmatched guard
+// continues to the next check.  The optional ELSE clause handles all failures.
+func (l *Lowerer) lowerWith(st *desugar.WithStmt) {
+	if len(st.Guards) == 0 {
+		// No guards: lower the else body (if any) inline and return.
+		if st.Else != nil {
+			l.lowerStmts(st.Else)
+		}
+		return
+	}
+
+	endLabel := l.newLabel("with.end")
+	endBlk := l.newBlock(endLabel)
+	l.fn.Blocks[endBlk.ID] = endBlk
+
+	// Allocate body-block labels up-front so the outer check chain can reference them.
+	bodyLabels := make([]string, len(st.Guards))
+	for i := range st.Guards {
+		bodyLabels[i] = l.newLabel(fmt.Sprintf("with.body%d", i))
+	}
+
+	for i, guard := range st.Guards {
+		// ── IS check ──────────────────────────────────────────────────────
+		obj := l.lowerValue(guard.Expr)
+		rttiName := rttiNameForType(guard.Type.Type())
+
+		// Determine the label for the *next* check (or else/end) when IS fails.
+		var nextLabel string
+		if i+1 < len(st.Guards) {
+			nextLabel = l.newLabel(fmt.Sprintf("with.check%d", i+1))
+		} else if st.Else != nil && len(st.Else.Stmts) > 0 {
+			nextLabel = l.newLabel("with.else")
+		} else {
+			nextLabel = endLabel
+		}
+
+		// Emit the inline boolean IS check; we land in the merge block.
+		cond := l.lowerISCheck(obj, rttiName)
+		// If RTTI unavailable, cond is a false const-materialized temp; the
+		// body will be unreachable.  That is the conservative safe choice.
+
+		// Branch: IS matched → body, IS failed → next check / else / end.
+		cbr := &CondBrInst{Cond: cond, TrueLabel: bodyLabels[i], FalseLabel: nextLabel}
+		l.emit(cbr)
+		l.curBlock.Term = cbr
+
+		// ── body block ────────────────────────────────────────────────────
+		bodyBlk := l.newBlock(bodyLabels[i])
+		l.fn.Blocks[bodyBlk.ID] = bodyBlk
+		l.switchTo(bodyBlk)
+		l.lowerStmts(guard.Body)
+		// Fall through to end unless already terminated.
+		if l.curBlock != nil && l.curBlock.Term == nil {
+			jEnd := &JumpInst{Target: endLabel}
+			l.emit(jEnd)
+			l.curBlock.Term = jEnd
+		}
+
+		// ── next check block (if needed) ──────────────────────────────────
+		if i+1 < len(st.Guards) {
+			nextBlk := l.newBlock(nextLabel)
+			l.fn.Blocks[nextBlk.ID] = nextBlk
+			l.switchTo(nextBlk)
+		} else if st.Else != nil && len(st.Else.Stmts) > 0 {
+			elseBlk := l.newBlock(nextLabel)
+			l.fn.Blocks[elseBlk.ID] = elseBlk
+			l.switchTo(elseBlk)
+			l.lowerStmts(st.Else)
+			if l.curBlock != nil && l.curBlock.Term == nil {
+				jEnd := &JumpInst{Target: endLabel}
+				l.emit(jEnd)
+				l.curBlock.Term = jEnd
+			}
+		}
+		// If nextLabel == endLabel we fall out of the loop and land in endBlk.
+	}
+
+	// Switch to the common end block; caller continues here.
+	l.switchTo(endBlk)
 }
 
 func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
