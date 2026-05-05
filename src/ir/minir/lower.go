@@ -1006,9 +1006,9 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 		// the module name (used by LDMOD/LDCMD).
 		return NewConst(e.Name, e.Name, Ptr(primI32))
 	case *desugar.SetExpr:
-		return NewConst("0", int64(0), primI32)
+		return l.lowerSetExpr(e)
 	case *desugar.RangeExpr:
-		return NewConst("0", int64(0), primI32)
+		return l.lowerRangeExpr(e)
 	default:
 		return NewConst("0", int64(0), primI32)
 	}
@@ -1159,6 +1159,70 @@ func (l *Lowerer) lowerUnary(e *desugar.UnaryExpr) Value {
 	default:
 		return operand
 	}
+}
+
+// lowerSetExpr materializes a SET literal `{e1, e2, e3..n}` as a 32-bit
+// bitmask.  Each singleton element contributes bit (1 << elem); each
+// RangeExpr element contributes a contiguous run of bits.  The result is
+// an i32 *Temp (or a zero *Constant when the set is empty).
+func (l *Lowerer) lowerSetExpr(s *desugar.SetExpr) Value {
+	if len(s.Elems) == 0 {
+		return NewConst("0", int64(0), primI32)
+	}
+	var acc Value = NewConst("0", int64(0), primI32)
+	for _, elem := range s.Elems {
+		var mask Value
+		if re, ok := elem.(*desugar.RangeExpr); ok {
+			mask = l.lowerRangeExpr(re)
+		} else {
+			// singleton: mask = 1 << elem
+			idx := l.lowerValue(elem)
+			one := NewConst("1", int64(1), primI32)
+			shifted := NewAnonTemp(primI32)
+			l.emit(&BinaryInst{Dst: shifted, Op: "shl", Left: one, Right: idx})
+			mask = shifted
+		}
+		newAcc := NewAnonTemp(primI32)
+		l.emit(&BinaryInst{Dst: newAcc, Op: "or", Left: acc, Right: mask})
+		acc = newAcc
+	}
+	return acc
+}
+
+// lowerRangeExpr computes the bitmask for a range [low..high] in a set
+// literal so that bits low, low+1, …, high are all set.
+//
+// Algorithm (matching the obxir lowering):
+//
+//	length = (high + 1) - low          // number of bits to set
+//	ones   = (1 << length) - 1         // a run of `length` consecutive 1-bits
+//	mask   = ones << low               // shift the run to start at bit `low`
+func (l *Lowerer) lowerRangeExpr(e *desugar.RangeExpr) Value {
+	low := l.lowerValue(e.Low)
+	var high Value
+	if e.High != nil {
+		high = l.lowerValue(e.High)
+	} else {
+		high = low
+	}
+	one := NewConst("1", int64(1), primI32)
+
+	// length = (high + 1) - low
+	highPlusOne := NewAnonTemp(primI32)
+	l.emit(&BinaryInst{Dst: highPlusOne, Op: "add", Left: high, Right: one})
+	length := NewAnonTemp(primI32)
+	l.emit(&BinaryInst{Dst: length, Op: "sub", Left: highPlusOne, Right: low})
+
+	// ones = (1 << length) - 1
+	shifted := NewAnonTemp(primI32)
+	l.emit(&BinaryInst{Dst: shifted, Op: "shl", Left: one, Right: length})
+	ones := NewAnonTemp(primI32)
+	l.emit(&BinaryInst{Dst: ones, Op: "sub", Left: shifted, Right: one})
+
+	// mask = ones << low
+	mask := NewAnonTemp(primI32)
+	l.emit(&BinaryInst{Dst: mask, Op: "shl", Left: ones, Right: low})
+	return mask
 }
 
 // lowerISCheck emits an inline RTTI-based subtype-check for `obj IS T`, where
