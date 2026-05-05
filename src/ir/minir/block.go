@@ -24,15 +24,93 @@ type Block struct {
 	SuccOrder []int
 }
 
+// AddSucc links s as a successor of b (and records ordering). It does not
+// update the corresponding pred on s; callers should maintain both sides.
+func (b *Block) AddSucc(s *Block) {
+	if b.Succs == nil {
+		b.Succs = make(map[int]*Block)
+	}
+	if _, ok := b.Succs[s.ID]; ok {
+		return
+	}
+	b.Succs[s.ID] = s
+	b.SuccOrder = append(b.SuccOrder, s.ID)
+}
+
+// AddPred links p as a predecessor of b (and records ordering). It does not
+// update the corresponding succ on p; callers should maintain both sides.
+func (b *Block) AddPred(p *Block) {
+	if b.Preds == nil {
+		b.Preds = make(map[int]*Block)
+	}
+	if _, ok := b.Preds[p.ID]; ok {
+		return
+	}
+	b.Preds[p.ID] = p
+	b.PredOrder = append(b.PredOrder, p.ID)
+}
+
+// SortedSuccs returns successors in deterministic order: if SuccOrder is
+// populated it is used; otherwise the map keys are sorted and returned.
+func (b *Block) SortedSuccs() []*Block {
+	var out []*Block
+	if len(b.SuccOrder) > 0 {
+		for _, id := range b.SuccOrder {
+			if s, ok := b.Succs[id]; ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	// fallback: gather keys and sort
+	ids := make([]int, 0, len(b.Succs))
+	for id := range b.Succs {
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	sort.Ints(ids)
+	for _, id := range ids {
+		out = append(out, b.Succs[id])
+	}
+	return out
+}
+
+// SortedPreds similar to SortedSuccs.
+func (b *Block) SortedPreds() []*Block {
+	var out []*Block
+	if len(b.PredOrder) > 0 {
+		for _, id := range b.PredOrder {
+			if p, ok := b.Preds[id]; ok {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+	ids := make([]int, 0, len(b.Preds))
+	for id := range b.Preds {
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	sort.Ints(ids)
+	for _, id := range ids {
+		out = append(out, b.Preds[id])
+	}
+	return out
+}
+
 // Function is a collection of blocks with an entry block and signature.
 type Function struct {
-	FnName     string
-	Params     []*Temp
-	Result     Type
-	Entry      *Block
-	Exit       *Block
-	Blocks     map[int]*Block
-	SymTab     SymbolTable // function-local symbol table (params + alloca defs)
+	FnName string
+	Params []*Temp
+	Result Type
+	Entry  *Block
+	Exit   *Block
+	Blocks map[int]*Block
+	SymTab SymbolTable // function-local symbol table (params + alloca defs)
 }
 
 // GetBlock finds a block by label; returns nil if not found.
@@ -118,7 +196,7 @@ func (f *Function) SortedBlocks() []*Block {
 //	join   – amber  (#2d2507 / #f59e0b / #fef3c7)   (≥2 predecessors)
 //	branch – blue   (#0f1e3a / #60a5fa / #dbeafe)   (≥2 successors)
 //	normal – slate  (#1e2234 / #64748b / #e2e8f0)
-func (fn *Function) OutputDOT() string {
+func (f *Function) OutputDOT() string {
 	var sb strings.Builder
 
 	// ── Graph-level styling ───────────────────────────────────────────────
@@ -131,9 +209,9 @@ func (fn *Function) OutputDOT() string {
 	type style struct{ fill, border, font string }
 	blockStyle := func(b *Block) style {
 		switch {
-		case fn.Entry != nil && b.ID == fn.Entry.ID:
+		case f.Entry != nil && b.ID == f.Entry.ID:
 			return style{"#1a3a27", "#4ade80", "#bbf7d0"} // entry – green
-		case fn.Exit != nil && b.ID == fn.Exit.ID:
+		case f.Exit != nil && b.ID == f.Exit.ID:
 			return style{"#3a1a1a", "#ef4444", "#fecaca"} // exit  – red
 		case len(b.Preds) >= 2:
 			return style{"#2d2507", "#f59e0b", "#fef3c7"} // join  – amber
@@ -151,7 +229,7 @@ func (fn *Function) OutputDOT() string {
 	// left-aligned line.  The entire content is wrapped in an explicit
 	// <FONT COLOR="…"> tag because some renderers do not propagate the
 	// node-level fontcolor to unstyled text that follows a </B> close.
-	for _, b := range fn.SortedBlocks() {
+	for _, b := range f.SortedBlocks() {
 		s := blockStyle(b)
 
 		var lbl strings.Builder
@@ -174,12 +252,12 @@ func (fn *Function) OutputDOT() string {
 	sb.WriteString("\n")
 
 	// ── Edges ─────────────────────────────────────────────────────────────
-	for _, b := range fn.SortedBlocks() {
+	for _, b := range f.SortedBlocks() {
 		var cond *CondBrInst
 		if b.Term != nil {
 			cond, _ = b.Term.(*CondBrInst)
 		}
-		isExit := fn.Exit != nil && b.ID == fn.Exit.ID
+		isExit := f.Exit != nil && b.ID == f.Exit.ID
 
 		// compute deterministic iteration order for successors
 		succs := b.SortedSuccs()
@@ -201,7 +279,7 @@ func (fn *Function) OutputDOT() string {
 			// simple back-edge heuristic: successor appears earlier in DFS order
 			// than the current block.
 			dfsIdx := map[int]int{}
-			order := fn.DFSOrder()
+			order := f.DFSOrder()
 			for i, id := range order {
 				dfsIdx[id] = i
 			}
@@ -236,82 +314,4 @@ type Module struct {
 // at the level of the minir IR.
 type Program struct {
 	Modules []*Module
-}
-
-// AddSucc links s as a successor of b (and records ordering). It does not
-// update the corresponding pred on s; callers should maintain both sides.
-func (b *Block) AddSucc(s *Block) {
-	if b.Succs == nil {
-		b.Succs = make(map[int]*Block)
-	}
-	if _, ok := b.Succs[s.ID]; ok {
-		return
-	}
-	b.Succs[s.ID] = s
-	b.SuccOrder = append(b.SuccOrder, s.ID)
-}
-
-// AddPred links p as a predecessor of b (and records ordering). It does not
-// update the corresponding succ on p; callers should maintain both sides.
-func (b *Block) AddPred(p *Block) {
-	if b.Preds == nil {
-		b.Preds = make(map[int]*Block)
-	}
-	if _, ok := b.Preds[p.ID]; ok {
-		return
-	}
-	b.Preds[p.ID] = p
-	b.PredOrder = append(b.PredOrder, p.ID)
-}
-
-// SortedSuccs returns successors in deterministic order: if SuccOrder is
-// populated it is used; otherwise the map keys are sorted and returned.
-func (b *Block) SortedSuccs() []*Block {
-	var out []*Block
-	if len(b.SuccOrder) > 0 {
-		for _, id := range b.SuccOrder {
-			if s, ok := b.Succs[id]; ok {
-				out = append(out, s)
-			}
-		}
-		return out
-	}
-	// fallback: gather keys and sort
-	ids := make([]int, 0, len(b.Succs))
-	for id := range b.Succs {
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	sort.Ints(ids)
-	for _, id := range ids {
-		out = append(out, b.Succs[id])
-	}
-	return out
-}
-
-// SortedPreds similar to SortedSuccs.
-func (b *Block) SortedPreds() []*Block {
-	var out []*Block
-	if len(b.PredOrder) > 0 {
-		for _, id := range b.PredOrder {
-			if p, ok := b.Preds[id]; ok {
-				out = append(out, p)
-			}
-		}
-		return out
-	}
-	ids := make([]int, 0, len(b.Preds))
-	for id := range b.Preds {
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	sort.Ints(ids)
-	for _, id := range ids {
-		out = append(out, b.Preds[id])
-	}
-	return out
 }

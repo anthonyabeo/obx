@@ -27,6 +27,29 @@ type Lowerer struct {
 	loopExit map[string]string // loop label → exit-block label; "" = innermost loop
 }
 
+// currentModule is a package-level hook used by LowerType to register
+// module-scoped constants (vtable arrays, RTTI PODs) while lowering a
+// particular module. It is set by Lower() for the module currently being
+// processed and cleared afterward.
+var currentModule *Module
+
+// RTTI ID assignment state
+var (
+	nextRTTIID uint64 = 1
+	rttiID            = map[string]uint64{}
+)
+
+// Offsets (in bytes) within the RTTI POD for inline loads. We choose a
+// stable layout: ID(uint64) at offset 0, Base pointer at offset 8, VTable
+// pointer at offset 16, Name pointer at offset 24, Size(uint64) at offset 32.
+const (
+	rttiIDOff      = 0
+	rttiBasePtrOff = 8
+	rttiVTableOff  = 16
+	rttiNameOff    = 24
+	rttiSizeOff    = 32
+)
+
 // Lower translates a desugar.Program into a *minir.Program, producing one
 // minir.Module per desugar.Module.
 //
@@ -47,6 +70,8 @@ func Lower(prog *desugar.Program) *Program {
 	for _, hirMod := range prog.Modules {
 		mod := &Module{Name: hirMod.Name}
 		l.mod = mod
+		// expose module to LowerType so it can emit module-level constants
+		currentModule = mod
 
 		// ── pass 1: module-scope declarations ──────────────────────────
 		for _, decl := range hirMod.Decls {
@@ -72,6 +97,8 @@ func Lower(prog *desugar.Program) *Program {
 		}
 
 		outProg.Modules = append(outProg.Modules, mod)
+		// finished lowering this module
+		currentModule = nil
 	}
 	return outProg
 }
@@ -237,7 +264,73 @@ func LowerType(ty types.Type) Type {
 				offset += 4
 			}
 		}
-		return NewRecordType("", fields)
+		// Construct record type
+		rec := NewRecordType("", fields)
+
+		// If a runtime layout is available and a current module is being
+		// lowered, emit module-level vtable and RTTI constants so downstream
+		// codegen can place them in .rodata. We keep this in minir rather than
+		// obxir to avoid changing many call sites.
+		if t.Layout != nil && currentModule != nil {
+			// VTable: emit as a uint32 array constant
+			if t.Layout.VTableName != "" {
+				vtabLen := len(t.Layout.VTable)
+				vtabTyp := NewArrayType(vtabLen, primI32)
+				vals := make([]uint32, 0, vtabLen)
+				for _, ms := range t.Layout.VTable {
+					vals = append(vals, uint32(ms.FuncIndex))
+				}
+				vtabConst := NewConst(t.Layout.VTableName, vals, vtabTyp)
+				gv := &GlobalConst{Name: t.Layout.VTableName, Ty: vtabTyp, Init: vtabConst, Linkage: InternalLinkage}
+				currentModule.Constants = append(currentModule.Constants, gv)
+				_ = currentModule.SymTab.Define(t.Layout.VTableName, gv.Ref())
+			}
+
+			// RTTI: emit a name string and an extended RTTI POD
+			if t.Layout.RTTIName != "" {
+				// name symbol
+				nameSym := t.Layout.RTTIName + "_name"
+				nameConst := NewConst(nameSym, t.String(), NewArrayType(len(t.String())+1, primI32))
+				nameGV := &GlobalConst{Name: nameSym, Ty: nameConst.Ty, Init: nameConst, Linkage: PrivateLinkage}
+				currentModule.Constants = append(currentModule.Constants, nameGV)
+				_ = currentModule.SymTab.Define(nameSym, nameGV.Ref())
+
+				// Assign a stable RTTI numeric ID for this type.
+				id := rttiID[t.Layout.RTTIName]
+				if id == 0 {
+					id = nextRTTIID
+					nextRTTIID++
+					rttiID[t.Layout.RTTIName] = id
+				}
+
+				// Base RTTI symbol name (may be empty)
+				baseSym := ""
+				if t.Base != nil && t.Base.Layout != nil {
+					baseSym = t.Base.Layout.RTTIName
+				}
+
+				// Extended RTTI POD (ID, BasePtr, VTableName, NameSym, Size).
+				rttiVal := struct {
+					ID     uint64
+					Base   string
+					VTable string
+					Name   string
+					Size   uint64
+				}{
+					ID:     id,
+					Base:   baseSym,
+					VTable: t.Layout.VTableName,
+					Name:   nameSym,
+					Size:   uint64(t.Layout.Size),
+				}
+				rttiConst := NewConst(t.Layout.RTTIName, rttiVal, Ptr(primI32))
+				rttiGV := &GlobalConst{Name: t.Layout.RTTIName, Ty: Ptr(primI32), Init: rttiConst, Linkage: InternalLinkage}
+				currentModule.Constants = append(currentModule.Constants, rttiGV)
+				_ = currentModule.SymTab.Define(t.Layout.RTTIName, rttiGV.Ref())
+			}
+		}
+
+		return rec
 	case *types.NamedType:
 		inner := LowerType(t.Def)
 		if rec, ok := inner.(*RecordType); ok && rec.TypeName == "" {
@@ -721,10 +814,152 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 			ty = primI32
 		}
 		return NewConst("0", int64(0), ty)
+	case *desugar.TypeGuardExpr:
+		// Lower the subject expression to a pointer/value temp we can pass to
+		// a runtime helper. We keep the helper responsible for the subtype
+		// walk; on failure we emit a HaltInst to abort as required.
+		subj := l.lowerValue(e.Expr)
+		// ensure a pointer-like temp for passing to the runtime helper
+		obj := l.ensureTemp(subj, Ptr(primI32))
+
+		// Resolve target RTTI symbol name from the sema type (unwrap named types).
+		var rttiName string
+		switch tt := e.Typ.(type) {
+		case *types.NamedType:
+			if rec, ok := tt.Def.(*types.RecordType); ok && rec.Layout != nil {
+				rttiName = rec.Layout.RTTIName
+			}
+		case *types.RecordType:
+			if tt.Layout != nil {
+				rttiName = tt.Layout.RTTIName
+			}
+		}
+		if rttiName == "" || l.mod == nil {
+			// no runtime layout available — conservatively continue (no-op)
+			return obj
+		}
+		// ensure the RTTI global was emitted into the module constants
+		if _, ok := l.mod.SymTab.Lookup(rttiName); !ok {
+			return obj
+		}
+
+		// Inline numeric-ID based subtype walk.
+		// Load instance RTTI pointer from object header (vptr at offset 0).
+		instRTTIPtr := NewAnonTemp(Ptr(primI32))
+		// Treat obj as an address (pointer-to-object) for the load.
+		obj.IsAddr = true
+		l.emit(&LoadInst{Dst: instRTTIPtr, Addr: obj})
+
+		// Create an RTTI record type to address fields by index and load the ID.
+		rttiRec := NewRecordType("", []RecordField{
+			{Name: "ID", Type: primI64, Offset: 0},
+			{Name: "Base", Type: Ptr(primI32), Offset: 8},
+			{Name: "VTable", Type: Ptr(primI32), Offset: 16},
+			{Name: "Name", Type: Ptr(primI32), Offset: 24},
+			{Name: "Size", Type: primI64, Offset: 32},
+		})
+		// GEP to field 0 (ID)
+		idAddr := l.newAddrTemp("rtti.id", rttiRec)
+		l.emit(&GEPInst{Dst: idAddr, Base: instRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
+		instID := NewAnonTemp(primI64)
+		l.emit(&LoadInst{Dst: instID, Addr: idAddr})
+
+		// Resolve target ID from rttiID map (assigned during LowerType emission).
+		tid := rttiID[rttiName]
+		if tid == 0 {
+			// no id assigned: conservatively continue
+			return obj
+		}
+		targetConst := NewConst(fmt.Sprintf("%d", tid), int64(tid), primI64)
+
+		// Prepare basic blocks for loop: check, load-base, pass, fail.
+		startLabel := l.newLabel("tg.check")
+		passLabel := l.newLabel("tg.pass")
+		failLabel := l.newLabel("tg.fail")
+		loadBaseLabel := l.newLabel("tg.loadbase")
+
+		// Jump into the check block
+		j := &JumpInst{Target: startLabel}
+		l.emit(j)
+		l.curBlock.Term = j
+
+		// Create start/check block
+		startBlk := l.newBlock(startLabel)
+		l.fn.Blocks[startBlk.ID] = startBlk
+
+		// We'll need phi values for instID and instRTTIPtr; create phi temps
+		phiID := NewAnonTemp(primI64)
+		phiPtr := NewAnonTemp(Ptr(primI32))
+
+		// Create the block we'll jump from when loading base so phi arms can reference it
+		loadBaseBlk := l.newBlock(loadBaseLabel)
+		l.fn.Blocks[loadBaseBlk.ID] = loadBaseBlk
+
+		// Create fail block (halts)
+		failBlk := l.newBlock(failLabel)
+		l.fn.Blocks[failBlk.ID] = failBlk
+
+		// Capture predecessor label (the block that emitted the jump)
+		prevLabel := l.curBlock.Label
+
+		// switch to start block to emit phis and comparisons
+		l.switchTo(startBlk)
+		// Phi arms: from prevLabel (initial instID/instRTTIPtr) and from loadBaseBlk
+		// We'll create temps for base values that will be defined in loadBaseBlk.
+		basePtrTemp := NewAnonTemp(Ptr(primI32))
+		baseIDTemp := NewAnonTemp(primI64)
+		l.emit(&PhiInst{Dst: phiPtr, Args: []PhiArm{{BlockLabel: prevLabel, Val: instRTTIPtr}, {BlockLabel: loadBaseBlk.Label, Val: basePtrTemp}}})
+		l.emit(&PhiInst{Dst: phiID, Args: []PhiArm{{BlockLabel: prevLabel, Val: instID}, {BlockLabel: loadBaseBlk.Label, Val: baseIDTemp}}})
+
+		// Compare phiID == targetConst
+		cmp := NewAnonTemp(primI1)
+		l.emit(&ICmpInst{Dst: cmp, Pred: "eq", Left: phiID, Right: targetConst})
+		cbr := &CondBrInst{Cond: cmp, TrueLabel: passLabel, FalseLabel: loadBaseLabel}
+		l.emit(cbr)
+		l.curBlock.Term = cbr
+
+		// load-base block: load base RTTI pointer and its ID, then jump back to check
+		l.switchTo(loadBaseBlk)
+		// load base ptr from phiPtr (field index 1)
+		baseAddr := l.newAddrTemp("rtti.base", rttiRec)
+		l.emit(&GEPInst{Dst: baseAddr, Base: phiPtr, ElemType: rttiRec, Offsets: []int{1}})
+		l.emit(&LoadInst{Dst: basePtrTemp, Addr: baseAddr})
+		// if basePtr == 0 -> fail
+		zeroPtr := NewConst("0", int64(0), Ptr(primI32))
+		isNull := NewAnonTemp(primI1)
+		l.emit(&ICmpInst{Dst: isNull, Pred: "eq", Left: basePtrTemp, Right: zeroPtr})
+		// load base ID (so phi can receive it)
+		baseIDAddr := l.newAddrTemp("rtti.id", rttiRec)
+		l.emit(&GEPInst{Dst: baseIDAddr, Base: basePtrTemp, ElemType: rttiRec, Offsets: []int{0}})
+		l.emit(&LoadInst{Dst: baseIDTemp, Addr: baseIDAddr})
+		brNull := &CondBrInst{Cond: isNull, TrueLabel: failLabel, FalseLabel: startLabel}
+		l.emit(brNull)
+		l.curBlock.Term = brNull
+
+		// fail block: emit Halt
+		l.switchTo(failBlk)
+		halt := &HaltInst{Code: NewConst("1", int64(1), primI32)}
+		l.emit(halt)
+		failBlk.Term = halt
+		if l.fn != nil && l.fn.Exit != nil {
+			failBlk.AddSucc(l.fn.Exit)
+			l.fn.Exit.AddPred(failBlk)
+		}
+
+		// pass block
+		passBlk := l.newBlock(passLabel)
+		l.fn.Blocks[passBlk.ID] = passBlk
+		l.switchTo(passBlk)
+		// continue, return original object
+		return obj
 	case *desugar.ModuleRef:
 		// Module handle: represent as an opaque pointer-sized constant carrying
 		// the module name (used by LDMOD/LDCMD).
 		return NewConst(e.Name, e.Name, Ptr(primI32))
+	case *desugar.SetExpr:
+		return NewConst("0", int64(0), primI32)
+	case *desugar.RangeExpr:
+		return NewConst("0", int64(0), primI32)
 	default:
 		return NewConst("0", int64(0), primI32)
 	}

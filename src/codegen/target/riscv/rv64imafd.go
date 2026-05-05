@@ -392,23 +392,67 @@ func (r RV64IMAFD) Emit(module *asm.Module) string {
 	if len(module.Constants) > 0 {
 		buf.WriteString("\t.section .rodata\n")
 		for _, c := range module.Constants {
-			// Detect an RTTI POD value by reflection: anonymous struct { Name string; Size uint64 }
+			// Detect an RTTI POD value by reflection.
+			// Support legacy shape: struct { Name string; Size uint64 }
+			// and extended shape: struct { ID uint64; Base string; VTable string; Name string; Size uint64 }
 			if c.Value != nil {
 				rv := reflect.TypeOf(c.Value)
-				if rv.Kind() == reflect.Struct && rv.NumField() == 2 {
-					f0 := rv.Field(0)
-					f1 := rv.Field(1)
-					if f0.Type.Kind() == reflect.String && f1.Type.Kind() == reflect.Uint64 {
-						// extract values
-						rvv := reflect.ValueOf(c.Value)
-						nameSym := rvv.Field(0).String()
-						size := rvv.Field(1).Uint()
-						align := int(math.Log2(float64(r.FrameInfo().WordSize)))
-						buf.WriteString(fmt.Sprintf("\t.align %d\n", align))
-						buf.WriteString(fmt.Sprintf("%s:\n", c.Name))
-						buf.WriteString(fmt.Sprintf("\t.quad %s\n", nameSym))
-						buf.WriteString(fmt.Sprintf("\t.quad %d\n", size))
-						continue
+				if rv.Kind() == reflect.Struct {
+					rvv := reflect.ValueOf(c.Value)
+					// Extended RTTI POD: 5 fields
+					if rv.NumField() == 5 {
+						f0 := rv.Field(0)
+						f1 := rv.Field(1)
+						f2 := rv.Field(2)
+						f3 := rv.Field(3)
+						f4 := rv.Field(4)
+						if f0.Type.Kind() == reflect.Uint64 && f1.Type.Kind() == reflect.String && f2.Type.Kind() == reflect.String && f3.Type.Kind() == reflect.String && f4.Type.Kind() == reflect.Uint64 {
+							// extract values
+							id := rvv.Field(0).Uint()
+							baseSym := rvv.Field(1).String()
+							vtabSym := rvv.Field(2).String()
+							nameSym := rvv.Field(3).String()
+							size := rvv.Field(4).Uint()
+							align := int(math.Log2(float64(r.FrameInfo().WordSize)))
+							buf.WriteString(fmt.Sprintf("\t.align %d\n", align))
+							buf.WriteString(fmt.Sprintf("%s:\n", c.Name))
+							// Emit ID then pointers for base, vtable, name, then size
+							buf.WriteString(fmt.Sprintf("\t.quad %d\n", id))
+							if baseSym == "" {
+								buf.WriteString("\t.quad 0\n")
+							} else {
+								buf.WriteString(fmt.Sprintf("\t.quad %s\n", baseSym))
+							}
+							if vtabSym == "" {
+								buf.WriteString("\t.quad 0\n")
+							} else {
+								buf.WriteString(fmt.Sprintf("\t.quad %s\n", vtabSym))
+							}
+							if nameSym == "" {
+								buf.WriteString("\t.quad 0\n")
+							} else {
+								buf.WriteString(fmt.Sprintf("\t.quad %s\n", nameSym))
+							}
+							buf.WriteString(fmt.Sprintf("\t.quad %d\n", size))
+							continue
+						}
+					}
+					// Legacy RTTI POD: 2 fields { Name string; Size uint64 }
+					if rv.NumField() == 2 {
+						f0 := rv.Field(0)
+						f1 := rv.Field(1)
+						if f0.Type.Kind() == reflect.String && f1.Type.Kind() == reflect.Uint64 {
+							// extract values
+							rvvv := reflect.ValueOf(c.Value)
+							nameSym := rvvv.Field(0).String()
+							size := rvvv.Field(1).Uint()
+							align := int(math.Log2(float64(r.FrameInfo().WordSize)))
+							buf.WriteString(fmt.Sprintf("\t.align %d\n", align))
+							buf.WriteString(fmt.Sprintf("%s:\n", c.Name))
+							buf.WriteString(fmt.Sprintf("\t.quad %s\n", nameSym))
+							buf.WriteString(fmt.Sprintf("\t.quad %d\n", size))
+							continue
+						}
 					}
 				}
 			}
