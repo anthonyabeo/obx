@@ -101,10 +101,22 @@ type GEPInst struct {
 	Base     Value
 	ElemType Type
 	Offsets  []int
+	// Indices holds runtime index operands for dimensions that are not
+	// compile-time constants. Indices are stored in left-to-right source
+	// order and are consumed sequentially by codegen for dimensions where
+	// the corresponding Offsets entry is zero.
+	Indices  []Value
 }
 
 func (g *GEPInst) String() string { return FormatInstr(g) }
-func (g *GEPInst) Uses() []Value  { return []Value{g.Base} }
+func (g *GEPInst) Uses() []Value {
+	out := make([]Value, 0, 1+len(g.Indices))
+	out = append(out, g.Base)
+	for _, v := range g.Indices {
+		out = append(out, v)
+	}
+	return out
+}
 func (g *GEPInst) Def() *Temp     { return g.Dst }
 
 // CallInst represents a function call; optional result stored in Dst.

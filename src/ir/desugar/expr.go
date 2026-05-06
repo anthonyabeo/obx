@@ -22,6 +22,8 @@ type (
 		Kind     token.Kind
 		Value    string
 		SemaType types.Type
+		Start    int
+		End      int
 	}
 
 	BinaryExpr struct {
@@ -29,6 +31,8 @@ type (
 		Right    Expr
 		Op       token.Kind
 		SemaType types.Type
+		Start    int
+		End      int
 	}
 
 	UnaryExpr struct {

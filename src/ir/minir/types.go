@@ -1,6 +1,9 @@
 package minir
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+)
 
 // Minimal types for a compact SSA 3AC IR.
 
@@ -285,7 +288,136 @@ func NewAnonTemp(ty Type) *Temp {
 // NewConst constructs a Constant. If name is empty the textual value is
 // left blank; caller may set NameStr if desired.
 func NewConst(name string, val interface{}, ty Type) *Constant {
-	return &Constant{NameStr: name, Val: val, Ty: NormalizeType(ty)}
+	nty := NormalizeType(ty)
+	// Canonicalize concrete Go representation of the value according to the
+	// normalized type so later consumers can rely on predictable concrete
+	// types (e.g. integer constants -> int64, floats -> float64).
+	var v interface{} = val
+	switch t := nty.(type) {
+	case *PrimitiveType:
+		switch t.String() {
+		case "i1", "i32", "i64":
+			// canonicalize integers to int64 when possible
+			switch x := val.(type) {
+			case int64:
+				v = x
+			case int:
+				v = int64(x)
+			case int32:
+				v = int64(x)
+			case int16:
+				v = int64(x)
+			case int8:
+				v = int64(x)
+			case uint64:
+				v = int64(x)
+			case uint32:
+				v = int64(x)
+			case uint16:
+				v = int64(x)
+			case uint8:
+				v = int64(x)
+			case string:
+				if iv, err := strconv.ParseInt(x, 10, 64); err == nil {
+					v = iv
+				} else {
+					// fallback to formatting parse
+					if iv2, err2 := strconv.ParseInt(fmt.Sprintf("%v", val), 10, 64); err2 == nil {
+						v = iv2
+					}
+				}
+			default:
+				// try formatted parse
+				if iv, err := strconv.ParseInt(fmt.Sprintf("%v", val), 10, 64); err == nil {
+					v = iv
+				}
+			}
+		case "f32", "f64":
+			// canonicalize floats to float64
+			switch x := val.(type) {
+			case float64:
+				v = x
+			case float32:
+				v = float64(x)
+			case string:
+				if fv, err := strconv.ParseFloat(x, 64); err == nil {
+					v = fv
+				}
+			default:
+				// try formatted parse
+				if fv, err := strconv.ParseFloat(fmt.Sprintf("%v", val), 64); err == nil {
+					v = fv
+				}
+			}
+		default:
+			// leave as-is for other primitive kinds
+			v = val
+		}
+	case *PointerType:
+		// pointer immediates: represent as int64 (zero/null) when possible
+		switch x := val.(type) {
+		case int64:
+			v = x
+		case int:
+			v = int64(x)
+		case string:
+			if iv, err := strconv.ParseInt(x, 10, 64); err == nil {
+				v = iv
+			}
+		default:
+			// leave as-is
+			v = val
+		}
+	default:
+		// For arrays/records/other aggregates keep the original representation
+		v = val
+	}
+	return &Constant{NameStr: name, Val: v, Ty: nty}
+}
+
+// ConstantToInt attempts to convert a *Constant's Val to int. It returns an
+// error when conversion is not possible. It prefers the canonical concrete
+// representation produced by NewConst (int64 for integer types).
+func ConstantToInt(c *Constant) (int, error) {
+	if c == nil {
+		return 0, fmt.Errorf("nil constant")
+	}
+	switch v := c.Val.(type) {
+	case int:
+		return v, nil
+	case int8:
+		return int(v), nil
+	case int16:
+		return int(v), nil
+	case int32:
+		return int(v), nil
+	case int64:
+		return int(v), nil
+	case uint:
+		return int(v), nil
+	case uint8:
+		return int(v), nil
+	case uint16:
+		return int(v), nil
+	case uint32:
+		return int(v), nil
+	case uint64:
+		return int(v), nil
+	case string:
+		if n, err := strconv.Atoi(v); err == nil {
+			return n, nil
+		}
+		if n, err := strconv.Atoi(fmt.Sprintf("%v", v)); err == nil {
+			return n, nil
+		}
+		return 0, fmt.Errorf("cannot parse string constant %q as int", v)
+	default:
+		// fallback: try to format and parse
+		if n, err := strconv.Atoi(fmt.Sprintf("%v", v)); err == nil {
+			return n, nil
+		}
+		return 0, fmt.Errorf("unsupported constant type %T (value=%v)", v, v)
+	}
 }
 
 // pointer cache for canonical pointer types (keyed by element type string)

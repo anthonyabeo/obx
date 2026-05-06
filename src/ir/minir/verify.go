@@ -161,6 +161,11 @@ func VerifyIR(fn *Function) []VerifyError {
 						add(bl, is, "GEPInst base is not an address value (IsAddr *Temp or *GlobalRef)")
 					}
 				}
+				                // Offsets should be present (at least one dimension). Indices may be
+				                // nil when all indices are compile-time constants.
+				                if instr.Offsets == nil || len(instr.Offsets) == 0 {
+				                    add(bl, is, "GEPInst Offsets is nil or empty; expected at least one index/offset")
+				                }
 			case *PhiInst:
 				for _, arg := range instr.Args {
 					if arg.BlockLabel == "" {

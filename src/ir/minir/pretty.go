@@ -128,11 +128,22 @@ func FormatInstr(ins Instr) string {
 			}
 			offs += fmt.Sprintf("%d", o)
 		}
+		// indices as comma-separated values (short form)
+		idxs := ""
+		for i, iv := range v.Indices {
+			if i > 0 {
+				idxs += ", "
+			}
+			idxs += ShortValueString(iv)
+		}
 		et := "<nil>"
 		if v.ElemType != nil {
 			et = v.ElemType.String()
 		}
-		return fmt.Sprintf("%s = gep %s, %s, %s", ShortValueString(v.Dst), et, ShortValueString(v.Base), offs)
+		if idxs == "" {
+			return fmt.Sprintf("%s = gep %s, %s, offs=[%s]", ShortValueString(v.Dst), et, ShortValueString(v.Base), offs)
+		}
+		return fmt.Sprintf("%s = gep %s, %s, offs=[%s], idxs=[%s]", ShortValueString(v.Dst), et, ShortValueString(v.Base), offs, idxs)
 
 	case *UnaryInst:
 		ty := "<nil>"

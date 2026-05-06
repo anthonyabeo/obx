@@ -58,6 +58,8 @@ type (
 		Expr Expr
 		Type Expr
 		Body *CompoundStmt
+		Start int
+		End   int
 	}
 
 	ExitStmt struct {

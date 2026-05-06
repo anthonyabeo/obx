@@ -7,6 +7,9 @@ import (
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/support/compiler"
+	"github.com/anthonyabeo/obx/src/support/diag"
+	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -25,6 +28,9 @@ type Lowerer struct {
 	varEnv   map[string]*Temp  // variable name → alloca address temp (IsAddr=true)
 	constEnv map[string]Value  // constant name → pre-computed Value
 	loopExit map[string]string // loop label → exit-block label; "" = innermost loop
+	// diagnostics/context
+	dctx     *compiler.Context
+	reported map[string]bool // dedupe map keyed by rttiName@module
 }
 
 // currentModule is a package-level hook used by LowerType to register
@@ -55,11 +61,11 @@ const (
 // Field indices: 0=ID, 1=Base, 2=VTable, 3=Name, 4=Size.
 func rttiPODRecordType() *RecordType {
 	return NewRecordType("", []RecordField{
-		{Name: "ID", Type: primI64, Offset: 0},
-		{Name: "Base", Type: Ptr(primI32), Offset: 8},
-		{Name: "VTable", Type: Ptr(primI32), Offset: 16},
-		{Name: "Name", Type: Ptr(primI32), Offset: 24},
-		{Name: "Size", Type: primI64, Offset: 32},
+		{Name: "ID", Type: primI64, Offset: rttiIDOff},
+		{Name: "Base", Type: Ptr(primI32), Offset: rttiBasePtrOff},
+		{Name: "VTable", Type: Ptr(primI32), Offset: rttiVTableOff},
+		{Name: "Name", Type: Ptr(primI32), Offset: rttiNameOff},
+		{Name: "Size", Type: primI64, Offset: rttiSizeOff},
 	})
 }
 
@@ -81,7 +87,10 @@ func rttiNameForType(ty types.Type) string {
 	return ""
 }
 
-// Lower translates a desugar.Program into a *minir.Program, producing one
+// LowerWithContext lowers a desugared program using an optional compiler
+// Context for diagnostic emission. Pass nil to preserve previous behaviour
+// (no diagnostics emitted).
+// LowerWithContext translates a desugar.Program into a *minir.Program, producing one
 // minir.Module per desugar.Module.
 //
 // Within each module, lowering runs in two passes:
@@ -94,9 +103,11 @@ func rttiNameForType(ty types.Type) string {
 //
 //  2. Function bodies: each non-external function is lowered; global variables
 //     resolve directly to their *GlobalRef address (true LLVM semantics).
-func Lower(prog *desugar.Program) *Program {
+func LowerWithContext(prog *desugar.Program, dctx *compiler.Context) *Program {
 	outProg := &Program{}
 	l := &Lowerer{}
+	l.dctx = dctx
+	l.reported = make(map[string]bool)
 
 	for _, hirMod := range prog.Modules {
 		mod := &Module{Name: hirMod.Name}
@@ -132,6 +143,12 @@ func Lower(prog *desugar.Program) *Program {
 		currentModule = nil
 	}
 	return outProg
+}
+
+// Lower is the historical API that lowers without a diagnostic context.
+// Prefer LowerWithContext when callers have a *compiler.Context available.
+func Lower(prog *desugar.Program) *Program {
+	return LowerWithContext(prog, nil)
 }
 
 // lowerGlobalVar lowers a module-scope variable declaration into a *GlobalVar
@@ -1037,7 +1054,10 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 	case *desugar.RangeExpr:
 		return l.lowerRangeExpr(e)
 	default:
-		return NewConst("0", int64(0), primI32)
+		// Unknown/unsupported expression node — fail fast so missing lowering
+		// implementations are discovered during development rather than silently
+		// producing a zero constant which can mask real bugs.
+		panic(fmt.Sprintf("lowerValue: unsupported expr type %T", expr))
 	}
 }
 
@@ -1086,7 +1106,7 @@ func (l *Lowerer) lowerFieldAddr(e *desugar.FieldAccess) *Temp {
 		}
 		elemType = recTy
 	}
-	l.emit(&GEPInst{Dst: dst, Base: base, ElemType: elemType, Offsets: offsets})
+	l.emit(&GEPInst{Dst: dst, Base: base, ElemType: elemType, Offsets: offsets, Indices: nil})
 	return dst
 }
 
@@ -1095,13 +1115,34 @@ func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *Temp {
 	et := LowerType(e.SemaType)
 	dst := l.newAddrTemp("", et)
 
-	var offset int
-	if len(e.Index) > 0 {
-		idxVal := l.lowerValue(e.Index[0])
-		if c, ok := idxVal.(*Constant); ok {
-			offset, _ = strconv.Atoi(fmt.Sprintf("%v", c.Val))
+	var offsets []int
+	var indices []Value
+	if len(e.Index) == 0 {
+		offsets = []int{0}
+		indices = nil
+	} else {
+		offsets = make([]int, 0, len(e.Index))
+		indices = make([]Value, 0)
+		for _, idxExpr := range e.Index {
+			idxVal := l.lowerValue(idxExpr)
+			// If the index lowered to a constant, fold it into compile-time offsets.
+			if c, ok := idxVal.(*Constant); ok {
+				// Convert constant to int using canonical helper. This centralizes
+				// conversions and benefits from NewConst's canonicalization.
+				if n, err := ConstantToInt(c); err == nil {
+					offsets = append(offsets, n)
+				} else {
+					panic(fmt.Sprintf("lowerIndexAddr: cannot convert constant index %v: %v", c.Val, err))
+				}
+			} else {
+				// Dynamic runtime index: record a zero placeholder in Offsets and
+				// append the runtime Value to Indices (preserve left-to-right order).
+				offsets = append(offsets, 0)
+				indices = append(indices, idxVal)
+			}
 		}
 	}
+
 	var arrTy *ArrayType
 	if pt, ok := base.Type().(*PointerType); ok {
 		arrTy, _ = pt.Elem.(*ArrayType)
@@ -1110,7 +1151,7 @@ func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *Temp {
 	if arrTy != nil {
 		elemType = arrTy
 	}
-	l.emit(&GEPInst{Dst: dst, Base: base, ElemType: elemType, Offsets: []int{offset}})
+	l.emit(&GEPInst{Dst: dst, Base: base, ElemType: elemType, Offsets: offsets, Indices: indices})
 	return dst
 }
 
@@ -1120,7 +1161,8 @@ func (l *Lowerer) lowerBinary(e *desugar.BinaryExpr) Value {
 	if e.Op == token.IS {
 		left := l.lowerValue(e.Left)
 		rttiName := rttiNameForType(e.Right.Type())
-		return l.lowerISCheck(left, rttiName)
+		// pass source offsets for diagnostic Range attachment when available
+		return l.lowerISCheck(left, rttiName, e.Start, e.End)
 	}
 
 	left := l.lowerValue(e.Left)
@@ -1258,7 +1300,7 @@ func (l *Lowerer) lowerRangeExpr(e *desugar.RangeExpr) Value {
 // After returning, l.curBlock is the merge/continuation block that the caller
 // can continue emitting into.  Returns a conservative i1 false constant temp
 // when RTTI metadata is unavailable.
-func (l *Lowerer) lowerISCheck(obj Value, rttiName string) *Temp {
+func (l *Lowerer) lowerISCheck(obj Value, rttiName string, start, end int) *Temp {
 	falseTemp := func() *Temp {
 		dst := NewAnonTemp(primI1)
 		l.emit(&BinaryInst{Dst: dst, Op: "xor",
@@ -1271,10 +1313,14 @@ func (l *Lowerer) lowerISCheck(obj Value, rttiName string) *Temp {
 		return falseTemp()
 	}
 	if _, ok := l.mod.SymTab.Lookup(rttiName); !ok {
+		// RTTI symbol not emitted into this module — report once and return
+		l.reportMissingRTTI(rttiName, start, end)
 		return falseTemp()
 	}
 	tid := rttiID[rttiName]
 	if tid == 0 {
+		// no numeric RTTI id assigned — report once and return
+		l.reportMissingRTTI(rttiName, start, end)
 		return falseTemp()
 	}
 	targetConst := NewConst(fmt.Sprintf("%d", tid), int64(tid), primI64)
@@ -1391,6 +1437,40 @@ func (l *Lowerer) lowerISCheck(obj Value, rttiName string) *Temp {
 	return result
 }
 
+// reportMissingRTTI emits a single warning diagnostic per missing RTTI symbol
+// per-module so users are informed about absent runtime type metadata without
+// spamming repeated messages.
+func (l *Lowerer) reportMissingRTTI(rttiName string, start, end int) {
+	if l.dctx == nil || rttiName == "" {
+		return
+	}
+	module := ""
+	if l.mod != nil {
+		module = l.mod.Name
+	}
+	key := fmt.Sprintf("%s@%s", rttiName, module)
+	if l.reported == nil {
+		l.reported = make(map[string]bool)
+	}
+	if l.reported[key] {
+		return
+	}
+	l.reported[key] = true
+
+	var rng *source.Range
+	if l.dctx != nil && l.dctx.Source != nil {
+		rng = l.dctx.Source.Span(l.dctx.FileName, start, end)
+	}
+	d := diag.Diagnostic{
+		Severity: diag.Warning,
+		Message:  fmt.Sprintf("RTTI metadata missing for type %q", rttiName),
+		Range:    rng,
+	}
+	if l.dctx.Reporter != nil {
+		l.dctx.Reporter.Report(d)
+	}
+}
+
 // lowerWith lowers a WITH statement performing runtime type dispatch:
 //
 //	WITH v IS T1 DO body1
@@ -1437,7 +1517,8 @@ func (l *Lowerer) lowerWith(st *desugar.WithStmt) {
 		}
 
 		// Emit the inline boolean IS check; we land in the merge block.
-		cond := l.lowerISCheck(obj, rttiName)
+		// Pass guard Start/End so diagnostics can point to the guard span.
+		cond := l.lowerISCheck(obj, rttiName, guard.Start, guard.End)
 		// If RTTI unavailable, cond is a false const-materialized temp; the
 		// body will be unreachable.  That is the conservative safe choice.
 
@@ -1488,7 +1569,7 @@ func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
 		if v != nil {
 			return v
 		}
-		return NewConst("0", int64(0), primI32)
+		panic(fmt.Sprintf("lowerCallExpr: builtin %q returned nil in expression context", call.Func.Name))
 	}
 	var args []Value
 	for _, a := range call.Args {

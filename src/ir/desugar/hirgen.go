@@ -116,6 +116,8 @@ func (g Generator) VisitBinaryExpr(expr *ast.BinaryExpr) any {
 		Right:    expr.Right.Accept(g).(Expr),
 		Op:       expr.Op,
 		SemaType: expr.SemaType,
+		Start:    expr.Pos(),
+		End:      expr.End(),
 	}
 }
 
@@ -535,9 +537,11 @@ func (g Generator) VisitGuard(guard *ast.Guard) any {
 	guardType := guard.Type.Accept(g).(Expr)
 
 	return &WithGuard{
-		Expr: guardExpr,
-		Type: guardType,
-		Body: g.visitStmtSeq(guard.StmtSeq),
+		Expr:  guardExpr,
+		Type:  guardType,
+		Body:  g.visitStmtSeq(guard.StmtSeq),
+		Start: guard.Pos(),
+		End:   guard.End(),
 	}
 }
 
