@@ -8,6 +8,7 @@ import (
 
 type (
 	Variable struct {
+		NodeBase
 		Name       string
 		Mangled    string
 		Type       types.Type
@@ -17,6 +18,7 @@ type (
 	}
 
 	Constant struct {
+		NodeBase
 		Name       string
 		Mangled    string
 		Type       types.Type
@@ -27,6 +29,7 @@ type (
 	}
 
 	Type struct {
+		NodeBase
 		Name       string
 		Mangled    string
 		Type       types.Type
@@ -35,6 +38,7 @@ type (
 	}
 
 	Function struct {
+		NodeBase
 		Name        string
 		Mangled     string
 		Params      []*Param

@@ -8,15 +8,18 @@ import (
 
 type (
 	AssignStmt struct {
+		NodeBase
 		Left  Expr
 		Right Expr
 	}
 
 	ReturnStmt struct {
+		NodeBase
 		Result Expr
 	}
 
 	IfStmt struct {
+		NodeBase
 		Cond    Expr
 		Then    *CompoundStmt
 		Else    *CompoundStmt
@@ -24,49 +27,56 @@ type (
 	}
 
 	ElseIfBranch struct {
+		NodeBase
 		Cond Expr
 		Body *CompoundStmt
 	}
 
 	LoopStmt struct {
+		NodeBase
 		Body  *CompoundStmt
 		Label string
 	}
 
 	CaseStmt struct {
+		NodeBase
 		Expr  Expr
 		Cases []*Case
 		Else  *CompoundStmt
 	}
 
 	Case struct {
+		NodeBase
 		Labels []*LabelRange
 		Body   *CompoundStmt
 	}
 
 	LabelRange struct {
+		NodeBase
 		Low  Expr
 		High Expr // same as Low for singleton values
 	}
 
 	WithStmt struct {
+		NodeBase
 		Guards []*WithGuard
 		Else   *CompoundStmt
 	}
 
 	WithGuard struct {
+		NodeBase
 		Expr Expr
 		Type Expr
 		Body *CompoundStmt
-		Start int
-		End   int
 	}
 
 	ExitStmt struct {
+		NodeBase
 		LoopLabel string
 	}
 
 	CompoundStmt struct {
+		NodeBase
 		Stmts []Stmt
 	}
 )

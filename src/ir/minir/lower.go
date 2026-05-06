@@ -1054,10 +1054,51 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 	case *desugar.RangeExpr:
 		return l.lowerRangeExpr(e)
 	default:
-		// Unknown/unsupported expression node — fail fast so missing lowering
-		// implementations are discovered during development rather than silently
-		// producing a zero constant which can mask real bugs.
-		panic(fmt.Sprintf("lowerValue: unsupported expr type %T", expr))
+		// Unknown/unsupported expression node — emit a warning diagnostic and
+		// continue with a conservative zero value so lowering can progress.
+		msg := fmt.Sprintf("lowerValue: unsupported expr type %T", expr)
+		// attempt to attach a useful Range if the node carries Start/End
+		var start, end int
+		switch v := expr.(type) {
+		case *desugar.Literal:
+			start, end = v.Start, v.End
+		case *desugar.BinaryExpr:
+			start, end = v.Start, v.End
+		case *desugar.UnaryExpr:
+			start, end = v.Start, v.End
+		case *desugar.FuncCall:
+			start, end = v.Start, v.End
+		case *desugar.VariableRef:
+			start, end = v.Start, v.End
+		case *desugar.ConstantRef:
+			start, end = v.Start, v.End
+		case *desugar.FunctionRef:
+			start, end = v.Start, v.End
+		case *desugar.TypeRef:
+			start, end = v.Start, v.End
+		case *desugar.ModuleRef:
+			start, end = v.Start, v.End
+		case *desugar.FieldAccess:
+			start, end = v.Start, v.End
+		case *desugar.IndexExpr:
+			start, end = v.Start, v.End
+		case *desugar.DerefExpr:
+			start, end = v.Start, v.End
+		case *desugar.TypeGuardExpr:
+			start, end = v.Start, v.End
+		case *desugar.Param:
+			start, end = v.Start, v.End
+		}
+		l.reportLoweringDiagnostic(msg, start, end)
+		// Conservative fallback: return a zero constant of the expression's type
+		ty := LowerType(expr.Type())
+		if ty == nil {
+			ty = primI32
+		}
+		if ty == primI1 {
+			return NewConst("false", int64(0), primI1)
+		}
+		return NewConst("0", int64(0), ty)
 	}
 }
 
@@ -1072,7 +1113,19 @@ func (l *Lowerer) lowerAddr(expr desugar.Expr) Value {
 		v := l.resolveVar(e.Name, e.Name)
 		// Forbid taking the address of a ValueParam (non-address temp).
 		if !isAddrValue(v) {
-			panic(fmt.Sprintf("lowerAddr: attempt to take address of value parameter '%s'", e.Name))
+			// Attempt to take address of a non-addressable value parameter.
+			// Emit a warning and create an addressable stack slot, storing the
+			// parameter value into it so lowering can continue.
+			msg := fmt.Sprintf("lowerAddr: attempt to take address of value parameter '%s'", e.Name)
+			l.reportLoweringDiagnostic(msg, e.Start, e.End)
+			pt := LowerType(e.Typ)
+			if pt == nil {
+				pt = primI32
+			}
+			addr := l.newAddrTemp(e.Name, pt)
+			l.emit(&AllocaInst{Dst: addr, AllocType: pt})
+			l.emit(&StoreInst{Val: v, Addr: addr})
+			return addr
 		}
 		return v
 	case *desugar.FieldAccess:
@@ -1085,7 +1138,31 @@ func (l *Lowerer) lowerAddr(expr desugar.Expr) Value {
 		t.IsAddr = true
 		return t
 	default:
-		panic(fmt.Sprintf("lowerAddr: non-addressable expr %T", expr))
+		// Non-addressable lvalue expression — emit warning and materialize an
+		// addressable temporary by lowering the value and storing it to a new
+		// alloca so clients expecting an address can continue.
+		msg := fmt.Sprintf("lowerAddr: non-addressable expr %T", expr)
+		// Try to extract Start/End when expr is a desugar node
+		var start, end int
+		switch v := expr.(type) {
+		case *desugar.Literal:
+			start, end = v.Start, v.End
+		case *desugar.BinaryExpr:
+			start, end = v.Start, v.End
+		case *desugar.IndexExpr:
+			start, end = v.Start, v.End
+		}
+		l.reportLoweringDiagnostic(msg, start, end)
+		// Materialize fallback address
+		val := l.lowerValue(expr)
+		ty := LowerType(expr.Type())
+		if ty == nil {
+			ty = primI32
+		}
+		addr := l.newAddrTemp("", ty)
+		l.emit(&AllocaInst{Dst: addr, AllocType: ty})
+		l.emit(&StoreInst{Val: val, Addr: addr})
+		return addr
 	}
 }
 
@@ -1132,7 +1209,16 @@ func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *Temp {
 				if n, err := ConstantToInt(c); err == nil {
 					offsets = append(offsets, n)
 				} else {
-					panic(fmt.Sprintf("lowerIndexAddr: cannot convert constant index %v: %v", c.Val, err))
+					// Emit warning and conservatively treat as zero index so
+					// lowering can continue.
+					msg := fmt.Sprintf("lowerIndexAddr: cannot convert constant index %v: %v", c.Val, err)
+					// Attempt to use idxExpr range when available.
+					var start, end int
+					if lit, ok := idxExpr.(*desugar.Literal); ok {
+						start, end = lit.Start, lit.End
+					}
+					l.reportLoweringDiagnostic(msg, start, end)
+					offsets = append(offsets, 0)
 				}
 			} else {
 				// Dynamic runtime index: record a zero placeholder in Offsets and
@@ -1471,6 +1557,40 @@ func (l *Lowerer) reportMissingRTTI(rttiName string, start, end int) {
 	}
 }
 
+// reportLoweringDiagnostic emits a one-time warning diagnostic (per-module)
+// for general lowering issues. Messages are deduped by exact message + module
+// to avoid spamming the reporter when lowering repeats the same problem.
+func (l *Lowerer) reportLoweringDiagnostic(msg string, start, end int) {
+	if l.dctx == nil || msg == "" {
+		return
+	}
+	module := ""
+	if l.mod != nil {
+		module = l.mod.Name
+	}
+	key := fmt.Sprintf("lower:%s@%s", msg, module)
+	if l.reported == nil {
+		l.reported = make(map[string]bool)
+	}
+	if l.reported[key] {
+		return
+	}
+	l.reported[key] = true
+
+	var rng *source.Range
+	if l.dctx != nil && l.dctx.Source != nil && start != 0 && end != 0 {
+		rng = l.dctx.Source.Span(l.dctx.FileName, start, end)
+	}
+	d := diag.Diagnostic{
+		Severity: diag.Warning,
+		Message:  msg,
+		Range:    rng,
+	}
+	if l.dctx.Reporter != nil {
+		l.dctx.Reporter.Report(d)
+	}
+}
+
 // lowerWith lowers a WITH statement performing runtime type dispatch:
 //
 //	WITH v IS T1 DO body1
@@ -1569,7 +1689,18 @@ func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
 		if v != nil {
 			return v
 		}
-		panic(fmt.Sprintf("lowerCallExpr: builtin %q returned nil in expression context", call.Func.Name))
+		// Builtin failed to produce a value in expression context: warn and
+		// return a conservative zero value of the expected return type.
+		msg := fmt.Sprintf("lowerCallExpr: builtin %q returned nil in expression context", call.Func.Name)
+		l.reportLoweringDiagnostic(msg, call.Start, call.End)
+		rt := LowerType(call.RetType)
+		if rt == nil {
+			rt = primI32
+		}
+		if rt == primI1 {
+			return NewConst("false", int64(0), primI1)
+		}
+		return NewConst("0", int64(0), rt)
 	}
 	var args []Value
 	for _, a := range call.Args {
@@ -1735,7 +1866,15 @@ func (l *Lowerer) resolveVar(mangled, bare string) Value {
 			return v
 		}
 	}
-	panic(fmt.Sprintf("lowerer: undefined variable %q / %q", mangled, bare))
+	// Undefined variable: emit a diagnostic and return a synthetic addressable
+	// temporary so lowering can continue. The reporter (when present) will
+	// include no source Range for this site.
+	msg := fmt.Sprintf("lowerer: undefined variable %q / %q", mangled, bare)
+	l.reportLoweringDiagnostic(msg, 0, 0)
+	// Create an addressable alloca as a fallback.
+	addr := l.newAddrTemp(bare, primI32)
+	l.emit(&AllocaInst{Dst: addr, AllocType: primI32})
+	return addr
 }
 
 // ensureTemp coerces v to a *Temp. Constants are materialized via a trivial

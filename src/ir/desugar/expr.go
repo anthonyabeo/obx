@@ -19,46 +19,49 @@ const (
 
 type (
 	Literal struct {
+		NodeBase
 		Kind     token.Kind
 		Value    string
 		SemaType types.Type
-		Start    int
-		End      int
 	}
 
 	BinaryExpr struct {
+		NodeBase
 		Left     Expr
 		Right    Expr
 		Op       token.Kind
 		SemaType types.Type
-		Start    int
-		End      int
 	}
 
 	UnaryExpr struct {
+		NodeBase
 		Operand  Expr
 		Op       token.Kind
 		SemaType types.Type
 	}
 
 	SetExpr struct {
+		NodeBase
 		Elems    []Expr
 		SemaType types.Type
 	}
 
 	RangeExpr struct {
+		NodeBase
 		Low      Expr
 		High     Expr
 		SemaType types.Type
 	}
 
 	FuncCall struct {
+		NodeBase
 		Func    *FunctionRef
 		Args    []Expr
 		RetType types.Type
 	}
 
 	VariableRef struct {
+		NodeBase
 		Name       string     // name of the variable
 		Mangled    string     // mangled name for code emission
 		SemaType   types.Type // variable type
@@ -69,6 +72,7 @@ type (
 	}
 
 	ConstantRef struct {
+		NodeBase
 		Name       string // name of the variable
 		Mangled    string // mangled name for code emission
 		Value      Expr
@@ -81,6 +85,7 @@ type (
 	}
 
 	FunctionRef struct {
+		NodeBase
 		Name       string     // name of the variable
 		Mangled    string     // mangled name for code emission
 		SemaType   types.Type // variable type
@@ -94,6 +99,7 @@ type (
 	}
 
 	TypeRef struct {
+		NodeBase
 		Name       string
 		Mangled    string // mangled name for code emission
 		UnderType  types.Type
@@ -107,6 +113,7 @@ type (
 	// ModuleRef represents a reference to a module or definition module used
 	// as a first-class value (e.g. LDMOD(Fmt)).
 	ModuleRef struct {
+		NodeBase
 		Name       string
 		Mangled    string
 		Module     string
@@ -116,29 +123,34 @@ type (
 	}
 
 	FieldAccess struct {
+		NodeBase
 		Record   Expr
 		Field    string
 		SemaType types.Type
 	}
 
 	IndexExpr struct {
+		NodeBase
 		Array    Expr
 		Index    []Expr
 		SemaType types.Type
 	}
 
 	DerefExpr struct {
+		NodeBase
 		Pointer  Expr
 		SemaType types.Type
 	}
 
 	TypeGuardExpr struct {
+		NodeBase
 		Expr     Expr
 		Typ      types.Type
 		SemaType types.Type
 	}
 
 	Param struct {
+		NodeBase
 		Name string
 		Kind ParamKind // Value, Var, In
 		Typ  types.Type

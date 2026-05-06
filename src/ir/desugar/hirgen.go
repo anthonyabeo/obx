@@ -112,12 +112,11 @@ func (g Generator) VisitIdentifier(def *ast.Identifier) any { return def }
 
 func (g Generator) VisitBinaryExpr(expr *ast.BinaryExpr) any {
 	return &BinaryExpr{
+		NodeBase: NodeBase{Start: expr.Pos(), End: expr.End()},
 		Left:     expr.Left.Accept(g).(Expr),
 		Right:    expr.Right.Accept(g).(Expr),
 		Op:       expr.Op,
 		SemaType: expr.SemaType,
-		Start:    expr.Pos(),
-		End:      expr.End(),
 	}
 }
 
@@ -353,10 +352,10 @@ func (g Generator) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
 
 	// Emit exit condition
 	// exit if cond
-	exit := &IfStmt{
-		Cond: cond,
-		Then: &CompoundStmt{[]Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
-	}
+		exit := &IfStmt{
+			Cond: cond,
+			Then: &CompoundStmt{Stmts: []Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
+		}
 
 	body.Stmts = append(body.Stmts, exit)
 
@@ -369,10 +368,10 @@ func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
 	// WHILE <cond>
 	cond := stmt.BoolExpr.Accept(g).(Expr)
 	negated := &UnaryExpr{Op: token.NOT, Operand: cond}
-	body.Stmts = append(body.Stmts, &IfStmt{
-		Cond: negated,
-		Then: &CompoundStmt{[]Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
-	})
+		body.Stmts = append(body.Stmts, &IfStmt{
+			Cond: negated,
+			Then: &CompoundStmt{Stmts: []Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
+		})
 
 	// Body
 	for _, s := range stmt.StmtSeq {
@@ -387,7 +386,7 @@ func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
 		body.Stmts = append(body.Stmts, &IfStmt{
 			Cond: negB,
 			Then: &CompoundStmt{
-				[]Stmt{
+				Stmts: []Stmt{
 					&ExitStmt{LoopLabel: stmt.Label},
 				},
 			},
@@ -422,7 +421,7 @@ func (g Generator) VisitCaseStmt(stmt *ast.CaseStmt) any {
 	return &CaseStmt{
 		Expr:  expr,
 		Cases: cases,
-		Else:  &CompoundStmt{elseBody},
+		Else:  &CompoundStmt{Stmts: elseBody},
 	}
 }
 
@@ -441,7 +440,7 @@ func (g Generator) VisitCase(c *ast.Case) any {
 
 	return &Case{
 		Labels: labels,
-		Body:   &CompoundStmt{stmts},
+		Body:   &CompoundStmt{Stmts: stmts},
 	}
 }
 
@@ -485,7 +484,7 @@ func (g Generator) VisitForStmt(stmt *ast.ForStmt) any {
 			Left:  cvar,
 			Right: final,
 		},
-		Then: &CompoundStmt{[]Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
+		Then: &CompoundStmt{Stmts: []Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
 	}
 
 	// Generate loop body
@@ -507,9 +506,9 @@ func (g Generator) VisitForStmt(stmt *ast.ForStmt) any {
 	// Full loop body: condition, body, increment
 	body := append([]Stmt{breakIf}, append(bodyStmts, incr)...)
 
-	return &CompoundStmt{[]Stmt{
+	return &CompoundStmt{Stmts: []Stmt{
 		initAssign,
-		&LoopStmt{Body: &CompoundStmt{body}},
+		&LoopStmt{Body: &CompoundStmt{Stmts: body}},
 	}}
 }
 
@@ -537,11 +536,10 @@ func (g Generator) VisitGuard(guard *ast.Guard) any {
 	guardType := guard.Type.Accept(g).(Expr)
 
 	return &WithGuard{
+		NodeBase: NodeBase{Start: guard.Pos(), End: guard.End()},
 		Expr:  guardExpr,
 		Type:  guardType,
 		Body:  g.visitStmtSeq(guard.StmtSeq),
-		Start: guard.Pos(),
-		End:   guard.End(),
 	}
 }
 
