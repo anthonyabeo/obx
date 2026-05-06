@@ -89,6 +89,15 @@ func (g *GlobalConst) Ref() *GlobalRef {
 	return g.ref
 }
 
+// ExternalAttrs holds metadata for external (FFI) function declarations
+// that needs to be preserved across lowering passes and codegen.
+type ExternalAttrs struct {
+	CName    string // C symbol name (resolved CName / mangled alias)
+	DLLName  string // optional DLL / shared library override
+	Variadic bool   // accepts C-style varargs (...)
+	CallConv string // optional calling convention identifier
+}
+
 // ── ExternalFunc ──────────────────────────────────────────────────────────────
 
 // ExternalFunc is a declaration-only function — no body, only a signature.
@@ -97,6 +106,10 @@ type ExternalFunc struct {
 	Name    string
 	Sig     *FunctionType
 	Linkage Linkage
+	// Attrs stores optional external-specific attributes (C name, dll name,
+	// variadic marker, call-convention, etc).  It is nil when no attributes
+	// were provided.
+	Attrs *ExternalAttrs
 }
 
 func (e *ExternalFunc) String() string {
@@ -111,11 +124,42 @@ func (e *ExternalFunc) String() string {
 			params[i] = p.String()
 		}
 	}
+	// If variadic, append ellipsis marker. The variadic-ness may be carried
+	// in the Attrs struct when present.
+	if e.Attrs != nil && e.Attrs.Variadic {
+		if len(params) > 0 {
+			params = append(params, "...")
+		} else {
+			params = []string{"..."}
+		}
+	}
 	res := "void"
 	if e.Sig.Result != nil {
 		res = e.Sig.Result.String()
 	}
-	return fmt.Sprintf("declare @%s(%s) -> %s", e.Name, joinStrings(params, ", "), res)
+	out := fmt.Sprintf("declare @%s(%s) -> %s", e.Name, joinStrings(params, ", "), res)
+	// Render optional external attributes in a compact bracketed list. Keep
+	// backward-compatible textual appearance by using the previous [dll="..."]
+	// form when DLLName is present.
+	if e.Attrs != nil {
+		var parts []string
+		if e.Attrs.CName != "" {
+			parts = append(parts, fmt.Sprintf("cname=%q", e.Attrs.CName))
+		}
+		if e.Attrs.DLLName != "" {
+			parts = append(parts, fmt.Sprintf("dll=%q", e.Attrs.DLLName))
+		}
+		if e.Attrs.Variadic {
+			parts = append(parts, "varargs")
+		}
+		if e.Attrs.CallConv != "" {
+			parts = append(parts, fmt.Sprintf("callconv=%q", e.Attrs.CallConv))
+		}
+		if len(parts) > 0 {
+			out = out + " [" + joinStrings(parts, " ") + "]"
+		}
+	}
+	return out
 }
 
 // joinStrings concatenates elems with sep (avoids importing strings in global.go).

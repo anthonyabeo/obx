@@ -218,7 +218,24 @@ func (l *Lowerer) lowerExternalFunc(d *desugar.Function) {
 		params = append(params, LowerType(p.Typ))
 	}
 	sig := &FunctionType{Params: params, Result: LowerType(d.Result)}
-	ef := &ExternalFunc{Name: d.FnName(), Sig: sig, Linkage: ExternalLinkage}
+	// Build ExternalFunc and attach optional external attributes so downstream
+	// phases (IR, codegen, symbol emission) can access C-name, DLL override,
+	// and variadic / calling-convention metadata.
+	cName := d.Mangled
+	if cName == "" {
+		cName = d.Name
+	}
+	ef := &ExternalFunc{
+		Name:    d.FnName(),
+		Sig:     sig,
+		Linkage: ExternalLinkage,
+		Attrs: &ExternalAttrs{
+			CName:    cName,
+			DLLName:  d.DLLName,
+			Variadic: d.IsVarArgs,
+			CallConv: "",
+		},
+	}
 	l.mod.Externals = append(l.mod.Externals, ef)
 }
 
