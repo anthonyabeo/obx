@@ -249,7 +249,7 @@ func TestCompile(t *testing.T) {
 					t.Fatalf("failed to find project root: %v", err)
 				}
 
-				outDir := root + "/out"
+				outDir := root + "/build"
 				if _, err := os.Stat(outDir); os.IsNotExist(err) {
 					if err := os.MkdirAll(outDir, 0755); err != nil {
 						t.Fatalf("failed to create out directory: %v", err)

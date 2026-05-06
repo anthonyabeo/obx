@@ -37,7 +37,7 @@ var buildArgs struct {
 
 	// minir text emission
 	EmitMinir bool   // --emit-minir: write textual minir for every module
-	MinirOut  string // --minir-out: directory to write .minir files (defaults to out/)
+	MinirOut  string // --minir-out: directory to write .minir files (defaults to build/)
 }
 
 func init() {
@@ -56,9 +56,9 @@ func init() {
 	buildCmd.Flags().BoolVarP(&buildArgs.Verbose, "verbose", "V", false, "output detailed optimisation info")
 	buildCmd.Flags().BoolVarP(&buildArgs.Asm, "asm", "S", false, "print assembly to stdout")
 	buildCmd.Flags().BoolVarP(&buildArgs.EmitMinir, "emit-minir", "I", false,
-		"write textual minir for every lowered module to --minir-out (or out/)")
+		"write textual minir for every lowered module to --minir-out (or build/)")
 	buildCmd.Flags().StringVar(&buildArgs.MinirOut, "minir-out", "",
-		"directory to write .minir files when --emit-minir is set (defaults to out/)")
+		"directory to write .minir files when --emit-minir is set (defaults to build/)")
 }
 
 var buildCmd = &cobra.Command{
@@ -169,7 +169,8 @@ precedence over obx.mod values.`,
 		if buildArgs.EmitMinir {
 			minirDir := buildArgs.MinirOut
 			if minirDir == "" {
-				minirDir = filepath.Join(projectDir, "out")
+				// write textual minir output to the project's build/ directory by default
+				minirDir = filepath.Join(projectDir, "build")
 			}
 			if err := os.MkdirAll(minirDir, 0755); err != nil {
 				log.Printf("build: cannot create minir output dir %s: %v", minirDir, err)
@@ -185,7 +186,9 @@ precedence over obx.mod values.`,
 					if _, err := minir.NewEmitter(f).EmitModule(mod); err != nil {
 						log.Printf("build: emit minir for %s: %v", mod.Name, err)
 					}
-					f.Close()
+					if err := f.Close(); err != nil {
+						log.Printf("build: close %s: %v", outPath, err)
+					}
 					fmt.Printf("  minir: wrote %s\n", outPath)
 				}
 			}
@@ -201,18 +204,22 @@ precedence over obx.mod values.`,
 		})
 
 		// ── 7. Emit assembly ──────────────────────────────────────────────
-		outDir := filepath.Join(projectDir, "out")
+		// write generated artifacts (assembly, link flags) to the project's build/ directory
+		buildDir := filepath.Join(projectDir, "build")
+		if err := os.MkdirAll(buildDir, 0755); err != nil {
+			log.Printf("failed to create build dir: %v", err)
+		}
 		seenDLL := make(map[string]bool)
 		var linkLibs []string
 
 		for _, module := range MIRProgram.Modules {
-			asmPath := filepath.Join(outDir, module.Name+".s")
+			asmPath := filepath.Join(buildDir, module.Name+".s")
 			asmFile, err := os.Create(asmPath)
 			if err != nil {
 				log.Printf("failed to create assembly file: %v", err)
 				continue
 			}
-			defer asmFile.Close()
+			// explicitly close the asm file at the end of this iteration and log any error
 
 			targetDesc := filepath.Join(projectDir, "src", "codegen", "target", "desc")
 			ss, err := codegen.Compile(module, mach, targetDesc, codegen.CompileOptions{Debug: buildArgs.Asm})
@@ -233,7 +240,11 @@ precedence over obx.mod values.`,
 				if ext.DLLName != "" && !seenDLL[ext.DLLName] {
 					seenDLL[ext.DLLName] = true
 					linkLibs = append(linkLibs, ext.DLLName)
-				}
+												// close asm file for this module
+												if err := asmFile.Close(); err != nil {
+													log.Printf("failed to close assembly file %s: %v", asmPath, err)
+												}
+										}
 			}
 		}
 
@@ -243,7 +254,10 @@ precedence over obx.mod values.`,
 			for _, lib := range linkLibs {
 				flags = append(flags, "-l"+lib)
 			}
-			flagsPath := filepath.Join(outDir, "link.flags")
+			flagsPath := filepath.Join(buildDir, "link.flags")
+			if err := os.MkdirAll(buildDir, 0755); err != nil {
+				log.Printf("failed to create build dir: %v", err)
+			}
 			if err := os.WriteFile(flagsPath, []byte(strings.Join(flags, "\n")+"\n"), 0644); err != nil {
 				log.Printf("failed to write link.flags: %v", err)
 			} else {

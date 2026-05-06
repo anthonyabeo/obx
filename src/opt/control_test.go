@@ -388,14 +388,14 @@ end Main
 
 					dot := function.OutputDOT()
 
-					outDir, err := os.MkdirTemp(projectRoot, "cfg-*")
-					if err != nil {
-						t.Errorf("failed to create temp directory: %s", err)
+					buildDir := filepath.Join(projectRoot, "build")
+					if err := os.MkdirAll(buildDir, 0755); err != nil {
+						t.Errorf("failed to create build directory: %s", err)
 						continue
 					}
 
-					dotFile := fmt.Sprintf("%s/%s.cfg.dot", outDir, function.FnName)
-					pngFile := fmt.Sprintf("%s/%s.cfg.png", outDir, function.FnName)
+					dotFile := fmt.Sprintf("%s/%s.cfg.dot", buildDir, function.FnName)
+					pngFile := fmt.Sprintf("%s/%s.cfg.png", buildDir, function.FnName)
 
 					if err := os.WriteFile(dotFile, []byte(dot), 0644); err != nil {
 						t.Errorf("failed to write dot: %s", err)

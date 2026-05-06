@@ -106,7 +106,7 @@ func printIDoms(idom map[*obxir.Block]*obxir.Block) {
 // a project tree still succeed.
 func vizOutputDir(suffix string) (string, error) {
 	if Root, err := project.FindProjectRoot(); err == nil {
-		outDir := filepath.Join(Root, "out")
+		outDir := filepath.Join(Root, "build")
 		if err := os.MkdirAll(outDir, 0755); err != nil {
 			return "", fmt.Errorf("failed to create output directory: %w", err)
 		}

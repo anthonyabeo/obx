@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/project"
@@ -73,8 +74,13 @@ func (fn *Function) OutputDOT() {
 		panic(err)
 	}
 
-	dotFile := fmt.Sprintf("%s/out/%s.asm.dot", Root, fn.Name)
-	pngFile := fmt.Sprintf("%s/out/%s.asm.png", Root, fn.Name)
+	buildDir := filepath.Join(Root, "build")
+	if err := os.MkdirAll(buildDir, 0755); err != nil {
+		panic(err)
+	}
+
+	dotFile := fmt.Sprintf("%s/%s.asm.dot", buildDir, fn.Name)
+	pngFile := fmt.Sprintf("%s/%s.asm.png", buildDir, fn.Name)
 
 	if err = os.WriteFile(dotFile, []byte(dot), 0644); err != nil {
 		panic(err)
