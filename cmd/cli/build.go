@@ -15,6 +15,7 @@ import (
 	_ "github.com/anthonyabeo/obx/src/codegen/target/riscv" // register rv64imafd
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/minir"
+	miniropt "github.com/anthonyabeo/obx/src/ir/minir/opt"
 	"github.com/anthonyabeo/obx/src/ir/obxir"
 	"github.com/anthonyabeo/obx/src/opt"
 	"github.com/anthonyabeo/obx/src/project"
@@ -176,6 +177,12 @@ precedence over obx.mod values.`,
 				log.Printf("build: cannot create minir output dir %s: %v", minirDir, err)
 			} else {
 				lowered := minir.Lower(hirProgram)
+				// Promote non-escaping scalar allocas before emitting textual minir.
+				for _, mod := range lowered.Modules {
+					for _, fn := range mod.Functions {
+						miniropt.Mem2Reg(fn)
+					}
+				}
 				for _, mod := range lowered.Modules {
 					outPath := filepath.Join(minirDir, mod.Name+".minir")
 					f, err := os.Create(outPath)

@@ -18,6 +18,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/minir"
+	miniropt "github.com/anthonyabeo/obx/src/ir/minir/opt"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
@@ -446,6 +447,12 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 
 	var graphs []graphEntry
 	lowered := minir.Lower(hirProgram)
+	// Promote non-escaping scalar allocas before generating CFG graphs.
+	for _, mod := range lowered.Modules {
+		for _, fn := range mod.Functions {
+			miniropt.Mem2Reg(fn)
+		}
+	}
 	for _, mod := range lowered.Modules {
 		for _, fn := range mod.Functions {
 			dotSrc := fn.OutputDOT()
@@ -689,6 +696,12 @@ func (s *Server) HandleMinir(w http.ResponseWriter, r *http.Request) {
 	// ── lower and emit ────────────────────────────────────────────────────
 	hirProgram := desugar.NewGenerator(obx, ctx).Generate()
 	lowered := minir.Lower(hirProgram)
+	// Promote non-escaping scalar allocas before emitting textual minir.
+	for _, mod := range lowered.Modules {
+		for _, fn := range mod.Functions {
+			miniropt.Mem2Reg(fn)
+		}
+	}
 
 	type moduleEntry struct {
 		Name string `json:"name"`

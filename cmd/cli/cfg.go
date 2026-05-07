@@ -10,6 +10,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/minir"
+	miniropt "github.com/anthonyabeo/obx/src/ir/minir/opt"
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -109,6 +110,12 @@ otherwise the module entry or the first lowered function is used.`,
 		gen := desugar.NewGenerator(obx, ctx)
 		prog := gen.Generate()
 		lowered := minir.Lower(prog)
+		// Promote non-escaping scalar allocas before outputting the CFG.
+		for _, mod := range lowered.Modules {
+			for _, fn := range mod.Functions {
+				miniropt.Mem2Reg(fn)
+			}
+		}
 		var fns []*minir.Function
 		for _, mod := range lowered.Modules {
 			fns = append(fns, mod.Functions...)
