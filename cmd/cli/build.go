@@ -177,10 +177,11 @@ precedence over obx.mod values.`,
 				log.Printf("build: cannot create minir output dir %s: %v", minirDir, err)
 			} else {
 				lowered := minir.Lower(hirProgram)
-				// Promote non-escaping scalar allocas before emitting textual minir.
+				// Promote non-escaping scalar allocas, then forward store-to-load pairs.
 				for _, mod := range lowered.Modules {
 					for _, fn := range mod.Functions {
 						miniropt.Mem2Reg(fn)
+						miniropt.LoadForward(fn)
 					}
 				}
 				for _, mod := range lowered.Modules {

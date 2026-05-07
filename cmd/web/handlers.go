@@ -447,10 +447,11 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 
 	var graphs []graphEntry
 	lowered := minir.Lower(hirProgram)
-	// Promote non-escaping scalar allocas before generating CFG graphs.
+	// Promote non-escaping scalar allocas, then forward store-to-load pairs.
 	for _, mod := range lowered.Modules {
 		for _, fn := range mod.Functions {
 			miniropt.Mem2Reg(fn)
+			miniropt.LoadForward(fn)
 		}
 	}
 	for _, mod := range lowered.Modules {
@@ -696,10 +697,11 @@ func (s *Server) HandleMinir(w http.ResponseWriter, r *http.Request) {
 	// ── lower and emit ────────────────────────────────────────────────────
 	hirProgram := desugar.NewGenerator(obx, ctx).Generate()
 	lowered := minir.Lower(hirProgram)
-	// Promote non-escaping scalar allocas before emitting textual minir.
+	// Promote non-escaping scalar allocas, then forward store-to-load pairs.
 	for _, mod := range lowered.Modules {
 		for _, fn := range mod.Functions {
 			miniropt.Mem2Reg(fn)
+			miniropt.LoadForward(fn)
 		}
 	}
 
