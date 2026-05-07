@@ -27,6 +27,11 @@ func hirParamRef(name string, ty types.Type) *desugar.Param {
 	return &desugar.Param{Name: name, Kind: desugar.ValueParam, Typ: ty}
 }
 
+// helper for VAR parameter (passed by reference)
+func hirParamVar(name string, ty types.Type) *desugar.Param {
+	return &desugar.Param{Name: name, Kind: desugar.VarParam, Typ: ty}
+}
+
 func hirLit(val string, ty types.Type) *desugar.Literal {
 	return &desugar.Literal{Kind: token.INT32_LIT, Value: val, SemaType: ty}
 }
@@ -239,3 +244,96 @@ func TestLower_IfNoElse(t *testing.T) {
 	}
 	checkLower(t, "abs", Lower(hirProg(fn)))
 }
+
+// ── 6. increment(var x: INT32) – ensure VAR param lowers to incoming address
+
+func TestLower_Increment(t *testing.T) {
+	tempIDCounter = 0
+	i32 := types.Int32Type
+
+	// increment(VAR x: INT32) := x := x + 1
+	fn := &desugar.Function{
+		Name:   "increment",
+		Params: []*desugar.Param{hirParamVar("x", i32)},
+		Body: &desugar.CompoundStmt{Stmts: []desugar.Stmt{
+			&desugar.AssignStmt{
+				Left: &desugar.Param{Name: "x", Kind: desugar.VarParam, Typ: i32},
+				Right: &desugar.BinaryExpr{
+					Op:       token.PLUS,
+					Left:     &desugar.Param{Name: "x", Kind: desugar.VarParam, Typ: i32},
+					Right:    hirLit("1", i32),
+					SemaType: i32,
+				},
+			},
+		}},
+	}
+
+	prog := Lower(hirProg(fn))
+
+	// Basic sanity checks on lowered function shape
+	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 {
+		t.Fatalf("increment: expected 1 module with 1 function, got %d modules / %d functions",
+			len(prog.Modules), func() int { if len(prog.Modules) > 0 { return len(prog.Modules[0].Functions) }; return 0 }())
+	}
+	lfn := prog.Modules[0].Functions[0]
+	if len(lfn.Params) != 1 {
+		t.Fatalf("increment: expected 1 lowered param, got %d", len(lfn.Params))
+	}
+	p := lfn.Params[0]
+	// VAR params should be incoming pointer/address temps
+	if _, ok := p.Type().(*PointerType); !ok {
+		t.Fatalf("increment: expected param to be pointer type, got %T", p.Type())
+	}
+	if !p.IsAddr {
+		t.Fatalf("increment: expected param temp to be addressable (IsAddr=true)")
+	}
+
+	// Run the usual verification and dump the lowered IR for inspection
+	checkLower(t, "increment", prog)
+}
+
+// ── 7. in parameter – ensure IN param lowers to incoming address (read-only)
+
+func TestLower_InParam(t *testing.T) {
+	tempIDCounter = 0
+	i32 := types.Int32Type
+
+	// increment(IN x: INT32) := RETURN x + 1
+	fn := &desugar.Function{
+		Name:   "increment_in",
+		Params: []*desugar.Param{{Name: "x", Kind: desugar.InParam, Typ: i32}},
+		Result: i32,
+		Body: &desugar.CompoundStmt{Stmts: []desugar.Stmt{
+			&desugar.ReturnStmt{Result: &desugar.BinaryExpr{
+				Op:       token.PLUS,
+				Left:     &desugar.Param{Name: "x", Kind: desugar.InParam, Typ: i32},
+				Right:    hirLit("1", i32),
+				SemaType: i32,
+			}},
+		}},
+	}
+
+	prog := Lower(hirProg(fn))
+
+	// Basic sanity checks on lowered function shape
+	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 {
+		t.Fatalf("increment_in: expected 1 module with 1 function, got %d modules / %d functions",
+			len(prog.Modules), func() int { if len(prog.Modules) > 0 { return len(prog.Modules[0].Functions) }; return 0 }())
+	}
+	lfn := prog.Modules[0].Functions[0]
+	if len(lfn.Params) != 1 {
+		t.Fatalf("increment_in: expected 1 lowered param, got %d", len(lfn.Params))
+	}
+	p := lfn.Params[0]
+	// IN params should be incoming pointer/address temps
+	if _, ok := p.Type().(*PointerType); !ok {
+		t.Fatalf("increment_in: expected param to be pointer type, got %T", p.Type())
+	}
+	if !p.IsAddr {
+		t.Fatalf("increment_in: expected param temp to be addressable (IsAddr=true)")
+	}
+
+	// Run the usual verification and dump the lowered IR for inspection
+	checkLower(t, "increment_in", prog)
+}
+

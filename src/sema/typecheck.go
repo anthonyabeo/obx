@@ -2787,7 +2787,7 @@ func (t *TypeChecker) VisitAssignmentStmt(stmt *ast.AssignmentStmt) any {
 	if !t.isAssignable(stmt.LValue) {
 		t.ctx.Reporter.Report(diag.Diagnostic{
 			Severity: diag.Error,
-			Message:  fmt.Sprintf("left-hand side of assignment assignment, '%s', is not assignable", stmt.LValue),
+			Message:  fmt.Sprintf("left-hand side of assignment, '%s', is not assignable", stmt.LValue),
 			Range:    t.ctx.Source.Span(t.ctx.FileName, stmt.LValue.Pos(), stmt.LValue.End()),
 		})
 		return stmt

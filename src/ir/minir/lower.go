@@ -215,7 +215,15 @@ func (l *Lowerer) lowerGlobalConst(d *desugar.Constant) {
 func (l *Lowerer) lowerExternalFunc(d *desugar.Function) {
 	var params []Type
 	for _, p := range d.Params {
-		params = append(params, LowerType(p.Typ))
+		pt := LowerType(p.Typ)
+		if pt == nil {
+			pt = primI32
+		}
+		// VAR and IN formals are passed by reference: use pointer types.
+		if p.Kind == desugar.VarParam || p.Kind == desugar.InParam {
+			pt = Ptr(pt)
+		}
+		params = append(params, pt)
 	}
 	sig := &FunctionType{Params: params, Result: LowerType(d.Result)}
 	// Build ExternalFunc and attach optional external attributes so downstream
@@ -471,33 +479,27 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 	fn.Blocks[entry.ID] = entry
 	l.switchTo(entry)
 
-	// parameters: for ValueParam keep incoming SSA temp (no alloca).
-	// For VarParam/InParam create an addressable alloca and store the incoming value.
+	// parameters: ValueParam -> incoming SSA temp (element type).
+	// VarParam/InParam -> incoming pointer param (address of the actual).
 	for _, p := range hirFn.Params {
-		pt := LowerType(p.Typ)
-		if pt == nil {
-			pt = primI32
+		et := LowerType(p.Typ)
+		if et == nil {
+			et = primI32
 		}
-		param := NewTemp(p.Name, pt)
+		var param *Temp
+		if p.Kind == desugar.VarParam || p.Kind == desugar.InParam {
+			// Expect a pointer parameter for VAR/IN semantics.
+			param = NewTemp(p.Name, Ptr(et))
+			param.IsAddr = true
+		} else {
+			// Value parameter: incoming SSA temp of element type.
+			param = NewTemp(p.Name, et)
+		}
 		fn.Params = append(fn.Params, param)
 		// record original HIR param kind for downstream passes
 		fn.ParamKinds = append(fn.ParamKinds, p.Kind)
-
-		switch p.Kind {
-		case desugar.ValueParam:
-			// Keep incoming param as a register temp; map name -> temp so uses
-			// resolve directly to the SSA value. No Alloca/Store emitted.
-			l.varEnv[p.Name] = param
-		case desugar.VarParam, desugar.InParam:
-			// addressable parameter: allocate stack slot and store incoming value
-			addr := l.newAddrTemp(p.Name, pt)
-			l.emit(&AllocaInst{Dst: addr, AllocType: pt})
-			l.varEnv[p.Name] = addr
-			l.emit(&StoreInst{Val: param, Addr: addr})
-		default:
-			// conservative default: treat as value param
-			l.varEnv[p.Name] = param
-		}
+		// Bind name to either the value temp or address temp accordingly.
+		l.varEnv[p.Name] = param
 	}
 
 	// locals: alloca for variables, inline for constants
@@ -520,6 +522,8 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 			if d.Mangled != "" {
 				l.constEnv[d.Mangled] = cv
 			}
+			//case *desugar.Function:
+			//case *desugar.Type:
 		}
 	}
 
@@ -878,12 +882,62 @@ func (l *Lowerer) lowerCallStmt(call *desugar.FuncCall) {
 		return
 	}
 	var args []Value
-	for _, a := range call.Args {
-		args = append(args, l.lowerValue(a))
-	}
+	// Determine which formals expect addresses (VAR/IN) when possible.
+	var formalAddr []bool
 	callee := call.Func.Mangled
 	if callee == "" {
 		callee = call.Func.Name
+	}
+	// 1) Try to find a lowered function in the current module with ParamKinds
+	if l.mod != nil {
+		for _, fn := range l.mod.Functions {
+			if fn.FnName == callee && len(fn.ParamKinds) > 0 {
+				for _, k := range fn.ParamKinds {
+					formalAddr = append(formalAddr, k == desugar.VarParam || k == desugar.InParam)
+				}
+				break
+			}
+		}
+	}
+	// 2) If not found, check module externals signature (pointer params imply address semantics)
+	if formalAddr == nil && l.mod != nil {
+		for _, ef := range l.mod.Externals {
+			if ef.Name == callee && ef.Sig != nil {
+				for _, pt := range ef.Sig.Params {
+					if _, ok := pt.(*PointerType); ok {
+						formalAddr = append(formalAddr, true)
+					} else {
+						formalAddr = append(formalAddr, false)
+					}
+				}
+				break
+			}
+		}
+	}
+	// 3) If still unknown, use HIR procedure type info when available
+	if formalAddr == nil {
+		if pt, ok := call.Func.SemaType.(*types.ProcedureType); ok && pt != nil {
+			for _, fp := range pt.Params {
+				kind := strings.ToUpper(fp.Kind)
+				if kind == "VAR" || kind == "IN" {
+					formalAddr = append(formalAddr, true)
+				} else {
+					formalAddr = append(formalAddr, false)
+				}
+			}
+		}
+	}
+
+	for i, a := range call.Args {
+		needAddr := false
+		if formalAddr != nil && i < len(formalAddr) {
+			needAddr = formalAddr[i]
+		}
+		if needAddr {
+			args = append(args, l.lowerAddr(a))
+		} else {
+			args = append(args, l.lowerValue(a))
+		}
 	}
 	l.emit(&CallInst{Callee: callee, Args: args})
 }
@@ -1752,13 +1806,61 @@ func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
 		}
 		return NewConst("0", int64(0), rt)
 	}
+
 	var args []Value
-	for _, a := range call.Args {
-		args = append(args, l.lowerValue(a))
-	}
+	// Determine which formals expect addresses (VAR/IN) when possible.
+	var formalAddr []bool
 	callee := call.Func.Mangled
 	if callee == "" {
 		callee = call.Func.Name
+	}
+	if l.mod != nil {
+		for _, fn := range l.mod.Functions {
+			if fn.FnName == callee && len(fn.ParamKinds) > 0 {
+				for _, k := range fn.ParamKinds {
+					formalAddr = append(formalAddr, k == desugar.VarParam || k == desugar.InParam)
+				}
+				break
+			}
+		}
+	}
+	if formalAddr == nil && l.mod != nil {
+		for _, ef := range l.mod.Externals {
+			if ef.Name == callee && ef.Sig != nil {
+				for _, pt := range ef.Sig.Params {
+					if _, ok := pt.(*PointerType); ok {
+						formalAddr = append(formalAddr, true)
+					} else {
+						formalAddr = append(formalAddr, false)
+					}
+				}
+				break
+			}
+		}
+	}
+	if formalAddr == nil {
+		if pt, ok := call.Func.SemaType.(*types.ProcedureType); ok && pt != nil {
+			for _, fp := range pt.Params {
+				kind := strings.ToUpper(fp.Kind)
+				if kind == "VAR" || kind == "IN" {
+					formalAddr = append(formalAddr, true)
+				} else {
+					formalAddr = append(formalAddr, false)
+				}
+			}
+		}
+	}
+
+	for i, a := range call.Args {
+		needAddr := false
+		if formalAddr != nil && i < len(formalAddr) {
+			needAddr = formalAddr[i]
+		}
+		if needAddr {
+			args = append(args, l.lowerAddr(a))
+		} else {
+			args = append(args, l.lowerValue(a))
+		}
 	}
 	rt := LowerType(call.RetType)
 	var dst *Temp
