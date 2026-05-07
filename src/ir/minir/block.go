@@ -129,6 +129,13 @@ func (f *Function) GetBlock(label string) *Block {
 	return nil
 }
 
+// RemoveBlock removes b from the function's block map.
+// It does not update predecessor/successor lists of other blocks; callers are
+// responsible for maintaining CFG consistency before calling RemoveBlock.
+func (f *Function) RemoveBlock(b *Block) {
+	delete(f.Blocks, b.ID)
+}
+
 // DFSOrder returns block IDs in depth-first order starting from entry.
 func (f *Function) DFSOrder() []int {
 	visited := make(map[int]bool)

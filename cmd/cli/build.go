@@ -176,14 +176,17 @@ precedence over obx.mod values.`,
 			if err := os.MkdirAll(minirDir, 0755); err != nil {
 				log.Printf("build: cannot create minir output dir %s: %v", minirDir, err)
 			} else {
-				lowered := minir.Lower(hirProgram)
-				// Promote non-escaping scalar allocas, then forward store-to-load pairs.
-				for _, mod := range lowered.Modules {
-					for _, fn := range mod.Functions {
-						miniropt.Mem2Reg(fn)
-						miniropt.LoadForward(fn)
-					}
+			lowered := minir.Lower(hirProgram)
+			// Promote non-escaping scalar allocas, forward store-to-load pairs,
+			// then run CFG clean-up (dead blocks, combine, empty-block removal,
+			// redundant-branch folding, branch hoisting).
+			for _, mod := range lowered.Modules {
+				for _, fn := range mod.Functions {
+					miniropt.Mem2Reg(fn)
+					miniropt.LoadForward(fn)
+					miniropt.CleanCFG(fn)
 				}
+			}
 				for _, mod := range lowered.Modules {
 					outPath := filepath.Join(minirDir, mod.Name+".minir")
 					f, err := os.Create(outPath)

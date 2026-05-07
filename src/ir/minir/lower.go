@@ -288,6 +288,10 @@ func lowerConstant(expr desugar.Expr) *Constant {
 		return NewConst("true", int64(1), primI1)
 	case token.FALSE:
 		return NewConst("false", int64(0), primI1)
+	case token.CHAR_LIT, token.WCHAR_LIT:
+		return NewConst(lit.Value, lit.Value, primI32)
+	case token.STR_LIT, token.HEX_STR_LIT:
+		return NewConst(lit.Value, lit.Value, NewArrayType(len(lit.Value)+1, primI32))
 	case token.NIL:
 		return NewConst("nil", int64(0), Ptr(primI32))
 	default:
@@ -530,14 +534,19 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 		l.lowerStmts(hirFn.Body)
 	}
 
-	// ensure the current block is terminated: jump to the canonical exit
+	// ensure the current block is terminated: jump to the canonical exit.
+	// Only wire the CFG edge when curBlock is actually registered in fn.Blocks
+	// (i.e. it is a live, reachable block). Dead orphan blocks (e.g. the
+	// continuation after an all-branches-return if-else) must not create a
+	// spurious edge to fn.Exit.
 	if l.curBlock != nil && l.curBlock.Term == nil {
 		j := &JumpInst{Target: fn.Exit.Label}
 		l.emit(j)
 		l.curBlock.Term = j
-		// wire succ/pred immediately
-		l.curBlock.AddSucc(fn.Exit)
-		fn.Exit.AddPred(l.curBlock)
+		if _, live := fn.Blocks[l.curBlock.ID]; live {
+			l.curBlock.AddSucc(fn.Exit)
+			fn.Exit.AddPred(l.curBlock)
+		}
 	}
 
 	// wire CFG edges from other terminators (linkCFG is idempotent with our
@@ -606,6 +615,12 @@ func (l *Lowerer) lowerReturn(st *desugar.ReturnStmt) {
 	ret := &ReturnInst{Result: result}
 	l.emit(ret)
 	l.curBlock.Term = ret
+	// Wire a CFG edge to the canonical exit block so all return paths are
+	// visible in the CFG — mirrors the pattern used in builtinHalt.
+	if l.fn != nil && l.fn.Exit != nil {
+		l.curBlock.AddSucc(l.fn.Exit)
+		l.fn.Exit.AddPred(l.curBlock)
+	}
 	// Switch to an orphan block so unreachable code after RETURN emits into
 	// a block that is NOT in fn.Blocks, and is therefore ignored by the verifier.
 	dead := l.newBlock(l.newLabel("dead"))
@@ -614,6 +629,10 @@ func (l *Lowerer) lowerReturn(st *desugar.ReturnStmt) {
 
 func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 	endLabel := l.newLabel("if_end")
+	// hasLiveJumpToEnd tracks whether any live (in-fn.Blocks) block provides
+	// a path to endLabel.  When false, endBlk is unreachable and need not be
+	// added to fn.Blocks.
+	hasLiveJumpToEnd := false
 
 	type branch struct {
 		cond desugar.Expr
@@ -636,6 +655,8 @@ func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 			falseLabel = l.newLabel("if_else")
 		} else {
 			falseLabel = endLabel
+			// The CondBr's false path leads directly to endLabel from a live block.
+			hasLiveJumpToEnd = true
 		}
 
 		cbr := &CondBrInst{Cond: condTemp, TrueLabel: trueLabel, FalseLabel: falseLabel}
@@ -650,6 +671,10 @@ func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 			j := &JumpInst{Target: endLabel}
 			l.emit(j)
 			l.curBlock.Term = j
+			// Count as live only when curBlock is a registered live block.
+			if _, live := l.fn.Blocks[l.curBlock.ID]; live {
+				hasLiveJumpToEnd = true
+			}
 		}
 
 		if falseLabel != endLabel {
@@ -665,11 +690,19 @@ func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 			j := &JumpInst{Target: endLabel}
 			l.emit(j)
 			l.curBlock.Term = j
+			if _, live := l.fn.Blocks[l.curBlock.ID]; live {
+				hasLiveJumpToEnd = true
+			}
 		}
 	}
 
 	endBlk := l.newBlock(endLabel)
-	l.fn.Blocks[endBlk.ID] = endBlk
+	// Only register endBlk when at least one live predecessor jumps to it;
+	// otherwise every branch terminated (e.g. all paths return) and endBlk
+	// would be an orphaned, unreachable block in fn.Blocks.
+	if hasLiveJumpToEnd {
+		l.fn.Blocks[endBlk.ID] = endBlk
+	}
 	l.switchTo(endBlk)
 }
 

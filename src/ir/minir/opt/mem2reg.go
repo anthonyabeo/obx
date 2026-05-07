@@ -89,6 +89,12 @@ func Mem2Reg(fn *minir.Function) int {
 				if placed[y] {
 					continue
 				}
+				// Never place φ-nodes in the exit block: it is a sentinel with
+				// only a void ret, and doing so creates dead phis for every
+				// variable defined on only some return paths.
+				if fn.Exit != nil && y.ID == fn.Exit.ID {
+					continue
+				}
 				// Insert a φ-node for alloca a at the top of block y.
 				phi := &minir.PhiInst{
 					Dst:  minir.NewAnonTemp(a.AllocType),

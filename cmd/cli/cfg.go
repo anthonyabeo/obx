@@ -110,11 +110,13 @@ otherwise the module entry or the first lowered function is used.`,
 		gen := desugar.NewGenerator(obx, ctx)
 		prog := gen.Generate()
 		lowered := minir.Lower(prog)
-		// Promote non-escaping scalar allocas, then forward store-to-load pairs.
+		// Promote non-escaping scalar allocas, forward store-to-load pairs,
+		// then run CFG clean-up passes.
 		for _, mod := range lowered.Modules {
 			for _, fn := range mod.Functions {
 				miniropt.Mem2Reg(fn)
 				miniropt.LoadForward(fn)
+				miniropt.CleanCFG(fn)
 			}
 		}
 		var fns []*minir.Function
