@@ -3,4 +3,6 @@
 out/
 **/cfg-*
 build/
+stdlib/cache/*
 !/build/.gitkeep
+!/stdlib/cache/.gitkeep
