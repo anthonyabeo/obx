@@ -9,6 +9,7 @@ func Run() error {
 	}
 	rootCmd.AddCommand(buildCmd)
 	rootCmd.AddCommand(checkCmd)
+	rootCmd.AddCommand(precompileCmd)
 	rootCmd.AddCommand(cfgCmd)
 	rootCmd.AddCommand(newCmd)
 	rootCmd.AddCommand(webCmd)

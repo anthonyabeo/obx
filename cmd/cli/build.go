@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	zlog "github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/anthonyabeo/obx/src/codegen"
@@ -20,6 +21,7 @@ import (
 	"github.com/anthonyabeo/obx/src/opt"
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/sema"
+	"github.com/anthonyabeo/obx/src/support/cache"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
@@ -140,7 +142,59 @@ precedence over obx.mod values.`,
 
 		obx := ast.NewOberonX()
 
-		if ok := parseModules(sorted, ctx, obx); !ok {
+		// Attempt to load precompiled .obxi bundles for discovered modules.
+		// This injects pre-built sema scopes and/or pre-lowered minir modules
+		// for stdlib modules (if available) so we can skip reparsing/re-sema
+		// while still providing symbols to the rest of the program.
+		preBundles := make(map[string]*minir.Module)
+		loadedNames := make(map[string]bool)
+		for _, h := range sorted {
+			// look for sibling .obxi next to the .obx file (e.g. IO.obx -> IO.obxi)
+			obxPath := h.File
+			obxiPath := obxPath[:len(obxPath)-len(".obx")] + ".obxi"
+			if _, err := os.Stat(obxiPath); err == nil {
+				if b, err := cache.LoadBundle(obxiPath, nil); err == nil {
+					// inject scope into AST environment so semantic analysis of
+					// other modules can reference the precompiled module.
+					ctx.Env.AddModuleScope(b.ModuleName, b.Scope)
+					preBundles[b.ModuleName] = b.Module
+					// mark this header as loaded so we skip parsing it
+					loadedNames[h.Key.Name()] = true
+					zlog.Info().Str("module", b.ModuleName).Str("path", obxiPath).Msg("build: precompiled module loaded; will skip parsing")
+					continue
+				}
+			}
+			// also look for cache/<name>.obxi alongside stdlib (e.g. stdlib/cache/IO.obxi)
+			cachePath := filepath.Join(filepath.Dir(obxPath), "cache", filepath.Base(obxPath[:len(obxPath)-len(".obx")]+".obxi"))
+			if _, err := os.Stat(cachePath); err == nil {
+				if b, err := cache.LoadBundle(cachePath, nil); err == nil {
+					ctx.Env.AddModuleScope(b.ModuleName, b.Scope)
+					preBundles[b.ModuleName] = b.Module
+					// mark this header as loaded so we skip parsing it
+					loadedNames[h.Key.Name()] = true
+					zlog.Info().Str("module", b.ModuleName).Str("path", cachePath).Msg("build: precompiled module loaded; will skip parsing")
+					continue
+				}
+			}
+		}
+
+		// Build a filtered list of headers that still need parsing (i.e. those
+		// that did not have a precompiled .obxi bundle). This allows the
+		// pipeline to completely skip parse+sema for precompiled modules.
+		var toParse []project.Header
+		var skipped []string
+		for _, h := range sorted {
+			if loadedNames[h.Key.Name()] {
+				skipped = append(skipped, h.Key.Name())
+				continue
+			}
+			toParse = append(toParse, h)
+		}
+		if len(skipped) > 0 {
+			zlog.Info().Int("count", len(skipped)).Str("modules", strings.Join(skipped, ", ")).Msg("build: skipping parse/sema for precompiled modules")
+		}
+
+		if ok := parseModules(toParse, ctx, obx); !ok {
 			log.Fatalf("%d errors found", ctx.Reporter.ErrorCount())
 		}
 
@@ -174,31 +228,107 @@ precedence over obx.mod values.`,
 				minirDir = filepath.Join(projectDir, "build")
 			}
 			if err := os.MkdirAll(minirDir, 0755); err != nil {
-				log.Printf("build: cannot create minir output dir %s: %v", minirDir, err)
+				zlog.Error().Err(err).Str("dir", minirDir).Msg("build: cannot create minir output dir")
 			} else {
-			lowered := minir.Lower(hirProgram)
-			// Promote non-escaping scalar allocas, forward store-to-load pairs,
-			// then run CFG clean-up (dead blocks, combine, empty-block removal,
-			// redundant-branch folding, branch hoisting).
-			for _, mod := range lowered.Modules {
-				for _, fn := range mod.Functions {
-					miniropt.Mem2Reg(fn)
-					miniropt.LoadForward(fn)
-					miniropt.CleanCFG(fn)
+				lowered := minir.Lower(hirProgram)
+				// Merge any precompiled minir modules loaded earlier (.obxi bundles).
+				if len(preBundles) > 0 {
+					exist := make(map[string]bool)
+					for _, m := range lowered.Modules {
+						exist[m.Name] = true
+					}
+					for name, mod := range preBundles {
+						if exist[name] {
+							continue
+						}
+						lowered.Modules = append(lowered.Modules, mod)
+					}
 				}
-			}
+
+				// Extern dedup: merge ExternalFunc declarations across all lowered
+				// modules and precompiled bundles into a single canonical table keyed
+				// by (CName|DLLName|signature). Replace module.Externals entries
+				// with pointers to the canonical ExternalFunc objects.
+				if true {
+					uniq := make(map[string]*minir.ExternalFunc)
+					for _, m := range lowered.Modules {
+						newExts := make([]*minir.ExternalFunc, 0, len(m.Externals))
+						seen := make(map[string]bool)
+						for _, e := range m.Externals {
+							key := func() string {
+								cname := e.Name
+								dll := ""
+								vari := false
+								if e.Attrs != nil {
+									if e.Attrs.CName != "" {
+										cname = e.Attrs.CName
+									}
+									dll = e.Attrs.DLLName
+									vari = e.Attrs.Variadic
+								}
+								sig := ""
+								if e.Sig != nil {
+									// build signature string from param types + result + variadic
+									parts := make([]string, 0, len(e.Sig.Params)+1)
+									for _, p := range e.Sig.Params {
+										if p == nil {
+											parts = append(parts, "<nil>")
+										} else {
+											parts = append(parts, p.String())
+										}
+									}
+									if vari {
+										parts = append(parts, "...")
+									}
+									res := "void"
+									if e.Sig.Result != nil {
+										res = e.Sig.Result.String()
+									}
+									sig = res + "(" + strings.Join(parts, ",") + ")"
+								}
+								return cname + "|" + dll + "|" + sig
+							}()
+							if seen[key] {
+								continue
+							}
+							seen[key] = true
+							if ex, ok := uniq[key]; ok {
+								// merge attrs if missing
+								if ex.Attrs == nil && e.Attrs != nil {
+									ex.Attrs = e.Attrs
+								}
+								newExts = append(newExts, ex)
+							} else {
+								uniq[key] = e
+								newExts = append(newExts, e)
+							}
+						}
+						m.Externals = newExts
+					}
+				}
+
+				// Promote non-escaping scalar allocas, forward store-to-load pairs,
+				// then run CFG cleanup (dead blocks, combine, empty-block removal,
+				// redundant-branch folding, branch hoisting).
+				for _, mod := range lowered.Modules {
+					for _, fn := range mod.Functions {
+						miniropt.Mem2Reg(fn)
+						miniropt.LoadForward(fn)
+						miniropt.CleanCFG(fn)
+					}
+				}
 				for _, mod := range lowered.Modules {
 					outPath := filepath.Join(minirDir, mod.Name+".minir")
 					f, err := os.Create(outPath)
 					if err != nil {
-						log.Printf("build: create %s: %v", outPath, err)
+						zlog.Error().Err(err).Str("file", outPath).Msg("build: create minir output file")
 						continue
 					}
 					if _, err := minir.NewEmitter(f).EmitModule(mod); err != nil {
-						log.Printf("build: emit minir for %s: %v", mod.Name, err)
+						zlog.Error().Err(err).Str("module", mod.Name).Msg("build: emit minir failed")
 					}
 					if err := f.Close(); err != nil {
-						log.Printf("build: close %s: %v", outPath, err)
+						zlog.Error().Err(err).Str("file", outPath).Msg("build: close minir output file")
 					}
 					fmt.Printf("  minir: wrote %s\n", outPath)
 				}
@@ -218,7 +348,7 @@ precedence over obx.mod values.`,
 		// write generated artifacts (assembly, link flags) to the project's build/ directory
 		buildDir := filepath.Join(projectDir, "build")
 		if err := os.MkdirAll(buildDir, 0755); err != nil {
-			log.Printf("failed to create build dir: %v", err)
+			zlog.Error().Err(err).Msg("failed to create build dir")
 		}
 		seenDLL := make(map[string]bool)
 		var linkLibs []string
@@ -227,7 +357,7 @@ precedence over obx.mod values.`,
 			asmPath := filepath.Join(buildDir, module.Name+".s")
 			asmFile, err := os.Create(asmPath)
 			if err != nil {
-				log.Printf("failed to create assembly file: %v", err)
+				zlog.Error().Err(err).Msg("failed to create assembly file")
 				continue
 			}
 			// explicitly close the asm file at the end of this iteration and log any error
@@ -235,7 +365,7 @@ precedence over obx.mod values.`,
 			targetDesc := filepath.Join(projectDir, "src", "codegen", "target", "desc")
 			ss, err := codegen.Compile(module, mach, targetDesc, codegen.CompileOptions{Debug: buildArgs.Asm})
 			if err != nil {
-				log.Printf("compile failed: %v", err)
+				zlog.Error().Err(err).Msg("compile failed")
 				continue
 			}
 			if buildArgs.Asm {
@@ -243,7 +373,7 @@ precedence over obx.mod values.`,
 			}
 
 			if _, err := asmFile.WriteString(ss + "\n\n"); err != nil {
-				log.Printf("failed to write assembly: %v", err)
+				zlog.Error().Err(err).Msg("failed to write assembly")
 			}
 
 			// Collect unique dll names for linker flags.
@@ -251,11 +381,11 @@ precedence over obx.mod values.`,
 				if ext.DLLName != "" && !seenDLL[ext.DLLName] {
 					seenDLL[ext.DLLName] = true
 					linkLibs = append(linkLibs, ext.DLLName)
-												// close asm file for this module
-												if err := asmFile.Close(); err != nil {
-													log.Printf("failed to close assembly file %s: %v", asmPath, err)
-												}
-										}
+					// close asm file for this module
+					if err := asmFile.Close(); err != nil {
+						zlog.Error().Err(err).Str("file", asmPath).Msg("failed to close assembly file")
+					}
+				}
 			}
 		}
 
@@ -267,10 +397,10 @@ precedence over obx.mod values.`,
 			}
 			flagsPath := filepath.Join(buildDir, "link.flags")
 			if err := os.MkdirAll(buildDir, 0755); err != nil {
-				log.Printf("failed to create build dir: %v", err)
+				zlog.Error().Err(err).Msg("failed to create build dir")
 			}
 			if err := os.WriteFile(flagsPath, []byte(strings.Join(flags, "\n")+"\n"), 0644); err != nil {
-				log.Printf("failed to write link.flags: %v", err)
+				zlog.Error().Err(err).Msg("failed to write link.flags")
 			} else {
 				fmt.Printf("Linker flags written to %s\n", flagsPath)
 			}

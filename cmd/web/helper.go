@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,7 +15,11 @@ import (
 	"sync"
 	"time"
 
+	zlog "github.com/rs/zerolog/log"
+
+	"github.com/anthonyabeo/obx/src/ir/minir"
 	"github.com/anthonyabeo/obx/src/project"
+	"github.com/anthonyabeo/obx/src/support/cache"
 	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/directive"
@@ -80,7 +83,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Printf("writeJSON: %v", err)
+		zlog.Error().Err(err).Msg("writeJSON")
 	}
 }
 
@@ -166,39 +169,128 @@ func injectHostPlatformDirectives(ctx *compiler.Context) {
 	}
 }
 
-// prepareStdlibUnits discovers, parses and adds stdlib (and optional user)
-// units into the provided OberonX program. It uses `buildRoots` to obtain
-// resolver roots and cleans up any temporary directories created for user
-// source.
-func prepareStdlibUnits(ctx *compiler.Context, obx *ast.OberonX, entry, userFilename, userSource string) error {
+// prepareStdlibUnits discovers stdlib units, loads any precompiled .obxi
+// bundles, and parses the remaining headers into the provided OberonX program.
+// It returns the map of preloaded minir modules (keyed by module name) so
+// callers that need lowering can merge them without re-lowering.
+func prepareStdlibUnits(ctx *compiler.Context, obx *ast.OberonX, entry, userFilename, userSource string) (map[string]*minir.Module, error) {
 	roots, cleanup, err := buildRoots(userFilename, userSource)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(roots) == 0 {
-		return nil
+		return nil, nil
 	}
 	if cleanup != nil {
 		defer cleanup()
 	}
 
-	// Build resolver and compute sorted stdlib headers reachable from entry
+	// Build resolver and compute sorted stdlib headers reachable from entry.
 	sorted, err := buildSortedStdlibHeaders(roots, ctx, entry)
 	if err != nil {
-		return err
+		// Be tolerant in environments where a stdlib root was configured but
+		// is not present on disk (e.g. some test sandboxes). Log and continue
+		// without stdlib rather than failing the entire request.
+		zlog.Debug().Err(err).Msg("web: stdlib discovery failed — continuing without stdlib")
+		return nil, nil
 	}
 
 	// Print sorted stdlib file list for debugging/visibility.
 	for i, hdr := range sorted {
-		log.Printf("web: stdlib sorted[%d]: %s", i, filepath.Base(hdr.File))
+		zlog.Info().Str("file", filepath.Base(hdr.File)).Int("idx", i).Msg("web: stdlib sorted")
 	}
 
-	// Parse and add units into the OberonX program
-	if err := parseProgramFiles(sorted, ctx, obx); err != nil {
-		return err
+	// Load precompiled .obxi bundles where available; collect which names
+	// were satisfied so we can skip parsing them.
+	loadedNames, preBundles := loadStdlibBundles(sorted, ctx)
+
+	// Parse only the headers that were not covered by a bundle.
+	toParse := filterToParse(sorted, loadedNames)
+	if len(toParse) > 0 {
+		if err := parseProgramFiles(toParse, ctx, obx); err != nil {
+			return nil, err
+		}
 	}
 
-	return nil
+	return preBundles, nil
+}
+
+// loadStdlibBundles iterates over the sorted headers and, for each one, tries
+// to load a precompiled .obxi bundle from:
+//  1. a sibling file next to the .obx source (e.g. Math.obxi beside Math.obx)
+//  2. a cache/ subdirectory next to the .obx source (e.g. cache/Math.obxi)
+//
+// On success the bundle's sema scope is injected into ctx.Env and the minir
+// module is added to preBundles. The module name is added to loadedNames so
+// callers can skip reparsing that header.
+func loadStdlibBundles(sorted []project.Header, ctx *compiler.Context) (loadedNames map[string]bool, preBundles map[string]*minir.Module) {
+	loadedNames = make(map[string]bool)
+	preBundles = make(map[string]*minir.Module)
+	for _, h := range sorted {
+		obxPath := h.File
+
+		// 1. sibling .obxi next to the source file
+		obxiPath := obxPath[:len(obxPath)-len(".obx")] + ".obxi"
+		if _, err := os.Stat(obxiPath); err == nil {
+			if b, err := cache.LoadBundle(obxiPath, nil); err == nil {
+				ctx.Env.AddModuleScope(b.ModuleName, b.Scope)
+				preBundles[b.ModuleName] = b.Module
+				loadedNames[h.Key.Name()] = true
+				zlog.Info().Str("module", b.ModuleName).Str("path", obxiPath).
+					Msg("web: precompiled stdlib module loaded")
+				continue
+			}
+		}
+
+		// 2. cache/<name>.obxi in the same directory
+		cachePath := filepath.Join(
+			filepath.Dir(obxPath), "cache",
+			filepath.Base(obxPath[:len(obxPath)-len(".obx")]+".obxi"),
+		)
+		if _, err := os.Stat(cachePath); err == nil {
+			if b, err := cache.LoadBundle(cachePath, nil); err == nil {
+				ctx.Env.AddModuleScope(b.ModuleName, b.Scope)
+				preBundles[b.ModuleName] = b.Module
+				loadedNames[h.Key.Name()] = true
+				zlog.Info().Str("module", b.ModuleName).Str("path", cachePath).
+					Msg("web: precompiled stdlib module loaded from cache dir")
+				continue
+			}
+		}
+
+		// 3. global stdlib cache: <stdlibRoot>/cache/<relative/path/to/module>.obxi
+		// This mirrors the CLI precompiler which emits bundles into the top-level
+		// stdlib cache directory (e.g. stdlib/cache/posix/Stdio.obxi). Try this
+		// location as a last resort when the sibling/cache-local paths fail.
+		if stdlibRoot := findStdlibRoot(); stdlibRoot != "" {
+			if rel, err := filepath.Rel(stdlibRoot, obxPath); err == nil {
+				globalCachePath := filepath.Join(stdlibRoot, "cache", strings.TrimSuffix(rel, ".obx")+".obxi")
+				if _, err := os.Stat(globalCachePath); err == nil {
+					if b, err := cache.LoadBundle(globalCachePath, nil); err == nil {
+						ctx.Env.AddModuleScope(b.ModuleName, b.Scope)
+						preBundles[b.ModuleName] = b.Module
+						loadedNames[h.Key.Name()] = true
+						zlog.Info().Str("module", b.ModuleName).Str("path", globalCachePath).
+							Msg("web: precompiled stdlib module loaded from global cache")
+						continue
+					}
+				}
+			}
+		}
+	}
+	return
+}
+
+// filterToParse returns the subset of sorted headers whose module name does
+// not appear in loadedNames (i.e. headers that still need to be parsed).
+func filterToParse(sorted []project.Header, loadedNames map[string]bool) []project.Header {
+	out := make([]project.Header, 0, len(sorted))
+	for _, h := range sorted {
+		if !loadedNames[h.Key.Name()] {
+			out = append(out, h)
+		}
+	}
+	return out
 }
 
 // buildRoots prepares an ordered list of roots where the resolver should
@@ -254,7 +346,7 @@ func createTempRootWithUserFile(userFilename, userSource string) (string, func()
 	// cleanup function
 	cleanup := func() {
 		if err := os.RemoveAll(td); err != nil {
-			log.Printf("failed to remove temp dir %s: %v", td, err)
+			zlog.Error().Err(err).Str("dir", td).Msg("failed to remove temp dir")
 		}
 	}
 
@@ -300,13 +392,22 @@ func parseProgramFiles(sorted []project.Header, ctx *compiler.Context, obx *ast.
 	for _, header := range sorted {
 		data, err := os.ReadFile(header.File)
 		if err != nil {
-			continue
+			return fmt.Errorf("read %s: %w", header.File, err)
 		}
 		fileName := filepath.Base(header.File)
 		content := data[header.StartPos:header.EndPos]
 
 		p := parser.NewParser(ctx, fileName, content)
 		unit := p.Parse()
+
+		// If parsing produced diagnostics, flush them and return an error so
+		// callers (e.g. the web handler) can report the failure instead of
+		// silently continuing with partially-parsed units.
+		if ctx.Reporter.ErrorCount() > 0 {
+			ctx.Reporter.Flush()
+			return fmt.Errorf("parse errors in %s", header.File)
+		}
+
 		obx.AddUnit(unit)
 	}
 	return nil

@@ -287,7 +287,7 @@ func (s *Server) HandleCheck(w http.ResponseWriter, r *http.Request) {
 
 	// parse stdlib modules first (best-effort; skip if unavailable)
 	entry := deriveEntryFromFilename(req.Filename)
-	if err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source); err != nil {
+	if _, err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -405,7 +405,8 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 
 	obx := ast.NewOberonX()
 	entry := deriveEntryFromFilename(req.Filename)
-	if err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source); err != nil {
+	preBundles, err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source)
+	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -447,6 +448,23 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 
 	var graphs []graphEntry
 	lowered := minir.Lower(hirProgram)
+	// Merge any precompiled stdlib minir modules so downstream emit/analysis
+	// can see the stdlib modules without re-lowering them. Prefer already
+	// lowered modules produced from the HIR; only append missing preBundles.
+	if preBundles != nil {
+		for name, m := range preBundles {
+			found := false
+			for _, mm := range lowered.Modules {
+				if mm.Name == name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				lowered.Modules = append(lowered.Modules, m)
+			}
+		}
+	}
 	// Promote non-escaping scalar allocas, forward store-to-load pairs,
 	// then run CFG cleanup passes.
 	for _, mod := range lowered.Modules {
@@ -533,7 +551,7 @@ func (s *Server) HandleRun(w http.ResponseWriter, r *http.Request) {
 
 	obx := ast.NewOberonX()
 	entry := deriveEntryFromFilename(req.Filename)
-	if err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source); err != nil {
+	if _, err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
@@ -667,10 +685,12 @@ func (s *Server) HandleMinir(w http.ResponseWriter, r *http.Request) {
 	if req.Entry != "" {
 		entry = req.Entry
 	}
-	if err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source); err != nil {
+	preBundles, err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source)
+	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
+	_ = preBundles // pre-loaded stdlib minir modules available for merging
 
 	if reporter.ErrorCount() > 0 {
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -700,7 +720,7 @@ func (s *Server) HandleMinir(w http.ResponseWriter, r *http.Request) {
 	hirProgram := desugar.NewGenerator(obx, ctx).Generate()
 	lowered := minir.Lower(hirProgram)
 	// Promote non-escaping scalar allocas, forward store-to-load pairs,
-	// then run CFG clean-up passes.
+	// then run CFG cleanup passes.
 	for _, mod := range lowered.Modules {
 		for _, fn := range mod.Functions {
 			miniropt.Mem2Reg(fn)
