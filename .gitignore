@@ -2,7 +2,7 @@
 
 out/
 **/cfg-*
-build/
+build/*
 stdlib/cache/*
 !/build/.gitkeep
 !/stdlib/cache/.gitkeep

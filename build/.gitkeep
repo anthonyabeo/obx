@@ -1,0 +1,2 @@
+# keep the build/ directory in git; other files in this directory are ignored via .gitignore
+
