@@ -382,3 +382,73 @@ func TestMem2Reg_AggregateAllocaSkipped(t *testing.T) {
 	}
 }
 
+// TestMem2Reg_WriteOnlyAllocaPreserved verifies that an alloca whose address
+// is only stored to (never loaded from) is NOT promoted by Mem2Reg.
+//
+// Mirrors the Oberon+ pattern:
+//
+//	proc increment(var x: integer; in y: integer)
+//	  var p: integer
+//	begin
+//	  x := x + y
+//	  p := y    (* write-only — must not be silently erased *)
+//	end increment
+func TestMem2Reg_WriteOnlyAllocaPreserved(t *testing.T) {
+	minir.ResetTempCounter()
+
+	i32 := types.Int32Type
+
+	// Build a tiny HIR function with one VAR param, one IN param and one
+	// write-only local variable.
+	fn := &desugar.Function{
+		Name: "increment",
+		Params: []*desugar.Param{
+			{Name: "x", Kind: desugar.VarParam, Typ: i32},
+			{Name: "y", Kind: desugar.InParam, Typ: i32},
+		},
+		Locals: []desugar.Decl{
+			&desugar.Variable{Name: "p", Type: i32},
+		},
+		Body: &desugar.CompoundStmt{Stmts: []desugar.Stmt{
+			// x := x + y
+			&desugar.AssignStmt{
+				Left: &desugar.VariableRef{Name: "x", Mangled: "x", SemaType: i32},
+				Right: &desugar.BinaryExpr{
+					Op:       token.PLUS,
+					Left:     &desugar.Param{Name: "x", Kind: desugar.VarParam, Typ: i32},
+					Right:    &desugar.Param{Name: "y", Kind: desugar.InParam, Typ: i32},
+					SemaType: i32,
+				},
+			},
+			// p := y
+			&desugar.AssignStmt{
+				Left:  &desugar.VariableRef{Name: "p", Mangled: "p", SemaType: i32},
+				Right: &desugar.Param{Name: "y", Kind: desugar.InParam, Typ: i32},
+			},
+		}},
+	}
+
+	mod, counts, verrs := lowerAndPromote(t, hirProg(fn))
+	assertNoVerifyErrors(t, verrs)
+
+	if len(mod.Functions) == 0 {
+		t.Fatal("no functions in lowered module")
+	}
+	irFn := mod.Functions[0]
+
+	t.Logf("promoted %d alloca(s)", counts[0])
+
+	// The write-only alloca for `p` must NOT have been promoted.
+	// If it were promoted, both the alloca and the store to p would vanish.
+	storeCount := countInstrKind[*minir.StoreInst](irFn)
+	allocaCount := countInstrKind[*minir.AllocaInst](irFn)
+
+	// We expect at least two stores: one for x := x+y and one for p := y.
+	if storeCount < 2 {
+		t.Errorf("expected ≥2 StoreInst (x:=x+y and p:=y), got %d — p:=y was erased", storeCount)
+	}
+	// The alloca for p must still be present.
+	if allocaCount == 0 {
+		t.Error("alloca for write-only local 'p' was removed by Mem2Reg — dead-store boundary violated")
+	}
+}

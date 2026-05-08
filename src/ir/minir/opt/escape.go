@@ -5,8 +5,12 @@ import "github.com/anthonyabeo/obx/src/ir/minir"
 // ── Escape analysis ───────────────────────────────────────────────────────────
 //
 // An alloca is "promotable" to a scalar SSA value if and only if:
-//   - Its allocated type is scalar (PrimitiveType or PointerType), and
-//   - Its address temp never reaches a "dangerous" use site.
+//   - Its allocated type is scalar (PrimitiveType or PointerType),
+//   - Its address temp never reaches a "dangerous" use site, and
+//   - Its address temp is read by at least one LoadInst.
+//     Write-only allocas (stores but no loads) are intentionally left
+//     untouched by Mem2Reg; they belong to a dedicated dead-store-elimination
+//     pass, not to SSA promotion.
 //
 // Dangerous use sites are:
 //   - GEPInst.Base      — pointer arithmetic implies aggregate access.
@@ -67,8 +71,25 @@ func escapes(fn *minir.Function, dst *minir.Temp) bool {
 	return false
 }
 
+// hasLoad reports whether the address temp dst (an alloca's Dst) is used as
+// the Addr operand of at least one LoadInst anywhere in fn.  An alloca with
+// no loads is write-only: promoting it here would silently erase observable
+// assignments, which is dead-store elimination, not Mem2Reg's responsibility.
+func hasLoad(fn *minir.Function, dst *minir.Temp) bool {
+	for _, b := range fn.Blocks {
+		for _, instr := range b.Instrs {
+			if ld, ok := instr.(*minir.LoadInst); ok {
+				if ld.Addr == dst {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // collectPromotable returns all AllocaInst nodes in fn whose addresses are
-// non-escaping and whose allocated types are scalar.
+// non-escaping, scalar-typed, and read by at least one LoadInst.
 func collectPromotable(fn *minir.Function) []*minir.AllocaInst {
 	var out []*minir.AllocaInst
 	for _, b := range fn.Blocks {
@@ -83,9 +104,11 @@ func collectPromotable(fn *minir.Function) []*minir.AllocaInst {
 			if escapes(fn, a.Dst) {
 				continue
 			}
+			if !hasLoad(fn, a.Dst) {
+				continue // write-only alloca — leave for a dedicated DSE pass
+			}
 			out = append(out, a)
 		}
 	}
 	return out
 }
-

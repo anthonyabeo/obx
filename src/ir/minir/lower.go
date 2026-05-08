@@ -881,53 +881,16 @@ func (l *Lowerer) lowerCallStmt(call *desugar.FuncCall) {
 		fn(l, call)
 		return
 	}
-	var args []Value
-	// Determine which formals expect addresses (VAR/IN) when possible.
-	var formalAddr []bool
+
 	callee := call.Func.Mangled
 	if callee == "" {
 		callee = call.Func.Name
 	}
-	// 1) Try to find a lowered function in the current module with ParamKinds
-	if l.mod != nil {
-		for _, fn := range l.mod.Functions {
-			if fn.FnName == callee && len(fn.ParamKinds) > 0 {
-				for _, k := range fn.ParamKinds {
-					formalAddr = append(formalAddr, k == desugar.VarParam || k == desugar.InParam)
-				}
-				break
-			}
-		}
-	}
-	// 2) If not found, check module externals signature (pointer params imply address semantics)
-	if formalAddr == nil && l.mod != nil {
-		for _, ef := range l.mod.Externals {
-			if ef.Name == callee && ef.Sig != nil {
-				for _, pt := range ef.Sig.Params {
-					if _, ok := pt.(*PointerType); ok {
-						formalAddr = append(formalAddr, true)
-					} else {
-						formalAddr = append(formalAddr, false)
-					}
-				}
-				break
-			}
-		}
-	}
-	// 3) If still unknown, use HIR procedure type info when available
-	if formalAddr == nil {
-		if pt, ok := call.Func.SemaType.(*types.ProcedureType); ok && pt != nil {
-			for _, fp := range pt.Params {
-				kind := strings.ToUpper(fp.Kind)
-				if kind == "VAR" || kind == "IN" {
-					formalAddr = append(formalAddr, true)
-				} else {
-					formalAddr = append(formalAddr, false)
-				}
-			}
-		}
-	}
 
+	// Determine which formals expect addresses (VAR/IN) when possible.
+	formalAddr := l.formalAddrForCall(call)
+
+	var args []Value
 	for i, a := range call.Args {
 		needAddr := false
 		if formalAddr != nil && i < len(formalAddr) {
@@ -939,6 +902,7 @@ func (l *Lowerer) lowerCallStmt(call *desugar.FuncCall) {
 			args = append(args, l.lowerValue(a))
 		}
 	}
+
 	l.emit(&CallInst{Callee: callee, Args: args})
 }
 
@@ -1807,50 +1771,15 @@ func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
 		return NewConst("0", int64(0), rt)
 	}
 
-	var args []Value
-	// Determine which formals expect addresses (VAR/IN) when possible.
-	var formalAddr []bool
 	callee := call.Func.Mangled
 	if callee == "" {
 		callee = call.Func.Name
 	}
-	if l.mod != nil {
-		for _, fn := range l.mod.Functions {
-			if fn.FnName == callee && len(fn.ParamKinds) > 0 {
-				for _, k := range fn.ParamKinds {
-					formalAddr = append(formalAddr, k == desugar.VarParam || k == desugar.InParam)
-				}
-				break
-			}
-		}
-	}
-	if formalAddr == nil && l.mod != nil {
-		for _, ef := range l.mod.Externals {
-			if ef.Name == callee && ef.Sig != nil {
-				for _, pt := range ef.Sig.Params {
-					if _, ok := pt.(*PointerType); ok {
-						formalAddr = append(formalAddr, true)
-					} else {
-						formalAddr = append(formalAddr, false)
-					}
-				}
-				break
-			}
-		}
-	}
-	if formalAddr == nil {
-		if pt, ok := call.Func.SemaType.(*types.ProcedureType); ok && pt != nil {
-			for _, fp := range pt.Params {
-				kind := strings.ToUpper(fp.Kind)
-				if kind == "VAR" || kind == "IN" {
-					formalAddr = append(formalAddr, true)
-				} else {
-					formalAddr = append(formalAddr, false)
-				}
-			}
-		}
-	}
 
+	// Determine which formals expect addresses (VAR/IN) when possible.
+	formalAddr := l.formalAddrForCall(call)
+
+	var args []Value
 	for i, a := range call.Args {
 		needAddr := false
 		if formalAddr != nil && i < len(formalAddr) {
@@ -1862,15 +1791,18 @@ func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
 			args = append(args, l.lowerValue(a))
 		}
 	}
-	rt := LowerType(call.RetType)
+
 	var dst *Temp
+	rt := LowerType(call.RetType)
 	if rt != nil {
 		dst = NewAnonTemp(rt)
 	}
+
 	l.emit(&CallInst{Dst: dst, Callee: callee, Args: args})
 	if dst != nil {
 		return dst
 	}
+
 	return NewConst("0", int64(0), primI32)
 }
 
@@ -1960,6 +1892,54 @@ func linkCFG(fn *Function) {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+// formalAddrForCall attempts to infer which formals of a call expect
+// addresses (VAR/IN semantics). It consults, in order:
+//  1. lowered Function entries in the current module with ParamKinds set,
+//  2. ExternalFunc signatures (pointer param → address),
+//  3. HIR ProcedureType info attached to the call (fp.Kind == "VAR"/"IN").
+//
+// Returns nil when no information is available.
+func (l *Lowerer) formalAddrForCall(call *desugar.FuncCall) []bool {
+	var formalAddr []bool
+	callee := call.Func.Mangled
+	if callee == "" {
+		callee = call.Func.Name
+	}
+	if l.mod != nil {
+		for _, fn := range l.mod.Functions {
+			if fn.FnName == callee && len(fn.ParamKinds) > 0 {
+				for _, k := range fn.ParamKinds {
+					formalAddr = append(formalAddr, k == desugar.VarParam || k == desugar.InParam)
+				}
+				return formalAddr
+			}
+		}
+		for _, ef := range l.mod.Externals {
+			if ef.Name == callee && ef.Sig != nil {
+				for _, pt := range ef.Sig.Params {
+					if _, ok := pt.(*PointerType); ok {
+						formalAddr = append(formalAddr, true)
+					} else {
+						formalAddr = append(formalAddr, false)
+					}
+				}
+				return formalAddr
+			}
+		}
+	}
+	if pt, ok := call.Func.SemaType.(*types.ProcedureType); ok && pt != nil {
+		for _, fp := range pt.Params {
+			kind := strings.ToUpper(fp.Kind)
+			if kind == "VAR" || kind == "IN" {
+				formalAddr = append(formalAddr, true)
+			} else {
+				formalAddr = append(formalAddr, false)
+			}
+		}
+	}
+	return formalAddr
+}
 
 func (l *Lowerer) newBlock(label string) *Block {
 	id := l.blockSeq

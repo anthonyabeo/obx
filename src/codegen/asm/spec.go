@@ -2,11 +2,12 @@ package asm
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	zlog "github.com/rs/zerolog/log"
 
 	"github.com/anthonyabeo/obx/src/project"
 )
@@ -88,7 +89,7 @@ func (fn *Function) OutputDOT() {
 
 	cmd := exec.Command("dot", "-Tpng", dotFile, "-o", pngFile)
 	if err := cmd.Run(); err != nil {
-		log.Printf("warning: dot command failed (is graphviz installed?): %v", err)
+		zlog.Warn().Err(err).Msg("warning: dot command failed (is graphviz installed?)")
 	} else {
 		fmt.Printf("Generated %s\n", pngFile)
 	}
