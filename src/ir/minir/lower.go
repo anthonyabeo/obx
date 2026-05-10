@@ -479,53 +479,11 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 	fn.Blocks[entry.ID] = entry
 	l.switchTo(entry)
 
-	// parameters: ValueParam -> incoming SSA temp (element type).
-	// VarParam/InParam -> incoming pointer param (address of the actual).
-	for _, p := range hirFn.Params {
-		et := LowerType(p.Typ)
-		if et == nil {
-			et = primI32
-		}
-		var param *Temp
-		if p.Kind == desugar.VarParam || p.Kind == desugar.InParam {
-			// Expect a pointer parameter for VAR/IN semantics.
-			param = NewTemp(p.Name, Ptr(et))
-			param.IsAddr = true
-		} else {
-			// Value parameter: incoming SSA temp of element type.
-			param = NewTemp(p.Name, et)
-		}
-		fn.Params = append(fn.Params, param)
-		// record original HIR param kind for downstream passes
-		fn.ParamKinds = append(fn.ParamKinds, p.Kind)
-		// Bind name to either the value temp or address temp accordingly.
-		l.varEnv[p.Name] = param
-	}
+	// parameters
+	l.lowerParams(hirFn.Params)
 
 	// locals: alloca for variables, inline for constants
-	for _, local := range hirFn.Locals {
-		switch d := local.(type) {
-		case *desugar.Variable:
-			vt := LowerType(d.Type)
-			if vt == nil {
-				vt = primI32
-			}
-			addr := l.newAddrTemp(d.Name, vt)
-			l.emit(&AllocaInst{Dst: addr, AllocType: vt})
-			l.varEnv[d.Name] = addr
-			if d.Mangled != "" && d.Mangled != d.Name {
-				l.varEnv[d.Mangled] = addr
-			}
-		case *desugar.Constant:
-			cv := l.lowerLiteralExpr(d.Value)
-			l.constEnv[d.Name] = cv
-			if d.Mangled != "" {
-				l.constEnv[d.Mangled] = cv
-			}
-			//case *desugar.Function:
-			//case *desugar.Type:
-		}
-	}
+	l.lowerLocals(hirFn.Locals)
 
 	// body
 	// Create function exit block and result-storage temp before lowering the body
@@ -566,6 +524,61 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 	fn.Exit.Term = ret
 
 	return fn
+}
+
+// lowerParams lowers parameters to SSA temps and bind in varEnv; VAR/IN params get pointer types and are passed by reference.
+func (l *Lowerer) lowerParams(params []*desugar.Param) {
+	// parameters: ValueParam -> incoming SSA temp (element type).
+	// VarParam/InParam -> incoming pointer param (address of the actual).
+	for _, p := range params {
+		et := LowerType(p.Typ)
+		if et == nil {
+			et = primI32
+		}
+		var param *Temp
+		if p.Kind == desugar.VarParam || p.Kind == desugar.InParam {
+			// Expect a pointer parameter for VAR/IN semantics.
+			param = l.newAddrTemp(p.Name, et)
+		} else {
+			// Value parameter: incoming SSA temp of element type.
+			param = NewTemp(p.Name, et)
+		}
+		l.fn.Params = append(l.fn.Params, param)
+		// record original HIR param kind for downstream passes
+		l.fn.ParamKinds = append(l.fn.ParamKinds, p.Kind)
+		// Bind name to either the value temp or address temp accordingly.
+		l.varEnv[p.Name] = param
+	}
+}
+
+// lowerLocals lowers local variable declarations to stack allocas and constant declarations
+// to pre-computed Values, and binds their names in varEnv and constEnv respectively.  Local
+// functions and types are not handled here; they are currently unsupported in minir but may
+// be added in the future.
+func (l *Lowerer) lowerLocals(locals []desugar.Decl) {
+	for _, local := range locals {
+		switch d := local.(type) {
+		case *desugar.Variable:
+			vt := LowerType(d.Type)
+			if vt == nil {
+				vt = primI32
+			}
+			addr := l.newAddrTemp(d.Name, vt)
+			l.emit(&AllocaInst{Dst: addr, AllocType: vt})
+			l.varEnv[d.Mangled] = addr
+			if d.Mangled != "" && d.Mangled != d.Name {
+				l.varEnv[d.Name] = addr
+			}
+		case *desugar.Constant:
+			cv := l.lowerLiteralExpr(d.Value)
+			l.constEnv[d.Mangled] = cv
+			if d.Mangled != "" {
+				l.constEnv[d.Name] = cv
+			}
+			//case *desugar.Function:
+			//case *desugar.Type:
+		}
+	}
 }
 
 // ── statement lowering ────────────────────────────────────────────────────────

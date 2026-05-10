@@ -277,8 +277,8 @@ func (e *Emitter) EmitProgram(prog *Program) (int, error) {
 // ── io.WriterTo implementations ───────────────────────────────────────────────
 
 // WriteTo implements io.WriterTo for *Function.
-func (fn *Function) WriteTo(w io.Writer) (int64, error) {
-	n, err := NewEmitter(w).EmitFunction(fn)
+func (f *Function) WriteTo(w io.Writer) (int64, error) {
+	n, err := NewEmitter(w).EmitFunction(f)
 	return int64(n), err
 }
 

@@ -265,7 +265,6 @@ otherwise the module entry or the first lowered function is used.`,
 		}
 
 		format := strings.ToLower(cfgArgs.Format)
-		//opts := minir.DotOptions{Title: target.FnName}
 		switch format {
 		case "dot", "":
 			if cfgArgs.Out == "-" {

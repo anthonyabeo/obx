@@ -17,9 +17,9 @@ func TempString(t *Temp) string {
 		ty = t.Ty.String()
 	}
 	if t.NameStr != "" {
-		return fmt.Sprintf("%%%s:%s", t.NameStr, ty)
+		return fmt.Sprintf("%%%s: %s", t.NameStr, ty)
 	}
-	return fmt.Sprintf("%%t%d:%s", t.ID, ty)
+	return fmt.Sprintf("%%t%d: %s", t.ID, ty)
 }
 
 // ValueString formats a Value (Temp or Constant) for printing.
