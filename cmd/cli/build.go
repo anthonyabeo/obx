@@ -4,22 +4,17 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/codegen"
-	"github.com/anthonyabeo/obx/src/ir/obxir"
 	zlog "github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/anthonyabeo/obx/src/codegen/target"
-	_ "github.com/anthonyabeo/obx/src/codegen/target/arm64" // register arm64-apple-macos + aarch64-apple-darwin
-	_ "github.com/anthonyabeo/obx/src/codegen/target/riscv" // register rv64imafd
+	"github.com/anthonyabeo/obx/src/backend"
+	backendtarget "github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/minir"
 	miniropt "github.com/anthonyabeo/obx/src/ir/minir/opt"
-	"github.com/anthonyabeo/obx/src/opt"
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -52,7 +47,7 @@ func init() {
 		"entry module to build (defaults to entry in obx.mod; omit to build all)")
 	buildCmd.Flags().StringVarP(&buildArgs.Output, "output", "o", "", "final executable name/path (defaults to the project name under build/)")
 	buildCmd.Flags().StringVarP(&buildArgs.Target, "target", "T", "rv64imafd",
-		"target architecture (available: "+strings.Join(target.Available(), ", ")+")")
+		"target architecture (available: "+strings.Join(backendtarget.Available(), ", ")+")")
 	buildCmd.Flags().StringArrayVarP(&buildArgs.Defines, "define", "d", nil,
 		"set a compile-time directive constant: NAME (bool true) or NAME=VALUE (bool/int/float)")
 	buildCmd.Flags().IntVarP(&buildArgs.OptLevel, "optlevel", "O", 2, "optimisation level (0-3)")
@@ -70,9 +65,9 @@ func init() {
 
 var buildCmd = &cobra.Command{
 	Use:   "build",
-	Short: "compile module(s), link them, and produce a runnable executable",
-	Long: `build runs the full compilation pipeline (discovery, parsing, semantic
-analysis, IR lowering, optimisation, and code generation).
+	Short: "lower module(s) into backend MIR",
+	Long: `build runs the front-end pipeline (discovery, parsing, semantic
+analysis, and minir lowering) and then lowers the result into backend MIR.
 
 When --root is omitted, obx.mod in the nearest parent directory is read for
 source roots and the default entry module.  --entry and --root always take
@@ -92,12 +87,7 @@ precedence over obx.mod values.`,
 		}
 		ctx := boot.Ctx
 		mach := boot.Machine
-		toolchain, err := buildToolchainFor(mach)
-		if err != nil {
-			log.Fatalf("build: %v", err)
-		}
 		projectDir := boot.ProjectDir
-		manifest := boot.Manifest
 		roots := boot.Roots
 		entry := boot.Entry
 
@@ -200,124 +190,29 @@ precedence over obx.mod values.`,
 			}
 		}
 
-		// ── 6. Optimise ───────────────────────────────────────────────────
-		pm := opt.NewPassManager()
-		pm.ConfigurePasses(map[string]any{
-			"verbose":       buildArgs.Verbose,
-			"optlevel":      buildArgs.OptLevel,
-			"enablePasses":  buildArgs.EnablePasses,
-			"disablePasses": buildArgs.DisablePasses,
-		})
-
-		Builder := obxir.NewIRBuilder(ctx.Target.WordSize)
-		MIRProgram := Builder.Build(hirProgram, ctx)
-
-		for _, module := range MIRProgram.Modules {
-			for _, function := range module.Funcs {
-				opt.BuildCFG(function)
-			}
-		}
-
-		// ── 7. Emit assembly ──────────────────────────────────────────────
-		buildDir := filepath.Join(projectDir, "build")
-		if err := os.MkdirAll(buildDir, 0755); err != nil {
-			zlog.Error().Err(err).Msg("failed to create build dir")
-		}
-		seenDLL := make(map[string]bool)
-		var linkLibs []string
-		var asmPaths []string
-		var objPaths []string
-		buildFailed := false
-
-		for _, module := range MIRProgram.Modules {
-			asmPath := filepath.Join(buildDir, module.Name+".s")
-			targetDesc := filepath.Join(projectDir, "src", "codegen", "target", "desc")
-			ss, err := codegen.Compile(module, mach, targetDesc, codegen.CompileOptions{Debug: buildArgs.Asm})
-			if err != nil {
-				zlog.Error().Err(err).Msg("compile failed")
-				buildFailed = true
-				continue
-			}
-			if buildArgs.Asm {
-				fmt.Println(ss)
-			}
-
-			if err := os.WriteFile(asmPath, []byte(ss+"\n\n"), 0644); err != nil {
-				zlog.Error().Err(err).Str("file", asmPath).Msg("failed to write assembly")
-				buildFailed = true
-				continue
-			}
-			asmPaths = append(asmPaths, asmPath)
-
-			objPath := filepath.Join(buildDir, module.Name+".o")
-			assembleArgs := append([]string{}, toolchain.assemblerArgs...)
-			assembleArgs = append(assembleArgs, "-c", asmPath, "-o", objPath)
-			assembleCmd := exec.Command(toolchain.assembler, assembleArgs...)
-			assembleCmd.Stdout = os.Stdout
-			assembleCmd.Stderr = os.Stderr
-			if err := assembleCmd.Run(); err != nil {
-				zlog.Error().Err(err).Str("file", asmPath).Msg("failed to assemble object file")
-				buildFailed = true
-				continue
-			}
-			objPaths = append(objPaths, objPath)
-
-			// Collect unique dll names for linker flags.
-			for _, ext := range module.Externals {
-				if ext.DLLName != "" && !seenDLL[ext.DLLName] {
-					seenDLL[ext.DLLName] = true
-					linkLibs = append(linkLibs, ext.DLLName)
-				}
-			}
-		}
-
-		if buildFailed {
-			log.Fatalf("build: failed to assemble one or more modules")
-		}
-
-		var flags []string
-		for _, lib := range linkLibs {
-			flags = append(flags, "-l"+lib)
-		}
-		flagsPath := filepath.Join(buildDir, "link.flags")
-		if err := os.WriteFile(flagsPath, []byte(strings.Join(flags, "\n")+"\n"), 0644); err != nil {
-			zlog.Error().Err(err).Msg("failed to write link.flags")
-		} else {
-			fmt.Printf("Linker flags written to %s\n", flagsPath)
-		}
-
-		outputPath := resolveOutputPath(projectDir, manifest, mach.Name(), buildArgs.Output)
-		if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
-			zlog.Error().Err(err).Str("dir", filepath.Dir(outputPath)).Msg("failed to create executable output dir")
+		backendTarget, err := backendTargetFor(mach.Name())
+		if err != nil {
 			log.Fatalf("build: %v", err)
 		}
-
-		linkArgs := append([]string{}, toolchain.linkerArgs...)
-		linkArgs = append(linkArgs, "-o", outputPath)
-		linkArgs = append(linkArgs, objPaths...)
-		linkArgs = append(linkArgs, flags...)
-		linkCmd := exec.Command(toolchain.linker, linkArgs...)
-		linkCmd.Stdout = os.Stdout
-		linkCmd.Stderr = os.Stderr
-		if err := linkCmd.Run(); err != nil {
-			log.Fatalf("build: link failed: %v", err)
+		pipeline := backend.NewPipelineDriver(backendTarget)
+		bridge, err := pipeline.Run(lowered)
+		if err != nil {
+			log.Fatalf("build: backend pipeline failed: %v", err)
+		}
+		if buildArgs.Verbose {
+			fmt.Printf("Backend pipeline lowered %d module(s) and prepared %d function plan(s)\n", len(bridge.MIR.Modules), len(bridge.Plans))
 		}
 
-		fmt.Printf("Executable written to %s\n", outputPath)
-
-		if !buildArgs.KeepAsm {
-			for _, p := range asmPaths {
-				if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
-					zlog.Warn().Err(err).Str("file", p).Msg("build: failed to remove assembly file")
-				}
-			}
-		}
-		if !buildArgs.KeepObj {
-			for _, p := range objPaths {
-				if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
-					zlog.Warn().Err(err).Str("file", p).Msg("build: failed to remove object file")
-				}
-			}
-		}
+		fmt.Println("Backend MIR lowering complete.")
 	},
+}
+
+func backendTargetFor(name string) (backendtarget.Target, error) {
+	switch name {
+	case "rv64imafd", "riscv", "riscv64":
+		return backendtarget.Lookup("riscv64")
+	case "arm64-apple-macos", "arm64", "aarch64-apple-darwin":
+		return backendtarget.Lookup("arm64")
+	}
+	return backendtarget.Lookup(name)
 }
