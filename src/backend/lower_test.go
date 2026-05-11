@@ -101,6 +101,8 @@ func TestLowerAndPlan(t *testing.T) {
 
 func TestPipelineDriverRunEmptyProgram(t *testing.T) {
 	driver := backend.NewPipelineDriver(btarget.NewRISCV64Target())
+	driver.Assemble = func(*mir.Program) error { return nil }
+	driver.Link = func(*mir.Program) error { return nil }
 	out, err := driver.Run(&minir.Program{})
 	if err != nil {
 		t.Fatalf("Run failed: %v", err)
@@ -138,10 +140,10 @@ func TestPipelineDriverPassThroughStages(t *testing.T) {
 
 func TestBackendStageRegistry(t *testing.T) {
 	available := backend.AvailableStages()
-	if len(available) != 4 {
-		t.Fatalf("expected 4 registered backend stages, got %d", len(available))
+	if len(available) != 6 {
+		t.Fatalf("expected 6 registered backend stages, got %d", len(available))
 	}
-	want := []string{"instruction-scheduling", "instruction-selection", "legalization", "register-allocation"}
+	want := []string{"assemble", "instruction-scheduling", "instruction-selection", "legalization", "link", "register-allocation"}
 	for i := range want {
 		if available[i] != want[i] {
 			t.Fatalf("available[%d] = %q, want %q", i, available[i], want[i])
@@ -161,3 +163,45 @@ func TestBackendStageRegistry(t *testing.T) {
 		}
 	}
 }
+
+type recordingStage struct {
+	calls *int
+}
+
+func (s *recordingStage) Name() string { return "test-recording-stage" }
+func (s *recordingStage) Enabled(btarget.Target) bool {
+	return true
+}
+func (s *recordingStage) Run(_ *backend.PipelineDriver, prog *mir.Program) (*mir.Program, error) {
+	*s.calls++
+	return prog, nil
+}
+
+func TestPipelineDriverRunCustomStageAndNilTarget(t *testing.T) {
+	t.Run("custom stage executes", func(t *testing.T) {
+		calls := 0
+		backend.RegisterStage("test-recording-stage", func() backend.Stage {
+			return &recordingStage{calls: &calls}
+		})
+
+		driver := backend.NewPipelineDriver(btarget.NewRISCV64Target(), "test-recording-stage")
+		out, err := driver.Run(&minir.Program{})
+		if err != nil {
+			t.Fatalf("Run failed: %v", err)
+		}
+		if out == nil || out.MIR == nil {
+			t.Fatalf("expected lowered output from custom stage run")
+		}
+		if calls != 1 {
+			t.Fatalf("expected custom stage to run once, got %d", calls)
+		}
+	})
+
+	t.Run("nil target rejected", func(t *testing.T) {
+		driver := backend.NewPipelineDriver(nil)
+		if _, err := driver.Run(&minir.Program{}); err == nil {
+			t.Fatalf("expected nil target error")
+		}
+	})
+}
+
