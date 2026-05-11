@@ -3,7 +3,9 @@ package backend
 import (
 	"fmt"
 
+	"github.com/anthonyabeo/obx/src/backend/lower"
 	"github.com/anthonyabeo/obx/src/backend/mir"
+	selector "github.com/anthonyabeo/obx/src/backend/select"
 	"github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/minir"
 )
@@ -32,7 +34,7 @@ func NewPipelineDriver(tgt target.Target, stages ...string) *PipelineDriver {
 }
 
 // Run executes the backend pipeline from minir to target plans.
-func (p *PipelineDriver) Run(prog *minir.Program) (*LoweredProgram, error) {
+func (p *PipelineDriver) Run(prog *minir.Program) (*lower.LoweredProgram, error) {
 	if p == nil {
 		return nil, fmt.Errorf("backend pipeline: nil driver")
 	}
@@ -40,7 +42,7 @@ func (p *PipelineDriver) Run(prog *minir.Program) (*LoweredProgram, error) {
 		return nil, fmt.Errorf("backend pipeline: nil target")
 	}
 
-	mprog, err := p.Lower(prog)
+	mprog, err := lower.LowerProgram(prog)
 	if err != nil {
 		return nil, err
 	}
@@ -59,12 +61,12 @@ func (p *PipelineDriver) Run(prog *minir.Program) (*LoweredProgram, error) {
 		}
 	}
 
-	plans, err := BuildPlans(mprog, p.Target)
+	plans, err := selector.BuildPlans(mprog, p.Target)
 	if err != nil {
 		return nil, err
 	}
 
-	return &LoweredProgram{MIR: mprog, Plans: plans}, nil
+	return &lower.LoweredProgram{MIR: mprog, Plans: plans}, nil
 }
 
 // Lower is the real front-end of the backend pipeline.
@@ -72,7 +74,7 @@ func (p *PipelineDriver) Lower(prog *minir.Program) (*mir.Program, error) {
 	if p == nil {
 		return nil, fmt.Errorf("backend pipeline: nil driver")
 	}
-	return LowerProgram(prog)
+	return lower.LowerProgram(prog)
 }
 
 // InstructionSelection is currently a stub.
