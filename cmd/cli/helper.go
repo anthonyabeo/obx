@@ -8,7 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/anthonyabeo/obx/src/codegen/target"
+	zlog "github.com/rs/zerolog/log"
+
+	"github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
@@ -17,7 +19,6 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/directive"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
-	zlog "github.com/rs/zerolog/log"
 )
 
 type bootstrapOptions struct {
@@ -32,7 +33,7 @@ type bootstrapOptions struct {
 
 type bootstrapState struct {
 	Ctx        *compiler.Context
-	Machine    target.Machine
+	Machine    target.Target
 	ProjectDir string
 	Manifest   project.Manifest
 	Roots      []string

@@ -9,10 +9,10 @@ import (
 
 	zlog "github.com/rs/zerolog/log"
 
-	"github.com/anthonyabeo/obx/src/codegen/target"
+	"github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/minir"
 	"github.com/anthonyabeo/obx/src/project"
-	minircache "github.com/anthonyabeo/obx/src/support/cache"
+	"github.com/anthonyabeo/obx/src/support/cache"
 	"github.com/anthonyabeo/obx/src/support/compiler"
 )
 
@@ -27,7 +27,7 @@ func canonicalBuildTarget(targetName string) string {
 	return strings.ToLower(strings.TrimSpace(targetName))
 }
 
-func buildToolchainFor(mach target.Machine) (buildToolchain, error) {
+func buildToolchainFor(mach target.Target) (buildToolchain, error) {
 	switch canonicalBuildTarget(mach.Name()) {
 	case "rv64imafd":
 		return buildToolchain{
@@ -121,7 +121,7 @@ func loadPrecompiledBundles(ctx *compiler.Context, sorted []project.Header) (map
 		obxPath := h.File
 		obxiPath := obxPath[:len(obxPath)-len(".obx")] + ".obxi"
 		if _, err := os.Stat(obxiPath); err == nil {
-			if b, err := minircache.LoadBundle(obxiPath, nil); err == nil {
+			if b, err := cache.LoadBundle(obxiPath, nil); err == nil {
 				ctx.Env.AddModuleScope(b.ModuleName, b.Scope)
 				preBundles[b.ModuleName] = b.Module
 				loadedNames[h.Key.Name()] = true
@@ -131,7 +131,7 @@ func loadPrecompiledBundles(ctx *compiler.Context, sorted []project.Header) (map
 		}
 		cachePath := filepath.Join(filepath.Dir(obxPath), "cache", filepath.Base(obxPath[:len(obxPath)-len(".obx")]+".obxi"))
 		if _, err := os.Stat(cachePath); err == nil {
-			if b, err := minircache.LoadBundle(cachePath, nil); err == nil {
+			if b, err := cache.LoadBundle(cachePath, nil); err == nil {
 				ctx.Env.AddModuleScope(b.ModuleName, b.Scope)
 				preBundles[b.ModuleName] = b.Module
 				loadedNames[h.Key.Name()] = true
@@ -233,4 +233,14 @@ func externalFuncKey(e *minir.ExternalFunc) string {
 		sig = res + "(" + strings.Join(parts, ",") + ")"
 	}
 	return cname + "|" + dll + "|" + sig
+}
+
+func backendTargetFor(name string) (target.Target, error) {
+	switch name {
+	case "rv64imafd", "riscv", "riscv64":
+		return target.Lookup("riscv64")
+	case "arm64-apple-macos", "arm64", "aarch64-apple-darwin":
+		return target.Lookup("arm64")
+	}
+	return target.Lookup(name)
 }

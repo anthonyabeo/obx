@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/anthonyabeo/obx/src/backend"
+	"github.com/anthonyabeo/obx/src/backend/emit"
 	_ "github.com/anthonyabeo/obx/src/backend/stages"
 	"github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/desugar"
@@ -89,8 +90,14 @@ precedence over obx.mod values.`,
 		ctx := boot.Ctx
 		mach := boot.Machine
 		projectDir := boot.ProjectDir
+		manifest := boot.Manifest
 		roots := boot.Roots
 		entry := boot.Entry
+
+		toolchain, err := buildToolchainFor(mach)
+		if err != nil {
+			log.Fatalf("build: %v", err)
+		}
 
 		// ── 2. Discover and order modules ─────────────────────────────────
 		sorted, graph, err := resolveModules(ctx, roots...)
@@ -195,7 +202,26 @@ precedence over obx.mod values.`,
 		if err != nil {
 			log.Fatalf("build: %v", err)
 		}
+
+		emitter := emit.New(emit.Config{
+			ProjectDir: projectDir,
+			Manifest:   manifest,
+			Target:     backendTarget,
+			Toolchain: emit.Toolchain{
+				Assembler:     toolchain.assembler,
+				AssemblerArgs: append([]string(nil), toolchain.assemblerArgs...),
+				Linker:        toolchain.linker,
+				LinkerArgs:    append([]string(nil), toolchain.linkerArgs...),
+			},
+			Output:   buildArgs.Output,
+			PrintAsm: buildArgs.Asm,
+			KeepAsm:  buildArgs.KeepAsm,
+			KeepObj:  buildArgs.KeepObj,
+		})
 		pipeline := backend.NewPipelineDriver(backendTarget)
+		pipeline.Assemble = emitter.Assemble
+		pipeline.Link = emitter.Link
+
 		bridge, err := pipeline.Run(lowered)
 		if err != nil {
 			log.Fatalf("build: backend pipeline failed: %v", err)
@@ -206,14 +232,4 @@ precedence over obx.mod values.`,
 
 		fmt.Println("Backend MIR lowering complete.")
 	},
-}
-
-func backendTargetFor(name string) (target.Target, error) {
-	switch name {
-	case "rv64imafd", "riscv", "riscv64":
-		return target.Lookup("riscv64")
-	case "arm64-apple-macos", "arm64", "aarch64-apple-darwin":
-		return target.Lookup("arm64")
-	}
-	return target.Lookup(name)
 }
