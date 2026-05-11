@@ -565,14 +565,22 @@ func (l *Lowerer) lowerLocals(locals []desugar.Decl) {
 			}
 			addr := l.newAddrTemp(d.Name, vt)
 			l.emit(&AllocaInst{Dst: addr, AllocType: vt})
-			l.varEnv[d.Mangled] = addr
-			if d.Mangled != "" && d.Mangled != d.Name {
+			key := d.Mangled
+			if key == "" {
+				key = d.Name
+			}
+			l.varEnv[key] = addr
+			if d.Name != "" && d.Name != key {
 				l.varEnv[d.Name] = addr
 			}
 		case *desugar.Constant:
 			cv := l.lowerLiteralExpr(d.Value)
-			l.constEnv[d.Mangled] = cv
-			if d.Mangled != "" {
+			key := d.Mangled
+			if key == "" {
+				key = d.Name
+			}
+			l.constEnv[key] = cv
+			if d.Name != "" {
 				l.constEnv[d.Name] = cv
 			}
 			//case *desugar.Function:
