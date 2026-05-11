@@ -161,7 +161,7 @@ ok      3 module(s) checked, no errors
 
 ### `obx build`
 
-Runs the full compilation pipeline and writes assembly files to `out/`.
+Runs the full compilation pipeline and produces a runnable executable under `build/`.
 
 ```
 obx build [flags]
@@ -173,16 +173,20 @@ obx build [flags]
 |---|---|---|---|
 | `--root` | `-r` | *(obx.mod)* | Source root directory. Repeatable. Falls back to `roots` in `obx.mod`. |
 | `--entry` | `-e` | *(obx.mod)* | Entry module. Falls back to `entry` in `obx.mod`; omit to build all modules. |
-| `--output` | `-o` | | Name of the output file to produce. |
+| `--output` | `-o` | *(project name)* | Final executable path/name. Relative names are written under `build/`. |
 | `--target` | `-T` | `rv64imafd` | Target architecture. Run `obx build --help` to see all registered targets. Injects platform directives automatically. |
 | `--define` | `-d` | | Compile-time directive: `NAME` (bool true) or `NAME=VALUE`. Repeatable. Applied after platform directives, so can override them. |
-| `--asm` | `-S` | `false` | Print generated assembly to stdout in addition to writing it to `out/`. |
+| `--asm` | `-S` | `false` | Print generated assembly to stdout in addition to writing it to `build/`. |
+| `--keep-asm` | | `false` | Keep generated `.s` files after linking. |
+| `--keep-obj` | | `false` | Keep generated `.o` files after linking. |
 | `--optlevel` | `-O` | `2` | Optimisation level `0`–`3` (see [Optimisation Passes](#optimisation-passes)). |
 | `--passes` | `-P` | | Comma-separated passes to enable, overriding `-O`. |
 | `--disable-passes` | `-D` | | Comma-separated passes to disable from the selected level. |
 | `--verbose` | `-V` | `false` | Print per-pass IR diffs and optimisation details. |
 
-Assembly is written to `out/<ModuleName>.s` relative to the project root.
+Assembly is written to `build/<ModuleName>.s` and object files to `build/<ModuleName>.o`.
+The executable defaults to the project name from `obx.mod` (sanitized per platform) when
+`--output` is omitted.
 
 ---
 
@@ -302,11 +306,12 @@ export OBX_STDLIB=/opt/obx/stdlib
 { "stdlib": "/opt/obx/stdlib", … }
 ```
 
-Linker flags for all required native libraries are written to `out/link.flags`
-automatically.  Example link invocation for RISC-V:
+Linker flags for all required native libraries are written to `build/link.flags`
+automatically.  `obx build` also invokes the linker directly, but if you want to relink
+manually, a typical RISC-V invocation is:
 
 ```shell
-riscv64-linux-gnu-gcc out/Main.s $(cat out/link.flags) -o myapp
+riscv64-linux-gnu-gcc build/Main.o $(cat build/link.flags) -o build/myapp
 ```
 
 See **[stdlib/README.md](stdlib/README.md)** for the full API reference.
@@ -524,7 +529,7 @@ Source files
 │  9. Assembly emission  (src/codegen/target)                      │
 │     The active target backend (rv64imafd or arm64-apple-macos)   │
 │     formats instructions, computes the frame layout, and writes  │
-│     .s files to out/.                                            │
+│     .s and .o files to build/.                                   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 

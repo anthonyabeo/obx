@@ -4,16 +4,13 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 
 	zlog "github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/anthonyabeo/obx/src/ir/minir"
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/sema"
-	"github.com/anthonyabeo/obx/src/support/cache"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 )
 
@@ -50,35 +47,26 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		entry := buildArgs.Entry
-		roots := []string{checkArgs.Path}
-		label := checkArgs.Path // used in progress output
 
-		ctx, _ := newContext(checkArgs.MaxErrors)
-
-		// Inject platform directives first so --define can still override.
-		injectPlatformDirectives(ctx, checkArgs.Target)
-
-		if err := applyDirectives(ctx, checkArgs.Defines); err != nil {
-			fmt.Fprintf(os.Stderr, "check: %v\n", err)
-			os.Exit(1)
+		boot, err := bootstrapFrontEnd(bootstrapOptions{
+			Command:   "check",
+			Target:    checkArgs.Target,
+			Defines:   checkArgs.Defines,
+			MaxErrors: checkArgs.MaxErrors,
+			Path:      checkArgs.Path,
+			Entry:     entry,
+		})
+		if err != nil {
+			log.Fatalf("check: %v", err)
 		}
-
-		// ── 0. Fall back to obx.mod when --path is not given ─────────────
-		var manifest project.Manifest
-		if checkArgs.Path == "" {
-			dir, err := project.FindProjectRoot()
-			if err != nil {
-				log.Fatalf("check: no --path given and %s", err)
-			}
-			manifest, err = project.LoadManifest(dir)
-			if err != nil {
-				log.Fatalf("check: %v", err)
-			}
-			roots = manifest.Roots
-			label = dir
-			if entry == "" {
-				entry = manifest.Entry
-			}
+		ctx := boot.Ctx
+		projectDir := boot.ProjectDir
+		manifest := boot.Manifest
+		roots := boot.Roots
+		entry = boot.Entry
+		label := checkArgs.Path
+		if label == "" {
+			label = projectDir
 		}
 
 		// ── 0a. Prepend stdlib root (dual-root discovery) ─────────────────
@@ -89,13 +77,13 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 		// ── 1. Discover and order modules ────────────────────────────────
 		sorted, graph, err := resolveModules(ctx, roots...)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "check: %v\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "check: %v\n", err)
 			os.Exit(1)
 		}
 
 		sorted, err = project.ReachableFrom(sorted, graph, entry)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "check: %v\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "check: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -110,50 +98,15 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 		// ── 2. Parse ─────────────────────────────────────────────────────
 		obx := ast.NewOberonX()
 
-		// Attempt to load precompiled .obxi bundles for discovered modules so
-		// we can inject scopes and skip reparsing/re-sema when possible.
-		preBundles := make(map[string]*minir.Module)
-		loadedNames := make(map[string]bool)
-		for _, h := range sorted {
-			obxPath := h.File
-			obxiPath := obxPath[:len(obxPath)-len(".obx")] + ".obxi"
-			if _, err := os.Stat(obxiPath); err == nil {
-				if b, err := cache.LoadBundle(obxiPath, nil); err == nil {
-					ctx.Env.AddModuleScope(b.ModuleName, b.Scope)
-					preBundles[b.ModuleName] = b.Module
-					loadedNames[h.Key.Name()] = true
-					zlog.Info().Str("module", b.ModuleName).Str("path", obxiPath).Msg("check: precompiled module loaded; will skip parsing")
-					continue
-				}
-			}
-			cachePath := filepath.Join(filepath.Dir(obxPath), "cache", filepath.Base(obxPath[:len(obxPath)-len(".obx")]+".obxi"))
-			if _, err := os.Stat(cachePath); err == nil {
-				if b, err := cache.LoadBundle(cachePath, nil); err == nil {
-					ctx.Env.AddModuleScope(b.ModuleName, b.Scope)
-					preBundles[b.ModuleName] = b.Module
-					loadedNames[h.Key.Name()] = true
-					zlog.Info().Str("module", b.ModuleName).Str("path", cachePath).Msg("check: precompiled module loaded; will skip parsing")
-					continue
-				}
-			}
-		}
-
-		var toParse []project.Header
-		var skipped []string
-		for _, h := range sorted {
-			if loadedNames[h.Key.Name()] {
-				skipped = append(skipped, h.Key.Name())
-				continue
-			}
-			toParse = append(toParse, h)
-		}
+		_, loadedNames := loadPrecompiledBundles(ctx, sorted)
+		toParse, skipped := splitParsedHeaders(sorted, loadedNames)
 		if len(skipped) > 0 {
 			zlog.Info().Int("count", len(skipped)).Str("modules", strings.Join(skipped, ", ")).Msg("check: skipping parse/sema for precompiled modules")
 		}
 
 		if ok := parseModules(toParse, ctx, obx); !ok {
 			n := ctx.Reporter.ErrorCount()
-			fmt.Fprintf(os.Stderr, "check failed: %d parse error(s)\n", n)
+			_, _ = fmt.Fprintf(os.Stderr, "check failed: %d parse error(s)\n", n)
 			os.Exit(1)
 		}
 
@@ -164,7 +117,7 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 		if ctx.Reporter.ErrorCount() > 0 {
 			ctx.Reporter.Flush()
 			n := ctx.Reporter.ErrorCount()
-			fmt.Fprintf(os.Stderr, "check failed: %d error(s)\n", n)
+			_, _ = fmt.Fprintf(os.Stderr, "check failed: %d error(s)\n", n)
 			os.Exit(1)
 		}
 

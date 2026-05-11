@@ -308,11 +308,12 @@ obx build
 
 ## Linking
 
-The linker flags for stdlib dependencies are written to `out/link.flags`
-automatically by `obx build`.  A typical POSIX link invocation:
+The linker flags for stdlib dependencies are written to `build/link.flags`
+automatically by `obx build`.  `obx build` also links the final executable directly,
+but a typical POSIX relink invocation is:
 
 ```shell
-riscv64-linux-gnu-gcc out/Main.s $(cat out/link.flags) -o myapp
+riscv64-linux-gnu-gcc build/Main.o $(cat build/link.flags) -o build/myapp
 ```
 
 Expected flags for each module:

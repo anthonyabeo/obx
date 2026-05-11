@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/anthonyabeo/obx/src/codegen/target"
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
@@ -16,7 +17,27 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/directive"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
+	zlog "github.com/rs/zerolog/log"
 )
+
+type bootstrapOptions struct {
+	Command   string
+	Target    string
+	Defines   []string
+	MaxErrors int
+	Roots     []string
+	Path      string
+	Entry     string
+}
+
+type bootstrapState struct {
+	Ctx        *compiler.Context
+	Machine    target.Machine
+	ProjectDir string
+	Manifest   project.Manifest
+	Roots      []string
+	Entry      string
+}
 
 // resolveModules discovers every .obx file under the given source roots,
 // derives their ModuleKeys from the filesystem layout, builds the import
@@ -54,6 +75,71 @@ func newContext(maxErrors int) (*compiler.Context, *source.Manager) {
 	)
 	ctx := compiler.New("", srcMgr, reporter, ast.NewEnv(), 8)
 	return ctx, srcMgr
+}
+
+// bootstrapFrontEnd resolves the target, creates the compiler context, applies
+// directives, and resolves project roots / manifest state for the command.
+func bootstrapFrontEnd(opts bootstrapOptions) (*bootstrapState, error) {
+	mach, err := target.Lookup(opts.Target)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, _ := newContext(opts.MaxErrors)
+	injectPlatformDirectives(ctx, mach.Name())
+	if err := applyDirectives(ctx, opts.Defines); err != nil {
+		return nil, err
+	}
+
+	state := &bootstrapState{
+		Ctx:        ctx,
+		Machine:    mach,
+		ProjectDir: ".",
+		Manifest:   project.Manifest{},
+		Roots:      append([]string(nil), opts.Roots...),
+		Entry:      opts.Entry,
+	}
+
+	if opts.Path != "" {
+		state.Roots = []string{opts.Path}
+		return state, nil
+	}
+
+	if len(opts.Roots) == 0 {
+		dir, err := project.FindProjectRoot()
+		if err != nil {
+			return nil, fmt.Errorf("%s: no --root given and %w", opts.Command, err)
+		}
+		state.ProjectDir = dir
+		manifest, err := project.LoadManifest(dir)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", opts.Command, err)
+		}
+		state.Manifest = manifest
+		state.Roots = manifest.Roots
+		if state.Entry == "" {
+			state.Entry = manifest.Entry
+		}
+	} else {
+		if dir, err := project.FindProjectRoot(); err == nil {
+			state.ProjectDir = dir
+			manifest, err := project.LoadManifest(dir)
+			if err != nil {
+				zlog.Warn().Err(err).Str("dir", dir).Msg(opts.Command + ": ignoring invalid obx.mod while explicit roots are set")
+			} else {
+				state.Manifest = manifest
+				if state.Entry == "" {
+					state.Entry = manifest.Entry
+				}
+			}
+		}
+	}
+
+	if stdlibRoot := project.ResolveStdlibRoot(state.Manifest); stdlibRoot != "" {
+		state.Roots = append([]string{stdlibRoot}, state.Roots...)
+	}
+
+	return state, nil
 }
 
 // parseModules parses every header (in sorted order) into obx.
