@@ -27,6 +27,8 @@ var DefaultStageOrder = []string{
 	"legalization",
 	"instruction-scheduling",
 	"register-allocation",
+	"assemble",
+	"link",
 }
 
 // RegisterStage makes a backend pipeline stage available by name.
