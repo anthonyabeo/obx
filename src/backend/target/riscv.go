@@ -9,7 +9,7 @@ type RISCV64Target struct {
 
 func NewRISCV64Target() *RISCV64Target {
 	return &RISCV64Target{
-		BaseTarget: NewBaseTarget("riscv64", ABI{
+		BaseTarget: NewBaseTarget(RV64IMAFDName, ABI{
 			WordSize:            8,
 			Align:               16,
 			IntArgRegs:          []string{"a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7"},
@@ -29,5 +29,6 @@ func (t *RISCV64Target) Emit(*mir.Module) string {
 }
 
 func init() {
-	Register("riscv64", func() Target { return NewRISCV64Target() })
+	Register(RV64IMAFDName, func() Target { return NewRISCV64Target() })
+	RegisterAlias(RISCV64AliasName, RV64IMAFDName)
 }

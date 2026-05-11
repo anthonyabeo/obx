@@ -8,7 +8,7 @@ type ARM64Target struct {
 }
 
 var arm64Default = &ARM64Target{
-	BaseTarget: NewBaseTarget("arm64", ABI{
+	BaseTarget: NewBaseTarget(Arm64Name, ABI{
 		WordSize:            8,
 		Align:               16,
 		IntArgRegs:          []string{"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7"},
@@ -27,5 +27,5 @@ func (t *ARM64Target) Emit(*mir.Module) string {
 }
 
 func init() {
-	Register("arm64", func() Target { return arm64Default })
+	Register(Arm64Name, func() Target { return arm64Default })
 }

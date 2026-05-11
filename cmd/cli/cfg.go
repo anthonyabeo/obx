@@ -9,6 +9,7 @@ import (
 	zlog "github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/minir"
 	miniropt "github.com/anthonyabeo/obx/src/ir/minir/opt"
@@ -28,7 +29,7 @@ var cfgArgs struct {
 
 func init() {
 	cfgCmd.Flags().StringVarP(&cfgArgs.Path, "path", "p", "", "source root directory (defaults to roots in obx.mod)")
-	cfgCmd.Flags().StringVarP(&cfgArgs.Target, "target", "T", "rv64imafd", "target architecture (used to select the stdlib platform layer)")
+	cfgCmd.Flags().StringVarP(&cfgArgs.Target, "target", "T", target.RV64IMAFDName, "target architecture (used to select the stdlib platform layer)")
 	cfgCmd.Flags().StringVarP(&cfgArgs.Out, "out", "o", "", "output path for CFG; use '-' for stdout when format=dot")
 	cfgCmd.Flags().StringVar(&cfgArgs.Format, "format", "dot", "output format: dot (default), png, svg, or minir")
 	cfgCmd.Flags().StringVar(&cfgArgs.Fn, "fn", "", "name of function to dump; defaults to module entry or first lowered function")

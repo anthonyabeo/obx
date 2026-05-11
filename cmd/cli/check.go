@@ -9,6 +9,7 @@ import (
 	zlog "github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
@@ -25,7 +26,7 @@ var checkArgs struct {
 func init() {
 	checkCmd.Flags().StringVarP(&checkArgs.Path, "path", "p", "",
 		"source root directory (defaults to roots in obx.mod)")
-	checkCmd.Flags().StringVarP(&checkArgs.Target, "target", "T", "rv64imafd",
+	checkCmd.Flags().StringVarP(&checkArgs.Target, "target", "T", target.RV64IMAFDName,
 		"target architecture (used to select the stdlib platform layer)")
 	checkCmd.Flags().IntVar(&checkArgs.MaxErrors, "max-errors", 32, "maximum number of errors to report before stopping")
 	checkCmd.Flags().BoolVarP(&checkArgs.Quiet, "quiet", "q", false, "suppress informational output; only show diagnostics")

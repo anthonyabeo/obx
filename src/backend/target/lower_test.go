@@ -158,7 +158,7 @@ func TestRegistryLookupAndAvailable(t *testing.T) {
 	if len(available) != 2 {
 		t.Fatalf("expected 2 registered targets, got %d", len(available))
 	}
-	if available[0] != "arm64" || available[1] != "riscv64" {
+	if available[0] != Arm64Name || available[1] != RV64IMAFDName {
 		t.Fatalf("unexpected available targets: %#v", available)
 	}
 

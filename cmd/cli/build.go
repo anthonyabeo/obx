@@ -26,7 +26,7 @@ var buildArgs struct {
 	Roots  []string // --root (repeatable); falls back to roots in obx.mod
 	Entry  string   // --entry; falls back to entry in obx.mod
 	Output string   // --output; final executable path/name (defaults to project name)
-	Target string   // --target; defaults to rv64imafd
+	Target string   // --target; defaults to backend target constants
 
 	Defines       []string // --define (repeatable); NAME or NAME=VALUE
 	OptLevel      int
@@ -48,7 +48,7 @@ func init() {
 	buildCmd.Flags().StringVarP(&buildArgs.Entry, "entry", "e", "",
 		"entry module to build (defaults to entry in obx.mod; omit to build all)")
 	buildCmd.Flags().StringVarP(&buildArgs.Output, "output", "o", "", "final executable name/path (defaults to the project name under build/)")
-	buildCmd.Flags().StringVarP(&buildArgs.Target, "target", "T", "rv64imafd",
+	buildCmd.Flags().StringVarP(&buildArgs.Target, "target", "T", target.RV64IMAFDName,
 		"target architecture (available: "+strings.Join(target.Available(), ", ")+")")
 	buildCmd.Flags().StringArrayVarP(&buildArgs.Defines, "define", "d", nil,
 		"set a compile-time directive constant: NAME (bool true) or NAME=VALUE (bool/int/float)")

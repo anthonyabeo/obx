@@ -6,7 +6,10 @@ import (
 	"strings"
 )
 
-var registry = map[string]func() Target{}
+var (
+	registry = map[string]func() Target{}
+	aliases  = map[string]string{}
+)
 
 // Register makes a target available by name. Intended to be called from each
 // target package's init() function.
@@ -14,9 +17,17 @@ func Register(name string, factory func() Target) {
 	registry[name] = factory
 }
 
+// RegisterAlias makes alias resolve to a previously-registered canonical name.
+func RegisterAlias(alias, canonical string) {
+	aliases[alias] = canonical
+}
+
 // Lookup returns a freshly constructed Target for the given target name.
 // Returns an error that lists all registered targets when name is unknown.
 func Lookup(name string) (Target, error) {
+	if canonical, ok := aliases[name]; ok {
+		name = canonical
+	}
 	f, ok := registry[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown target %q; available: %s", name, strings.Join(Available(), ", "))

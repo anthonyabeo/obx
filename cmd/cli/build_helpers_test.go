@@ -4,12 +4,19 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/anthonyabeo/obx/src/codegen/target"
-	_ "github.com/anthonyabeo/obx/src/codegen/target/arm64"
-	_ "github.com/anthonyabeo/obx/src/codegen/target/riscv"
+	bmir "github.com/anthonyabeo/obx/src/backend/mir"
+	btarget "github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/minir"
 	"github.com/anthonyabeo/obx/src/project"
 )
+
+type fakeToolchainTarget struct{ *btarget.BaseTarget }
+
+func newFakeToolchainTarget(name string) btarget.Target {
+	return &fakeToolchainTarget{BaseTarget: btarget.NewBaseTarget(name, btarget.ABI{})}
+}
+
+func (f *fakeToolchainTarget) Emit(_ *bmir.Module) string { return "" }
 
 func TestNormalizeExecutableBase(t *testing.T) {
 	cases := []struct {
@@ -32,10 +39,10 @@ func TestNormalizeExecutableBase(t *testing.T) {
 
 func TestDefaultExecutableName(t *testing.T) {
 	m := project.Manifest{Name: "my project"}
-	if got, want := defaultExecutableName(m, "rv64imafd"), "my_project"; got != want {
+	if got, want := defaultExecutableName(m, btarget.RV64IMAFDName), "my_project"; got != want {
 		t.Fatalf("defaultExecutableName(rv64) = %q, want %q", got, want)
 	}
-	if got, want := defaultExecutableName(m, "x86_64-pc-windows"), "my_project.exe"; got != want {
+	if got, want := defaultExecutableName(m, btarget.RV64IMAFDName+"-windows"), "my_project.exe"; got != want {
 		t.Fatalf("defaultExecutableName(windows) = %q, want %q", got, want)
 	}
 }
@@ -44,23 +51,19 @@ func TestResolveOutputPath(t *testing.T) {
 	m := project.Manifest{Name: "calc"}
 	projectDir := string(filepath.Separator) + "tmp" + string(filepath.Separator) + "proj"
 
-	if got, want := resolveOutputPath(projectDir, m, "rv64imafd", ""), filepath.Join(projectDir, "build", "calc"); got != want {
+	if got, want := resolveOutputPath(projectDir, m, btarget.RV64IMAFDName, ""), filepath.Join(projectDir, "build", "calc"); got != want {
 		t.Fatalf("resolveOutputPath(default) = %q, want %q", got, want)
 	}
-	if got, want := resolveOutputPath(projectDir, m, "rv64imafd", "dist/app"), filepath.Join(projectDir, "dist", "app"); got != want {
+	if got, want := resolveOutputPath(projectDir, m, btarget.RV64IMAFDName, "dist/app"), filepath.Join(projectDir, "dist", "app"); got != want {
 		t.Fatalf("resolveOutputPath(relative) = %q, want %q", got, want)
 	}
-	if got, want := resolveOutputPath(projectDir, m, "rv64imafd", filepath.Join(string(filepath.Separator), "opt", "app")), filepath.Join(string(filepath.Separator), "opt", "app"); got != want {
+	if got, want := resolveOutputPath(projectDir, m, btarget.RV64IMAFDName, filepath.Join(string(filepath.Separator), "opt", "app")), filepath.Join(string(filepath.Separator), "opt", "app"); got != want {
 		t.Fatalf("resolveOutputPath(absolute) = %q, want %q", got, want)
 	}
 }
 
 func TestBuildToolchainFor(t *testing.T) {
-	riscvMach, err := target.Lookup("rv64imafd")
-	if err != nil {
-		t.Fatalf("target.Lookup(rv64imafd): %v", err)
-	}
-	tc, err := buildToolchainFor(riscvMach)
+	tc, err := buildToolchainFor(newFakeToolchainTarget(btarget.RV64IMAFDName))
 	if err != nil {
 		t.Fatalf("buildToolchainFor(rv64imafd): %v", err)
 	}
@@ -68,11 +71,7 @@ func TestBuildToolchainFor(t *testing.T) {
 		t.Fatalf("unexpected riscv toolchain: %+v", tc)
 	}
 
-	armMach, err := target.Lookup("arm64-apple-macos")
-	if err != nil {
-		t.Fatalf("target.Lookup(arm64-apple-macos): %v", err)
-	}
-	tc, err = buildToolchainFor(armMach)
+	tc, err = buildToolchainFor(newFakeToolchainTarget(btarget.Arm64AppleMacosName))
 	if err != nil {
 		t.Fatalf("buildToolchainFor(arm64): %v", err)
 	}

@@ -29,12 +29,12 @@ func canonicalBuildTarget(targetName string) string {
 
 func buildToolchainFor(mach target.Target) (buildToolchain, error) {
 	switch canonicalBuildTarget(mach.Name()) {
-	case "rv64imafd":
+	case target.RV64IMAFDName:
 		return buildToolchain{
 			assembler: "riscv64-linux-gnu-gcc",
 			linker:    "riscv64-linux-gnu-gcc",
 		}, nil
-	case "arm64-apple-macos", "aarch64-apple-darwin":
+	case target.Arm64AppleMacosName, target.AArch64AppleDarwinName:
 		return buildToolchain{
 			assembler:     "clang",
 			assemblerArgs: []string{"-arch", "arm64"},
@@ -237,10 +237,10 @@ func externalFuncKey(e *minir.ExternalFunc) string {
 
 func backendTargetFor(name string) (target.Target, error) {
 	switch name {
-	case "rv64imafd", "riscv", "riscv64":
-		return target.Lookup("riscv64")
-	case "arm64-apple-macos", "arm64", "aarch64-apple-darwin":
-		return target.Lookup("arm64")
+	case target.RV64IMAFDName, target.RISCVAliasName, target.RISCV64AliasName:
+		return target.Lookup(target.RV64IMAFDName)
+	case target.Arm64AppleMacosName, target.Arm64Name, target.AArch64AppleDarwinName:
+		return target.Lookup(target.Arm64Name)
 	}
 	return target.Lookup(name)
 }
