@@ -86,6 +86,20 @@ func (i *BinaryInstr) String() string {
 	return fmt.Sprintf("%s %s, %s, %s", i.Op, i.Dst, i.Left, i.Right)
 }
 
+// CompareInstr compares Left and Right using Pred and writes the boolean result
+// to Dst.
+type CompareInstr struct {
+	Dst         *Register
+	Pred        string
+	Left, Right Operand
+}
+
+func (i *CompareInstr) Defs() []*Register { return defs1(i.Dst) }
+func (i *CompareInstr) Uses() []Operand   { return useList(i.Left, i.Right) }
+func (i *CompareInstr) String() string {
+	return fmt.Sprintf("cmp.%s %s, %s, %s", i.Pred, i.Dst, i.Left, i.Right)
+}
+
 // PhiArm selects a value from a predecessor block.
 type PhiArm struct {
 	BlockLabel string

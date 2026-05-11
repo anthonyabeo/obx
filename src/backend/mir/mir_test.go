@@ -16,6 +16,11 @@ func TestInstrDefsUses(t *testing.T) {
 	if len(uses) != 2 || uses[0] != lhs || uses[1] != rhs {
 		t.Fatalf("BinaryInstr.Uses() = %#v, want [%p %p]", uses, lhs, rhs)
 	}
+
+	cmp := &CompareInstr{Dst: dst, Pred: "eq", Left: lhs, Right: rhs}
+	if got := cmp.String(); got != "cmp.eq v0, v1, 7" {
+		t.Fatalf("CompareInstr.String() = %q", got)
+	}
 }
 
 func TestBlockAndFunctionHelpers(t *testing.T) {
