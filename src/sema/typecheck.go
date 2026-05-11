@@ -3603,6 +3603,8 @@ func (t *TypeChecker) VisitFieldList(list *ast.FieldList) any {
 			continue
 		}
 
+		sym.SetType(typ)
+
 		fields = append(fields, &types.Field{
 			Name:       def.Name,
 			Type:       typ,

@@ -164,7 +164,7 @@ func TestTypeCheckInvalidPrograms(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:     "Invalid assignments - incompatible types",
+			name: "Invalid assignments - incompatible types",
 			filename: "test.obx",
 			source: `
 		MODULE Test;
@@ -257,6 +257,60 @@ func TestTypeCheckInvalidPrograms(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestTypeCheckFieldSymbolGetsType(t *testing.T) {
+	obx := ast.NewOberonX()
+	srcMgr := source.NewSourceManager()
+	reporter := diag.NewBufferedReporter(srcMgr, 32, diag.Stdout(formatter.NewTextFormatter(srcMgr, 0)))
+
+	ctx := compiler.New("field_type.obx", srcMgr, reporter, ast.NewEnv(), 0)
+
+	p := parser.NewParser(ctx, "field_type.obx", []byte(`
+		MODULE Test;
+		TYPE Point = RECORD
+			x: INTEGER
+		END;
+		VAR p: Point;
+		BEGIN
+			p.x := 1
+		END Test.
+	`))
+	unit := p.Parse()
+	if ctx.Reporter.ErrorCount() > 0 {
+		ctx.Reporter.Flush()
+		t.Fatalf("%d parse errors found", ctx.Reporter.ErrorCount())
+	}
+
+	obx.AddUnit(unit)
+
+	s := NewSema(ctx, obx)
+	s.Validate()
+	if ctx.Reporter.ErrorCount() > 0 {
+		ctx.Reporter.Flush()
+		t.Fatalf("unexpected semantic errors: %d", ctx.Reporter.ErrorCount())
+	}
+
+	mod := unit.(*ast.Module)
+	typeDecl, ok := mod.DeclSeq[0].(*ast.TypeDecl)
+	if !ok {
+		t.Fatalf("expected first declaration to be a TypeDecl, got %T", mod.DeclSeq[0])
+	}
+	rec, ok := typeDecl.DenotedType.(*ast.RecordType)
+	if !ok {
+		t.Fatalf("expected denoted type to be a RecordType, got %T", typeDecl.DenotedType)
+	}
+	if len(rec.Fields) == 0 || len(rec.Fields[0].List) == 0 {
+		t.Fatal("expected record to contain at least one field")
+	}
+
+	sym := rec.Fields[0].Env.Lookup(rec.Fields[0].List[0].Name)
+	if sym == nil {
+		t.Fatal("expected field symbol to be present in record scope")
+	}
+	if sym.Type() == nil {
+		t.Fatalf("expected field symbol %q to have a semantic type", sym.Name())
 	}
 }
 

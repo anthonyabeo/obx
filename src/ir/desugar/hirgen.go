@@ -352,10 +352,10 @@ func (g Generator) VisitRepeatStmt(stmt *ast.RepeatStmt) any {
 
 	// Emit exit condition
 	// exit if cond
-		exit := &IfStmt{
-			Cond: cond,
-			Then: &CompoundStmt{Stmts: []Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
-		}
+	exit := &IfStmt{
+		Cond: cond,
+		Then: &CompoundStmt{Stmts: []Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
+	}
 
 	body.Stmts = append(body.Stmts, exit)
 
@@ -368,10 +368,10 @@ func (g Generator) VisitWhileStmt(stmt *ast.WhileStmt) any {
 	// WHILE <cond>
 	cond := stmt.BoolExpr.Accept(g).(Expr)
 	negated := &UnaryExpr{Op: token.NOT, Operand: cond}
-		body.Stmts = append(body.Stmts, &IfStmt{
-			Cond: negated,
-			Then: &CompoundStmt{Stmts: []Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
-		})
+	body.Stmts = append(body.Stmts, &IfStmt{
+		Cond: negated,
+		Then: &CompoundStmt{Stmts: []Stmt{&ExitStmt{LoopLabel: stmt.Label}}},
+	})
 
 	// Body
 	for _, s := range stmt.StmtSeq {
@@ -537,9 +537,9 @@ func (g Generator) VisitGuard(guard *ast.Guard) any {
 
 	return &WithGuard{
 		NodeBase: NodeBase{Start: guard.Pos(), End: guard.End()},
-		Expr:  guardExpr,
-		Type:  guardType,
-		Body:  g.visitStmtSeq(guard.StmtSeq),
+		Expr:     guardExpr,
+		Type:     guardType,
+		Body:     g.visitStmtSeq(guard.StmtSeq),
 	}
 }
 
