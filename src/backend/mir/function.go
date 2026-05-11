@@ -13,6 +13,27 @@ type Local struct {
 	Type *Type
 }
 
+// FrameLayout describes the stack frame assigned by register allocation.
+// It is nil on a Function until the register-allocation stage runs.
+type FrameLayout struct {
+	// TotalSize is the total number of bytes allocated on the stack for this
+	// frame, including saved registers and spill slots.
+	TotalSize int
+
+	// SavedRegs lists callee-saved physical register names that this function
+	// must preserve (i.e. those that are live across calls or clobbered).
+	SavedRegs []string
+
+	// SpillSlots maps virtual-register names to their frame-relative byte
+	// offsets (measured from the frame pointer or stack pointer base).
+	SpillSlots map[string]int
+}
+
+// NewFrameLayout returns an empty FrameLayout ready for population.
+func NewFrameLayout() *FrameLayout {
+	return &FrameLayout{SpillSlots: make(map[string]int)}
+}
+
 // Function is a machine-IR function with explicit blocks and CFG.
 type Function struct {
 	Name     string
@@ -24,6 +45,10 @@ type Function struct {
 	Exit     *Block
 	IsLeaf   bool
 	HasCalls bool
+
+	// Frame is populated by the register-allocation stage.  It is nil before
+	// that stage has run.
+	Frame *FrameLayout
 
 	blockByLabel map[string]*Block
 }

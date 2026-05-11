@@ -208,3 +208,82 @@ func (i *SwitchInstr) Uses() []Operand {
 	return out
 }
 func (i *SwitchInstr) String() string { return fmt.Sprintf("switch %s", i.Value) }
+
+// ── Machine instructions ──────────────────────────────────────────────────────
+//
+// MachineInstr and MachineTerm are produced by instruction selection.  At that
+// point every virtual-op name (e.g. "add", "cmp.eq") is replaced by the real
+// target opcode (e.g. RISC-V "add", "addi", "seqz", …) and the operand list
+// is target-ordered (dsts first, then srcs).  Register allocation subsequently
+// replaces VirtualReg operands with PhysicalReg ones.
+
+// MachineInstr is a target-specific non-terminator instruction.
+type MachineInstr struct {
+	Op   string     // real machine opcode, e.g. "add", "addi", "ld", "sd"
+	Dsts []*Register
+	Srcs []Operand
+}
+
+func NewMachineInstr(op string, dsts []*Register, srcs []Operand) *MachineInstr {
+	return &MachineInstr{Op: op, Dsts: append([]*Register(nil), dsts...), Srcs: append([]Operand(nil), srcs...)}
+}
+
+func (i *MachineInstr) Defs() []*Register { return i.Dsts }
+func (i *MachineInstr) Uses() []Operand   { return i.Srcs }
+func (i *MachineInstr) String() string {
+	if len(i.Dsts) == 0 && len(i.Srcs) == 0 {
+		return i.Op
+	}
+	parts := make([]string, 0, len(i.Dsts)+len(i.Srcs))
+	for _, d := range i.Dsts {
+		parts = append(parts, d.String())
+	}
+	for _, s := range i.Srcs {
+		parts = append(parts, s.String())
+	}
+	out := i.Op
+	for j, p := range parts {
+		if j == 0 {
+			out += " " + p
+		} else {
+			out += ", " + p
+		}
+	}
+	return out
+}
+
+// MachineTerm is a target-specific terminator (branch, return, etc.).
+// Targets lists the successor block labels in branch-operand order.
+type MachineTerm struct {
+	Op      string
+	Srcs    []Operand
+	Targets []string // successor labels, e.g. ["then", "else"] for a conditional branch
+}
+
+func NewMachineTerm(op string, srcs []Operand, targets []string) *MachineTerm {
+	return &MachineTerm{Op: op, Srcs: append([]Operand(nil), srcs...), Targets: append([]string(nil), targets...)}
+}
+
+func (*MachineTerm) isTerminator()       {}
+func (i *MachineTerm) Defs() []*Register { return nil }
+func (i *MachineTerm) Uses() []Operand   { return i.Srcs }
+func (i *MachineTerm) String() string {
+	if len(i.Srcs) == 0 && len(i.Targets) == 0 {
+		return i.Op
+	}
+	parts := make([]string, 0, len(i.Srcs)+len(i.Targets))
+	for _, s := range i.Srcs {
+		parts = append(parts, s.String())
+	}
+	parts = append(parts, i.Targets...)
+	out := i.Op
+	for j, p := range parts {
+		if j == 0 {
+			out += " " + p
+		} else {
+			out += ", " + p
+		}
+	}
+	return out
+}
+
