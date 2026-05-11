@@ -82,7 +82,9 @@ END Test.`
 	}
 
 	var resp map[string]any
-	json.NewDecoder(rr.Body).Decode(&resp)
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 
 	if ok, _ := resp["ok"].(bool); !ok {
 		t.Fatalf("expected ok=true, got error: %v", resp["error"])
@@ -133,7 +135,9 @@ END LoopTest.`
 	}
 
 	var resp map[string]any
-	json.NewDecoder(rr.Body).Decode(&resp)
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 
 	if ok, _ := resp["ok"].(bool); !ok {
 		t.Fatalf("expected ok=true, got error: %v", resp["error"])
@@ -178,7 +182,9 @@ END LoopTest.`
 	}
 
 	var resp map[string]any
-	json.NewDecoder(rr.Body).Decode(&resp)
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 
 	t.Logf("response ok=%v error=%v", resp["ok"], resp["error"])
 
@@ -204,6 +210,53 @@ func TestHandleCFG_ParseError(t *testing.T) {
 	newTestServer().HandleCFG(rr, req)
 
 	var resp map[string]any
-	json.NewDecoder(rr.Body).Decode(&resp)
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 	t.Logf("parse-error response: ok=%v error=%v", resp["ok"], resp["error"])
 }
+
+func TestHandleUI_RootServesPlayground(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	newTestServer().HandleUI(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "Oberon+ Playground") {
+		t.Fatalf("expected playground HTML, got: %s", rr.Body.String())
+	}
+}
+
+func TestHandleUI_UnknownPathServes404Page(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/does/not/exist", nil)
+	rr := httptest.NewRecorder()
+
+	newTestServer().HandleUI(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("want 404, got %d: %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "Back to playground") || !strings.Contains(body, "href=\"/\"") {
+		t.Fatalf("expected custom 404 page, got: %s", body)
+	}
+}
+
+func TestHandleStatic_MissingFileServes404Page(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/static/missing.js", nil)
+	rr := httptest.NewRecorder()
+
+	newTestServer().HandleStatic(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("want 404, got %d: %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "Back to playground") || !strings.Contains(body, "href=\"/\"") {
+		t.Fatalf("expected custom 404 page, got: %s", body)
+	}
+}
+

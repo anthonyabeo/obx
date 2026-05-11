@@ -32,6 +32,28 @@ var staticFS embed.FS
 
 var filenameRE = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
+func (s *Server) write404Page(w http.ResponseWriter, r *http.Request) {
+	data, err := staticFS.ReadFile("static/404.html")
+	if err != nil {
+		http.Error(w, "could not read 404 page", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
+	w.WriteHeader(http.StatusNotFound)
+	if r.Method != http.MethodHead {
+		_, _ = w.Write(data)
+	}
+}
+
 // (monarch served via generic /static/ handler)
 
 // HandleStatic serves embedded static files under the `static/` directory.
@@ -56,18 +78,18 @@ func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 	// Clean and disallow traversal outside the static directory
 	clean := path.Clean(reqPath)
 	if clean == "." || clean == "" {
-		http.NotFound(w, r)
+		s.write404Page(w, r)
 		return
 	}
 	if strings.HasPrefix(clean, "../") || strings.Contains(clean, "../") {
-		http.NotFound(w, r)
+		s.write404Page(w, r)
 		return
 	}
 
 	embPath := path.Join("static", clean)
 	data, err := staticFS.ReadFile(embPath)
 	if err != nil {
-		http.NotFound(w, r)
+		s.write404Page(w, r)
 		return
 	}
 
@@ -183,7 +205,7 @@ func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) HandleUI(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
-		http.NotFound(w, r)
+		s.write404Page(w, r)
 		return
 	}
 	data, err := staticFS.ReadFile("static/index.html")
