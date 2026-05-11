@@ -1,5 +1,7 @@
 package target
 
+import "github.com/anthonyabeo/obx/src/backend/mir"
+
 // RISCV64Target is the first minir-first target implementation.
 type RISCV64Target struct {
 	*BaseTarget
@@ -20,6 +22,10 @@ func NewRISCV64Target() *RISCV64Target {
 			JumpTableMinDensity: 0.5,
 		}),
 	}
+}
+
+func (t *RISCV64Target) Emit(*mir.Module) string {
+	panic("Emit not implemented for RISCV64Target yet")
 }
 
 func init() {

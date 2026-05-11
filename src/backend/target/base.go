@@ -11,6 +11,8 @@ type Target interface {
 	LowerPhiBlock(joinLabel string, phis []*mir.PhiInstr) (*PhiPlan, error)
 	LowerSwitch(sw *mir.SwitchInstr) (*SwitchPlan, error)
 	LowerCall(call *mir.CallInstr) (*CallPlan, error)
+
+	Emit(*mir.Module) string
 }
 
 // BaseTarget carries the shared target identity and ABI metadata.

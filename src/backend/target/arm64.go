@@ -1,5 +1,7 @@
 package target
 
+import "github.com/anthonyabeo/obx/src/backend/mir"
+
 // ARM64Target is the first minir-first target implementation.
 type ARM64Target struct {
 	*BaseTarget
@@ -18,6 +20,10 @@ var arm64Default = &ARM64Target{
 		LinkRegister:        "x30",
 		JumpTableMinDensity: 0.5,
 	}),
+}
+
+func (t *ARM64Target) Emit(*mir.Module) string {
+	panic("Emit not implemented for ARM64Target yet")
 }
 
 func init() {

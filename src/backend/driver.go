@@ -16,10 +16,14 @@ import (
 //  3. Legalization (stub)
 //  4. InstructionScheduling (stub)
 //  5. RegisterAllocation (stub)
-//  6. BuildPlans(target lowering helpers)
+//  6. Assemble (optional callback)
+//  7. Link (optional callback)
+//  8. BuildPlans(target lowering helpers)
 type PipelineDriver struct {
-	Target target.Target
-	Stages []string
+	Target   target.Target
+	Stages   []string
+	Assemble func(*mir.Program) error
+	Link     func(*mir.Program) error
 }
 
 // NewPipelineDriver constructs a backend pipeline driver for tgt.
@@ -31,6 +35,9 @@ func NewPipelineDriver(tgt target.Target, stages ...string) *PipelineDriver {
 func (p *PipelineDriver) Run(prog *minir.Program) (*LoweredProgram, error) {
 	if p == nil {
 		return nil, fmt.Errorf("backend pipeline: nil driver")
+	}
+	if p.Target == nil {
+		return nil, fmt.Errorf("backend pipeline: nil target")
 	}
 
 	mprog, err := p.Lower(prog)
@@ -62,6 +69,9 @@ func (p *PipelineDriver) Run(prog *minir.Program) (*LoweredProgram, error) {
 
 // Lower is the real front-end of the backend pipeline.
 func (p *PipelineDriver) Lower(prog *minir.Program) (*mir.Program, error) {
+	if p == nil {
+		return nil, fmt.Errorf("backend pipeline: nil driver")
+	}
 	return LowerProgram(prog)
 }
 
