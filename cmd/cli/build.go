@@ -11,7 +11,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/anthonyabeo/obx/src/backend"
-	backendtarget "github.com/anthonyabeo/obx/src/backend/target"
+	_ "github.com/anthonyabeo/obx/src/backend/stages"
+	"github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/minir"
 	miniropt "github.com/anthonyabeo/obx/src/ir/minir/opt"
@@ -47,7 +48,7 @@ func init() {
 		"entry module to build (defaults to entry in obx.mod; omit to build all)")
 	buildCmd.Flags().StringVarP(&buildArgs.Output, "output", "o", "", "final executable name/path (defaults to the project name under build/)")
 	buildCmd.Flags().StringVarP(&buildArgs.Target, "target", "T", "rv64imafd",
-		"target architecture (available: "+strings.Join(backendtarget.Available(), ", ")+")")
+		"target architecture (available: "+strings.Join(target.Available(), ", ")+")")
 	buildCmd.Flags().StringArrayVarP(&buildArgs.Defines, "define", "d", nil,
 		"set a compile-time directive constant: NAME (bool true) or NAME=VALUE (bool/int/float)")
 	buildCmd.Flags().IntVarP(&buildArgs.OptLevel, "optlevel", "O", 2, "optimisation level (0-3)")
@@ -207,12 +208,12 @@ precedence over obx.mod values.`,
 	},
 }
 
-func backendTargetFor(name string) (backendtarget.Target, error) {
+func backendTargetFor(name string) (target.Target, error) {
 	switch name {
 	case "rv64imafd", "riscv", "riscv64":
-		return backendtarget.Lookup("riscv64")
+		return target.Lookup("riscv64")
 	case "arm64-apple-macos", "arm64", "aarch64-apple-darwin":
-		return backendtarget.Lookup("arm64")
+		return target.Lookup("arm64")
 	}
-	return backendtarget.Lookup(name)
+	return target.Lookup(name)
 }

@@ -1,9 +1,11 @@
-package backend
+package backend_test
 
 import (
 	"testing"
 
+	backend "github.com/anthonyabeo/obx/src/backend"
 	"github.com/anthonyabeo/obx/src/backend/mir"
+	_ "github.com/anthonyabeo/obx/src/backend/stages"
 	btarget "github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/minir"
 )
@@ -60,7 +62,7 @@ func TestLowerAndPlan(t *testing.T) {
 	mod := &minir.Module{Name: "M", Functions: []*minir.Function{fn}}
 	prog := &minir.Program{Modules: []*minir.Module{mod}}
 
-	lowered, err := LowerAndPlan(prog, btarget.NewRISCV64Target())
+	lowered, err := backend.LowerAndPlan(prog, btarget.NewRISCV64Target())
 	if err != nil {
 		t.Fatalf("LowerAndPlan failed: %v", err)
 	}
@@ -98,7 +100,7 @@ func TestLowerAndPlan(t *testing.T) {
 }
 
 func TestPipelineDriverRunEmptyProgram(t *testing.T) {
-	driver := NewPipelineDriver(btarget.NewRISCV64Target())
+	driver := backend.NewPipelineDriver(btarget.NewRISCV64Target())
 	out, err := driver.Run(&minir.Program{})
 	if err != nil {
 		t.Fatalf("Run failed: %v", err)
@@ -115,7 +117,7 @@ func TestPipelineDriverRunEmptyProgram(t *testing.T) {
 }
 
 func TestPipelineDriverPassThroughStages(t *testing.T) {
-	driver := NewPipelineDriver(btarget.NewRISCV64Target())
+	driver := backend.NewPipelineDriver(btarget.NewRISCV64Target())
 	mprog, err := driver.Lower(&minir.Program{})
 	if err != nil {
 		t.Fatalf("Lower failed: %v", err)
@@ -135,7 +137,7 @@ func TestPipelineDriverPassThroughStages(t *testing.T) {
 }
 
 func TestBackendStageRegistry(t *testing.T) {
-	available := AvailableStages()
+	available := backend.AvailableStages()
 	if len(available) != 4 {
 		t.Fatalf("expected 4 registered backend stages, got %d", len(available))
 	}
@@ -146,8 +148,8 @@ func TestBackendStageRegistry(t *testing.T) {
 		}
 	}
 
-	for _, name := range DefaultStageOrder {
-		stage, err := LookupStage(name)
+	for _, name := range backend.DefaultStageOrder {
+		stage, err := backend.LookupStage(name)
 		if err != nil {
 			t.Fatalf("LookupStage(%s) failed: %v", name, err)
 		}
