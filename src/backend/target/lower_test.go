@@ -153,17 +153,25 @@ func TestBuildCallPlanAssignsRegistersAndStack(t *testing.T) {
 	}
 }
 
-func TestKnownTargetsShareCommonBase(t *testing.T) {
-	if arm64Default.Name() != "arm64" {
-		t.Fatalf("unexpected arm64 target name")
+func TestRegistryLookupAndAvailable(t *testing.T) {
+	available := Available()
+	if len(available) != 2 {
+		t.Fatalf("expected 2 registered targets, got %d", len(available))
 	}
-	for name, factory := range KnownTargets {
-		tgt := factory()
+	if available[0] != "arm64" || available[1] != "riscv64" {
+		t.Fatalf("unexpected available targets: %#v", available)
+	}
+
+	for _, name := range available {
+		tgt, err := Lookup(name)
+		if err != nil {
+			t.Fatalf("Lookup(%s) failed: %v", name, err)
+		}
 		if tgt == nil {
-			t.Fatalf("factory for %s returned nil", name)
+			t.Fatalf("Lookup(%s) returned nil", name)
 		}
 		if got := tgt.Name(); got != name {
-			t.Fatalf("factory %s returned target %q", name, got)
+			t.Fatalf("Lookup(%s) returned target %q", name, got)
 		}
 	}
 }

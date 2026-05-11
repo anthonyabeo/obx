@@ -21,3 +21,7 @@ func NewRISCV64Target() *RISCV64Target {
 		}),
 	}
 }
+
+func init() {
+	Register("riscv64", func() Target { return NewRISCV64Target() })
+}

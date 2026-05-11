@@ -96,3 +96,66 @@ func TestLowerAndPlan(t *testing.T) {
 		t.Fatalf("unexpected non-empty plans: %#v", plans)
 	}
 }
+
+func TestPipelineDriverRunEmptyProgram(t *testing.T) {
+	driver := NewPipelineDriver(btarget.NewRISCV64Target())
+	out, err := driver.Run(&minir.Program{})
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if out == nil || out.MIR == nil {
+		t.Fatalf("expected non-nil driver result and MIR")
+	}
+	if len(out.MIR.Modules) != 0 {
+		t.Fatalf("expected empty lowered program, got %d modules", len(out.MIR.Modules))
+	}
+	if out.Plans == nil {
+		t.Fatalf("expected non-nil plans map")
+	}
+}
+
+func TestPipelineDriverPassThroughStages(t *testing.T) {
+	driver := NewPipelineDriver(btarget.NewRISCV64Target())
+	mprog, err := driver.Lower(&minir.Program{})
+	if err != nil {
+		t.Fatalf("Lower failed: %v", err)
+	}
+	if _, err := driver.InstructionSelection(mprog); err != nil {
+		t.Fatalf("InstructionSelection failed: %v", err)
+	}
+	if _, err := driver.Legalization(mprog); err != nil {
+		t.Fatalf("Legalization failed: %v", err)
+	}
+	if _, err := driver.InstructionScheduling(mprog); err != nil {
+		t.Fatalf("InstructionScheduling failed: %v", err)
+	}
+	if _, err := driver.RegisterAllocation(mprog); err != nil {
+		t.Fatalf("RegisterAllocation failed: %v", err)
+	}
+}
+
+func TestBackendStageRegistry(t *testing.T) {
+	available := AvailableStages()
+	if len(available) != 4 {
+		t.Fatalf("expected 4 registered backend stages, got %d", len(available))
+	}
+	want := []string{"instruction-scheduling", "instruction-selection", "legalization", "register-allocation"}
+	for i := range want {
+		if available[i] != want[i] {
+			t.Fatalf("available[%d] = %q, want %q", i, available[i], want[i])
+		}
+	}
+
+	for _, name := range DefaultStageOrder {
+		stage, err := LookupStage(name)
+		if err != nil {
+			t.Fatalf("LookupStage(%s) failed: %v", name, err)
+		}
+		if stage == nil {
+			t.Fatalf("LookupStage(%s) returned nil", name)
+		}
+		if got := stage.Name(); got != name {
+			t.Fatalf("LookupStage(%s) returned stage %q", name, got)
+		}
+	}
+}

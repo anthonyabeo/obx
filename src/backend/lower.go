@@ -27,15 +27,7 @@ type FunctionPlans struct {
 
 // LowerAndPlan lowers minir into backend MIR and derives target plans in one go.
 func LowerAndPlan(prog *minir.Program, tgt target.Target) (*LoweredProgram, error) {
-	mprog, err := LowerProgram(prog)
-	if err != nil {
-		return nil, err
-	}
-	plans, err := BuildPlans(mprog, tgt)
-	if err != nil {
-		return nil, err
-	}
-	return &LoweredProgram{MIR: mprog, Plans: plans}, nil
+	return NewPipelineDriver(tgt).Run(prog)
 }
 
 // LowerProgram lowers a minir.Program into backend MIR.

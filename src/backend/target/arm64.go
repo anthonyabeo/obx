@@ -19,3 +19,7 @@ var arm64Default = &ARM64Target{
 		JumpTableMinDensity: 0.5,
 	}),
 }
+
+func init() {
+	Register("arm64", func() Target { return arm64Default })
+}
