@@ -1,11 +1,11 @@
-package backend
+package lower
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/backend/mir"
-	"github.com/anthonyabeo/obx/src/backend/target"
+	selector "github.com/anthonyabeo/obx/src/backend/select"
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/minir"
 )
@@ -14,20 +14,7 @@ import (
 // deriving target-specific lowering plans from that MIR.
 type LoweredProgram struct {
 	MIR   *mir.Program
-	Plans map[string]*FunctionPlans
-}
-
-// FunctionPlans groups the target-level lowering plans associated with one
-// lowered function.
-type FunctionPlans struct {
-	Phi    []*target.PhiPlan
-	Switch []*target.SwitchPlan
-	Calls  []*target.CallPlan
-}
-
-// LowerAndPlan lowers minir into backend MIR and derives target plans in one go.
-func LowerAndPlan(prog *minir.Program, tgt target.Target) (*LoweredProgram, error) {
-	return NewPipelineDriver(tgt).Run(prog)
+	Plans map[string]*selector.FunctionPlans
 }
 
 // LowerProgram lowers a minir.Program into backend MIR.
@@ -239,12 +226,12 @@ func lowerInstr(inst minir.Instr, regByTemp map[*minir.Temp]*mir.Register, globa
 			args = append(args, lop)
 		}
 		var dst *mir.Register
-		var err error
 		if i.Dst != nil {
-			dst, err = lowerTemp(i.Dst, regByTemp)
-			if err != nil {
-				return nil, err
+			callDst, callErr := lowerTemp(i.Dst, regByTemp)
+			if callErr != nil {
+				return nil, callErr
 			}
+			dst = callDst
 		}
 		return &mir.CallInstr{Dst: dst, Callee: mir.NewSymbol(i.Callee, nil), Args: args}, nil
 	case *minir.PhiInst:

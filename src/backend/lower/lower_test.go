@@ -1,4 +1,4 @@
-package backend_test
+package lower_test
 
 import (
 	"testing"
@@ -62,7 +62,8 @@ func TestLowerAndPlan(t *testing.T) {
 	mod := &minir.Module{Name: "M", Functions: []*minir.Function{fn}}
 	prog := &minir.Program{Modules: []*minir.Module{mod}}
 
-	lowered, err := backend.LowerAndPlan(prog, btarget.NewRISCV64Target())
+	driver := backend.NewPipelineDriver(btarget.NewRISCV64Target())
+	lowered, err := driver.Run(prog)
 	if err != nil {
 		t.Fatalf("LowerAndPlan failed: %v", err)
 	}
@@ -204,4 +205,3 @@ func TestPipelineDriverRunCustomStageAndNilTarget(t *testing.T) {
 		}
 	})
 }
-
