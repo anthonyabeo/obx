@@ -96,11 +96,10 @@ func (*Binding) matchItemNode() {}
 
 // TypeSpec describes the type of a bound operand.
 //
-//	TypeSpec = Ident [ ":" Ident ] [ ":" Ref ] ;
+//	TypeSpec = Ident [ ":" Ident ] ;
 type TypeSpec struct {
 	Kind string // register class or type name, e.g. "GPR", "imm", "label"
 	Sub  string // allocation mode, e.g. "virt", "phys" (optional)
-	Ref  string // specific register name without "$", e.g. "rd" (optional)
 }
 
 // PatternDecl declares the pattern matched inside a MatchSection.

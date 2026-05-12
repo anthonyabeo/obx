@@ -17,9 +17,11 @@ type PredicateFunc func(env map[string]any, args []*Value) bool
 // match; otherwise it passes instructions through unchanged.
 type Selector struct {
 	file       *File
+	abi        string
 	rules      []*compiledRule
 	byOp       map[string][]*compiledRule
 	predicates map[string]PredicateFunc
+	termPrefix []mir.Instr
 	tempMu     sync.Mutex
 	tempSeq    int
 }
@@ -49,11 +51,13 @@ func New(file *File) (*Selector, error) {
 	s := &Selector{
 		file:       file,
 		byOp:       make(map[string][]*compiledRule),
-		predicates: defaultPredicates(),
 	}
 	if file == nil {
+		s.predicates = defaultPredicates("")
 		return s, nil
 	}
+	s.abi = headerString(file.Header, "ABI")
+	s.predicates = defaultPredicates(s.abi)
 	if err := s.compile(); err != nil {
 		return nil, err
 	}
@@ -89,6 +93,19 @@ func (s *Selector) compile() error {
 		}
 	}
 	return nil
+}
+
+func headerString(hdr *Header, key string) string {
+	if hdr == nil {
+		return ""
+	}
+	for _, f := range hdr.Fields {
+		if f == nil || !strings.EqualFold(f.Key, key) || f.Val == nil {
+			continue
+		}
+		return valueString(f.Val)
+	}
+	return ""
 }
 
 func (s *Selector) compileItems(items []BlockItem) error {
@@ -279,6 +296,10 @@ func (s *Selector) SelectBlock(b *mir.Block) (*mir.Block, error) {
 		if err != nil {
 			return nil, fmt.Errorf("terminator %T: %w", b.Term, err)
 		}
+		if len(s.termPrefix) > 0 {
+			out.Instrs = append(out.Instrs, s.termPrefix...)
+			s.termPrefix = nil
+		}
 		out.Term = term
 	}
 
@@ -320,6 +341,7 @@ func (s *Selector) SelectTerminator(term mir.Terminator) (mir.Terminator, error)
 	if term == nil {
 		return nil, nil
 	}
+	s.termPrefix = nil
 
 	node := classifyTerm(term)
 	if node.op == "" {
@@ -331,12 +353,19 @@ func (s *Selector) SelectTerminator(term mir.Terminator) (mir.Terminator, error)
 		return term, nil
 	}
 
-	_, selectedTerm, err := s.emitSelection(rule, env, true)
+	sel, selectedTerm, err := s.emitSelection(rule, env, true)
 	if err != nil {
 		return nil, err
 	}
 
 	if selectedTerm != nil {
+		// Preserve any prefix instructions emitted by the descriptor so the
+		// caller can splice them into the block before the final terminator.
+		// This is how ABI return-register moves are carried through.
+		// (SelectBlock consumes termPrefix immediately after selection.)
+		if len(sel) > 0 {
+			s.termPrefix = append([]mir.Instr(nil), sel...)
+		}
 		return selectedTerm, nil
 	}
 
@@ -368,6 +397,8 @@ func classifyInstr(inst mir.Instr) matchNode {
 		return matchNode{op: "phi", dst: i.Dst, args: args}
 	case *mir.MachineInstr:
 		return matchNode{op: strings.ToLower(i.Op), dst: firstRegister(i.Dsts), args: i.Srcs}
+	case *mir.MoveInstr:
+		return matchNode{op: "mov", dst: i.Dst, args: []mir.Operand{i.Src}}
 	default:
 		return matchNode{}
 	}
@@ -482,10 +513,19 @@ func (s *Selector) matchPatternExpr(pe *PatternExpr, actual mir.Operand, env map
 		return false
 	}
 	if mem, ok := actual.(*mir.Memory); ok {
-		if !strings.EqualFold(pe.Name, "add") {
+		switch strings.ToLower(pe.Name) {
+		case "add":
+			return s.matchArgs(pe.Args, []mir.Operand{mem.Base, mem.Offset}, env)
+		case "mem":
+			if len(pe.Args) == 1 {
+				if rec, ok := pe.Args[0].(*Value); ok {
+					return s.matchMemoryRecord(rec, mem, env)
+				}
+			}
+			return s.matchArgs(pe.Args, []mir.Operand{mem.Base, mem.Offset}, env)
+		default:
 			return false
 		}
-		return s.matchArgs(pe.Args, []mir.Operand{mem.Base, mem.Offset}, env)
 	}
 	return strings.EqualFold(pe.Name, operandName(actual))
 }
@@ -587,7 +627,11 @@ func (s *Selector) applyBindings(rule *compiledRule, node matchNode, env map[str
 			continue
 		}
 		if _, ok := env[name]; !ok {
-			env[name] = s.nextTempRegister()
+			if reg, ok := fixedRegisterForBinding(t); ok {
+				env[name] = reg
+			} else {
+				env[name] = s.nextTempRegister()
+			}
 		}
 	}
 
@@ -638,9 +682,6 @@ func bindingMatches(ts TypeSpec, actual mir.Operand) bool {
 					return false
 				}
 			}
-		}
-		if ts.Ref != "" && !strings.EqualFold(reg.Name, ts.Ref) {
-			return false
 		}
 		return true
 	case "imm":
@@ -837,13 +878,33 @@ func resolvePatternValue(p *PatternExpr, env map[string]any) (mir.Operand, bool)
 		return nil, false
 	}
 
-	if strings.EqualFold(p.Name, "mem") && len(p.Args) == 1 {
-		if rec, ok := p.Args[0].(*Value); ok {
-			return resolveRecordValue(rec, env)
+	if strings.EqualFold(p.Name, "mem") {
+		switch len(p.Args) {
+		case 1:
+			if rec, ok := p.Args[0].(*Value); ok {
+				return resolveRecordValue(rec, env)
+			}
+		case 2:
+			base, ok := resolveEmitValue(asValueArg(p.Args[0]), env)
+			if !ok {
+				return nil, false
+			}
+			off, ok := resolveEmitValue(asValueArg(p.Args[1]), env)
+			if !ok {
+				return nil, false
+			}
+			return &mir.Memory{Base: base, Offset: off}, true
 		}
 	}
 
 	return &mir.Symbol{Name: patternString(p)}, true
+}
+
+func asValueArg(arg PatternArg) *Value {
+	if v, ok := arg.(*Value); ok {
+		return v
+	}
+	return nil
 }
 
 func resolveRecordValue(v *Value, env map[string]any) (mir.Operand, bool) {
@@ -931,6 +992,20 @@ func asOperand(v any) (mir.Operand, bool) {
 
 func sameCapturedOperand(a, b any) bool {
 	return operandStringFromAny(a) == operandStringFromAny(b)
+}
+
+func fixedRegisterForBinding(b *Binding) (*mir.Register, bool) {
+	if b == nil {
+		return nil, false
+	}
+	if !strings.EqualFold(b.Type.Sub, "phys") {
+		return nil, false
+	}
+	name := trimDollar(b.Name)
+	if name == "" {
+		return nil, false
+	}
+	return &mir.Register{Name: name, Kind: mir.PhysicalReg}, true
 }
 
 func operandName(op mir.Operand) string {
@@ -1085,7 +1160,7 @@ func (s *Selector) nextTempRegister() *mir.Register {
 	return &mir.Register{Name: name, Kind: mir.VirtualReg}
 }
 
-func defaultPredicates() map[string]PredicateFunc {
+func defaultPredicates(abi string) map[string]PredicateFunc {
 	return map[string]PredicateFunc{
 		"SImmFits12": func(env map[string]any, args []*Value) bool {
 			if len(args) != 1 {
@@ -1100,6 +1175,13 @@ func defaultPredicates() map[string]PredicateFunc {
 			}
 			v, ok := resolvePredicateInt(args[0], env)
 			return ok && v >= 0 && v <= 63
+		},
+		"ABIIs": func(env map[string]any, args []*Value) bool {
+			if len(args) != 1 {
+				return false
+			}
+			want := emitString(args[0], env)
+			return want != "" && strings.EqualFold(want, abi)
 		},
 	}
 }

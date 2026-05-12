@@ -58,6 +58,97 @@ func TestSelectorSelectInstr(t *testing.T) {
 	}
 }
 
+func TestSelectorSelectMoveInstr(t *testing.T) {
+	sel := mustSelector(t, `
+		target test {
+			rule mov_copy {
+				match {
+					out $rd : GPR:virt;
+					in $src : any;
+					pattern mov($src);
+				}
+				cost 0;
+				emit { instr { opcode: "mov"; dst: $rd; src: [$src]; }; }
+			}
+		}
+	`)
+
+	inst := &mir.MoveInstr{
+		Dst: mir.NewRegister("v0", mir.VirtualReg, mir.NewScalarType("i64", 8)),
+		Src: mir.NewRegister("v1", mir.VirtualReg, mir.NewScalarType("i64", 8)),
+	}
+
+	selected, err := sel.SelectInstr(inst)
+	if err != nil {
+		t.Fatalf("SelectInstr failed: %v", err)
+	}
+	if len(selected) != 1 {
+		t.Fatalf("len(selected) = %d, want 1", len(selected))
+	}
+	mi, ok := selected[0].(*mir.MachineInstr)
+	if !ok {
+		t.Fatalf("selected[0] is %T, want *mir.MachineInstr", selected[0])
+	}
+	if mi.Op != "mov" || len(mi.Dsts) != 1 || len(mi.Srcs) != 1 {
+		t.Fatalf("selected machine instr = %#v", mi)
+	}
+}
+
+func TestSelectorABIConditionalReturnLowering(t *testing.T) {
+	sel := mustSelector(t, `
+		header { ABI: "AAPCS64"; }
+		target test {
+			rule ret_abi {
+				match {
+					temp $x0 : GPR:phys;
+					in $rs : GPR:virt;
+					pattern ret($rs);
+				}
+				cost 0;
+				cond ABIIs("AAPCS64");
+				emit {
+					instr {
+						opcode: "add";
+						dst: $x0;
+						src: [$rs, 0];
+						def: $x0;
+						uses: [$rs];
+					};
+					instr { opcode: "ret"; };
+				}
+			}
+			rule ret_generic {
+				match {
+					in $rs : GPR:virt;
+					pattern ret($rs);
+				}
+				cost 1;
+				emit { instr { opcode: "ret"; src: [$rs]; uses: [$rs]; }; }
+			}
+		}
+	`)
+
+	blk := mir.NewBlock(0, "entry")
+	blk.Term = &mir.ReturnInstr{Value: mir.NewRegister("v0", mir.VirtualReg, mir.NewScalarType("i64", 8))}
+	out, err := sel.SelectBlock(blk)
+	if err != nil {
+		t.Fatalf("SelectBlock failed: %v", err)
+	}
+	if len(out.Instrs) != 1 {
+		t.Fatalf("len(out.Instrs) = %d, want 1", len(out.Instrs))
+	}
+	mi, ok := out.Instrs[0].(*mir.MachineInstr)
+	if !ok {
+		t.Fatalf("out.Instrs[0] is %T, want *mir.MachineInstr", out.Instrs[0])
+	}
+	if mi.Op != "add" || len(mi.Dsts) != 1 || mi.Dsts[0].Name != "x0" {
+		t.Fatalf("ABI return move = %#v", mi)
+	}
+	if _, ok := out.Term.(*mir.MachineTerm); !ok {
+		t.Fatalf("out.Term is %T, want *mir.MachineTerm", out.Term)
+	}
+}
+
 func TestSelectorCommutativeMatch(t *testing.T) {
 	sel := mustSelector(t, `
 		target test {
