@@ -82,8 +82,13 @@ func TestLowerAndPlan(t *testing.T) {
 	if entryLowered == nil {
 		t.Fatalf("missing lowered entry block")
 	}
-	if _, ok := entryLowered.Instrs[0].(*mir.CompareInstr); !ok {
-		t.Fatalf("expected first lowered instruction to be CompareInstr, got %T", entryLowered.Instrs[0])
+	switch entryLowered.Instrs[0].(type) {
+	case *mir.CompareInstr:
+		// pre-selection shape
+	case *mir.MachineInstr:
+		// post-selection shape
+	default:
+		t.Fatalf("expected first lowered instruction to be CompareInstr or MachineInstr, got %T", entryLowered.Instrs[0])
 	}
 	plans := lowered.Plans["M.main"]
 	if plans == nil {
@@ -116,6 +121,9 @@ func TestPipelineDriverRunEmptyProgram(t *testing.T) {
 	}
 	if out.Plans == nil {
 		t.Fatalf("expected non-nil plans map")
+	}
+	if driver.Selector == nil {
+		t.Fatal("expected Run to initialize driver.Selector")
 	}
 }
 

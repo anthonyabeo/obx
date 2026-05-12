@@ -2,6 +2,8 @@ package backend
 
 import (
 	"fmt"
+	"path/filepath"
+	"runtime"
 
 	"github.com/anthonyabeo/obx/src/backend/lower"
 	"github.com/anthonyabeo/obx/src/backend/mir"
@@ -23,6 +25,7 @@ import (
 //  8. BuildPlans(target lowering helpers)
 type PipelineDriver struct {
 	Target   target.Target
+	Selector *selector.Selector
 	Stages   []string
 	Assemble func(*mir.Program) error
 	Link     func(*mir.Program) error
@@ -40,6 +43,13 @@ func (p *PipelineDriver) Run(prog *minir.Program) (*lower.LoweredProgram, error)
 	}
 	if p.Target == nil {
 		return nil, fmt.Errorf("backend pipeline: nil target")
+	}
+	if p.Selector == nil {
+		sel, err := p.loadSelector()
+		if err != nil {
+			return nil, err
+		}
+		p.Selector = sel
 	}
 
 	mprog, err := lower.LowerProgram(prog)
@@ -77,9 +87,23 @@ func (p *PipelineDriver) Lower(prog *minir.Program) (*mir.Program, error) {
 	return lower.LowerProgram(prog)
 }
 
-// InstructionSelection is currently a stub.
 func (p *PipelineDriver) InstructionSelection(prog *mir.Program) (*mir.Program, error) {
-	return p.passThrough("instruction selection", prog)
+	if p == nil {
+		return nil, fmt.Errorf("backend pipeline: nil driver")
+	}
+	if prog == nil {
+		return nil, fmt.Errorf("backend pipeline: nil MIR program before instruction selection")
+	}
+	if p.Selector == nil {
+		return p.passThrough("instruction selection", prog)
+	}
+
+	selected, err := p.Selector.SelectProgram(prog)
+	if err != nil {
+		return nil, fmt.Errorf("instruction selection: %w", err)
+	}
+
+	return selected, nil
 }
 
 // Legalization is currently a stub.
@@ -113,3 +137,20 @@ func (p *PipelineDriver) stageNames() []string {
 	}
 	return append([]string(nil), p.Stages...)
 }
+
+func (p *PipelineDriver) loadSelector() (*selector.Selector, error) {
+	if p == nil || p.Target == nil {
+		return nil, nil
+	}
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return nil, fmt.Errorf("backend pipeline: unable to locate selector descriptors")
+	}
+	path := filepath.Join(filepath.Dir(file), "select", "desc", p.Target.Name()+".td")
+	sel, err := selector.ParseSelectorFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("backend pipeline: load selector for %s: %w", p.Target.Name(), err)
+	}
+	return sel, nil
+}
+
