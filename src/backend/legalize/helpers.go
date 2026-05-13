@@ -39,7 +39,14 @@ func BuildRewrite(name string, args []mir.Operand) ([]mir.Instr, bool, error) {
 	if strings.TrimSpace(name) == "" {
 		return nil, false, nil
 	}
-	return []mir.Instr{mir.NewMachineInstr(name, nil, args)}, true, nil
+	var dsts []*mir.Register
+	if len(args) > 0 {
+		if reg, ok := args[0].(*mir.Register); ok {
+			dsts = append(dsts, reg)
+			args = args[1:]
+		}
+	}
+	return []mir.Instr{mir.NewMachineInstr(name, dsts, args)}, true, nil
 }
 
 // BuildSpill turns a spill request into a canonical pseudo instruction.
@@ -69,6 +76,61 @@ func BuildMove(src, dst mir.Operand) ([]mir.Instr, bool, error) {
 		return nil, false, nil
 	}
 	return []mir.Instr{mir.NewMachineInstr("mov", []*mir.Register{reg}, []mir.Operand{src})}, true, nil
+}
+
+// BuildHi20 returns the upper 20 bits of a large RV64 immediate.
+func BuildHi20(op mir.Operand) (mir.Operand, bool) {
+	if sym, ok := operandToSymbol(op); ok {
+		return relocSymbol(sym, "@HI20"), true
+	}
+	v, ok := operandToInt64(op)
+	if !ok {
+		return nil, false
+	}
+	hi := (v + 0x800) >> 12
+	return &mir.Immediate{Value: hi}, true
+}
+
+// BuildLo12 returns the low 12 bits of a large RV64 immediate.
+func BuildLo12(op mir.Operand) (mir.Operand, bool) {
+	if sym, ok := operandToSymbol(op); ok {
+		return relocSymbol(sym, "@LO12"), true
+	}
+	v, ok := operandToInt64(op)
+	if !ok {
+		return nil, false
+	}
+	hi := (v + 0x800) >> 12
+	lo := v - (hi << 12)
+	return &mir.Immediate{Value: lo}, true
+}
+
+// BuildImm16Part returns a 16-bit chunk of a large immediate, selecting the
+// requested lane from the low end of the value.
+func BuildImm16Part(op mir.Operand, part int) (mir.Operand, bool) {
+	v, ok := operandToUint64(op)
+	if !ok || part < 0 || part > 3 {
+		return nil, false
+	}
+	shift := uint(part * 16)
+	chunk := (v >> shift) & 0xffff
+	return &mir.Immediate{Value: int64(chunk)}, true
+}
+
+// BuildPageHi returns an ARM64 PAGE relocation-like symbol for a global.
+func BuildPageHi(op mir.Operand) (mir.Operand, bool) {
+	if sym, ok := operandToSymbol(op); ok {
+		return relocSymbol(sym, "@PAGE"), true
+	}
+	return nil, false
+}
+
+// BuildPageOff returns an ARM64 PAGEOFF relocation-like symbol for a global.
+func BuildPageOff(op mir.Operand) (mir.Operand, bool) {
+	if sym, ok := operandToSymbol(op); ok {
+		return relocSymbol(sym, "@PAGEOFF"), true
+	}
+	return nil, false
 }
 
 // EmitsReturnMove reports whether instrs materialize a value into an ABI return register.
@@ -115,6 +177,88 @@ func trimDollar(s string) string { return strings.TrimPrefix(s, "$") }
 func asOperand(v any) (mir.Operand, bool) {
 	op, ok := v.(mir.Operand)
 	return op, ok
+}
+
+func operandToInt64(op mir.Operand) (int64, bool) {
+	imm, ok := op.(*mir.Immediate)
+	if !ok || imm == nil {
+		return 0, false
+	}
+	switch v := imm.Value.(type) {
+	case int:
+		return int64(v), true
+	case int8:
+		return int64(v), true
+	case int16:
+		return int64(v), true
+	case int32:
+		return int64(v), true
+	case int64:
+		return v, true
+	case uint:
+		return int64(v), true
+	case uint8:
+		return int64(v), true
+	case uint16:
+		return int64(v), true
+	case uint32:
+		return int64(v), true
+	case uint64:
+		if v > ^uint64(0)>>1 {
+			return 0, false
+		}
+		return int64(v), true
+	case string:
+		return 0, false
+	default:
+		return 0, false
+	}
+}
+
+func operandToUint64(op mir.Operand) (uint64, bool) {
+	imm, ok := op.(*mir.Immediate)
+	if !ok || imm == nil {
+		return 0, false
+	}
+	switch v := imm.Value.(type) {
+	case int:
+		return uint64(int64(v)), true
+	case int8:
+		return uint64(int64(v)), true
+	case int16:
+		return uint64(int64(v)), true
+	case int32:
+		return uint64(int64(v)), true
+	case int64:
+		return uint64(v), true
+	case uint:
+		return uint64(v), true
+	case uint8:
+		return uint64(v), true
+	case uint16:
+		return uint64(v), true
+	case uint32:
+		return uint64(v), true
+	case uint64:
+		return v, true
+	default:
+		return 0, false
+	}
+}
+
+func operandToSymbol(op mir.Operand) (*mir.Symbol, bool) {
+	sym, ok := op.(*mir.Symbol)
+	if !ok || sym == nil || strings.TrimSpace(sym.Name) == "" {
+		return nil, false
+	}
+	return sym, true
+}
+
+func relocSymbol(sym *mir.Symbol, suffix string) *mir.Symbol {
+	if sym == nil {
+		return nil
+	}
+	return &mir.Symbol{Name: sym.Name + suffix, Ty: sym.Ty}
 }
 
 func hasRegisterName(names []string, want string) bool {

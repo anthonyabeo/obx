@@ -58,6 +58,139 @@ func TestSelectorSelectInstr(t *testing.T) {
 	}
 }
 
+func TestSelectorSelectLargeAddImmediate(t *testing.T) {
+	sel := mustSelector(t, `
+		header { ABI: "LP64D"; }
+		target test {
+			rule ADDri {
+				match {
+					commutative;
+					out $rd : GPR:virt;
+					in $lhs : GPR:virt;
+					in $imm : imm;
+					pattern add($lhs, $imm);
+				}
+				cost 1;
+				cond SImmFits12($imm);
+				emit { instr { opcode: "addi"; dst: $rd; src: [$lhs, $imm]; def: $rd; uses: [$lhs]; }; }
+			}
+			rule ADDri_large {
+				match {
+					commutative;
+					out $rd : GPR:virt;
+					in $lhs : GPR:virt;
+					in $imm : imm;
+					temp $tmp : GPR:virt;
+					pattern add($lhs, $imm);
+				}
+				cost 3;
+				cond !SImmFits12($imm);
+				legalize {
+					rewrite lui($tmp, hi20($imm));
+					rewrite addi($tmp, $tmp, lo12($imm));
+				}
+				emit { instr { opcode: "add"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; }; }
+			}
+		}
+	`)
+
+	inst := &mir.BinaryInstr{
+		Dst:   mir.NewRegister("v0", mir.VirtualReg, mir.NewScalarType("i64", 8)),
+		Op:    "add",
+		Left:  mir.NewRegister("v1", mir.VirtualReg, mir.NewScalarType("i64", 8)),
+		Right: mir.NewImmediate(4096, mir.NewScalarType("i64", 8)),
+	}
+
+	selected, err := sel.SelectInstr(inst)
+	if err != nil {
+		t.Fatalf("SelectInstr failed: %v", err)
+	}
+	if len(selected) != 3 {
+		t.Fatalf("len(selected) = %d, want 3", len(selected))
+	}
+	if mi, ok := selected[0].(*mir.MachineInstr); !ok || mi.Op != "lui" || len(mi.Dsts) != 1 {
+		t.Fatalf("selected[0] = %#v", selected[0])
+	}
+	if mi, ok := selected[1].(*mir.MachineInstr); !ok || mi.Op != "addi" || len(mi.Dsts) != 1 {
+		t.Fatalf("selected[1] = %#v", selected[1])
+	}
+	if mi0, ok := selected[0].(*mir.MachineInstr); ok {
+		if mi1, ok := selected[1].(*mir.MachineInstr); ok {
+			if mi0.Dsts[0].Name != mi1.Dsts[0].Name {
+				t.Fatalf("expected materialization to use same temp, got %q and %q", mi0.Dsts[0].Name, mi1.Dsts[0].Name)
+			}
+		}
+	}
+	if mi, ok := selected[2].(*mir.MachineInstr); !ok || mi.Op != "add" || len(mi.Srcs) != 2 {
+		t.Fatalf("selected[2] = %#v", selected[2])
+	}
+}
+
+func TestRV64DescriptorSelectsLargeAddImmediate(t *testing.T) {
+	parsed, err := ParseFilePath(descriptorPath(t, "rv64imafd.td"))
+	if err != nil {
+		t.Fatalf("ParseFilePath failed: %v", err)
+	}
+	sel, err := New(parsed)
+	if err != nil {
+		t.Fatalf("New selector failed: %v", err)
+	}
+
+	inst := &mir.BinaryInstr{
+		Dst:   mir.NewRegister("v0", mir.VirtualReg, mir.NewScalarType("i64", 8)),
+		Op:    "add",
+		Left:  mir.NewRegister("v1", mir.VirtualReg, mir.NewScalarType("i64", 8)),
+		Right: mir.NewImmediate(4096, mir.NewScalarType("i64", 8)),
+	}
+
+	selected, err := sel.SelectInstr(inst)
+	if err != nil {
+		t.Fatalf("SelectInstr failed: %v", err)
+	}
+	if len(selected) != 3 {
+		t.Fatalf("len(selected) = %d, want 3", len(selected))
+	}
+	if mi, ok := selected[0].(*mir.MachineInstr); !ok || mi.Op != "lui" {
+		t.Fatalf("selected[0] = %#v, want lui", selected[0])
+	}
+	if mi, ok := selected[1].(*mir.MachineInstr); !ok || mi.Op != "addi" {
+		t.Fatalf("selected[1] = %#v, want addi", selected[1])
+	}
+	if mi, ok := selected[2].(*mir.MachineInstr); !ok || mi.Op != "add" {
+		t.Fatalf("selected[2] = %#v, want add", selected[2])
+	}
+}
+
+func TestArm64DescriptorSelectsLargeImmediateMove(t *testing.T) {
+	parsed, err := ParseFilePath(descriptorPath(t, "arm64.td"))
+	if err != nil {
+		t.Fatalf("ParseFilePath failed: %v", err)
+	}
+	sel, err := New(parsed)
+	if err != nil {
+		t.Fatalf("New selector failed: %v", err)
+	}
+
+	inst := &mir.MoveInstr{
+		Dst: mir.NewRegister("v0", mir.VirtualReg, mir.NewScalarType("i64", 8)),
+		Src: mir.NewImmediate(0x123456789, mir.NewScalarType("i64", 8)),
+	}
+
+	selected, err := sel.SelectInstr(inst)
+	if err != nil {
+		t.Fatalf("SelectInstr failed: %v", err)
+	}
+	if len(selected) != 4 {
+		t.Fatalf("len(selected) = %d, want 4", len(selected))
+	}
+	for i, want := range []string{"movz", "movk", "movk", "movk"} {
+		mi, ok := selected[i].(*mir.MachineInstr)
+		if !ok || mi.Op != want {
+			t.Fatalf("selected[%d] = %#v, want %s", i, selected[i], want)
+		}
+	}
+}
+
 func TestSelectorSelectMoveInstr(t *testing.T) {
 	sel := mustSelector(t, `
 		target test {

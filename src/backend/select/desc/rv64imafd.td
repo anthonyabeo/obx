@@ -54,6 +54,27 @@ block arithmetic {
     }
   }
 
+  // add(rd, lhs, imm) -> materialize large constant, then add.
+  rule ADDri_large {
+    match {
+      commutative;
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $imm : imm;
+      temp $tmp : GPR:virt;
+      pattern add($lhs, $imm);
+    }
+    cost 3;
+    cond !SImmFits12($imm);
+    legalize {
+      rewrite lui($tmp, hi20($imm));
+      rewrite addi($tmp, $tmp, lo12($imm));
+    }
+    emit {
+      instr { opcode: "add"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
+    }
+  }
+
   // add(rd, lhs, add(rhs, imm)) -> addi/add folding form.
   //
   // This form captures the common case where a small offset appears on the
@@ -209,6 +230,78 @@ block arithmetic {
     }
   }
 
+
+  rule SUBri_large {
+    match {
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $imm : imm;
+      temp $tmp : GPR:virt;
+      pattern sub($lhs, $imm);
+    }
+    cost 2;
+    cond !SImmFits12($imm);
+    emit {
+      instr { opcode: "lui"; dst: $tmp; src: [hi20($imm)]; def: $tmp; };
+      instr { opcode: "addi"; dst: $tmp; src: [$tmp, lo12($imm)]; def: $tmp; uses: [$tmp]; };
+      instr { opcode: "sub"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
+    }
+  }
+
+  rule ANDri_large {
+    match {
+      commutative;
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $imm : imm;
+      temp $tmp : GPR:virt;
+      pattern and($lhs, $imm);
+    }
+    cost 2;
+    cond !SImmFits12($imm);
+    emit {
+      instr { opcode: "lui"; dst: $tmp; src: [hi20($imm)]; def: $tmp; };
+      instr { opcode: "addi"; dst: $tmp; src: [$tmp, lo12($imm)]; def: $tmp; uses: [$tmp]; };
+      instr { opcode: "and"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
+    }
+  }
+
+  rule ORri_large {
+    match {
+      commutative;
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $imm : imm;
+      temp $tmp : GPR:virt;
+      pattern or($lhs, $imm);
+    }
+    cost 2;
+    cond !SImmFits12($imm);
+    emit {
+      instr { opcode: "lui"; dst: $tmp; src: [hi20($imm)]; def: $tmp; };
+      instr { opcode: "addi"; dst: $tmp; src: [$tmp, lo12($imm)]; def: $tmp; uses: [$tmp]; };
+      instr { opcode: "or"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
+    }
+  }
+
+  rule XORri_large {
+    match {
+      commutative;
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $imm : imm;
+      temp $tmp : GPR:virt;
+      pattern xor($lhs, $imm);
+    }
+    cost 2;
+    cond !SImmFits12($imm);
+    emit {
+      instr { opcode: "lui"; dst: $tmp; src: [hi20($imm)]; def: $tmp; };
+      instr { opcode: "addi"; dst: $tmp; src: [$tmp, lo12($imm)]; def: $tmp; uses: [$tmp]; };
+      instr { opcode: "xor"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
+    }
+  }
+
   // ----- Multiplication / Division -----
   rule MULrr {
     match {
@@ -337,6 +430,33 @@ block move {
       instr { opcode: "mov"; dst: $rd; src: [$src]; def: $rd; uses: [$src]; };
     }
   }
+
+  rule MOV_large_imm {
+    match {
+      out $rd : GPR:virt;
+      in $imm : imm;
+      pattern mov($imm);
+    }
+    cost 0;
+    cond !SImmFits12($imm);
+    emit {
+      instr { opcode: "lui"; dst: $rd; src: [hi20($imm)]; def: $rd; };
+      instr { opcode: "addi"; dst: $rd; src: [$rd, lo12($imm)]; def: $rd; uses: [$rd]; };
+    }
+  }
+
+  rule ADDR_sym {
+    match {
+      out $rd : GPR:virt;
+      in $sym : symbol;
+      pattern addr($sym);
+    }
+    cost 0;
+    emit {
+      instr { opcode: "lui"; dst: $rd; src: [hi20($sym)]; def: $rd; };
+      instr { opcode: "addi"; dst: $rd; src: [$rd, lo12($sym)]; def: $rd; uses: [$rd]; };
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -386,6 +506,24 @@ block memory {
     cost 1;
     emit {
       instr { opcode: "load"; dst: $rd; src: [$sym]; def: $rd; uses: [$sym]; };
+    }
+  }
+
+  rule LOAD_large_off {
+    match {
+      out $rd : GPR:virt;
+      in $base : GPR:virt;
+      in $off : imm;
+      temp $tmp : GPR:virt;
+      pattern load(mem($base, $off));
+    }
+    cost 2;
+    cond !SImmFits12($off);
+    emit {
+      instr { opcode: "lui"; dst: $tmp; src: [hi20($off)]; def: $tmp; };
+      instr { opcode: "addi"; dst: $tmp; src: [$tmp, lo12($off)]; def: $tmp; uses: [$tmp]; };
+      instr { opcode: "add"; dst: $tmp; src: [$base, $tmp]; def: $tmp; uses: [$base, $tmp]; };
+      instr { opcode: "load"; dst: $rd; src: [$tmp]; def: $rd; uses: [$tmp]; };
     }
   }
 
@@ -482,6 +620,24 @@ block memory {
     emit {
       instr { opcode: "mov"; dst: $tmp; src: [$val]; def: $tmp; };
       instr { opcode: "store"; src: [$tmp, $sym]; uses: [$tmp, $sym]; };
+    }
+  }
+
+  rule STORE_large_off {
+    match {
+      in $val : GPR:virt;
+      in $base : GPR:virt;
+      in $off : imm;
+      temp $tmp : GPR:virt;
+      pattern store($val, mem($base, $off));
+    }
+    cost 2;
+    cond !SImmFits12($off);
+    emit {
+      instr { opcode: "lui"; dst: $tmp; src: [hi20($off)]; def: $tmp; };
+      instr { opcode: "addi"; dst: $tmp; src: [$tmp, lo12($off)]; def: $tmp; uses: [$tmp]; };
+      instr { opcode: "add"; dst: $tmp; src: [$base, $tmp]; def: $tmp; uses: [$base, $tmp]; };
+      instr { opcode: "store"; src: [$val, $tmp]; uses: [$val, $tmp]; };
     }
   }
 }
@@ -654,6 +810,114 @@ block comparisons {
     cost 2;
     emit {
       instr { opcode: "slt"; dst: $rd; src: [$lhs, $rhs]; def: $rd; uses: [$lhs, $rhs]; };
+      instr { opcode: "seqz"; dst: $rd; src: [$rd]; def: $rd; uses: [$rd]; };
+    }
+  }
+
+  rule ICMP_eq_large {
+    match {
+      commutative;
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $imm : imm;
+      temp $tmp : GPR:virt;
+      pattern eq($lhs, $imm);
+    }
+    cost 3;
+    cond !SImmFits12($imm);
+    emit {
+      instr { opcode: "lui"; dst: $tmp; src: [hi20($imm)]; def: $tmp; };
+      instr { opcode: "addi"; dst: $tmp; src: [$tmp, lo12($imm)]; def: $tmp; uses: [$tmp]; };
+      instr { opcode: "xor"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
+      instr { opcode: "seqz"; dst: $rd; src: [$rd]; def: $rd; uses: [$rd]; };
+    }
+  }
+
+  rule ICMP_ne_large {
+    match {
+      commutative;
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $imm : imm;
+      temp $tmp : GPR:virt;
+      pattern ne($lhs, $imm);
+    }
+    cost 3;
+    cond !SImmFits12($imm);
+    emit {
+      instr { opcode: "lui"; dst: $tmp; src: [hi20($imm)]; def: $tmp; };
+      instr { opcode: "addi"; dst: $tmp; src: [$tmp, lo12($imm)]; def: $tmp; uses: [$tmp]; };
+      instr { opcode: "xor"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
+      instr { opcode: "snez"; dst: $rd; src: [$rd]; def: $rd; uses: [$rd]; };
+    }
+  }
+
+  rule ICMP_lt_large {
+    match {
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $imm : imm;
+      temp $tmp : GPR:virt;
+      pattern lt($lhs, $imm);
+    }
+    cost 2;
+    cond !SImmFits12($imm);
+    emit {
+      instr { opcode: "lui"; dst: $tmp; src: [hi20($imm)]; def: $tmp; };
+      instr { opcode: "addi"; dst: $tmp; src: [$tmp, lo12($imm)]; def: $tmp; uses: [$tmp]; };
+      instr { opcode: "slt"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
+    }
+  }
+
+  rule ICMP_le_large {
+    match {
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $imm : imm;
+      temp $tmp : GPR:virt;
+      pattern le($lhs, $imm);
+    }
+    cost 3;
+    cond !SImmFits12($imm);
+    emit {
+      instr { opcode: "lui"; dst: $tmp; src: [hi20($imm)]; def: $tmp; };
+      instr { opcode: "addi"; dst: $tmp; src: [$tmp, lo12($imm)]; def: $tmp; uses: [$tmp]; };
+      instr { opcode: "slt"; dst: $rd; src: [$tmp, $lhs]; def: $rd; uses: [$tmp, $lhs]; };
+      instr { opcode: "seqz"; dst: $rd; src: [$rd]; def: $rd; uses: [$rd]; };
+    }
+  }
+
+  rule ICMP_gt_large {
+    match {
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $imm : imm;
+      temp $tmp : GPR:virt;
+      pattern gt($lhs, $imm);
+    }
+    cost 3;
+    cond !SImmFits12($imm);
+    emit {
+      instr { opcode: "lui"; dst: $tmp; src: [hi20($imm)]; def: $tmp; };
+      instr { opcode: "addi"; dst: $tmp; src: [$tmp, lo12($imm)]; def: $tmp; uses: [$tmp]; };
+      instr { opcode: "slt"; dst: $rd; src: [$tmp, $lhs]; def: $rd; uses: [$tmp, $lhs]; };
+    }
+  }
+
+  rule ICMP_ge_large {
+    match {
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $imm : imm;
+      temp $tmp : GPR:virt;
+      pattern ge($lhs, $imm);
+    }
+    cost 3;
+    cond !SImmFits12($imm);
+    emit {
+      instr { opcode: "lui"; dst: $tmp; src: [hi20($imm)]; def: $tmp; };
+      instr { opcode: "addi"; dst: $tmp; src: [$tmp, lo12($imm)]; def: $tmp; uses: [$tmp]; };
+      instr { opcode: "slt"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
       instr { opcode: "seqz"; dst: $rd; src: [$rd]; def: $rd; uses: [$rd]; };
     }
   }

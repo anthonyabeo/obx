@@ -1017,6 +1017,31 @@ func resolvePatternValue(p *PatternExpr, env map[string]any) (mir.Operand, bool)
 	if p == nil {
 		return nil, false
 	}
+	if len(p.Args) == 1 {
+		arg := asValueArg(p.Args[0])
+		op, ok := resolveEmitValue(arg, env)
+		if !ok {
+			return nil, false
+		}
+		switch {
+		case strings.EqualFold(p.Name, "hi20"):
+			return legalize.BuildHi20(op)
+		case strings.EqualFold(p.Name, "lo12"):
+			return legalize.BuildLo12(op)
+		case strings.EqualFold(p.Name, "imm16_0"):
+			return legalize.BuildImm16Part(op, 0)
+		case strings.EqualFold(p.Name, "imm16_1"):
+			return legalize.BuildImm16Part(op, 1)
+		case strings.EqualFold(p.Name, "imm16_2"):
+			return legalize.BuildImm16Part(op, 2)
+		case strings.EqualFold(p.Name, "imm16_3"):
+			return legalize.BuildImm16Part(op, 3)
+		case strings.EqualFold(p.Name, "pagehi"):
+			return legalize.BuildPageHi(op)
+		case strings.EqualFold(p.Name, "pageoff"):
+			return legalize.BuildPageOff(op)
+		}
+	}
 
 	if strings.EqualFold(p.Name, "mem") {
 		switch len(p.Args) {
