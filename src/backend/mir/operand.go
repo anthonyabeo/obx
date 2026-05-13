@@ -4,6 +4,7 @@ import "fmt"
 
 // Operand is any value that can appear as an instruction operand.
 type Operand interface {
+	Type() *Type
 	String() string
 }
 
@@ -19,11 +20,11 @@ const (
 type Register struct {
 	Name string
 	Kind RegKind
-	Type *Type
+	Ty   *Type
 }
 
 func NewRegister(name string, kind RegKind, ty *Type) *Register {
-	return &Register{Name: name, Kind: kind, Type: ty}
+	return &Register{Name: name, Kind: kind, Ty: ty}
 }
 
 func (r *Register) String() string {
@@ -31,6 +32,13 @@ func (r *Register) String() string {
 		return "<reg:nil>"
 	}
 	return r.Name
+}
+
+func (r *Register) Type() *Type {
+	if r == nil {
+		return nil
+	}
+	return r.Ty
 }
 
 // Label is a named control-flow target.
@@ -47,13 +55,15 @@ func (l *Label) String() string {
 	return l.Name
 }
 
+func (*Label) Type() *Type { return nil }
+
 // Symbol names a module-level global or external symbol.
 type Symbol struct {
 	Name string
-	Type *Type
+	Ty   *Type
 }
 
-func NewSymbol(name string, ty *Type) *Symbol { return &Symbol{Name: name, Type: ty} }
+func NewSymbol(name string, ty *Type) *Symbol { return &Symbol{Name: name, Ty: ty} }
 
 func (s *Symbol) String() string {
 	if s == nil {
@@ -62,13 +72,20 @@ func (s *Symbol) String() string {
 	return s.Name
 }
 
+func (s *Symbol) Type() *Type {
+	if s == nil {
+		return nil
+	}
+	return s.Ty
+}
+
 // Immediate represents an immediate constant operand.
 type Immediate struct {
 	Value any
-	Type  *Type
+	Ty    *Type
 }
 
-func NewImmediate(v any, ty *Type) *Immediate { return &Immediate{Value: v, Type: ty} }
+func NewImmediate(v any, ty *Type) *Immediate { return &Immediate{Value: v, Ty: ty} }
 
 func (i *Immediate) String() string {
 	if i == nil {
@@ -77,15 +94,22 @@ func (i *Immediate) String() string {
 	return fmt.Sprint(i.Value)
 }
 
+func (i *Immediate) Type() *Type {
+	if i == nil {
+		return nil
+	}
+	return i.Ty
+}
+
 // Memory models a target-neutral address expression.
 type Memory struct {
 	Base   Operand
 	Offset Operand
-	Type   *Type
+	Ty     *Type
 }
 
 func NewMemory(base Operand, offset Operand, ty *Type) *Memory {
-	return &Memory{Base: base, Offset: offset, Type: ty}
+	return &Memory{Base: base, Offset: offset, Ty: ty}
 }
 
 func (m *Memory) String() string {
@@ -97,3 +121,11 @@ func (m *Memory) String() string {
 	}
 	return fmt.Sprintf("[%s + %s]", m.Base, m.Offset)
 }
+
+func (m *Memory) Type() *Type {
+	if m == nil {
+		return nil
+	}
+	return m.Ty
+}
+

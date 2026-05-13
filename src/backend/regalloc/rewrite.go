@@ -3,6 +3,7 @@ package regalloc
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/anthonyabeo/obx/src/backend/mir"
 	"github.com/anthonyabeo/obx/src/backend/target"
@@ -87,7 +88,7 @@ func rewritePhi(phi *mir.PhiInstr, ba *blockAnalysis, fa *functionAnalysis, allo
 			}
 			return nil, nil, fmt.Errorf("register allocation: missing color for phi destination %q", phi.Dst.Name)
 		}
-		rewritten.Dst = &mir.Register{Name: preg, Kind: mir.PhysicalReg, Type: phi.Dst.Type}
+		rewritten.Dst = &mir.Register{Name: preg, Kind: mir.PhysicalReg, Ty: phi.Dst.Type()}
 	}
 
 	for _, arm := range phi.Arms {
@@ -125,13 +126,13 @@ func rewriteInstr(instr mir.Instr, liveIn map[string]bool, alloc *regAllocResult
 		for _, reg := range alloc.scratchRegs {
 			if !occupied[reg] && !usedTemps[reg] {
 				usedTemps[reg] = true
-				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Type: hint}, nil
+				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Ty: hint}, nil
 			}
 		}
 		for _, reg := range freeColorsFor(liveIn, alloc) {
 			if !occupied[reg] && !usedTemps[reg] {
 				usedTemps[reg] = true
-				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Type: hint}, nil
+				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Ty: hint}, nil
 			}
 		}
 		return nil, fmt.Errorf("register allocation: no scratch register available for %T", instr)
@@ -220,6 +221,59 @@ func rewriteInstr(instr mir.Instr, liveIn map[string]bool, alloc *regAllocResult
 		ins.Args = args
 		return ins, pre, post, nil
 	case *mir.MachineInstr:
+		switch strings.ToLower(ins.Op) {
+		case "spill":
+			if len(ins.Srcs) == 0 && len(ins.Dsts) == 0 {
+				return nil, nil, nil, nil
+			}
+			srcOp := firstOperand(ins.Srcs)
+			if srcOp == nil && len(ins.Dsts) > 0 {
+				srcOp = ins.Dsts[0]
+			}
+			if srcOp == nil {
+				return nil, nil, nil, fmt.Errorf("register allocation: spill requires a source operand")
+			}
+			src, pre, post, err := mapOperand(srcOp)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			reg, ok := src.(*mir.Register)
+			if !ok {
+				return nil, nil, nil, fmt.Errorf("register allocation: spill source must resolve to a register, got %T", src)
+			}
+			slotName := spillOperandName(srcOp)
+			slot, ok := alloc.spillSlots[slotName]
+			if !ok {
+				return nil, nil, nil, fmt.Errorf("register allocation: missing spill slot for %q", slotName)
+			}
+			return &mir.StoreInstr{Addr: spillSlotAddr(slot, abi), Value: reg}, pre, post, nil
+		case "reload":
+			dstReg := firstRegister(ins.Dsts)
+			if dstReg == nil && len(ins.Srcs) > 0 {
+				if reg, ok := ins.Srcs[0].(*mir.Register); ok {
+					dstReg = reg
+				}
+			}
+			if dstReg == nil {
+				return nil, nil, nil, fmt.Errorf("register allocation: reload requires a destination operand")
+			}
+			mapped, pre, post, err := mapOperand(dstReg)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+				if reg, ok := mapped.(*mir.Register); ok {
+				slotName := dstReg.Name
+				slot, ok := alloc.spillSlots[slotName]
+				if !ok {
+					return nil, nil, nil, fmt.Errorf("register allocation: missing spill slot for %q", slotName)
+				}
+				return &mir.LoadInstr{Dst: reg, Addr: spillSlotAddr(slot, abi)}, pre, post, nil
+			}
+			if len(pre) > 0 {
+				return nil, pre, post, nil
+			}
+			return nil, nil, nil, fmt.Errorf("register allocation: reload destination must resolve to a register")
+		}
 		pre := make([]mir.Instr, 0)
 		post := make([]mir.Instr, 0)
 		for i, dst := range ins.Dsts {
@@ -248,6 +302,35 @@ func rewriteInstr(instr mir.Instr, liveIn map[string]bool, alloc *regAllocResult
 	}
 }
 
+func firstOperand(ops []mir.Operand) mir.Operand {
+	if len(ops) == 0 {
+		return nil
+	}
+	return ops[0]
+}
+
+func firstRegister(rs []*mir.Register) *mir.Register {
+	if len(rs) == 0 {
+		return nil
+	}
+	return rs[0]
+}
+
+func spillOperandName(op mir.Operand) string {
+	switch x := op.(type) {
+	case *mir.Register:
+		return x.Name
+	case *mir.Label:
+		return x.Name
+	case *mir.Symbol:
+		return x.Name
+	case *mir.Immediate:
+		return fmt.Sprint(x.Value)
+	default:
+		return fmt.Sprint(op)
+	}
+}
+
 func rewriteTerminator(term mir.Terminator, liveIn map[string]bool, alloc *regAllocResult, frame *mir.FrameLayout, abi target.ABI, ba *blockAnalysis) (mir.Terminator, []mir.Instr, error) {
 	if term == nil {
 		return nil, nil, nil
@@ -258,13 +341,13 @@ func rewriteTerminator(term mir.Terminator, liveIn map[string]bool, alloc *regAl
 		for _, reg := range alloc.scratchRegs {
 			if !occupied[reg] && !usedTemps[reg] {
 				usedTemps[reg] = true
-				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Type: hint}, nil
+				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Ty: hint}, nil
 			}
 		}
 		for _, reg := range freeColorsFor(liveIn, alloc) {
 			if !occupied[reg] && !usedTemps[reg] {
 				usedTemps[reg] = true
-				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Type: hint}, nil
+				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Ty: hint}, nil
 			}
 		}
 		return nil, fmt.Errorf("register allocation: no scratch register available for terminator %T", term)
@@ -497,13 +580,13 @@ func rewriteOperandWithChooser(op mir.Operand, alloc *regAllocResult, frame *mir
 			return v, nil, nil, nil
 		}
 		if preg, ok := alloc.mapVRegToPReg[v.Name]; ok {
-			return &mir.Register{Name: preg, Kind: mir.PhysicalReg, Type: v.Type}, nil, nil, nil
+			return &mir.Register{Name: preg, Kind: mir.PhysicalReg, Ty: v.Type()}, nil, nil, nil
 		}
 		slot, ok := alloc.spillSlots[v.Name]
 		if !ok {
 			return nil, nil, nil, fmt.Errorf("register allocation: missing spill slot for %q", v.Name)
 		}
-		tmp, err := choose(v.Type)
+		tmp, err := choose(v.Type())
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -518,7 +601,7 @@ func rewriteOperandWithChooser(op mir.Operand, alloc *regAllocResult, frame *mir
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		mem := &mir.Memory{Base: base, Offset: offset, Type: v.Type}
+		mem := &mir.Memory{Base: base, Offset: offset, Ty: v.Type()}
 		return mem, append(pre1, pre2...), append(post1, post2...), nil
 	default:
 		return op, nil, nil, nil
@@ -531,12 +614,12 @@ func rewriteOperand(op mir.Operand, alloc *regAllocResult, frame *mir.FrameLayou
 		free := freeColorsFor(live, alloc)
 		for _, reg := range alloc.scratchRegs {
 			if !occupied[reg] {
-				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Type: hint}, nil
+				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Ty: hint}, nil
 			}
 		}
 		for _, reg := range free {
 			if !occupied[reg] {
-				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Type: hint}, nil
+				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Ty: hint}, nil
 			}
 		}
 		return nil, fmt.Errorf("register allocation: no scratch register available")
@@ -550,6 +633,14 @@ func spillLoad(dst *mir.Register, offset int, abi target.ABI) *mir.LoadInstr {
 		base = abi.StackPointer
 	}
 	return &mir.LoadInstr{Dst: dst, Addr: &mir.Memory{Base: &mir.Register{Name: base, Kind: mir.PhysicalReg}, Offset: &mir.Immediate{Value: offset}}}
+}
+
+func spillSlotAddr(slot int, abi target.ABI) *mir.Memory {
+	base := abi.FramePointer
+	if base == "" {
+		base = abi.StackPointer
+	}
+	return &mir.Memory{Base: &mir.Register{Name: base, Kind: mir.PhysicalReg}, Offset: &mir.Immediate{Value: frameOffset(slot, abi.WordSize)}}
 }
 
 func frameOffset(slot int, wordSize int) int {
@@ -636,12 +727,6 @@ func operandRegs(op mir.Operand) []string {
 		regs := operandRegs(v.Base)
 		regs = append(regs, operandRegs(v.Offset)...)
 		return uniqueStrings(regs)
-	case *mir.CallInstr:
-		return nil
-	case *mir.PhiInstr:
-		return nil
-	case *mir.MachineInstr:
-		return nil
 	}
 	return nil
 }

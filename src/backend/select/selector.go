@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/anthonyabeo/obx/src/backend/legalize"
 	"github.com/anthonyabeo/obx/src/backend/mir"
 )
 
@@ -37,6 +38,7 @@ type compiledRule struct {
 	commutative bool
 	cost        int
 	conds       []*Predicate
+	legalize    *LegalizeSection
 	emit        *EmitSection
 }
 
@@ -170,6 +172,8 @@ func compileRule(r *Rule) (*compiledRule, error) {
 			}
 		case *CondSection:
 			cr.conds = append(cr.conds, x.Predicates...)
+		case *LegalizeSection:
+			cr.legalize = x
 		case *EmitSection:
 			cr.emit = x
 		}
@@ -727,6 +731,14 @@ func (s *Selector) emitSelection(rule *compiledRule, env map[string]any, termCon
 
 	var instrs []mir.Instr
 	var term mir.Terminator
+	var legalizeRet bool
+	if legalizeInstrs, hasReturnMove, err := s.emitLegalize(rule, env); err != nil {
+		return nil, nil, err
+	} else if len(legalizeInstrs) > 0 {
+		instrs = append(instrs, legalizeInstrs...)
+		legalizeRet = hasReturnMove
+	}
+
 	for _, stmt := range rule.emit.Stmts {
 		i, t, err := s.emitStmt(stmt, env, termContext)
 		if err != nil {
@@ -738,8 +750,136 @@ func (s *Selector) emitSelection(rule *compiledRule, env map[string]any, termCon
 		}
 	}
 
+	if termContext && legalizeRet {
+		legalize.NormalizeReturnTerminator(term)
+	}
+
 	return instrs, term, nil
 }
+
+func (s *Selector) emitLegalize(rule *compiledRule, env map[string]any) ([]mir.Instr, bool, error) {
+	if rule == nil || rule.legalize == nil {
+		return nil, false, nil
+	}
+
+	var instrs []mir.Instr
+	var normalizeRet bool
+	for _, item := range rule.legalize.Items {
+		i, ok, err := s.emitLegalizeItem(item, env)
+		if err != nil {
+			return nil, false, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		instrs = append(instrs, i...)
+		if legalize.EmitsReturnMove(i, s.abi) {
+			normalizeRet = true
+		}
+	}
+
+	return instrs, normalizeRet, nil
+}
+
+func (s *Selector) emitLegalizeItem(item LegalizeItem, env map[string]any) ([]mir.Instr, bool, error) {
+	switch x := item.(type) {
+	case *RequireItem:
+		if !s.evalPredicate(x.Pred, env) {
+			return nil, false, nil
+		}
+		return nil, true, nil
+	case *RewriteItem:
+		args := make([]mir.Operand, 0, len(x.Expr.Args))
+		for _, arg := range x.Expr.Args {
+			op, ok := resolveEmitValue(asValueArg(arg), env)
+			if !ok {
+				return nil, false, nil
+			}
+			args = append(args, op)
+		}
+		return legalize.BuildRewrite(x.Expr.Name, args)
+	case *MoveItem:
+		src, ok := resolveEmitValue(x.From, env)
+		if !ok {
+			return nil, false, nil
+		}
+		dst, ok := resolveEmitValue(x.To, env)
+		if !ok {
+			return nil, false, nil
+		}
+		return legalize.BuildMove(src, dst)
+	case *SpillItem:
+		op, ok := legalize.ResolveOperand(x.Name, env)
+		if !ok {
+			return nil, false, nil
+		}
+		return legalize.BuildSpill(op)
+	case *ReloadItem:
+		op, ok := legalize.ResolveOperand(x.Name, env)
+		if !ok {
+			return nil, false, nil
+		}
+		return legalize.BuildReload(op)
+	case *IfItem:
+		if !s.evalPredicate(x.Pred, env) {
+			return nil, true, nil
+		}
+		switch a := x.Action.(type) {
+		case *RewriteExpr:
+			args := make([]mir.Operand, 0, len(a.Args))
+			for _, arg := range a.Args {
+				op, ok := resolveEmitValue(asValueArg(arg), env)
+				if !ok {
+					return nil, false, nil
+				}
+				args = append(args, op)
+			}
+			return legalize.BuildRewrite(a.Name, args)
+		case *SpillAction:
+			op, ok := legalize.ResolveOperand(a.Name, env)
+			if !ok {
+				return nil, false, nil
+			}
+			return legalize.BuildSpill(op)
+		case *ReloadAction:
+			op, ok := legalize.ResolveOperand(a.Name, env)
+			if !ok {
+				return nil, false, nil
+			}
+			return legalize.BuildReload(op)
+		case *MoveAction:
+			src, ok := resolveEmitValue(a.From, env)
+			if !ok {
+				return nil, false, nil
+			}
+			dst, ok := resolveEmitValue(a.To, env)
+			if !ok {
+				return nil, false, nil
+			}
+			return legalize.BuildMove(src, dst)
+		default:
+			return nil, true, nil
+		}
+	default:
+		return nil, true, nil
+	}
+}
+
+func (s *Selector) evalPredicate(pred *Predicate, env map[string]any) bool {
+	if pred == nil {
+		return true
+	}
+	fn, ok := s.predicates[pred.Name]
+	if !ok {
+		return false
+	}
+	matched := fn(env, pred.Args)
+	if pred.Negated {
+		matched = !matched
+	}
+	return matched
+}
+
 
 func (s *Selector) emitStmt(stmt EmitStmt, env map[string]any, termContext bool) ([]mir.Instr, mir.Terminator, error) {
 	switch x := stmt.(type) {

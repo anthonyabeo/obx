@@ -96,34 +96,54 @@ func TestSelectorSelectMoveInstr(t *testing.T) {
 
 func TestSelectorABIConditionalReturnLowering(t *testing.T) {
 	sel := mustSelector(t, `
-		header { ABI: "AAPCS64"; }
 		target test {
-			rule ret_abi {
-				match {
-					temp $x0 : GPR:phys;
-					in $rs : GPR:virt;
-					pattern ret($rs);
-				}
-				cost 0;
-				cond ABIIs("AAPCS64");
-				emit {
-					instr {
-						opcode: "add";
-						dst: $x0;
-						src: [$rs, 0];
-						def: $x0;
-						uses: [$rs];
-					};
-					instr { opcode: "ret"; };
-				}
-			}
 			rule ret_generic {
 				match {
 					in $rs : GPR:virt;
 					pattern ret($rs);
 				}
 				cost 1;
-				emit { instr { opcode: "ret"; src: [$rs]; uses: [$rs]; }; }
+				emit {
+					instr { opcode: "ret"; src: [$rs]; uses: [$rs]; };
+				}
+			}
+		}
+	`)
+
+	blk := mir.NewBlock(0, "entry")
+	blk.Term = &mir.ReturnInstr{Value: mir.NewRegister("v0", mir.VirtualReg, mir.NewScalarType("i64", 8))}
+	out, err := sel.SelectBlock(blk)
+	if err != nil {
+		t.Fatalf("SelectBlock failed: %v", err)
+	}
+	if len(out.Instrs) != 0 {
+		t.Fatalf("len(out.Instrs) = %d, want 0", len(out.Instrs))
+	}
+	mt, ok := out.Term.(*mir.MachineTerm)
+	if !ok {
+		t.Fatalf("out.Term is %T, want *mir.MachineTerm", out.Term)
+	}
+	if mt.Op != "ret" || len(mt.Srcs) != 1 || mt.Srcs[0].String() != "v0" {
+		t.Fatalf("return term = %#v", mt)
+	}
+}
+
+func TestSelectorLegalizeMoveBeforeReturn(t *testing.T) {
+	sel := mustSelector(t, `
+		target test {
+			rule ret_legalize {
+				match {
+					temp $x0 : GPR:phys;
+					in $v : GPR:virt;
+					pattern ret($v);
+				}
+				legalize {
+					move $v -> $x0;
+				}
+				cost 0;
+				emit {
+					instr { opcode: "ret"; src: [$v]; uses: [$v]; };
+				}
 			}
 		}
 	`)
@@ -141,11 +161,68 @@ func TestSelectorABIConditionalReturnLowering(t *testing.T) {
 	if !ok {
 		t.Fatalf("out.Instrs[0] is %T, want *mir.MachineInstr", out.Instrs[0])
 	}
-	if mi.Op != "add" || len(mi.Dsts) != 1 || mi.Dsts[0].Name != "x0" {
-		t.Fatalf("ABI return move = %#v", mi)
+	if mi.Op != "mov" || len(mi.Dsts) != 1 || mi.Dsts[0] == nil || mi.Dsts[0].Name != "x0" {
+		t.Fatalf("legalize move = %#v, want mov to x0", mi)
 	}
-	if _, ok := out.Term.(*mir.MachineTerm); !ok {
+	mt, ok := out.Term.(*mir.MachineTerm)
+	if !ok {
 		t.Fatalf("out.Term is %T, want *mir.MachineTerm", out.Term)
+	}
+	if mt.Op != "ret" || len(mt.Srcs) != 0 {
+		t.Fatalf("return terminator was not normalized: %#v", mt)
+	}
+}
+
+func TestSelectorLegalizeRewriteSpillReload(t *testing.T) {
+	sel := mustSelector(t, `
+		header { ABI: "AAPCS64"; }
+		target test {
+			rule legalize_misc {
+				match {
+					temp $x0 : GPR:phys;
+					in $v : GPR:virt;
+					pattern ret($v);
+				}
+				legalize {
+					require ABIIs("AAPCS64");
+					spill $v;
+					reload $v;
+					rewrite expand($v);
+					move $v -> $x0;
+				}
+				cost 0;
+				emit { instr { opcode: "ret"; src: [$v]; uses: [$v]; }; }
+			}
+		}
+	`)
+
+	blk := mir.NewBlock(0, "entry")
+	blk.Term = &mir.ReturnInstr{Value: mir.NewRegister("v0", mir.VirtualReg, mir.NewScalarType("i64", 8))}
+	out, err := sel.SelectBlock(blk)
+	if err != nil {
+		t.Fatalf("SelectBlock failed: %v", err)
+	}
+	if len(out.Instrs) != 4 {
+		t.Fatalf("len(out.Instrs) = %d, want 4", len(out.Instrs))
+	}
+	if mi, ok := out.Instrs[0].(*mir.MachineInstr); !ok || mi.Op != "spill" {
+		t.Fatalf("out.Instrs[0] = %#v, want spill pseudo-op", out.Instrs[0])
+	}
+	if mi, ok := out.Instrs[1].(*mir.MachineInstr); !ok || mi.Op != "reload" {
+		t.Fatalf("out.Instrs[1] = %#v, want reload pseudo-op", out.Instrs[1])
+	}
+	if mi, ok := out.Instrs[2].(*mir.MachineInstr); !ok || mi.Op != "expand" {
+		t.Fatalf("out.Instrs[2] = %#v, want rewrite pseudo-op", out.Instrs[2])
+	}
+	if mi, ok := out.Instrs[3].(*mir.MachineInstr); !ok || mi.Op != "mov" {
+		t.Fatalf("out.Instrs[3] = %#v, want mov to ABI return register", out.Instrs[3])
+	}
+	mt, ok := out.Term.(*mir.MachineTerm)
+	if !ok {
+		t.Fatalf("out.Term is %T, want *mir.MachineTerm", out.Term)
+	}
+	if mt.Op != "ret" || len(mt.Srcs) != 0 {
+		t.Fatalf("return terminator was not normalized: %#v", mt)
 	}
 }
 

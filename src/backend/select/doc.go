@@ -65,6 +65,11 @@
 //	| "reload" Ident
 //	| "move" Value "->" Value ;
 //
+// In practice, require guards whether a legalization rule applies, rewrite
+// describes a structural replacement, spill/reload model stack traffic for an
+// operand, and move materializes an explicit value transfer (often into an ABI
+// return register).
+//
 // PatternSection =
 //
 //	"pattern" PatternExpr ";" ;

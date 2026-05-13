@@ -15,7 +15,7 @@ func TestRewriteTerminatorUsesScratchRegisterForSpilledOperand(t *testing.T) {
 		scratchRegs:   []string{"t0"},
 	}
 	frame := mir.NewFrameLayout()
-	term := &mir.ReturnInstr{Value: &mir.Register{Name: "spill", Kind: mir.VirtualReg, Type: i64}}
+	term := &mir.ReturnInstr{Value: &mir.Register{Name: "spill", Kind: mir.VirtualReg, Ty: i64}}
 
 	rewritten, pre, err := rewriteTerminator(term, map[string]bool{"live": true}, alloc, frame, target.ABI{
 		WordSize:     4,
@@ -52,6 +52,64 @@ func TestRewriteTerminatorUsesScratchRegisterForSpilledOperand(t *testing.T) {
 	}
 }
 
+func TestRewriteMachineInstrSpillReload(t *testing.T) {
+	i64 := mir.NewScalarType("i64", 8)
+	alloc := &regAllocResult{
+		mapVRegToPReg: map[string]string{"v0": "a0"},
+		spillSlots:    map[string]int{"v0": 0},
+		scratchRegs:   []string{"t0"},
+	}
+	frame := mir.NewFrameLayout()
+	abi := target.ABI{
+		WordSize:     4,
+		Align:        16,
+		FramePointer: "s0",
+		StackPointer: "sp",
+	}
+
+	spill := &mir.MachineInstr{Op: "spill", Srcs: []mir.Operand{&mir.Register{Name: "v0", Kind: mir.VirtualReg, Ty: i64}}}
+	rewritten, pre, post, err := rewriteInstr(spill, map[string]bool{"v0": true}, alloc, frame, abi, &blockAnalysis{})
+	if err != nil {
+		t.Fatalf("rewriteInstr(spill) failed: %v", err)
+	}
+	if len(pre) != 0 || len(post) != 0 {
+		t.Fatalf("spill pre/post = %d/%d, want 0/0", len(pre), len(post))
+	}
+	store, ok := rewritten.(*mir.StoreInstr)
+	if !ok {
+		t.Fatalf("rewriteInstr(spill) = %T, want *mir.StoreInstr", rewritten)
+	}
+	if reg, ok := store.Value.(*mir.Register); !ok || reg.Name != "a0" {
+		t.Fatalf("spill store value = %#v, want a0", store.Value)
+	}
+	if mem, ok := store.Addr.(*mir.Memory); !ok {
+		t.Fatalf("spill addr = %T, want *mir.Memory", store.Addr)
+	} else if off, ok := mem.Offset.(*mir.Immediate); !ok || off.Value != -4 {
+		t.Fatalf("spill offset = %#v, want -4", mem.Offset)
+	}
+
+	reload := &mir.MachineInstr{Op: "reload", Dsts: []*mir.Register{{Name: "v0", Kind: mir.VirtualReg, Ty: i64}}}
+	rewritten, pre, post, err = rewriteInstr(reload, map[string]bool{"v0": true}, alloc, frame, abi, &blockAnalysis{})
+	if err != nil {
+		t.Fatalf("rewriteInstr(reload) failed: %v", err)
+	}
+	if len(pre) != 0 || len(post) != 0 {
+		t.Fatalf("reload pre/post = %d/%d, want 0/0", len(pre), len(post))
+	}
+	load, ok := rewritten.(*mir.LoadInstr)
+	if !ok {
+		t.Fatalf("rewriteInstr(reload) = %T, want *mir.LoadInstr", rewritten)
+	}
+	if load.Dst == nil || load.Dst.Name != "a0" {
+		t.Fatalf("reload dst = %#v, want a0", load.Dst)
+	}
+	if mem, ok := load.Addr.(*mir.Memory); !ok {
+		t.Fatalf("reload addr = %T, want *mir.Memory", load.Addr)
+	} else if off, ok := mem.Offset.(*mir.Immediate); !ok || off.Value != -4 {
+		t.Fatalf("reload offset = %#v, want -4", mem.Offset)
+	}
+}
+
 func TestMaterializeEdgeBlocksRedirectsCriticalEdge(t *testing.T) {
 	i64 := mir.NewScalarType("i64", 8)
 	i1 := mir.NewScalarType("i1", 1)
@@ -61,7 +119,7 @@ func TestMaterializeEdgeBlocksRedirectsCriticalEdge(t *testing.T) {
 	other := mir.NewBlock(2, "other")
 
 	pred.Term = &mir.CondBrInstr{
-		Cond:       &mir.Register{Name: "cond", Kind: mir.VirtualReg, Type: i1},
+		Cond:       &mir.Register{Name: "cond", Kind: mir.VirtualReg, Ty: i1},
 		TrueLabel:  "join",
 		FalseLabel: "other",
 	}
@@ -95,11 +153,11 @@ func TestMaterializeEdgeBlocksRedirectsCriticalEdge(t *testing.T) {
 	}
 
 	load := &mir.LoadInstr{
-		Dst: &mir.Register{Name: "t0", Kind: mir.PhysicalReg, Type: i64},
+		Dst: &mir.Register{Name: "t0", Kind: mir.PhysicalReg, Ty: i64},
 		Addr: &mir.Memory{
-			Base:   &mir.Register{Name: "sp", Kind: mir.PhysicalReg, Type: i64},
-			Offset: &mir.Immediate{Value: -8, Type: i64},
-			Type:   i64,
+			Base:   &mir.Register{Name: "sp", Kind: mir.PhysicalReg, Ty: i64},
+			Offset: &mir.Immediate{Value: -8, Ty: i64},
+			Ty:     i64,
 		},
 	}
 

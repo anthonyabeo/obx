@@ -524,44 +524,34 @@ block control {
 
   rule RET_val_r {
     match {
-      temp $a0 : GPR:phys;
       in $rs : GPR:virt;
       pattern ret($rs);
     }
     cost 1;
-    cond ABIIs("LP64D");
     emit {
-      instr { opcode: "addi"; dst: $a0; src: [$rs, 0]; def: $a0; uses: [$rs];};
-      instr { opcode: "ret"; };
+      instr { opcode: "ret"; src: [$rs]; uses: [$rs]; };
     }
   }
 
   rule RET_val_imm {
     match {
-      // Fixed ABI return register: descriptor-owned temp binding.
-      temp $a0 : GPR:phys;
       in $val : imm;
       pattern ret($val);
     }
     cost 2;
-    cond ABIIs("LP64D");
     emit {
-      instr { opcode: "mov"; dst: $a0; src: [$val]; def: $a0; uses: [$val]; };
-      instr { opcode: "ret"; };
+      instr { opcode: "ret"; src: [$val]; uses: [$val]; };
     }
   }
 
   rule RET_val_sym {
     match {
-      temp $a0 : GPR:phys;
       in $val : symbol;
       pattern ret($val);
     }
     cost 2;
-    cond ABIIs("LP64D");
     emit {
-      instr { opcode: "mov"; dst: $a0; src: [$val]; def: $a0; uses: [$val]; };
-      instr { opcode: "ret"; };
+      instr { opcode: "ret"; src: [$val]; uses: [$val]; };
     }
   }
 

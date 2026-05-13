@@ -23,6 +23,36 @@ func TestInstrDefsUses(t *testing.T) {
 	}
 }
 
+func TestOperandTypes(t *testing.T) {
+	i32 := NewScalarType("i32", 4)
+	reg := NewRegister("v0", VirtualReg, i32)
+	if reg.Type() != i32 {
+		t.Fatalf("Register.Type() = %#v, want %#v", reg.Type(), i32)
+	}
+	if (*Register)(nil).Type() != nil {
+		t.Fatalf("nil Register.Type() should be nil")
+	}
+
+	imm := NewImmediate(7, i32)
+	if imm.Type() != i32 {
+		t.Fatalf("Immediate.Type() = %#v, want %#v", imm.Type(), i32)
+	}
+
+	mem := NewMemory(reg, imm, i32)
+	if mem.Type() != i32 {
+		t.Fatalf("Memory.Type() = %#v, want %#v", mem.Type(), i32)
+	}
+
+	sym := NewSymbol("g0", i32)
+	if sym.Type() != i32 {
+		t.Fatalf("Symbol.Type() = %#v, want %#v", sym.Type(), i32)
+	}
+
+	if lbl := NewLabel("L1"); lbl.Type() != nil {
+		t.Fatalf("Label.Type() = %#v, want nil", lbl.Type())
+	}
+}
+
 func TestBlockAndFunctionHelpers(t *testing.T) {
 	fn := NewFunction("Foo", NewScalarType("i32", 4))
 	entry := NewBlock(0, "entry")

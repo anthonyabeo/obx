@@ -96,7 +96,7 @@ func BuildPhiPlan(joinLabel string, phis []*mir.PhiInstr) (*PhiPlan, error) {
 		if phi.Dst == nil {
 			return nil, fmt.Errorf("phi lowering requires a destination register")
 		}
-		if !SupportsIntegerScalar(phi.Dst.Type) {
+		if !SupportsIntegerScalar(phi.Dst.Type()) {
 			return nil, fmt.Errorf("phi %s has unsupported destination type", phi.Dst)
 		}
 		for _, arm := range phi.Arms {
@@ -154,7 +154,7 @@ func LinearizeParallelCopy(pc ParallelCopy) []Copy {
 		}
 
 		cycle := pending[0]
-		tmp := &mir.Register{Name: fmt.Sprintf("__pc_tmp%d", tmpSeq), Kind: mir.VirtualReg, Type: copyType(cycle)}
+		tmp := &mir.Register{Name: fmt.Sprintf("__pc_tmp%d", tmpSeq), Kind: mir.VirtualReg, Ty: copyType(cycle)}
 		tmpSeq++
 		out = append(out, Copy{Dst: tmp, Src: cycle.Src})
 		cycleSrcReg, _ := cycle.Src.(*mir.Register)
@@ -249,7 +249,7 @@ func BuildCallPlan(call *mir.CallInstr, abi ABI) (*CallPlan, error) {
 	}
 
 	if call.Dst != nil {
-		if !SupportsIntegerScalar(call.Dst.Type) {
+		if !SupportsIntegerScalar(call.Dst.Type()) {
 			return nil, fmt.Errorf("call result %s has unsupported type", call.Dst)
 		}
 		res := &ResultLocation{}
@@ -277,14 +277,14 @@ func isNoOpCopy(c Copy) bool {
 }
 
 func copyType(c Copy) *mir.Type {
-	if c.Dst != nil && c.Dst.Type != nil {
-		return c.Dst.Type
+	if c.Dst != nil && c.Dst.Type() != nil {
+		return c.Dst.Type()
 	}
 	if src, ok := c.Src.(*mir.Register); ok {
-		return src.Type
+		return src.Type()
 	}
 	if imm, ok := c.Src.(*mir.Immediate); ok {
-		return imm.Type
+		return imm.Type()
 	}
 	return nil
 }
@@ -372,9 +372,9 @@ func alignUp(n, align int) int {
 func supportsIntegerOperand(op mir.Operand) bool {
 	switch v := op.(type) {
 	case *mir.Register:
-		return SupportsIntegerScalar(v.Type)
+		return SupportsIntegerScalar(v.Type())
 	case *mir.Immediate:
-		return SupportsIntegerScalar(v.Type)
+		return SupportsIntegerScalar(v.Type())
 	default:
 		return false
 	}

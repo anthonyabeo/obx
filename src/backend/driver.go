@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/anthonyabeo/obx/src/backend/legalize"
 	"github.com/anthonyabeo/obx/src/backend/lower"
 	"github.com/anthonyabeo/obx/src/backend/mir"
 	"github.com/anthonyabeo/obx/src/backend/regalloc"
@@ -17,10 +18,10 @@ import (
 //
 // Current implementation:
 //  1. Lower(minir -> backend/mir)
-//  2. InstructionSelection (stub)
-//  3. Legalization (stub)
+//  2. InstructionSelection
+//  3. Legalization (target-aware post-pass)
 //  4. InstructionScheduling (stub)
-//  5. RegisterAllocation (stub)
+//  5. RegisterAllocation
 //  6. Assemble (optional callback)
 //  7. Link (optional callback)
 //  8. BuildPlans(target lowering helpers)
@@ -107,9 +108,18 @@ func (p *PipelineDriver) InstructionSelection(prog *mir.Program) (*mir.Program, 
 	return selected, nil
 }
 
-// Legalization is currently a stub.
 func (p *PipelineDriver) Legalization(prog *mir.Program) (*mir.Program, error) {
-	return p.passThrough("legalization", prog)
+	if p == nil {
+		return nil, fmt.Errorf("backend pipeline: nil driver")
+	}
+	if prog == nil {
+		return nil, fmt.Errorf("backend pipeline: nil MIR program before legalization")
+	}
+	if p.Target == nil {
+		return nil, fmt.Errorf("backend pipeline: nil target before legalization")
+	}
+
+	return legalize.Run(prog, p.Target)
 }
 
 // InstructionScheduling is currently a stub.

@@ -83,18 +83,11 @@ func TestArm64DescriptorABIReturnLowering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SelectBlock failed: %v", err)
 	}
-	if len(out.Instrs) != 1 {
-		t.Fatalf("len(out.Instrs) = %d, want 1", len(out.Instrs))
-	}
-	mi, ok := out.Instrs[0].(*mir.MachineInstr)
-	if !ok {
-		t.Fatalf("out.Instrs[0] is %T, want *mir.MachineInstr", out.Instrs[0])
-	}
-	if mi.Op != "add" || len(mi.Dsts) != 1 || mi.Dsts[0].Name != "x0" {
-		t.Fatalf("ABI move = %#v", mi)
+	if len(out.Instrs) != 0 {
+		t.Fatalf("len(out.Instrs) = %d, want 0", len(out.Instrs))
 	}
 	mt, ok := out.Term.(*mir.MachineTerm)
-	if !ok || mt.Op != "ret" {
+	if !ok || mt.Op != "ret" || len(mt.Srcs) != 1 || mt.Srcs[0].String() != "v7" {
 		t.Fatalf("term = %#v, want ret", out.Term)
 	}
 }
@@ -255,13 +248,10 @@ func TestArm64DescriptorSelectsCoreInstructions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SelectBlock(ret) failed: %v", err)
 	}
-	if len(outRet.Instrs) != 1 {
-		t.Fatalf("return block instrs = %d, want 1", len(outRet.Instrs))
+	if len(outRet.Instrs) != 0 {
+		t.Fatalf("return block instrs = %d, want 0", len(outRet.Instrs))
 	}
-	if mi, ok := outRet.Instrs[0].(*mir.MachineInstr); !ok || mi.Op != "mov" || len(mi.Dsts) != 1 || mi.Dsts[0].Name != "x0" {
-		t.Fatalf("return ABI move = %#v", outRet.Instrs[0])
-	}
-	if mt, ok := outRet.Term.(*mir.MachineTerm); !ok || mt.Op != "ret" {
+	if mt, ok := outRet.Term.(*mir.MachineTerm); !ok || mt.Op != "ret" || len(mt.Srcs) != 1 || mt.Srcs[0].String() != "42" {
 		t.Fatalf("return term = %#v", outRet.Term)
 	}
 }

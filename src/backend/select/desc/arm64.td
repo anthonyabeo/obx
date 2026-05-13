@@ -612,43 +612,34 @@ block control {
 
   rule RET_val_r {
 	match {
-	  temp $x0 : GPR:phys;
 	  in $rs : GPR:virt;
 	  pattern ret($rs);
 	}
 	cost 1;
-	cond ABIIs("AAPCS64");
 	emit {
-	  instr { opcode: "add"; dst: $x0; src: [$rs, 0]; def: $x0; uses: [$rs]; };
-	  instr { opcode: "ret"; };
+	  instr { opcode: "ret"; src: [$rs]; uses: [$rs]; };
 	}
   }
 
   rule RET_val_imm {
 	match {
-	  temp $x0 : GPR:phys;
 	  in $val : imm;
 	  pattern ret($val);
 	}
 	cost 2;
-	cond ABIIs("AAPCS64");
 	emit {
-	  instr { opcode: "mov"; dst: $x0; src: [$val]; def: $x0; uses: [$val]; };
-	  instr { opcode: "ret"; };
+	  instr { opcode: "ret"; src: [$val]; uses: [$val]; };
 	}
   }
 
   rule RET_val_sym {
 	match {
-	  temp $x0 : GPR:phys;
 	  in $val : symbol;
 	  pattern ret($val);
 	}
 	cost 2;
-	cond ABIIs("AAPCS64");
 	emit {
-	  instr { opcode: "mov"; dst: $x0; src: [$val]; def: $x0; uses: [$val]; };
-	  instr { opcode: "ret"; };
+	  instr { opcode: "ret"; src: [$val]; uses: [$val]; };
 	}
   }
 
