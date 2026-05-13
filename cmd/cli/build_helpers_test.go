@@ -71,6 +71,14 @@ func TestBuildToolchainFor(t *testing.T) {
 		t.Fatalf("unexpected riscv toolchain: %+v", tc)
 	}
 
+	tc, err = buildToolchainFor(newFakeToolchainTarget(btarget.Arm64Name))
+	if err != nil {
+		t.Fatalf("buildToolchainFor(arm64 canonical): %v", err)
+	}
+	if tc.assembler != "clang" || tc.linker != "clang" {
+		t.Fatalf("unexpected arm64 canonical toolchain: %+v", tc)
+	}
+
 	tc, err = buildToolchainFor(newFakeToolchainTarget(btarget.Arm64AppleMacosName))
 	if err != nil {
 		t.Fatalf("buildToolchainFor(arm64): %v", err)

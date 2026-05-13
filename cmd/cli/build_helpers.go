@@ -34,7 +34,7 @@ func buildToolchainFor(mach target.Target) (buildToolchain, error) {
 			assembler: "riscv64-linux-gnu-gcc",
 			linker:    "riscv64-linux-gnu-gcc",
 		}, nil
-	case target.Arm64AppleMacosName, target.AArch64AppleDarwinName:
+	case target.Arm64Name, target.Arm64AppleMacosName, target.AArch64AppleDarwinName:
 		return buildToolchain{
 			assembler:     "clang",
 			assemblerArgs: []string{"-arch", "arm64"},
