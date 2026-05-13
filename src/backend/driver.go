@@ -7,6 +7,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/backend/lower"
 	"github.com/anthonyabeo/obx/src/backend/mir"
+	"github.com/anthonyabeo/obx/src/backend/regalloc"
 	selector "github.com/anthonyabeo/obx/src/backend/select"
 	"github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/minir"
@@ -118,7 +119,14 @@ func (p *PipelineDriver) InstructionScheduling(prog *mir.Program) (*mir.Program,
 
 // RegisterAllocation is currently a stub.
 func (p *PipelineDriver) RegisterAllocation(prog *mir.Program) (*mir.Program, error) {
-	return p.passThrough("register allocation", prog)
+	if p == nil {
+		return nil, fmt.Errorf("backend pipeline: nil driver")
+	}
+	if prog == nil {
+		return nil, fmt.Errorf("backend pipeline: nil MIR program before register allocation")
+	}
+
+	return regalloc.Run(prog, p.Target)
 }
 
 func (p *PipelineDriver) passThrough(stage string, prog *mir.Program) (*mir.Program, error) {
@@ -153,4 +161,3 @@ func (p *PipelineDriver) loadSelector() (*selector.Selector, error) {
 	}
 	return sel, nil
 }
-

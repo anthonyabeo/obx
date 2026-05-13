@@ -10,7 +10,7 @@ type registerAllocationStage struct{}
 
 func (s *registerAllocationStage) Name() string { return backend.DefaultStageOrder[3] }
 func (s *registerAllocationStage) Enabled(tgt target.Target) bool {
-	return tgt != nil && tgt.ABIInfo().Align > 0
+	return tgt != nil
 }
 func (s *registerAllocationStage) Run(p *backend.PipelineDriver, prog *mir.Program) (*mir.Program, error) {
 	return p.RegisterAllocation(prog)

@@ -1,0 +1,183 @@
+package regalloc
+
+import (
+	"testing"
+
+	"github.com/anthonyabeo/obx/src/backend/mir"
+	"github.com/anthonyabeo/obx/src/backend/target"
+)
+
+func TestRewriteTerminatorUsesScratchRegisterForSpilledOperand(t *testing.T) {
+	i64 := mir.NewScalarType("i64", 8)
+	alloc := &regAllocResult{
+		mapVRegToPReg: map[string]string{"live": "a0"},
+		spillSlots:    map[string]int{"spill": 0},
+		scratchRegs:   []string{"t0"},
+	}
+	frame := mir.NewFrameLayout()
+	term := &mir.ReturnInstr{Value: &mir.Register{Name: "spill", Kind: mir.VirtualReg, Type: i64}}
+
+	rewritten, pre, err := rewriteTerminator(term, map[string]bool{"live": true}, alloc, frame, target.ABI{
+		WordSize:     4,
+		Align:        16,
+		FramePointer: "s0",
+		StackPointer: "sp",
+	}, &blockAnalysis{})
+	if err != nil {
+		t.Fatalf("rewriteTerminator failed: %v", err)
+	}
+	if rewritten != term {
+		t.Fatalf("expected terminator to be rewritten in place")
+	}
+	if len(pre) != 1 {
+		t.Fatalf("expected one spill load before return, got %d", len(pre))
+	}
+	load, ok := pre[0].(*mir.LoadInstr)
+	if !ok {
+		t.Fatalf("expected prelude instruction to be a load, got %T", pre[0])
+	}
+	if load.Dst == nil || load.Dst.Name != "t0" {
+		t.Fatalf("expected spilled value to use scratch register t0, got %#v", load.Dst)
+	}
+	mem, ok := load.Addr.(*mir.Memory)
+	if !ok {
+		t.Fatalf("expected load address to be memory, got %T", load.Addr)
+	}
+	off, ok := mem.Offset.(*mir.Immediate)
+	if !ok {
+		t.Fatalf("expected spill offset to be immediate, got %T", mem.Offset)
+	}
+	if got := off.Value; got != -4 {
+		t.Fatalf("expected spill offset -4 for 4-byte word size, got %v", got)
+	}
+}
+
+func TestMaterializeEdgeBlocksRedirectsCriticalEdge(t *testing.T) {
+	i64 := mir.NewScalarType("i64", 8)
+	i1 := mir.NewScalarType("i1", 1)
+
+	pred := mir.NewBlock(0, "pred")
+	join := mir.NewBlock(1, "join")
+	other := mir.NewBlock(2, "other")
+
+	pred.Term = &mir.CondBrInstr{
+		Cond:       &mir.Register{Name: "cond", Kind: mir.VirtualReg, Type: i1},
+		TrueLabel:  "join",
+		FalseLabel: "other",
+	}
+	pred.AddSucc(join)
+	pred.AddSucc(other)
+	join.AddPred(pred)
+	other.AddPred(pred)
+
+	fn := mir.NewFunction("f", i64)
+	fn.AddBlock(pred)
+	fn.AddBlock(join)
+	fn.AddBlock(other)
+	fn.SetEntry(pred)
+	fn.SetExit(join)
+
+	predBA := &blockAnalysis{block: pred}
+	joinBA := &blockAnalysis{block: join}
+	otherBA := &blockAnalysis{block: other}
+	fa := &functionAnalysis{
+		blocks: []*blockAnalysis{predBA, joinBA, otherBA},
+		byID: map[int]*blockAnalysis{
+			pred.ID:  predBA,
+			join.ID:  joinBA,
+			other.ID: otherBA,
+		},
+		byName: map[string]*blockAnalysis{
+			pred.Label:  predBA,
+			join.Label:  joinBA,
+			other.Label: otherBA,
+		},
+	}
+
+	load := &mir.LoadInstr{
+		Dst: &mir.Register{Name: "t0", Kind: mir.PhysicalReg, Type: i64},
+		Addr: &mir.Memory{
+			Base:   &mir.Register{Name: "sp", Kind: mir.PhysicalReg, Type: i64},
+			Offset: &mir.Immediate{Value: -8, Type: i64},
+			Type:   i64,
+		},
+	}
+
+	if err := materializeEdgeBlocks(fn, fa, map[edgeKey][]mir.Instr{
+		{predID: pred.ID, joinLabel: join.Label}: {load},
+	}); err != nil {
+		t.Fatalf("materializeEdgeBlocks failed: %v", err)
+	}
+
+	edge := fn.BlockByLabel("pred.__ra_edge__join")
+	if edge == nil {
+		t.Fatalf("expected a split edge block between pred and join")
+	}
+	if len(fn.Blocks) != 4 {
+		t.Fatalf("expected 4 blocks after edge splitting, got %d", len(fn.Blocks))
+	}
+	if _, ok := pred.Succs[join.ID]; ok {
+		t.Fatalf("expected pred -> join edge to be redirected away from join")
+	}
+	if pred.Succs[edge.ID] != edge {
+		t.Fatalf("expected pred to target edge block %q", edge.Label)
+	}
+	if join.Preds[pred.ID] != nil {
+		t.Fatalf("expected join to stop referencing pred directly")
+	}
+	if join.Preds[edge.ID] != edge {
+		t.Fatalf("expected join to reference edge block %q", edge.Label)
+	}
+	if term, ok := pred.Term.(*mir.CondBrInstr); !ok || term.TrueLabel != edge.Label {
+		t.Fatalf("expected conditional branch to be retargeted to %q, got %#v", edge.Label, pred.Term)
+	}
+	if len(edge.Instrs) != 1 {
+		t.Fatalf("expected edge block to contain one load, got %d", len(edge.Instrs))
+	}
+	if jump, ok := edge.Term.(*mir.JumpInstr); !ok || jump.Target != join.Label {
+		t.Fatalf("expected edge block to jump to %q, got %#v", join.Label, edge.Term)
+	}
+}
+
+func TestRunOnEmptyProgram(t *testing.T) {
+	prog := mir.NewProgram()
+	out, err := Run(prog, target.NewRISCV64Target())
+	if err != nil {
+		t.Fatalf("Run(empty program) failed: %v", err)
+	}
+	if out != prog {
+		t.Fatalf("expected Run to operate in place")
+	}
+	if len(out.Modules) != 0 {
+		t.Fatalf("expected empty program to remain empty, got %d modules", len(out.Modules))
+	}
+}
+
+func TestRunPopulatesFrameForMinimalFunction(t *testing.T) {
+	fn := mir.NewFunction("main", mir.NewScalarType("i64", 8))
+	blk := mir.NewBlock(0, "entry")
+	blk.Term = &mir.ReturnInstr{}
+	fn.AddBlockAndSetEntry(blk)
+	fn.SetExit(blk)
+
+	mod := mir.NewModule("M")
+	mod.AddFunction(fn)
+	prog := mir.NewProgram(mod)
+
+	out, err := Run(prog, target.NewRISCV64Target())
+	if err != nil {
+		t.Fatalf("Run(minimal function) failed: %v", err)
+	}
+	if out != prog {
+		t.Fatalf("expected Run to reuse the input program")
+	}
+	if fn.Frame == nil {
+		t.Fatal("expected register allocation to populate a frame")
+	}
+	if fn.Frame.SpillSlots == nil {
+		t.Fatal("expected frame spill-slot map to be initialized")
+	}
+	if got := out.ModuleByName("M"); got == nil || got.FunctionByName("main") == nil {
+		t.Fatal("expected module/function to remain present after allocation")
+	}
+}
