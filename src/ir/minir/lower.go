@@ -33,6 +33,16 @@ type Lowerer struct {
 	reported map[string]bool // dedupe map keyed by rttiName@module
 }
 
+func New(dctx *compiler.Context) *Lowerer {
+	return &Lowerer{
+		dctx:     dctx,
+		varEnv:   make(map[string]*Temp),
+		constEnv: make(map[string]Value),
+		loopExit: make(map[string]string),
+		reported: make(map[string]bool),
+	}
+}
+
 // currentModule is a package-level hook used by LowerType to register
 // module-scoped constants (vtable arrays, RTTI PODs) while lowering a
 // particular module. It is set by Lower() for the module currently being
@@ -87,27 +97,22 @@ func rttiNameForType(ty types.Type) string {
 	return ""
 }
 
-// LowerWithContext lowers a desugared program using an optional compiler
-// Context for diagnostic emission. Pass nil to preserve previous behaviour
-// (no diagnostics emitted).
-// LowerWithContext translates a desugar.Program into a *minir.Program, producing one
+// Lower lowers a desugared program using a compiler Context for diagnostic
+// emission translates a desugar.Program into a *minir.Program, producing one
 // minir.Module per desugar.Module.
 //
 // Within each module, lowering runs in two passes:
 //
 //  1. Module-scope declarations:
-//     - *desugar.Variable             → *GlobalVar   (GlobalRef in Module.SymTab)
-//     - *desugar.Constant             → *GlobalConst (*Constant in Module.SymTab so
+//     - *desugar.Variable → *GlobalVar (GlobalRef in Module.SymTab)
+//     - *desugar.Constant → *GlobalConst (*Constant in Module.SymTab so
 //     ConstantRef resolution returns the immediate value without a load)
 //     - *desugar.Function{IsExternal} → *ExternalFunc (declaration only)
 //
 //  2. Function bodies: each non-external function is lowered; global variables
-//     resolve directly to their *GlobalRef address (true LLVM semantics).
-func LowerWithContext(prog *desugar.Program, dctx *compiler.Context) *Program {
+//     resolve directly to their *GlobalRef address.
+func (l *Lowerer) Lower(prog *desugar.Program) *Program {
 	outProg := &Program{}
-	l := &Lowerer{}
-	l.dctx = dctx
-	l.reported = make(map[string]bool)
 
 	for _, hirMod := range prog.Modules {
 		mod := &Module{Name: hirMod.Name}
@@ -142,13 +147,8 @@ func LowerWithContext(prog *desugar.Program, dctx *compiler.Context) *Program {
 		// finished lowering this module
 		currentModule = nil
 	}
-	return outProg
-}
 
-// Lower is the historical API that lowers without a diagnostic context.
-// Prefer LowerWithContext when callers have a *compiler.Context available.
-func Lower(prog *desugar.Program) *Program {
-	return LowerWithContext(prog, nil)
+	return outProg
 }
 
 // lowerGlobalVar lowers a module-scope variable declaration into a *GlobalVar
@@ -158,20 +158,28 @@ func (l *Lowerer) lowerGlobalVar(d *desugar.Variable) {
 	if vt == nil {
 		vt = primI32
 	}
+
 	lk := InternalLinkage
 	if d.IsExport {
 		lk = ExternalLinkage
 	}
+
 	name := d.Name
 	if d.Mangled != "" {
 		name = d.Mangled
 	}
+
 	gv := &GlobalVar{Name: name, Ty: vt, Linkage: lk}
 	l.mod.Globals = append(l.mod.Globals, gv)
-	_ = l.mod.SymTab.Define(name, gv.Ref())
-	// Also register the bare (un-mangled) name when it differs.
+	if err := l.mod.SymTab.Define(name, gv.Ref()); err != nil {
+		l.reportLoweringDiagnostic(err.Error(), d.StartOffset, d.EndOffset)
+	}
+
+	// Also, register the bare (unmangled) name when it differs.
 	if d.Mangled != "" && d.Mangled != d.Name {
-		_ = l.mod.SymTab.Define(d.Name, gv.Ref())
+		if err := l.mod.SymTab.Define(d.Name, gv.Ref()); err != nil {
+			l.reportLoweringDiagnostic(err.Error(), d.StartOffset, d.EndOffset)
+		}
 	}
 }
 
@@ -184,34 +192,50 @@ func (l *Lowerer) lowerGlobalConst(d *desugar.Constant) {
 	if vt == nil {
 		vt = primI32
 	}
+
 	lk := InternalLinkage
 	if d.IsExport {
 		lk = ExternalLinkage
 	}
+
 	name := d.Name
 	if d.Mangled != "" {
 		name = d.Mangled
 	}
+
 	init := lowerConstant(d.Value)
 	gc := &GlobalConst{Name: name, Ty: vt, Init: init, Linkage: lk}
 	l.mod.Constants = append(l.mod.Constants, gc)
+
 	// Insert the immediate value so ConstantRef does not need a load.
+	// otherwise, references to this constant would resolve to the GlobalRef.
 	if init != nil {
-		_ = l.mod.SymTab.Define(name, init)
+		if err := l.mod.SymTab.Define(name, init); err != nil {
+			l.reportLoweringDiagnostic(err.Error(), d.StartOffset, d.EndOffset)
+		}
 	} else {
-		_ = l.mod.SymTab.Define(name, gc.Ref())
+		if err := l.mod.SymTab.Define(name, gc.Ref()); err != nil {
+			l.reportLoweringDiagnostic(err.Error(), d.StartOffset, d.EndOffset)
+		}
 	}
+
+	// if mangled name differs from the original name, also register the
+	// original name for direct lookup
 	if d.Mangled != "" && d.Mangled != d.Name {
 		if init != nil {
-			_ = l.mod.SymTab.Define(d.Name, init)
+			if err := l.mod.SymTab.Define(d.Name, init); err != nil {
+				l.reportLoweringDiagnostic(err.Error(), d.StartOffset, d.EndOffset)
+			}
 		} else {
-			_ = l.mod.SymTab.Define(d.Name, gc.Ref())
+			if err := l.mod.SymTab.Define(d.Name, gc.Ref()); err != nil {
+				l.reportLoweringDiagnostic(err.Error(), d.StartOffset, d.EndOffset)
+			}
 		}
 	}
 }
 
 // lowerExternalFunc lowers an FFI / external function declaration into an
-// *ExternalFunc (no body, only a signature).
+// *ExternalFunc (only a signature).
 func (l *Lowerer) lowerExternalFunc(d *desugar.Function) {
 	var params []Type
 	for _, p := range d.Params {
@@ -219,13 +243,16 @@ func (l *Lowerer) lowerExternalFunc(d *desugar.Function) {
 		if pt == nil {
 			pt = primI32
 		}
+
 		// VAR and IN formals are passed by reference: use pointer types.
 		if p.Kind == desugar.VarParam || p.Kind == desugar.InParam {
 			pt = Ptr(pt)
 		}
 		params = append(params, pt)
 	}
+
 	sig := &FunctionType{Params: params, Result: LowerType(d.Result)}
+
 	// Build ExternalFunc and attach optional external attributes so downstream
 	// phases (IR, codegen, symbol emission) can access C-name, DLL override,
 	// and variadic / calling-convention metadata.
@@ -233,6 +260,7 @@ func (l *Lowerer) lowerExternalFunc(d *desugar.Function) {
 	if cName == "" {
 		cName = d.Name
 	}
+
 	ef := &ExternalFunc{
 		Name:    d.FnName(),
 		Sig:     sig,
@@ -244,6 +272,7 @@ func (l *Lowerer) lowerExternalFunc(d *desugar.Function) {
 			CallConv: "",
 		},
 	}
+
 	l.mod.Externals = append(l.mod.Externals, ef)
 }
 
@@ -254,54 +283,83 @@ func lowerConstant(expr desugar.Expr) *Constant {
 	if !ok {
 		return nil
 	}
+
 	ty := LowerType(lit.SemaType)
 	if ty == nil {
 		ty = primI32
 	}
+
 	switch lit.Kind {
-	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
-		// Handle hex literals ending with 'H'/'h' (scanner may leave the
-		// original lexeme intact). Convert them to numeric value and store a
-		// canonical decimal textual name so minir prints a normalized form.
+	case token.BYTE_LIT:
+		iv, err := strconv.ParseUint(lit.Value, 10, 8)
+		if err != nil {
+			return NewConst(lit.Value, lit.Value, ty)
+		}
+		return NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
+	case token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
 		v := lit.Value
 		var iv int64
 		var err error
 		if strings.HasSuffix(v, "h") || strings.HasSuffix(v, "H") {
-			// strip trailing H and parse as base-16
 			v2 := v[:len(v)-1]
 			iv, err = strconv.ParseInt(v2, 16, 64)
 		} else {
 			iv, err = strconv.ParseInt(v, 10, 64)
 		}
 		if err != nil {
-			// fallback: keep original lexeme as name and try to store raw value
 			return NewConst(lit.Value, lit.Value, ty)
 		}
+
 		return NewConst(fmt.Sprintf("%d", iv), iv, ty)
 	case token.REAL_LIT, token.LONGREAL_LIT:
-		// Normalize exponent letter: allow 'D'/'d' and 'S'/'s' by converting
-		// them to 'E' before parsing with strconv.
 		v := lit.Value
 		norm := strings.ReplaceAll(v, "D", "E")
 		norm = strings.ReplaceAll(norm, "d", "E")
 		norm = strings.ReplaceAll(norm, "S", "E")
 		norm = strings.ReplaceAll(norm, "s", "E")
 		fv, _ := strconv.ParseFloat(norm, 64)
-		// Use a canonical textual representation for the constant name so
-		// textual emitters print a normalized form. Use strconv's shortest
-		// representation that preserves value.
 		name := strconv.FormatFloat(fv, 'g', -1, 64)
 		return NewConst(name, fv, ty)
 	case token.TRUE:
 		return NewConst("true", int64(1), primI1)
 	case token.FALSE:
 		return NewConst("false", int64(0), primI1)
-	case token.CHAR_LIT, token.WCHAR_LIT:
-		return NewConst(lit.Value, lit.Value, primI32)
+	case token.CHAR_LIT:
+		v := lit.Value
+		var iv uint64
+		var err error
+		if strings.HasSuffix(v, "x") || strings.HasSuffix(v, "X") {
+			v2 := v[:len(v)-1]
+			iv, err = strconv.ParseUint(v2, 16, 8)
+		} else {
+			iv, err = strconv.ParseUint(v, 16, 8)
+		}
+
+		if err != nil {
+			return NewConst(lit.Value, lit.Value, ty)
+		}
+
+		return NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
+	case token.WCHAR_LIT:
+		v := lit.Value
+		var iv uint64
+		var err error
+		if strings.HasSuffix(v, "x") || strings.HasSuffix(v, "X") {
+			v2 := v[:len(v)-1]
+			iv, err = strconv.ParseUint(v2, 16, 16)
+		} else {
+			iv, err = strconv.ParseUint(v, 16, 16)
+		}
+
+		if err != nil {
+			return NewConst(lit.Value, lit.Value, ty)
+		}
+
+		return NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
 	case token.STR_LIT, token.HEX_STR_LIT:
-		return NewConst(lit.Value, lit.Value, NewArrayType(len(lit.Value)+1, primI32))
+		return NewConst(lit.Value, lit.Value, NewArrayType(len(lit.Value)+1, primU16))
 	case token.NIL:
-		return NewConst("nil", int64(0), Ptr(primI32))
+		return NewConst("nil", int64(0), Ptr(primVoid))
 	default:
 		iv, err := strconv.ParseInt(lit.Value, 10, 64)
 		if err == nil {
@@ -319,14 +377,24 @@ func LowerType(ty types.Type) Type {
 	if ty == nil {
 		return nil
 	}
+
 	switch t := ty.(type) {
 	case *types.BasicType:
 		switch t.Kind {
 		case types.BOOLEAN:
 			return primI1
-		case types.BYTE, types.CHAR, types.INT8, types.INT16, types.SHORTINT,
-			types.INT32, types.INTEGER, types.WCHAR, types.SET:
+		case types.BYTE, types.CHAR:
+			return primU8
+		case types.INT8:
+			return primI8
+		case types.INT16, types.SHORTINT:
+			return primI16
+		case types.INT32, types.INTEGER:
 			return primI32
+		case types.WCHAR:
+			return primU16
+		case types.SET:
+			return primU32
 		case types.INT64, types.LONGINT:
 			return primI64
 		case types.REAL:
@@ -341,13 +409,13 @@ func LowerType(ty types.Type) Type {
 	case *types.PointerType:
 		base := LowerType(t.Base)
 		if base == nil {
-			return Ptr(primI32) // void* → ptr.i32
+			return Ptr(primVoid) // void*
 		}
 		return Ptr(base)
 	case *types.CPointerType:
 		base := LowerType(t.Base)
 		if base == nil {
-			return Ptr(primI32)
+			return Ptr(primVoid)
 		}
 		return Ptr(base)
 	case *types.ArrayType:
@@ -359,15 +427,13 @@ func LowerType(ty types.Type) Type {
 	case *types.RecordType:
 		var fields []RecordField
 		offset := 0
+
 		for _, f := range t.Fields {
 			ft := LowerType(f.Type)
 			fields = append(fields, RecordField{Name: f.Name, Type: ft, Offset: offset})
-			if w := f.Type.Width(); w > 0 {
-				offset += w
-			} else {
-				offset += 4
-			}
+			offset += f.Type.Width()
 		}
+
 		// Construct record type
 		rec := NewRecordType("", fields)
 
@@ -450,7 +516,7 @@ func LowerType(ty types.Type) Type {
 	case *types.StringType:
 		return NewArrayType(t.Length+1, primI32)
 	case *types.EnumType:
-		return primI32
+		return primU32
 	default:
 		return primI32
 	}
@@ -485,13 +551,13 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 	// locals: alloca for variables, inline for constants
 	l.lowerLocals(hirFn.Locals)
 
-	// body
 	// Create function exit block and result-storage temp before lowering the body
 	// so return sites can jump to the canonical exit and wire Succs/Preds now.
 	exit := l.newBlock(fn.FnName + "_exit")
 	fn.Exit = exit
 	fn.Blocks[exit.ID] = exit
 
+	// body
 	if hirFn.Body != nil {
 		l.lowerStmts(hirFn.Body)
 	}
@@ -515,10 +581,11 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 	// per-site wiring because AddSucc/AddPred are no-ops for existing links).
 	linkCFG(fn)
 
-	l.switchTo(fn.Exit)
 	// Keep the exit as a simple sentinel return; actual return values and
 	// halting semantics remain in their original blocks and are handled
 	// by later phases.
+	l.switchTo(fn.Exit)
+
 	ret := &ReturnInst{}
 	l.emit(ret)
 	fn.Exit.Term = ret
@@ -526,7 +593,8 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 	return fn
 }
 
-// lowerParams lowers parameters to SSA temps and bind in varEnv; VAR/IN params get pointer types and are passed by reference.
+// lowerParams lowers parameters to SSA temps and bindings in varEnv;
+// VAR/IN params get pointer types and are passed by reference.
 func (l *Lowerer) lowerParams(params []*desugar.Param) {
 	// parameters: ValueParam -> incoming SSA temp (element type).
 	// VarParam/InParam -> incoming pointer param (address of the actual).
@@ -535,6 +603,7 @@ func (l *Lowerer) lowerParams(params []*desugar.Param) {
 		if et == nil {
 			et = primI32
 		}
+
 		var param *Temp
 		if p.Kind == desugar.VarParam || p.Kind == desugar.InParam {
 			// Expect a pointer parameter for VAR/IN semantics.
@@ -543,9 +612,12 @@ func (l *Lowerer) lowerParams(params []*desugar.Param) {
 			// Value parameter: incoming SSA temp of element type.
 			param = NewTemp(p.Name, et)
 		}
+
 		l.fn.Params = append(l.fn.Params, param)
+
 		// record original HIR param kind for downstream passes
 		l.fn.ParamKinds = append(l.fn.ParamKinds, p.Kind)
+
 		// Bind name to either the value temp or address temp accordingly.
 		l.varEnv[p.Name] = param
 	}
@@ -563,12 +635,15 @@ func (l *Lowerer) lowerLocals(locals []desugar.Decl) {
 			if vt == nil {
 				vt = primI32
 			}
+
 			addr := l.newAddrTemp(d.Name, vt)
 			l.emit(&AllocaInst{Dst: addr, AllocType: vt})
+
 			key := d.Mangled
 			if key == "" {
 				key = d.Name
 			}
+
 			l.varEnv[key] = addr
 			if d.Name != "" && d.Name != key {
 				l.varEnv[d.Name] = addr
@@ -579,6 +654,7 @@ func (l *Lowerer) lowerLocals(locals []desugar.Decl) {
 			if key == "" {
 				key = d.Name
 			}
+
 			l.constEnv[key] = cv
 			if d.Name != "" {
 				l.constEnv[d.Name] = cv
@@ -1146,47 +1222,19 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 		// Unknown/unsupported expression node — emit a warning diagnostic and
 		// continue with a conservative zero value so lowering can progress.
 		msg := fmt.Sprintf("lowerValue: unsupported expr type %T", expr)
-		// attempt to attach a useful Range if the node carries Start/End
-		var start, end int
-		switch v := expr.(type) {
-		case *desugar.Literal:
-			start, end = v.Start, v.End
-		case *desugar.BinaryExpr:
-			start, end = v.Start, v.End
-		case *desugar.UnaryExpr:
-			start, end = v.Start, v.End
-		case *desugar.FuncCall:
-			start, end = v.Start, v.End
-		case *desugar.VariableRef:
-			start, end = v.Start, v.End
-		case *desugar.ConstantRef:
-			start, end = v.Start, v.End
-		case *desugar.FunctionRef:
-			start, end = v.Start, v.End
-		case *desugar.TypeRef:
-			start, end = v.Start, v.End
-		case *desugar.ModuleRef:
-			start, end = v.Start, v.End
-		case *desugar.FieldAccess:
-			start, end = v.Start, v.End
-		case *desugar.IndexExpr:
-			start, end = v.Start, v.End
-		case *desugar.DerefExpr:
-			start, end = v.Start, v.End
-		case *desugar.TypeGuardExpr:
-			start, end = v.Start, v.End
-		case *desugar.Param:
-			start, end = v.Start, v.End
-		}
+		var start, end = e.Pos(), e.End()
 		l.reportLoweringDiagnostic(msg, start, end)
+
 		// Conservative fallback: return a zero constant of the expression's type
 		ty := LowerType(expr.Type())
 		if ty == nil {
 			ty = primI32
 		}
+
 		if ty == primI1 {
 			return NewConst("false", int64(0), primI1)
 		}
+
 		return NewConst("0", int64(0), ty)
 	}
 }
@@ -1206,7 +1254,7 @@ func (l *Lowerer) lowerAddr(expr desugar.Expr) Value {
 			// Emit a warning and create an addressable stack slot, storing the
 			// parameter value into it so lowering can continue.
 			msg := fmt.Sprintf("lowerAddr: attempt to take address of value parameter '%s'", e.Name)
-			l.reportLoweringDiagnostic(msg, e.Start, e.End)
+			l.reportLoweringDiagnostic(msg, e.StartOffset, e.EndOffset)
 			pt := LowerType(e.Typ)
 			if pt == nil {
 				pt = primI32
@@ -1231,26 +1279,22 @@ func (l *Lowerer) lowerAddr(expr desugar.Expr) Value {
 		// addressable temporary by lowering the value and storing it to a new
 		// alloca so clients expecting an address can continue.
 		msg := fmt.Sprintf("lowerAddr: non-addressable expr %T", expr)
+
 		// Try to extract Start/End when expr is a desugar node
-		var start, end int
-		switch v := expr.(type) {
-		case *desugar.Literal:
-			start, end = v.Start, v.End
-		case *desugar.BinaryExpr:
-			start, end = v.Start, v.End
-		case *desugar.IndexExpr:
-			start, end = v.Start, v.End
-		}
+		var start, end = e.Pos(), e.End()
 		l.reportLoweringDiagnostic(msg, start, end)
+
 		// Materialize fallback address
 		val := l.lowerValue(expr)
 		ty := LowerType(expr.Type())
 		if ty == nil {
 			ty = primI32
 		}
+
 		addr := l.newAddrTemp("", ty)
 		l.emit(&AllocaInst{Dst: addr, AllocType: ty})
 		l.emit(&StoreInst{Val: val, Addr: addr})
+
 		return addr
 	}
 }
@@ -1264,7 +1308,8 @@ func (l *Lowerer) lowerFieldAddr(e *desugar.FieldAccess) *Temp {
 	if pt, ok := base.Type().(*PointerType); ok {
 		recTy, _ = pt.Elem.(*RecordType)
 	}
-	var elemType Type = ft
+
+	var elemType = ft
 	var offsets []int
 	if recTy != nil {
 		if idx := recTy.FieldIndex(e.Field); idx >= 0 {
@@ -1272,7 +1317,9 @@ func (l *Lowerer) lowerFieldAddr(e *desugar.FieldAccess) *Temp {
 		}
 		elemType = recTy
 	}
+
 	l.emit(&GEPInst{Dst: dst, Base: base, ElemType: elemType, Offsets: offsets, Indices: nil})
+
 	return dst
 }
 
@@ -1304,7 +1351,7 @@ func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *Temp {
 					// Attempt to use idxExpr range when available.
 					var start, end int
 					if lit, ok := idxExpr.(*desugar.Literal); ok {
-						start, end = lit.Start, lit.End
+						start, end = lit.StartOffset, lit.EndOffset
 					}
 					l.reportLoweringDiagnostic(msg, start, end)
 					offsets = append(offsets, 0)
@@ -1318,15 +1365,18 @@ func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *Temp {
 		}
 	}
 
+	var elemType = et
 	var arrTy *ArrayType
 	if pt, ok := base.Type().(*PointerType); ok {
 		arrTy, _ = pt.Elem.(*ArrayType)
 	}
-	var elemType Type = et
+
 	if arrTy != nil {
 		elemType = arrTy
 	}
+
 	l.emit(&GEPInst{Dst: dst, Base: base, ElemType: elemType, Offsets: offsets, Indices: indices})
+
 	return dst
 }
 
@@ -1337,7 +1387,7 @@ func (l *Lowerer) lowerBinary(e *desugar.BinaryExpr) Value {
 		left := l.lowerValue(e.Left)
 		rttiName := rttiNameForType(e.Right.Type())
 		// pass source offsets for diagnostic Range attachment when available
-		return l.lowerISCheck(left, rttiName, e.Start, e.End)
+		return l.lowerISCheck(left, rttiName, e.StartOffset, e.EndOffset)
 	}
 
 	left := l.lowerValue(e.Left)
@@ -1346,39 +1396,51 @@ func (l *Lowerer) lowerBinary(e *desugar.BinaryExpr) Value {
 	if ty == nil {
 		ty = primI32
 	}
+
 	switch e.Op {
 	case token.EQUAL, token.NEQ, token.LESS, token.LEQ, token.GREAT, token.GEQ:
+		left, right = l.alignOperands(left, right)
 		pred := tokenToICmpPred(e.Op)
 		dst := NewAnonTemp(primI1)
+
 		if isFloatVal(left) || isFloatVal(right) {
 			l.emit(&FCmpInst{ICmpInst: ICmpInst{Dst: dst, Pred: pred, Left: left, Right: right}})
 		} else {
 			l.emit(&ICmpInst{Dst: dst, Pred: pred, Left: left, Right: right})
 		}
+
 		return dst
 	case token.AND:
+		left, right = l.sameWidthOperands(left, right, ty)
 		dst := NewAnonTemp(ty)
 		l.emit(&BinaryInst{Dst: dst, Op: "and", Left: left, Right: right})
 		return dst
 	case token.OR:
+		left, right = l.sameWidthOperands(left, right, ty)
 		dst := NewAnonTemp(ty)
 		l.emit(&BinaryInst{Dst: dst, Op: "or", Left: left, Right: right})
 		return dst
 	case token.IN:
+		left, right = l.sameWidthOperands(left, right, primU32)
 		// set membership: ((1 << left) & right) != 0
-		one := NewConst("1", int64(1), primI32)
-		shifted := NewAnonTemp(primI32)
+		one := NewConst("1", int64(1), primU32)
+		shifted := NewAnonTemp(primU32)
 		l.emit(&BinaryInst{Dst: shifted, Op: "shl", Left: one, Right: left})
-		andRes := NewAnonTemp(primI32)
+
+		andRes := NewAnonTemp(primU32)
 		l.emit(&BinaryInst{Dst: andRes, Op: "and", Left: shifted, Right: right})
-		zero := NewConst("0", int64(0), primI32)
+
+		zero := NewConst("0", int64(0), primU32)
 		dst := NewAnonTemp(primI1)
 		l.emit(&ICmpInst{Dst: dst, Pred: "ne", Left: andRes, Right: zero})
+
 		return dst
 	default:
+		left, right = l.sameWidthOperands(left, right, ty)
 		op := tokenToArithOp(e.Op)
 		dst := NewAnonTemp(ty)
 		l.emit(&BinaryInst{Dst: dst, Op: op, Left: left, Right: right})
+
 		return dst
 	}
 }
@@ -1389,13 +1451,16 @@ func (l *Lowerer) lowerUnary(e *desugar.UnaryExpr) Value {
 	if ty == nil {
 		ty = primI32
 	}
+
 	switch e.Op {
 	case token.NOT:
+		operand = l.sameType(operand, primI1)
 		one := NewConst("true", int64(1), primI1)
 		dst := NewAnonTemp(primI1)
 		l.emit(&BinaryInst{Dst: dst, Op: "xor", Left: operand, Right: one})
 		return dst
 	case token.MINUS:
+		operand = l.sameType(operand, ty)
 		zero := NewConst("0", int64(0), ty)
 		dst := NewAnonTemp(ty)
 		l.emit(&BinaryInst{Dst: dst, Op: "sub", Left: zero, Right: operand})
@@ -1405,15 +1470,64 @@ func (l *Lowerer) lowerUnary(e *desugar.UnaryExpr) Value {
 	}
 }
 
-// lowerSetExpr materializes a SET literal `{e1, e2, e3..n}` as a 32-bit
+// sameWidthOperands coerces both operands to the same type, preferring the
+// requested type when it is available. This keeps the verifier happy when one
+// side is an untyped literal that defaulted to i64 during lowering.
+func (l *Lowerer) sameWidthOperands(left, right Value, ty Type) (Value, Value) {
+	if ty != nil {
+		if left != nil && (left.Type() == nil || !left.Type().Equal(ty)) {
+			left = l.sameType(left, ty)
+		}
+		if right != nil && (right.Type() == nil || !right.Type().Equal(ty)) {
+			right = l.sameType(right, ty)
+		}
+		return left, right
+	}
+	return l.alignOperands(left, right)
+}
+
+// alignOperands coerces one operand to the other operand's type, preferring to
+// cast constants rather than values when the widths differ.
+func (l *Lowerer) alignOperands(left, right Value) (Value, Value) {
+	if left == nil || right == nil {
+		return left, right
+	}
+	lt, rt := left.Type(), right.Type()
+	if lt == nil || rt == nil || lt.Equal(rt) {
+		return left, right
+	}
+	if left.IsConst() && !right.IsConst() {
+		if rt != nil {
+			left = l.sameType(left, rt)
+		}
+		return left, right
+	}
+	if right.IsConst() && !left.IsConst() {
+		if lt != nil {
+			right = l.sameType(right, lt)
+		}
+		return left, right
+	}
+	if lt != nil {
+		right = l.sameType(right, lt)
+		return left, right
+	}
+	if rt != nil {
+		left = l.sameType(left, rt)
+	}
+	return left, right
+}
+
+// lowerSetExpr materializes a SET literal `{e1, e2, e3..n}` as a unsigned 32-bit
 // bitmask.  Each singleton element contributes bit (1 << elem); each
 // RangeExpr element contributes a contiguous run of bits.  The result is
-// an i32 *Temp (or a zero *Constant when the set is empty).
+// a u32 *Temp (or a zero *Constant when the set is empty).
 func (l *Lowerer) lowerSetExpr(s *desugar.SetExpr) Value {
 	if len(s.Elems) == 0 {
-		return NewConst("0", int64(0), primI32)
+		return NewConst("0", int64(0), primU32)
 	}
-	var acc Value = NewConst("0", int64(0), primI32)
+
+	var acc Value = NewConst("0", int64(0), primU32)
 	for _, elem := range s.Elems {
 		var mask Value
 		if re, ok := elem.(*desugar.RangeExpr); ok {
@@ -1421,12 +1535,12 @@ func (l *Lowerer) lowerSetExpr(s *desugar.SetExpr) Value {
 		} else {
 			// singleton: mask = 1 << elem
 			idx := l.lowerValue(elem)
-			one := NewConst("1", int64(1), primI32)
-			shifted := NewAnonTemp(primI32)
+			one := NewConst("1", int64(1), primU32)
+			shifted := NewAnonTemp(primU32)
 			l.emit(&BinaryInst{Dst: shifted, Op: "shl", Left: one, Right: idx})
 			mask = shifted
 		}
-		newAcc := NewAnonTemp(primI32)
+		newAcc := NewAnonTemp(primU32)
 		l.emit(&BinaryInst{Dst: newAcc, Op: "or", Left: acc, Right: mask})
 		acc = newAcc
 	}
@@ -1449,22 +1563,22 @@ func (l *Lowerer) lowerRangeExpr(e *desugar.RangeExpr) Value {
 	} else {
 		high = low
 	}
-	one := NewConst("1", int64(1), primI32)
+	one := NewConst("1", int64(1), primU32)
 
 	// length = (high + 1) - low
-	highPlusOne := NewAnonTemp(primI32)
+	highPlusOne := NewAnonTemp(primU32)
 	l.emit(&BinaryInst{Dst: highPlusOne, Op: "add", Left: high, Right: one})
-	length := NewAnonTemp(primI32)
+	length := NewAnonTemp(primU32)
 	l.emit(&BinaryInst{Dst: length, Op: "sub", Left: highPlusOne, Right: low})
 
 	// ones = (1 << length) - 1
-	shifted := NewAnonTemp(primI32)
+	shifted := NewAnonTemp(primU32)
 	l.emit(&BinaryInst{Dst: shifted, Op: "shl", Left: one, Right: length})
-	ones := NewAnonTemp(primI32)
+	ones := NewAnonTemp(primU32)
 	l.emit(&BinaryInst{Dst: ones, Op: "sub", Left: shifted, Right: one})
 
 	// mask = ones << low
-	mask := NewAnonTemp(primI32)
+	mask := NewAnonTemp(primU32)
 	l.emit(&BinaryInst{Dst: mask, Op: "shl", Left: ones, Right: low})
 	return mask
 }
@@ -1484,14 +1598,17 @@ func (l *Lowerer) lowerISCheck(obj Value, rttiName string, start, end int) *Temp
 		})
 		return dst
 	}
+
 	if rttiName == "" || l.mod == nil || l.fn == nil {
 		return falseTemp()
 	}
+
 	if _, ok := l.mod.SymTab.Lookup(rttiName); !ok {
-		// RTTI symbol not emitted into this module — report once and return
+		// RTTI symbol has not been emitted into this module — report once and return
 		l.reportMissingRTTI(rttiName, start, end)
 		return falseTemp()
 	}
+
 	tid := rttiID[rttiName]
 	if tid == 0 {
 		// no numeric RTTI id assigned — report once and return
@@ -1727,7 +1844,7 @@ func (l *Lowerer) lowerWith(st *desugar.WithStmt) {
 
 		// Emit the inline boolean IS check; we land in the merge block.
 		// Pass guard Start/End so diagnostics can point to the guard span.
-		cond := l.lowerISCheck(obj, rttiName, guard.Start, guard.End)
+		cond := l.lowerISCheck(obj, rttiName, guard.StartOffset, guard.EndOffset)
 		// If RTTI unavailable, cond is a false const-materialized temp; the
 		// body will be unreachable.  That is the conservative safe choice.
 
@@ -1778,17 +1895,20 @@ func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
 		if v != nil {
 			return v
 		}
+
 		// Builtin failed to produce a value in expression context: warn and
 		// return a conservative zero value of the expected return type.
 		msg := fmt.Sprintf("lowerCallExpr: builtin %q returned nil in expression context", call.Func.Name)
-		l.reportLoweringDiagnostic(msg, call.Start, call.End)
+		l.reportLoweringDiagnostic(msg, call.StartOffset, call.EndOffset)
 		rt := LowerType(call.RetType)
 		if rt == nil {
 			rt = primI32
 		}
+
 		if rt == primI1 {
 			return NewConst("false", int64(0), primI1)
 		}
+
 		return NewConst("0", int64(0), rt)
 	}
 
@@ -1830,14 +1950,26 @@ func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
 func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) Value {
 	lit, ok := expr.(*desugar.Literal)
 	if !ok {
-		return l.lowerValue(expr)
+		l.reportLoweringDiagnostic(fmt.Sprintf("lowerLiteralExpr: expected *desugar.Literal, got %T", expr),
+			expr.Pos(), expr.End())
+		return NewConst("0", int64(0), primI32)
 	}
+
 	ty := LowerType(lit.SemaType)
 	if ty == nil {
 		ty = primI32
 	}
+
 	switch lit.Kind {
-	case token.BYTE_LIT, token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
+	case token.BYTE_LIT:
+		iv, err := strconv.ParseUint(lit.Value, 10, 8)
+		if err != nil {
+			l.reportLoweringDiagnostic(fmt.Sprintf("lowerLiteralExpr: cannot parse byte literal %q: %v",
+				lit.Value, err), lit.StartOffset, lit.EndOffset)
+			return NewConst(lit.Value, lit.Value, ty)
+		}
+		return NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
+	case token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
 		v := lit.Value
 		var iv int64
 		var err error
@@ -1850,6 +1982,7 @@ func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) Value {
 		if err != nil {
 			return NewConst(lit.Value, lit.Value, ty)
 		}
+
 		return NewConst(fmt.Sprintf("%d", iv), iv, ty)
 	case token.REAL_LIT, token.LONGREAL_LIT:
 		v := lit.Value
@@ -1864,12 +1997,46 @@ func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) Value {
 		return NewConst("true", int64(1), primI1)
 	case token.FALSE:
 		return NewConst("false", int64(0), primI1)
-	case token.CHAR_LIT, token.WCHAR_LIT:
-		return NewConst(lit.Value, lit.Value, primI32)
+	case token.CHAR_LIT:
+		v := lit.Value
+		var iv uint64
+		var err error
+		if strings.HasSuffix(v, "x") || strings.HasSuffix(v, "X") {
+			v2 := v[:len(v)-1]
+			iv, err = strconv.ParseUint(v2, 16, 8)
+		} else {
+			iv, err = strconv.ParseUint(v, 16, 8)
+		}
+
+		if err != nil {
+			l.reportLoweringDiagnostic(fmt.Sprintf("lowerLiteralExpr: cannot parse char literal %q: %v",
+				lit.Value, err), lit.StartOffset, lit.EndOffset)
+			return NewConst(lit.Value, lit.Value, ty)
+		}
+
+		return NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
+	case token.WCHAR_LIT:
+		v := lit.Value
+		var iv uint64
+		var err error
+		if strings.HasSuffix(v, "x") || strings.HasSuffix(v, "X") {
+			v2 := v[:len(v)-1]
+			iv, err = strconv.ParseUint(v2, 16, 16)
+		} else {
+			iv, err = strconv.ParseUint(v, 16, 16)
+		}
+
+		if err != nil {
+			l.reportLoweringDiagnostic(fmt.Sprintf("lowerLiteralExpr: cannot parse char literal %q: %v",
+				lit.Value, err), lit.StartOffset, lit.EndOffset)
+			return NewConst(lit.Value, lit.Value, ty)
+		}
+
+		return NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
 	case token.STR_LIT, token.HEX_STR_LIT:
-		return NewConst(lit.Value, lit.Value, NewArrayType(len(lit.Value)+1, primI32))
+		return NewConst(lit.Value, lit.Value, NewArrayType(len(lit.Value)+1, primU16))
 	case token.NIL:
-		return NewConst("nil", int64(0), Ptr(primI32))
+		return NewConst("nil", int64(0), Ptr(primVoid))
 	default:
 		iv, err := strconv.ParseInt(lit.Value, 10, 64)
 		if err == nil {
@@ -1966,10 +2133,11 @@ func (l *Lowerer) newBlock(label string) *Block {
 	id := l.blockSeq
 	l.blockSeq++
 	return &Block{
-		ID:    id,
-		Label: label,
-		Preds: make(map[int]*Block),
-		Succs: make(map[int]*Block),
+		ID:     id,
+		Label:  label,
+		Preds:  make(map[int]*Block),
+		Succs:  make(map[int]*Block),
+		Parent: l.fn,
 	}
 }
 

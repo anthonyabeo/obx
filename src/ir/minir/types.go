@@ -24,6 +24,16 @@ func (p *PrimitiveType) String() string {
 		return "i1"
 	case "i1":
 		return "i1"
+	case "u8", "uint8":
+		return "u8"
+	case "u16", "uint16":
+		return "u16"
+	case "u32", "uint32":
+		return "u32"
+	case "i8", "int8":
+		return "i8"
+	case "i16", "int16":
+		return "i16"
 	case "i32", "int32", "int":
 		return "i32"
 	case "i64", "int64":
@@ -145,11 +155,11 @@ func (r *RecordType) Equal(t Type) bool {
 	return true
 }
 
-// FieldIndex returns the 0-based index of the field named name, or -1 if not found.
+// FieldIndex returns the 0-based index of the field named `name`, or -1 if not found.
 func (r *RecordType) FieldIndex(name string) int {
-	for i, f := range r.Fields {
+	for _, f := range r.Fields {
 		if f.Name == name {
-			return i
+			return f.Offset
 		}
 	}
 	return -1
@@ -252,14 +262,25 @@ func (c *Constant) IsConst() bool { return true }
 
 // Canonical primitive singletons and factory functions.
 var (
-	primI1  = &PrimitiveType{Name: "i1"}
-	primI32 = &PrimitiveType{Name: "i32"}
-	primI64 = &PrimitiveType{Name: "i64"}
-	primF32 = &PrimitiveType{Name: "f32"}
-	primF64 = &PrimitiveType{Name: "f64"}
+	primI1   = &PrimitiveType{Name: "i1"}
+	primI8   = &PrimitiveType{Name: "i8"}
+	primI16  = &PrimitiveType{Name: "i16"}
+	primI32  = &PrimitiveType{Name: "i32"}
+	primI64  = &PrimitiveType{Name: "i64"}
+	primU8   = &PrimitiveType{Name: "u8"}
+	primU16  = &PrimitiveType{Name: "u16"}
+	primU32  = &PrimitiveType{Name: "u32"}
+	primF32  = &PrimitiveType{Name: "f32"}
+	primF64  = &PrimitiveType{Name: "f64"}
+	primVoid = &PrimitiveType{Name: "void"}
 )
 
 func I1() *PrimitiveType   { return primI1 }
+func U8() *PrimitiveType   { return primU8 }
+func U16() *PrimitiveType  { return primU16 }
+func U32() *PrimitiveType  { return primU32 }
+func I8() *PrimitiveType   { return primI8 }
+func I16() *PrimitiveType  { return primI16 }
 func I32() *PrimitiveType  { return primI32 }
 func I64() *PrimitiveType  { return primI64 }
 func F32() *PrimitiveType  { return primF32 }
@@ -290,8 +311,8 @@ func NewAnonTemp(ty Type) *Temp {
 	return &Temp{ID: nextTempID(), Ty: NormalizeType(ty)}
 }
 
-// NewConst constructs a Constant. If name is empty the textual value is
-// left blank; caller may set NameStr if desired.
+// NewConst constructs a Constant. If `name` is empty, the textual value is
+// left blank; the caller may set NameStr if desired.
 func NewConst(name string, val interface{}, ty Type) *Constant {
 	nty := NormalizeType(ty)
 	// Canonicalize concrete Go representation of the value according to the
