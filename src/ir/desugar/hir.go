@@ -8,6 +8,8 @@ import (
 
 type Node interface {
 	fmt.Stringer
+	Pos() int
+	End() int
 }
 
 type Stmt interface {

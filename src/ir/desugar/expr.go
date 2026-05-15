@@ -19,141 +19,157 @@ const (
 
 type (
 	Literal struct {
-		NodeBase
-		Kind     token.Kind
-		Value    string
-		SemaType types.Type
+		Kind        token.Kind
+		Value       string
+		SemaType    types.Type
+		StartOffset int
+		EndOffset   int
 	}
 
 	BinaryExpr struct {
-		NodeBase
-		Left     Expr
-		Right    Expr
-		Op       token.Kind
-		SemaType types.Type
+		Left        Expr
+		Right       Expr
+		Op          token.Kind
+		SemaType    types.Type
+		StartOffset int
+		EndOffset   int
 	}
 
 	UnaryExpr struct {
-		NodeBase
-		Operand  Expr
-		Op       token.Kind
-		SemaType types.Type
+		Operand     Expr
+		Op          token.Kind
+		SemaType    types.Type
+		StartOffset int
+		EndOffset   int
 	}
 
 	SetExpr struct {
-		NodeBase
-		Elems    []Expr
-		SemaType types.Type
+		Elems       []Expr
+		SemaType    types.Type
+		StartOffset int
+		EndOffset   int
 	}
 
 	RangeExpr struct {
-		NodeBase
-		Low      Expr
-		High     Expr
-		SemaType types.Type
+		Low         Expr
+		High        Expr
+		SemaType    types.Type
+		StartOffset int
+		EndOffset   int
 	}
 
 	FuncCall struct {
-		NodeBase
-		Func    *FunctionRef
-		Args    []Expr
-		RetType types.Type
+		Func        *FunctionRef
+		Args        []Expr
+		RetType     types.Type
+		StartOffset int
+		EndOffset   int
 	}
 
 	VariableRef struct {
-		NodeBase
-		Name       string     // name of the variable
-		Mangled    string     // mangled name for code emission
-		SemaType   types.Type // variable type
-		Module     string     // name of the module in which it declared/used
-		IsExported bool
-		IsReadOnly bool
-		Size       int
+		Name        string     // name of the variable
+		Mangled     string     // mangled name for code emission
+		SemaType    types.Type // variable type
+		Module      string     // name of the module in which it declared/used
+		IsExported  bool
+		IsReadOnly  bool
+		Size        int
+		StartOffset int
+		EndOffset   int
 	}
 
 	ConstantRef struct {
-		NodeBase
-		Name       string // name of the variable
-		Mangled    string // mangled name for code emission
-		Value      Expr
-		SemaType   types.Type // variable type
-		Module     string     // name of the module in which it declared/used
-		IsExported bool
-		IsReadOnly bool
-		Offset     int
-		Size       int
+		Name        string // name of the variable
+		Mangled     string // mangled name for code emission
+		Value       Expr
+		SemaType    types.Type // variable type
+		Module      string     // name of the module in which it declared/used
+		IsExported  bool
+		IsReadOnly  bool
+		Offset      int
+		Size        int
+		StartOffset int
+		EndOffset   int
 	}
 
 	FunctionRef struct {
-		NodeBase
-		Name       string     // name of the variable
-		Mangled    string     // mangled name for code emission
-		SemaType   types.Type // variable type
-		Kind       ast.ProcedureKind
-		Module     string // name of the module in which it declared/used
-		IsExported bool
-		IsReadOnly bool
+		Name        string     // name of the variable
+		Mangled     string     // mangled name for code emission
+		SemaType    types.Type // variable type
+		Kind        ast.ProcedureKind
+		Module      string // name of the module in which it declared/used
+		IsExported  bool
+		IsReadOnly  bool
+		StartOffset int
+		EndOffset   int
 		// FFI fields
 		IsExternal bool
 		IsVarArgs  bool
 	}
 
 	TypeRef struct {
-		NodeBase
-		Name       string
-		Mangled    string // mangled name for code emission
-		UnderType  types.Type
-		Module     string // name of the module in which it declared/used
-		IsExported bool
-		IsReadOnly bool
-		Offset     int
-		Size       int
+		Name        string
+		Mangled     string // mangled name for code emission
+		UnderType   types.Type
+		Module      string // name of the module in which it declared/used
+		IsExported  bool
+		IsReadOnly  bool
+		Offset      int
+		Size        int
+		StartOffset int
+		EndOffset   int
 	}
 
 	// ModuleRef represents a reference to a module or definition module used
 	// as a first-class value (e.g. LDMOD(Fmt)).
 	ModuleRef struct {
-		NodeBase
-		Name       string
-		Mangled    string
-		Module     string
-		SemaType   types.Type
-		IsExported bool
-		IsReadOnly bool
+		Name        string
+		Mangled     string
+		Module      string
+		SemaType    types.Type
+		IsExported  bool
+		IsReadOnly  bool
+		StartOffset int
+		EndOffset   int
 	}
 
 	FieldAccess struct {
-		NodeBase
-		Record   Expr
-		Field    string
-		SemaType types.Type
+		Record      Expr
+		Field       string
+		SemaType    types.Type
+		StartOffset int
+		EndOffset   int
 	}
 
 	IndexExpr struct {
-		NodeBase
-		Array    Expr
-		Index    []Expr
-		SemaType types.Type
+		Array       Expr
+		Index       []Expr
+		SemaType    types.Type
+		StartOffset int
+		EndOffset   int
 	}
 
 	DerefExpr struct {
-		NodeBase
-		Pointer  Expr
-		SemaType types.Type
+		Pointer     Expr
+		SemaType    types.Type
+		StartOffset int
+		EndOffset   int
 	}
 
 	TypeGuardExpr struct {
-		NodeBase
-		Expr     Expr
-		Typ      types.Type
-		SemaType types.Type
+		Expr        Expr
+		Typ         types.Type
+		SemaType    types.Type
+		StartOffset int
+		EndOffset   int
 	}
 
 	Param struct {
-		NodeBase
-		Name string
-		Kind ParamKind // Value, Var, In
-		Typ  types.Type
+		Name        string
+		Kind        ParamKind // Value, Var, In
+		Typ         types.Type
+		StartOffset int
+		EndOffset   int
 	}
 )
 
@@ -238,3 +254,37 @@ func (e *FunctionRef) String() string { return e.Name }
 func (e *TypeRef) String() string     { return e.Name }
 func (e *ModuleRef) String() string   { return e.Name }
 func (p *Param) String() string       { return p.Name }
+
+func (e *Literal) Pos() int       { return e.StartOffset }
+func (e *BinaryExpr) Pos() int    { return e.StartOffset }
+func (e *UnaryExpr) Pos() int     { return e.StartOffset }
+func (e *FuncCall) Pos() int      { return e.StartOffset }
+func (e *FieldAccess) Pos() int   { return e.StartOffset }
+func (e *IndexExpr) Pos() int     { return e.StartOffset }
+func (e *DerefExpr) Pos() int     { return e.StartOffset }
+func (e *TypeGuardExpr) Pos() int { return e.StartOffset }
+func (e *SetExpr) Pos() int       { return e.StartOffset }
+func (e *RangeExpr) Pos() int     { return e.StartOffset }
+func (e *VariableRef) Pos() int   { return e.StartOffset }
+func (e *ConstantRef) Pos() int   { return e.StartOffset }
+func (e *FunctionRef) Pos() int   { return e.StartOffset }
+func (e *TypeRef) Pos() int       { return e.StartOffset }
+func (e *ModuleRef) Pos() int     { return e.StartOffset }
+func (e *Param) Pos() int         { return e.StartOffset }
+
+func (e *Literal) End() int       { return e.EndOffset }
+func (e *BinaryExpr) End() int    { return e.EndOffset }
+func (e *UnaryExpr) End() int     { return e.EndOffset }
+func (e *FuncCall) End() int      { return e.EndOffset }
+func (e *FieldAccess) End() int   { return e.EndOffset }
+func (e *IndexExpr) End() int     { return e.EndOffset }
+func (e *DerefExpr) End() int     { return e.EndOffset }
+func (e *TypeGuardExpr) End() int { return e.EndOffset }
+func (e *SetExpr) End() int       { return e.EndOffset }
+func (e *RangeExpr) End() int     { return e.EndOffset }
+func (e *VariableRef) End() int   { return e.EndOffset }
+func (e *ConstantRef) End() int   { return e.EndOffset }
+func (e *FunctionRef) End() int   { return e.EndOffset }
+func (e *TypeRef) End() int       { return e.EndOffset }
+func (e *ModuleRef) End() int     { return e.EndOffset }
+func (p *Param) End() int         { return p.EndOffset }

@@ -8,75 +8,85 @@ import (
 
 type (
 	AssignStmt struct {
-		NodeBase
-		Left  Expr
-		Right Expr
+		Left        Expr
+		Right       Expr
+		StartOffset int
+		EndOffset   int
 	}
 
 	ReturnStmt struct {
-		NodeBase
-		Result Expr
+		Result      Expr
+		StartOffset int
+		EndOffset   int
 	}
 
 	IfStmt struct {
-		NodeBase
-		Cond    Expr
-		Then    *CompoundStmt
-		Else    *CompoundStmt
-		ElseIfs []*ElseIfBranch
+		Cond        Expr
+		Then        *CompoundStmt
+		Else        *CompoundStmt
+		ElseIfs     []*ElseIfBranch
+		StartOffset int
+		EndOffset   int
 	}
 
 	ElseIfBranch struct {
-		NodeBase
-		Cond Expr
-		Body *CompoundStmt
+		Cond        Expr
+		Body        *CompoundStmt
+		StartOffset int
+		EndOffset   int
 	}
 
 	LoopStmt struct {
-		NodeBase
-		Body  *CompoundStmt
-		Label string
+		Body        *CompoundStmt
+		Label       string
+		StartOffset int
+		EndOffset   int
 	}
 
 	CaseStmt struct {
-		NodeBase
-		Expr  Expr
-		Cases []*Case
-		Else  *CompoundStmt
+		Expr        Expr
+		Cases       []*Case
+		Else        *CompoundStmt
+		StartOffset int
+		EndOffset   int
 	}
 
 	Case struct {
-		NodeBase
-		Labels []*LabelRange
-		Body   *CompoundStmt
+		Labels      []*LabelRange
+		Body        *CompoundStmt
+		StartOffset int
+		EndOffset   int
 	}
 
 	LabelRange struct {
-		NodeBase
-		Low  Expr
-		High Expr // same as Low for singleton values
+		Low         Expr
+		High        Expr // same as Low for singleton values
+		StartOffset int
+		EndOffset   int
 	}
 
 	WithStmt struct {
-		NodeBase
-		Guards []*WithGuard
-		Else   *CompoundStmt
+		Guards      []*WithGuard
+		Else        *CompoundStmt
+		StartOffset int
+		EndOffset   int
 	}
 
 	WithGuard struct {
-		NodeBase
-		Expr Expr
-		Type Expr
-		Body *CompoundStmt
+		Expr        Expr
+		Type        Expr
+		Body        *CompoundStmt
+		StartOffset int
+		EndOffset   int
 	}
 
 	ExitStmt struct {
-		NodeBase
-		LoopLabel string
+		LoopLabel   string
+		StartOffset int
+		EndOffset   int
 	}
 
 	CompoundStmt struct {
-		NodeBase
 		Stmts []Stmt
 	}
 )
@@ -90,6 +100,34 @@ func (*WithStmt) stmt()     {}
 func (*ExitStmt) stmt()     {}
 func (*CompoundStmt) stmt() {}
 func (*FuncCall) stmt()     {}
+
+func (stmt *AssignStmt) Pos() int { return stmt.StartOffset }
+func (stmt *ReturnStmt) Pos() int { return stmt.StartOffset }
+func (stmt *IfStmt) Pos() int     { return stmt.StartOffset }
+func (stmt *LoopStmt) Pos() int   { return stmt.StartOffset }
+func (stmt *CaseStmt) Pos() int   { return stmt.StartOffset }
+func (stmt *WithStmt) Pos() int   { return stmt.StartOffset }
+func (stmt *ExitStmt) Pos() int   { return stmt.StartOffset }
+func (stmt *CompoundStmt) Pos() int {
+	if len(stmt.Stmts) == 0 {
+		return -1
+	}
+	return stmt.Stmts[0].Pos()
+}
+
+func (stmt *AssignStmt) End() int { return stmt.EndOffset }
+func (stmt *ReturnStmt) End() int { return stmt.EndOffset }
+func (stmt *IfStmt) End() int     { return stmt.EndOffset }
+func (stmt *LoopStmt) End() int   { return stmt.EndOffset }
+func (stmt *CaseStmt) End() int   { return stmt.EndOffset }
+func (stmt *WithStmt) End() int   { return stmt.EndOffset }
+func (stmt *ExitStmt) End() int   { return stmt.EndOffset }
+func (stmt *CompoundStmt) End() int {
+	if len(stmt.Stmts) == 0 {
+		return -1
+	}
+	return stmt.Stmts[0].End()
+}
 
 func (stmt *AssignStmt) String() string { return fmt.Sprintf("%s := %s", stmt.Left, stmt.Right) }
 func (stmt *ReturnStmt) String() string {
