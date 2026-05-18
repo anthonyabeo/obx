@@ -1,6 +1,8 @@
-package minir
+package core
 
-import "testing"
+import (
+	"testing"
+)
 
 // ── RecordType ────────────────────────────────────────────────────────────────
 
@@ -319,7 +321,7 @@ func TestFormatGEP_Record(t *testing.T) {
 	dst.IsAddr = true
 
 	gep := &GEPInst{Dst: dst, Base: base, ElemType: recTy, Offsets: []int{0}}
-	out := FormatInstr(gep)
+	out := pretty.FormatInstr(gep)
 	t.Logf("formatted: %s", out)
 	// should contain the record type name
 	want := "record.Vec2"
@@ -351,7 +353,7 @@ func TestFormatGEP_Array(t *testing.T) {
 	dst.IsAddr = true
 
 	gep := &GEPInst{Dst: dst, Base: base, ElemType: arrTy, Offsets: []int{3}}
-	out := FormatInstr(gep)
+	out := pretty.FormatInstr(gep)
 	t.Logf("formatted: %s", out)
 	want := "[8 x i32]"
 	for _, s := range []string{"%e3", "%buf", want} {

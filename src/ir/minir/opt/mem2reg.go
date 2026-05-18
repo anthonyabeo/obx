@@ -1,6 +1,8 @@
 package miniropt
 
-import "github.com/anthonyabeo/obx/src/ir/minir"
+import (
+	"github.com/anthonyabeo/obx/src/ir/minir"
+)
 
 // Mem2Reg promotes non-escaping scalar allocas to SSA values, eliminating
 // load/store pairs and inserting φ-nodes where control flow merges.
@@ -11,13 +13,13 @@ import "github.com/anthonyabeo/obx/src/ir/minir"
 //  2. Insert φ-nodes at the iterated dominance frontier (IDF) of each
 //     alloca's definition sites (blocks that contain a StoreInst to it).
 //  3. Walk the dominator tree, maintaining a per-alloca value stack:
-//       • StoreInst  → push the stored value; mark for deletion.
-//       • LoadInst   → replace load result with stack top; mark for deletion
-//                      (or replace with a materialiser instruction when the
-//                      reaching value is a constant and the result must remain
-//                      a *Temp, e.g. ReturnInst.Result).
-//       • φ-node arm → fill with the current stack top before recursing into
-//                      each dominated successor.
+//     • StoreInst  → push the stored value; mark for deletion.
+//     • LoadInst   → replace load result with stack top; mark for deletion
+//     (or replace with a materialiser instruction when the
+//     reaching value is a constant and the result must remain
+//     a *Temp, e.g. ReturnInst.Result).
+//     • φ-node arm → fill with the current stack top before recursing into
+//     each dominated successor.
 //  4. Apply the substitution map (loadTemp → reachingValue) across the whole
 //     function, rebuilding only instructions that reference a substituted temp.
 //  5. Delete promoted AllocaInst and any remaining StoreInst / LoadInst that
@@ -517,4 +519,3 @@ func replaceInInstr(ins minir.Instr, subst map[*minir.Temp]minir.Value) minir.In
 		return ins
 	}
 }
-

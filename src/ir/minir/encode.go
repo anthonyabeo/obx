@@ -1,4 +1,4 @@
-package minir
+package core
 
 // encode.go — binary serialisation of a minir.Module.
 //
@@ -904,4 +904,3 @@ func ModuleBytes(m *Module) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
-

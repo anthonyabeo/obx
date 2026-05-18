@@ -267,4 +267,3 @@ func TestLoadForward_TwoGlobalsIndependent(t *testing.T) {
 		}
 	}
 }
-

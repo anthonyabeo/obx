@@ -1,4 +1,4 @@
-package minir
+package core
 
 import (
 	"fmt"
@@ -276,20 +276,20 @@ func (e *Emitter) EmitProgram(prog *Program) (int, error) {
 
 // ── io.WriterTo implementations ───────────────────────────────────────────────
 
-// WriteTo implements io.WriterTo for *Function.
-func (f *Function) WriteTo(w io.Writer) (int64, error) {
+// WriteFuncTo implements io.WriterTo for *Function.
+func WriteFuncTo(f *Function, w io.Writer) (int64, error) {
 	n, err := NewEmitter(w).EmitFunction(f)
 	return int64(n), err
 }
 
-// WriteTo implements io.WriterTo for *Module.
-func (m *Module) WriteTo(w io.Writer) (int64, error) {
+// WriteModuleTo implements io.WriterTo for *Module.
+func WriteModuleTo(m *Module, w io.Writer) (int64, error) {
 	n, err := NewEmitter(w).EmitModule(m)
 	return int64(n), err
 }
 
-// WriteTo implements io.WriterTo for *Program.
-func (prog *Program) WriteTo(w io.Writer) (int64, error) {
+// WriteProgramTo implements io.WriterTo for *Program.
+func WriteProgramTo(prog *Program, w io.Writer) (int64, error) {
 	n, err := NewEmitter(w).EmitProgram(prog)
 	return int64(n), err
 }

@@ -17,10 +17,10 @@ import (
 // Aliasing / invalidation rules (conservative):
 //   - StoreInst:          updates the known value for that address.
 //   - LoadInst (unknown): records the load result as the current known value
-//                         (useful for chaining: load → icmp, no intervening
-//                         store).
+//     (useful for chaining: load → icmp, no intervening
+//     store).
 //   - CallInst:           flushes the entire map — a call may clobber any
-//                         global variable or escaped alloca.
+//     global variable or escaped alloca.
 //   - GEPInst:            does not invalidate (computes an address, no write).
 //
 // This is a local (single-block) analysis.  Inter-block propagation requires
@@ -134,4 +134,3 @@ func applySubstToValue(v minir.Value, subst map[*minir.Temp]minir.Value) minir.V
 	}
 	return v
 }
-

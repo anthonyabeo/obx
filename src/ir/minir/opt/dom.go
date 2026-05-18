@@ -171,4 +171,3 @@ func containsBlock(slice []*minir.Block, b *minir.Block) bool {
 	}
 	return false
 }
-

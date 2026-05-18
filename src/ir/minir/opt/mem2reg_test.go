@@ -151,15 +151,15 @@ func TestMem2Reg_PhiInsertedAtMerge(t *testing.T) {
 			&desugar.AssignStmt{Left: iVarRef("r", i32), Right: iLit("0", i32)},
 			// IF x > 0 THEN r := x END
 			&desugar.IfStmt{
-			Cond: &desugar.BinaryExpr{
-				Op:       token.GREAT,
-				Left:     iParamRef("x", i32),
-				Right:    iLit("0", i32),
-				SemaType: types.BooleanType,
-			},
-			Then: &desugar.CompoundStmt{Stmts: []desugar.Stmt{
-				&desugar.AssignStmt{Left: iVarRef("r", i32), Right: iParamRef("x", i32)},
-			}},
+				Cond: &desugar.BinaryExpr{
+					Op:       token.GREAT,
+					Left:     iParamRef("x", i32),
+					Right:    iLit("0", i32),
+					SemaType: types.BooleanType,
+				},
+				Then: &desugar.CompoundStmt{Stmts: []desugar.Stmt{
+					&desugar.AssignStmt{Left: iVarRef("r", i32), Right: iParamRef("x", i32)},
+				}},
 			},
 			// RETURN r
 			&desugar.ReturnStmt{Result: iVarRef("r", i32)},

@@ -1,4 +1,4 @@
-package minir
+package core
 
 // Instr is the common interface for all instructions.
 type Instr interface {
@@ -105,7 +105,7 @@ type GEPInst struct {
 	// compile-time constants. Indices are stored in left-to-right source
 	// order and are consumed sequentially by codegen for dimensions where
 	// the corresponding Offsets entry is zero.
-	Indices  []Value
+	Indices []Value
 }
 
 func (g *GEPInst) String() string { return FormatInstr(g) }
@@ -117,7 +117,7 @@ func (g *GEPInst) Uses() []Value {
 	}
 	return out
 }
-func (g *GEPInst) Def() *Temp     { return g.Dst }
+func (g *GEPInst) Def() *Temp { return g.Dst }
 
 // CallInst represents a function call; optional result stored in Dst.
 type CallInst struct {

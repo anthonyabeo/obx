@@ -1,4 +1,4 @@
-package minir
+package core
 
 import "fmt"
 
@@ -21,9 +21,9 @@ func (e VerifyError) Error() string {
 	}
 }
 
-// isAddrValue reports whether v is a valid address operand for a memory
+// IsAddrValue reports whether v is a valid address operand for a memory
 // instruction: either an IsAddr=true *Temp (stack alloca) or a *GlobalRef.
-func isAddrValue(v Value) bool {
+func IsAddrValue(v Value) bool {
 	switch a := v.(type) {
 	case *Temp:
 		return a.IsAddr
@@ -143,11 +143,11 @@ func VerifyIR(fn *Function) []VerifyError {
 
 			switch instr := ins.(type) {
 			case *LoadInst:
-				if instr.Addr != nil && !isAddrValue(instr.Addr) {
+				if instr.Addr != nil && !IsAddrValue(instr.Addr) {
 					add(bl, is, fmt.Sprintf("LoadInst addr %q is not a memory value", instr.Addr.String()))
 				}
 			case *StoreInst:
-				if instr.Addr != nil && !isAddrValue(instr.Addr) {
+				if instr.Addr != nil && !IsAddrValue(instr.Addr) {
 					add(bl, is, fmt.Sprintf("StoreInst addr %q is not a memory value", instr.Addr.String()))
 				}
 			case *GEPInst:
@@ -157,15 +157,15 @@ func VerifyIR(fn *Function) []VerifyError {
 				if instr.Base == nil {
 					add(bl, is, "GEPInst base is nil")
 				} else {
-					if !isAddrValue(instr.Base) {
+					if !IsAddrValue(instr.Base) {
 						add(bl, is, "GEPInst base is not an address value (IsAddr *Temp or *GlobalRef)")
 					}
 				}
-				                // Offsets should be present (at least one dimension). Indices may be
-				                // nil when all indices are compile-time constants.
-				                if instr.Offsets == nil || len(instr.Offsets) == 0 {
-				                    add(bl, is, "GEPInst Offsets is nil or empty; expected at least one index/offset")
-				                }
+				// Offsets should be present (at least one dimension). Indices may be
+				// nil when all indices are compile-time constants.
+				if instr.Offsets == nil || len(instr.Offsets) == 0 {
+					add(bl, is, "GEPInst Offsets is nil or empty; expected at least one index/offset")
+				}
 			case *PhiInst:
 				for _, arg := range instr.Args {
 					if arg.BlockLabel == "" {

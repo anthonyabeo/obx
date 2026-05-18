@@ -1,4 +1,4 @@
-package minir
+package core
 
 import (
 	"math"
@@ -324,4 +324,3 @@ func TestShortValueString_Constant(t *testing.T) {
 		t.Errorf("ShortValueString named: want 'zero', got %q", s)
 	}
 }
-

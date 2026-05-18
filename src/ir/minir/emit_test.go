@@ -1,4 +1,4 @@
-package minir
+package core
 
 import (
 	"bytes"
@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/anthonyabeo/obx/src/ir/minir"
 )
 
 // buildSampleFn builds the same sample function used in pretty_test.go so the
@@ -15,7 +17,7 @@ import (
 func buildSampleFn() *Function {
 	i32 := I32()
 	boolT := Bool()
-	tempIDCounter = 0
+	minir.tempIDCounter = 0
 
 	paramX := NewTemp("x", i32)
 	const0 := NewConst("0", 0, i32)
@@ -83,7 +85,7 @@ func buildSampleFn() *Function {
 // produces output identical to FormatFunction (the string-based path).
 func TestEmitFunction_BytesBuffer(t *testing.T) {
 	fn := buildSampleFn()
-	want := FormatFunction(fn)
+	want := pretty.FormatFunction(fn)
 
 	var buf bytes.Buffer
 	n, err := NewEmitter(&buf).EmitFunction(fn)
@@ -101,7 +103,7 @@ func TestEmitFunction_BytesBuffer(t *testing.T) {
 // TestEmitFunction_WriterTo verifies the io.WriterTo implementation on *Function.
 func TestEmitFunction_WriterTo(t *testing.T) {
 	fn := buildSampleFn()
-	want := FormatFunction(fn)
+	want := pretty.FormatFunction(fn)
 
 	var buf bytes.Buffer
 	n64, err := fn.WriteTo(&buf)
@@ -120,7 +122,7 @@ func TestEmitFunction_WriterTo(t *testing.T) {
 // network / file descriptor) produces the correct output without buffering.
 func TestEmitFunction_Pipe(t *testing.T) {
 	fn := buildSampleFn()
-	want := FormatFunction(fn)
+	want := pretty.FormatFunction(fn)
 
 	pr, pw := io.Pipe()
 
@@ -163,7 +165,7 @@ func buildSampleModule() *Module {
 // TestEmitModule_BytesBuffer checks module emission into a bytes.Buffer.
 func TestEmitModule_BytesBuffer(t *testing.T) {
 	m := buildSampleModule()
-	want := FormatModule(m)
+	want := pretty.FormatModule(m)
 
 	var buf bytes.Buffer
 	n, err := NewEmitter(&buf).EmitModule(m)
@@ -181,7 +183,7 @@ func TestEmitModule_BytesBuffer(t *testing.T) {
 // TestEmitModule_WriterTo verifies the io.WriterTo implementation on *Module.
 func TestEmitModule_WriterTo(t *testing.T) {
 	m := buildSampleModule()
-	want := FormatModule(m)
+	want := pretty.FormatModule(m)
 
 	var buf bytes.Buffer
 	n64, err := m.WriteTo(&buf)
@@ -201,7 +203,7 @@ func TestEmitModule_WriterTo(t *testing.T) {
 // TestEmitProgram_BytesBuffer checks program emission into a bytes.Buffer.
 func TestEmitProgram_BytesBuffer(t *testing.T) {
 	prog := &Program{Modules: []*Module{buildSampleModule()}}
-	want := FormatProgram(prog)
+	want := pretty.FormatProgram(prog)
 
 	var buf bytes.Buffer
 	n, err := NewEmitter(&buf).EmitProgram(prog)
@@ -219,7 +221,7 @@ func TestEmitProgram_BytesBuffer(t *testing.T) {
 // TestEmitProgram_WriterTo verifies the io.WriterTo implementation on *Program.
 func TestEmitProgram_WriterTo(t *testing.T) {
 	prog := &Program{Modules: []*Module{buildSampleModule()}}
-	want := FormatProgram(prog)
+	want := pretty.FormatProgram(prog)
 
 	var buf bytes.Buffer
 	n64, err := prog.WriteTo(&buf)
@@ -239,7 +241,7 @@ func TestEmitProgram_WriterTo(t *testing.T) {
 // TestEmitInstr_MatchesFormatInstr ensures EmitInstr output equals FormatInstr.
 func TestEmitInstr_MatchesFormatInstr(t *testing.T) {
 	i32 := I32()
-	tempIDCounter = 0
+	minir.tempIDCounter = 0
 
 	instrs := []Instr{
 		&BinaryInst{Dst: NewTemp("r", i32), Op: "add", Left: NewTemp("a", i32), Right: NewConst("1", 1, i32)},
@@ -249,7 +251,7 @@ func TestEmitInstr_MatchesFormatInstr(t *testing.T) {
 	}
 
 	for _, ins := range instrs {
-		want := FormatInstr(ins)
+		want := pretty.FormatInstr(ins)
 		var sb strings.Builder
 		n, err := NewEmitter(&sb).EmitInstr(ins)
 		if err != nil {
@@ -304,7 +306,7 @@ func projectRoot(t *testing.T) string {
 // FormatFunction output.
 func TestEmitFunction_File(t *testing.T) {
 	fn := buildSampleFn()
-	want := FormatFunction(fn)
+	want := pretty.FormatFunction(fn)
 
 	outPath := filepath.Join(projectRoot(t), "build", "add1.minir")
 	f, err := os.Create(outPath)
@@ -337,7 +339,7 @@ func TestEmitFunction_File(t *testing.T) {
 // TestEmitModule_File writes testmod IR to <project-root>/build/testmod.minir.
 func TestEmitModule_File(t *testing.T) {
 	m := buildSampleModule()
-	want := FormatModule(m)
+	want := pretty.FormatModule(m)
 
 	outPath := filepath.Join(projectRoot(t), "build", "testmod.minir")
 	f, err := os.Create(outPath)
@@ -371,7 +373,7 @@ func TestEmitModule_File(t *testing.T) {
 // <project-root>/build/program.minir using the io.WriterTo path.
 func TestEmitProgram_File(t *testing.T) {
 	prog := &Program{Modules: []*Module{buildSampleModule()}}
-	want := FormatProgram(prog)
+	want := pretty.FormatProgram(prog)
 
 	outPath := filepath.Join(projectRoot(t), "build", "program.minir")
 	f, err := os.Create(outPath)

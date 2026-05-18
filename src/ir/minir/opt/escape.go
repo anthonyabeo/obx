@@ -1,6 +1,8 @@
 package miniropt
 
-import "github.com/anthonyabeo/obx/src/ir/minir"
+import (
+	"github.com/anthonyabeo/obx/src/ir/minir"
+)
 
 // ── Escape analysis ───────────────────────────────────────────────────────────
 //

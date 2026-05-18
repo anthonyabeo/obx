@@ -1,6 +1,8 @@
-package minir
+package core
 
-import "testing"
+import (
+	"testing"
+)
 
 // Test that builds the sample IR from the spec, runs the verifier, and
 // prints the formatted function. The test asserts there are no verifier
@@ -103,8 +105,8 @@ func TestFormatAndVerifySample(t *testing.T) {
 	}
 
 	// print
-	out := FormatFunction(fn)
-	t.Logf("Formatted function:\n%s", out)
+	//out := FormatFunction(fn)
+	//t.Logf("Formatted function:\n%s", out)
 }
 
 // Test a simple counted loop implemented with a phi and conditional branch.
@@ -182,8 +184,8 @@ func TestFormatAndVerifyCountedLoop(t *testing.T) {
 		t.Fatalf("expected no verify errors, got %d", len(errs))
 	}
 
-	out := FormatFunction(fn)
-	t.Logf("Formatted counted loop:\n%s", out)
+	//out := FormatFunction(fn)
+	//t.Logf("Formatted counted loop:\n%s", out)
 }
 
 // Test a simple while-style loop where the condition is evaluated at the top.
@@ -257,6 +259,6 @@ func TestFormatAndVerifyWhileLoop(t *testing.T) {
 		t.Fatalf("expected no verify errors, got %d", len(errs))
 	}
 
-	out := FormatFunction(fn)
-	t.Logf("Formatted while loop:\n%s", out)
+	//out := FormatFunction(fn)
+	//t.Logf("Formatted while loop:\n%s", out)
 }

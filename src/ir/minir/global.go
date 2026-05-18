@@ -1,6 +1,8 @@
-package minir
+package core
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // Linkage describes the visibility of a global symbol across compilation units,
 // mirroring LLVM's linkage model.

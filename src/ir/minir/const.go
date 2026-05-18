@@ -1,4 +1,4 @@
-package minir
+package core
 
 import (
 	"fmt"
@@ -152,7 +152,7 @@ func ConstInt(name string, v int64, ty Type) *IntegerConst {
 	return &IntegerConst{
 		Value:    uint64(v),
 		Signed:   true,
-		BitWidth: bitWidthOf(ty),
+		BitWidth: BitWidthOf(ty),
 		NameStr:  name,
 		Ty:       ty,
 	}
@@ -164,7 +164,7 @@ func ConstUint(name string, v uint64, ty Type) *IntegerConst {
 	return &IntegerConst{
 		Value:    v,
 		Signed:   false,
-		BitWidth: bitWidthOf(ty),
+		BitWidth: BitWidthOf(ty),
 		NameStr:  name,
 		Ty:       ty,
 	}
@@ -339,7 +339,7 @@ func IntBitWidth(ty Type) int {
 	if !IsIntType(ty) {
 		return 0
 	}
-	return bitWidthOf(ty)
+	return BitWidthOf(ty)
 }
 
 // ── Compile-time constant coercion ────────────────────────────────────────────
@@ -392,9 +392,9 @@ func CoerceConst(c Constant, to Type) Constant {
 
 // ── internal helpers ──────────────────────────────────────────────────────────
 
-// bitWidthOf returns the bit width of a PrimitiveType, defaulting to 64 for
+// BitWidthOf returns the bit width of a PrimitiveType, defaulting to 64 for
 // non-integers and unknown types.
-func bitWidthOf(ty Type) int {
+func BitWidthOf(ty Type) int {
 	pt, ok := ty.(*PrimitiveType)
 	if !ok {
 		return 64
