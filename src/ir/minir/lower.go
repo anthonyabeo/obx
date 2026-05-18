@@ -1470,7 +1470,7 @@ func (l *Lowerer) lowerUnary(e *desugar.UnaryExpr) Value {
 		l.emit(&BinaryInst{Dst: dst, Op: "xor", Left: operand, Right: one})
 		return dst
 	case token.MINUS:
-		operand = l.sameType(operand, ty)
+		operand = coerceToType(operand, ty)
 		zero := NewConst("0", int64(0), ty)
 		dst := NewAnonTemp(ty)
 		l.emit(&BinaryInst{Dst: dst, Op: "sub", Left: zero, Right: operand})
@@ -1483,8 +1483,19 @@ func (l *Lowerer) lowerUnary(e *desugar.UnaryExpr) Value {
 // sameWidthOperands coerces both operands to the same type, preferring the
 // requested type when it is available. This keeps the verifier happy when one
 // side is an untyped literal that defaulted to i64 during lowering.
+//
+// For integer target types the coercion is annotation-only (coerceToType —
+// no CastInst emitted).  Float and pointer targets still go through sameType
+// so that the appropriate fpext/fptrunc/bitcast instruction is emitted.
 func (l *Lowerer) sameWidthOperands(left, right Value, ty Type) (Value, Value) {
 	if ty != nil {
+		if IsIntType(ty) {
+			// Implicit integer promotion: annotate without emitting a cast.
+			left = coerceToType(left, ty)
+			right = coerceToType(right, ty)
+			return left, right
+		}
+		// Float / pointer: explicit cast instruction required.
 		if left != nil && (left.Type() == nil || !left.Type().Equal(ty)) {
 			left = l.sameType(left, ty)
 		}
@@ -1498,33 +1509,52 @@ func (l *Lowerer) sameWidthOperands(left, right Value, ty Type) (Value, Value) {
 
 // alignOperands coerces one operand to the other operand's type, preferring to
 // cast constants rather than values when the widths differ.
+//
+// For integer-integer pairs the dominant type is chosen via dominantIntType and
+// both sides are annotation-coerced (coerceToType — no CastInst emitted).
+// All other combinations (float-float, int-float, pointer) fall back to the
+// explicit sameType path.
 func (l *Lowerer) alignOperands(left, right Value) (Value, Value) {
 	if left == nil || right == nil {
 		return left, right
 	}
+
 	lt, rt := left.Type(), right.Type()
 	if lt == nil || rt == nil || lt.Equal(rt) {
 		return left, right
 	}
+
+	// Integer-integer: use the dominant type; annotate without emitting casts.
+	if dom := dominantIntType(lt, rt); dom != nil {
+		left = coerceToType(left, dom)
+		right = coerceToType(right, dom)
+		return left, right
+	}
+
+	// Float or mixed: fall back to explicit-cast path (prefer casting constants).
 	if left.IsConst() && !right.IsConst() {
 		if rt != nil {
 			left = l.sameType(left, rt)
 		}
 		return left, right
 	}
+
 	if right.IsConst() && !left.IsConst() {
 		if lt != nil {
 			right = l.sameType(right, lt)
 		}
 		return left, right
 	}
+
 	if lt != nil {
 		right = l.sameType(right, lt)
 		return left, right
 	}
+
 	if rt != nil {
 		left = l.sameType(left, rt)
 	}
+
 	return left, right
 }
 

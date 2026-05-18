@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/anthonyabeo/obx/src/ir/minir"
 	"github.com/anthonyabeo/obx/src/sema/types"
@@ -130,7 +131,7 @@ func DecodeBundle(data []byte, srcContent []byte) (*Bundle, error) {
 			// EncodeExternalFunc, etc.).  To reuse minir.DecodeModule we reconstruct a
 			// one-record stream, but we must use the minir opcode (0x20–0x23), not the
 			// cache tag (0x10–0x13), because DecodeModule's switch matches the former.
-			var mirOp byte
+			mirOp := byte(0x23)
 			switch tag {
 			case TagMirGlobal:
 				mirOp = 0x20 // recGlobal
@@ -138,12 +139,12 @@ func DecodeBundle(data []byte, srcContent []byte) (*Bundle, error) {
 				mirOp = 0x21 // recConst
 			case TagMirExtern:
 				mirOp = 0x22 // recExtern
-			case TagMirFunc:
-				mirOp = 0x23 // recFunc
 			}
 			var onRecord bytes.Buffer
 			onRecord.WriteByte(mirOp)
-			WriteU32LE(&onRecord, uint32(len(payload)))
+			if err := WriteU32LE(&onRecord, uint32(len(payload))); err != nil {
+				return nil, fmt.Errorf("cache: write reconstructed minir record length: %w", err)
+			}
 			onRecord.Write(payload)
 
 			partial, err := minir.DecodeModule(moduleName, onRecord.Bytes())
@@ -151,6 +152,11 @@ func DecodeBundle(data []byte, srcContent []byte) (*Bundle, error) {
 				return nil, fmt.Errorf("cache: decode minir record (tag=0x%02X): %w", tag, err)
 			}
 			// merge into bundle.Module
+			for _, name := range partial.SymTab.Names() {
+				if v, ok := partial.SymTab.Lookup(name); ok {
+					_ = bundle.Module.SymTab.DefineCompat(name, v)
+				}
+			}
 			bundle.Module.Globals = append(bundle.Module.Globals, partial.Globals...)
 			bundle.Module.Constants = append(bundle.Module.Constants, partial.Constants...)
 			bundle.Module.Externals = append(bundle.Module.Externals, partial.Externals...)
@@ -340,12 +346,18 @@ func DefToBundle(src []byte) (*Bundle, error) {
 		// minir: extern global (linkage = external)
 		mirTy := semaTypeToMinir(st)
 		gv := &minir.GlobalVar{
-			Name:    m.Name + "." + vd.Name,
+			Name:    m.Name + "$" + vd.Name,
 			Ty:      mirTy,
 			Linkage: minir.ExternalLinkage,
 		}
 		mirMod.Globals = append(mirMod.Globals, gv)
-		_ = mirMod.SymTab.Define(gv.Name, gv.Ref())
+		_ = mirMod.SymTab.DefineCompat(gv.Name, gv.Ref())
+
+		// Keep legacy dotted names readable if an older cache is loaded later.
+		legacyName := strings.ReplaceAll(gv.Name, "$", ".")
+		if legacyName != gv.Name {
+			_ = mirMod.SymTab.DefineCompat(legacyName, gv.Ref())
+		}
 	}
 
 	// ── proc declarations ─────────────────────────────────────────────────

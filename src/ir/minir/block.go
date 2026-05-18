@@ -24,6 +24,8 @@ type Block struct {
 	// ordering of preds/succs for deterministic iteration (stores block IDs)
 	PredOrder []int
 	SuccOrder []int
+
+	Parent *Function // the function this block belongs to
 }
 
 // AddSucc links s as a successor of b (and records ordering). It does not
@@ -52,8 +54,8 @@ func (b *Block) AddPred(p *Block) {
 	b.PredOrder = append(b.PredOrder, p.ID)
 }
 
-// SortedSuccs returns successors in deterministic order: if SuccOrder is
-// populated it is used; otherwise the map keys are sorted and returned.
+// SortedSuccs returns successors in deterministic order: if SuccOrder is populated, it is used;
+// otherwise the map keys are sorted and returned.
 func (b *Block) SortedSuccs() []*Block {
 	var out []*Block
 	if len(b.SuccOrder) > 0 {
@@ -134,6 +136,24 @@ func (f *Function) GetBlock(label string) *Block {
 // responsible for maintaining CFG consistency before calling RemoveBlock.
 func (f *Function) RemoveBlock(b *Block) {
 	delete(f.Blocks, b.ID)
+}
+
+func (f *Function) RemoveEdge(from *Block, to *Block) {
+	delete(from.Succs, to.ID)
+	delete(to.Preds, from.ID)
+
+	removeID := func(ids []int, target int) []int {
+		for i, id := range ids {
+			if id == target {
+				return append(ids[:i], ids[i+1:]...)
+			}
+		}
+		return ids
+	}
+
+	// update ordering slices
+	from.SuccOrder = removeID(from.SuccOrder, to.ID)
+	to.PredOrder = removeID(to.PredOrder, from.ID)
 }
 
 // DFSOrder returns block IDs in depth-first order starting from entry.

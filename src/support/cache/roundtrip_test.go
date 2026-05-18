@@ -32,7 +32,7 @@ func TestSaveLoadBundle_RoundTrip(t *testing.T) {
 		Name:    "TestMod.MaxVal",
 		Ty:      minir.I32(),
 		Linkage: minir.InternalLinkage,
-		Init:    &minir.Constant{Val: int64(42)},
+		Init:    minir.ConstInt("42", 42, minir.I32()),
 	}
 	m.Constants = append(m.Constants, gc)
 
@@ -84,6 +84,9 @@ func TestSaveLoadBundle_RoundTrip(t *testing.T) {
 	} else if bundle.Module.Globals[0].Name != "TestMod.x" {
 		t.Errorf("Global name = %q, want %q", bundle.Module.Globals[0].Name, "TestMod.x")
 	}
+	if _, ok := bundle.Module.SymTab.Lookup("TestMod$x"); !ok {
+		t.Errorf("module SymTab missing canonical alias %q", "TestMod$x")
+	}
 
 	if got := len(bundle.Module.Constants); got != 1 {
 		t.Errorf("Constants: got %d, want 1", got)
@@ -115,6 +118,29 @@ end Stdio`)
 	}
 	if len(b.Module.Externals) == 0 {
 		t.Errorf("Externals is empty; expected at least 2 external procs")
+	}
+}
+
+func TestDefToBundle_GlobalNamesUseDollar(t *testing.T) {
+	src := []byte(`module Foo
+var StdOut*: integer
+end Foo`)
+
+	b, err := cache.DefToBundle(src)
+	if err != nil {
+		t.Fatalf("DefToBundle: %v", err)
+	}
+	if b.Module == nil {
+		t.Fatal("Module is nil")
+	}
+	if got := len(b.Module.Globals); got != 1 {
+		t.Fatalf("Globals: got %d, want 1", got)
+	}
+	if got := b.Module.Globals[0].Name; got != "Foo$StdOut" {
+		t.Fatalf("Global name = %q, want %q", got, "Foo$StdOut")
+	}
+	if _, ok := b.Module.SymTab.Lookup("Foo$StdOut"); !ok {
+		t.Fatalf("module SymTab missing %q", "Foo$StdOut")
 	}
 }
 

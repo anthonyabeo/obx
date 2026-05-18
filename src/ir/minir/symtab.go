@@ -47,5 +47,19 @@ func (s *SymbolTable) Names() []string {
 	return names
 }
 
+// DefineCompat inserts the binding name → v, silently overwriting any
+// existing entry. It is used during cache-restore merges where the same
+// symbol may be encountered more than once (forward-compat).
+func (s *SymbolTable) DefineCompat(name string, v Value) error {
+	if s.table == nil {
+		s.table = make(map[string]Value)
+	}
+	if _, exists := s.table[name]; !exists {
+		s.order = append(s.order, name)
+	}
+	s.table[name] = v
+	return nil
+}
+
 // Len returns the number of symbols defined in the table.
 func (s *SymbolTable) Len() int { return len(s.table) }

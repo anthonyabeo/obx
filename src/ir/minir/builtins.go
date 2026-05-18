@@ -82,33 +82,143 @@ func typeArgType(expr desugar.Expr) Type {
 // isFloat reports whether the minir Type is a floating-point type.
 func isFloat(ty Type) bool { return ty == primF32 || ty == primF64 }
 
-// sameType returns val cast to ty if val.Type() != ty, else val unchanged.
-// Emits a sext/trunc/fpext/fptrunc CastInst as needed.
-func (l *Lowerer) sameType(val Value, ty Type) Value {
-	if val.Type().Equal(ty) {
+// nextSignedType returns the smallest signed integer type that is strictly
+// wider than n bits.  Used when a signed and an unsigned type of equal width
+// are combined: neither can safely represent the full range of the other, so
+// we widen to the next signed type.
+//
+//	 8-bit  → i16
+//	16-bit  → i32
+//	32-bit  → i64
+//	64-bit  → i64  (no wider signed type available; best effort)
+func nextSignedType(bits int) Type {
+	switch {
+	case bits <= 8:
+		return primI16
+	case bits <= 16:
+		return primI32
+	default:
+		return primI64
+	}
+}
+
+// dominantIntType returns the promotion target for two integer types,
+// implementing Oberon-style implicit integer promotion:
+//
+//  1. The type with the larger bit width wins.
+//  2. For equal bit widths with the same signedness, either type is
+//     returned unchanged (both signed → a; both unsigned → a).
+//  3. For equal bit widths with mixed signedness (e.g. i8 vs u8), the value
+//     of the unsigned type may not fit in the signed type (e.g. 255 > 127),
+//     so we promote to the next larger signed type (i8+u8 → i16, i16+u16 →
+//     i32, i32+u32 → i64).
+//
+// Returns nil when either argument is nil or not an integer type.
+func dominantIntType(a, b Type) Type {
+	wa, wb := IntBitWidth(a), IntBitWidth(b)
+	if wa == 0 || wb == 0 {
+		return nil
+	}
+	if wa > wb {
+		return a
+	}
+	if wb > wa {
+		return b
+	}
+	// Equal widths.
+	aSign, bSign := IsSignedIntType(a), IsSignedIntType(b)
+	if aSign == bSign {
+		return a // same signedness — either will do, prefer a
+	}
+	// Mixed signedness at equal width: promote to next larger signed type.
+	return nextSignedType(wa)
+}
+
+// coerceToType returns val re-typed to ty without emitting any CastInst.
+//
+//   - Temp operands:     shallow-copy with the new Ty annotation;
+//     the original SSA definition is unmodified.
+//   - Constant operands: compile-time fold via CoerceConst.
+//
+// *Temp is checked before Constant because *Temp satisfies the Constant
+// interface (it carries a Name() method).  If the Constant arm ran first,
+// CoerceConst would receive a *Temp, return nil, and coerceToType would fall
+// through returning the value unchanged instead of retyping it.
+//
+// Use this for implicit integer promotion in binary operations.
+// Use sameType for explicit language-level conversions (LONG, SHORT, CAST…).
+func coerceToType(val Value, ty Type) Value {
+	if val == nil || ty == nil {
 		return val
 	}
-	dst := NewAnonTemp(ty)
-	var op string
-	switch {
-	case isFloat(ty) && !isFloat(val.Type()):
-		op = "sitofp"
-	case !isFloat(ty) && isFloat(val.Type()):
-		op = "fptosi"
-	case isFloat(ty) && isFloat(val.Type()):
-		if ty == primF64 {
-			op = "fpext"
-		} else {
-			op = "fptrunc"
+	if vty := val.Type(); vty != nil && vty.Equal(ty) {
+		return val
+	}
+	// *Temp must be checked first (see doc comment above).
+	if t, ok := val.(*Temp); ok {
+		retyped := *t // shallow copy; same ID preserves SSA def-use chains
+		retyped.Ty = NormalizeType(ty)
+		return &retyped
+	}
+	if c, ok := val.(Constant); ok {
+		if coerced := CoerceConst(c, ty); coerced != nil {
+			return coerced
 		}
-	default:
-		if ty == primI64 {
-			op = "sext"
-		} else {
-			op = "trunc"
+		return val // CoerceConst couldn't fold it; leave unchanged
+	}
+	return val
+}
+
+// castOp returns the correct CastInst opcode for src → dst.
+func castOp(src, dst Type) string {
+	srcFloat := isFloat(src)
+	dstFloat := isFloat(dst)
+	switch {
+	case srcFloat && dstFloat:
+		if bitWidthOf(dst) > bitWidthOf(src) {
+			return "fpext"
+		}
+		return "fptrunc"
+	case !srcFloat && dstFloat:
+		if IsUnsignedType(src) {
+			return "uitofp"
+		}
+		return "sitofp"
+	case srcFloat && !dstFloat:
+		if IsUnsignedType(dst) {
+			return "fptoui"
+		}
+		return "fptosi"
+	default: // int → int
+		if bitWidthOf(dst) > bitWidthOf(src) {
+			if IsUnsignedType(src) {
+				return "zext"
+			}
+			return "sext"
+		}
+		return "trunc"
+	}
+}
+
+// sameType returns val cast to ty, emitting the appropriate CastInst.
+// Use only for explicit language-level conversions (LONG, SHORT, CAST, FLT…).
+// For implicit operand alignment use coerceToType.
+func (l *Lowerer) sameType(val Value, ty Type) Value {
+	if val == nil || ty == nil {
+		return val
+	}
+	vty := val.Type()
+	if vty != nil && vty.Equal(ty) {
+		return val
+	}
+	// Constants are always folded at compile time even for explicit casts.
+	if c, ok := val.(Constant); ok {
+		if coerced := CoerceConst(c, ty); coerced != nil {
+			return coerced
 		}
 	}
-	l.emit(&CastInst{Dst: dst, Op: op, Src: val})
+	dst := NewAnonTemp(ty)
+	l.emit(&CastInst{Dst: dst, Op: castOp(vty, ty), Src: val})
 	return dst
 }
 

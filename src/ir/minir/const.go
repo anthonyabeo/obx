@@ -304,6 +304,92 @@ func IsNilConst(c Constant) bool {
 // call sites that explicitly want to widen the type.
 func ConstAsValue(c Constant) Value { return c }
 
+// ── Type-query helpers ────────────────────────────────────────────────────────
+
+// IsUnsignedType reports whether ty is an unsigned integer primitive (u8/u16/u32).
+func IsUnsignedType(ty Type) bool {
+	pt, ok := ty.(*PrimitiveType)
+	if !ok {
+		return false
+	}
+	switch pt.String() {
+	case "u8", "u16", "u32":
+		return true
+	}
+	return false
+}
+
+// IsSignedIntType reports whether ty is a signed integer primitive (i1/i8/i16/i32/i64).
+func IsSignedIntType(ty Type) bool {
+	pt, ok := ty.(*PrimitiveType)
+	if !ok {
+		return false
+	}
+	return isSigned(pt)
+}
+
+// IsIntType reports whether ty is any integer primitive (signed or unsigned).
+func IsIntType(ty Type) bool {
+	return IsSignedIntType(ty) || IsUnsignedType(ty)
+}
+
+// IntBitWidth returns the bit width of an integer PrimitiveType, or 0 when ty
+// is not an integer type.
+func IntBitWidth(ty Type) int {
+	if !IsIntType(ty) {
+		return 0
+	}
+	return bitWidthOf(ty)
+}
+
+// ── Compile-time constant coercion ────────────────────────────────────────────
+
+// CoerceConst returns c re-typed to to without emitting any instruction.
+// Returns nil when the coercion is not possible (e.g. to is a pointer/aggregate).
+func CoerceConst(c Constant, to Type) Constant {
+	if c == nil || to == nil {
+		return nil
+	}
+
+	to = NormalizeType(to)
+	t, ok := to.(*PrimitiveType)
+	if !ok {
+		return nil
+	}
+
+	switch x := c.(type) {
+	case *IntegerConst:
+		switch t.String() {
+		case "i1", "i8", "i16", "i32", "i64":
+			return ConstInt(x.NameStr, int64(x.Value), to)
+		case "u8", "u16", "u32":
+			return ConstUint(x.NameStr, x.Value, to)
+		case "f32":
+			if x.Signed {
+				return ConstFloat32(x.NameStr, float32(int64(x.Value)))
+			}
+			return ConstFloat32(x.NameStr, float32(x.Value))
+		case "f64":
+			if x.Signed {
+				return ConstFloat64(x.NameStr, float64(int64(x.Value)))
+			}
+			return ConstFloat64(x.NameStr, float64(x.Value))
+		}
+	case *FloatConst:
+		switch t.String() {
+		case "f32":
+			return ConstFloat32(x.NameStr, float32(x.Value))
+		case "f64":
+			return ConstFloat64(x.NameStr, x.Value)
+		case "i1", "i8", "i16", "i32", "i64":
+			return ConstInt(x.NameStr, int64(x.Value), to)
+		case "u8", "u16", "u32":
+			return ConstUint(x.NameStr, uint64(x.Value), to)
+		}
+	}
+	return nil
+}
+
 // ── internal helpers ──────────────────────────────────────────────────────────
 
 // bitWidthOf returns the bit width of a PrimitiveType, defaulting to 64 for

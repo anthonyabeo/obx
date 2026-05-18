@@ -9,11 +9,23 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 )
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+// dotToCanonical converts the first '.' in a module-qualified name to '$',
+// producing the canonical SymTab alias used during lowering.
+// "TestMod.x" → "TestMod$x". Returns the original string unchanged when it
+// contains no '.'.
+func dotToCanonical(name string) string {
+	if i := strings.IndexByte(name, '.'); i >= 0 {
+		return name[:i] + "$" + name[i+1:]
+	}
+	return name
+}
 
 func decReadU8(r io.Reader) (byte, error) {
 	var buf [1]byte
@@ -903,6 +915,12 @@ func DecodeModule(name string, body []byte) (*Module, error) {
 			}
 			m.Globals = append(m.Globals, gv)
 			_ = m.SymTab.Define(gv.Name, gv.Ref())
+			// Also register the canonical $-alias (Module.Name → Module$Name) so
+			// resolveVar in the Lowerer and cache round-trips find the symbol using
+			// either convention.
+			if alias := dotToCanonical(gv.Name); alias != gv.Name {
+				_ = m.SymTab.DefineCompat(alias, gv.Ref())
+			}
 
 		case recConst:
 			gc, err := decodeGlobalConst(payload)

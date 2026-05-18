@@ -154,9 +154,9 @@ func (r *RecordType) Equal(t Type) bool {
 
 // FieldIndex returns the 0-based index of the field named `name`, or -1 if not found.
 func (r *RecordType) FieldIndex(name string) int {
-	for _, f := range r.Fields {
+	for i, f := range r.Fields {
 		if f.Name == name {
-			return f.Offset
+			return i
 		}
 	}
 	return -1
