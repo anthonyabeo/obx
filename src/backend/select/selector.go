@@ -2,6 +2,7 @@ package selector
 
 import (
 	"fmt"
+	"math/bits"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,8 +52,8 @@ type matchNode struct {
 // New compiles a parsed descriptor file into a selector.
 func New(file *File) (*Selector, error) {
 	s := &Selector{
-		file:       file,
-		byOp:       make(map[string][]*compiledRule),
+		file: file,
+		byOp: make(map[string][]*compiledRule),
 	}
 	if file == nil {
 		s.predicates = defaultPredicates("")
@@ -880,7 +881,6 @@ func (s *Selector) evalPredicate(pred *Predicate, env map[string]any) bool {
 	return matched
 }
 
-
 func (s *Selector) emitStmt(stmt EmitStmt, env map[string]any, termContext bool) ([]mir.Instr, mir.Terminator, error) {
 	switch x := stmt.(type) {
 	case *InstrStmt:
@@ -1327,6 +1327,100 @@ func (s *Selector) nextTempRegister() *mir.Register {
 
 func defaultPredicates(abi string) map[string]PredicateFunc {
 	return map[string]PredicateFunc{
+		"UImmFits16": func(env map[string]any, args []*Value) bool {
+			if len(args) != 1 {
+				return false
+			}
+			v, ok := resolvePredicateInt(args[0], env)
+			return ok && v >= 0 && v <= 65535
+		},
+		"FitsLogicalImm": func(env map[string]any, args []*Value) bool {
+			if len(args) != 1 {
+				return false
+			}
+
+			isShiftedMask := func(x uint64, size int) bool {
+				mask := uint64(1<<size) - 1
+				x &= mask
+
+				if x == 0 || x == mask {
+					return false
+				}
+
+				for rot := 0; rot < size; rot++ {
+					r := bits.RotateLeft64(x, -rot) & mask
+
+					// Check for form:
+					// 000..00111..11
+					if (r & (r + 1)) == 0 {
+						return true
+					}
+				}
+
+				return false
+			}
+
+			if v, ok := resolvePredicateInt(args[0], env); ok {
+				vu := uint64(v)
+
+				// All-zero and all-ones are NOT encodable
+				if vu == 0 || vu == ^uint64(0) {
+					return false
+				}
+
+				// Try every element size
+				for size := 2; size <= 64; size <<= 1 {
+
+					mask := uint64(1<<size) - 1
+					pattern := vu & mask
+
+					// Check if pattern repeats across 64 bits
+					repeated := uint64(0)
+					for i := 0; i < 64; i += size {
+						repeated |= pattern << i
+					}
+
+					if repeated != vu {
+						continue
+					}
+
+					// Pattern must contain:
+					// one contiguous run of 1 bits,
+					// possibly rotated.
+
+					if isShiftedMask(pattern, size) {
+						return true
+					}
+				}
+
+				return false
+			}
+			return false
+		},
+		"FitsAddSubImm": func(env map[string]any, args []*Value) bool {
+			if len(args) != 1 {
+				return false
+			}
+
+			if v, ok := resolvePredicateInt(args[0], env); ok {
+				if v >= 0 && v <= 4095 {
+					return true
+				}
+				if (v & 0xfff) == 0 {
+					return (v >> 12) <= 4095
+				}
+				return false
+			}
+
+			return false
+		},
+		"UImmFits12": func(env map[string]any, args []*Value) bool {
+			if len(args) != 1 {
+				return false
+			}
+			v, ok := resolvePredicateInt(args[0], env)
+			return ok && v >= 0 && v <= 4095
+		},
 		"SImmFits12": func(env map[string]any, args []*Value) bool {
 			if len(args) != 1 {
 				return false

@@ -116,7 +116,7 @@ block arithmetic {
 	  pattern sub($lhs, $imm);
 	}
 	cost 1;
-	cond SImmFits12($imm);
+	cond UImmFits12($imm);
 	emit {
 	  instr { opcode: "sub"; dst: $rd; src: [$lhs, $imm]; def: $rd; uses: [$lhs]; };
 	}
@@ -885,6 +885,26 @@ block comparisons {
 	}
   }
 
+  rule ICMP_eq_imm {
+      match {
+          commutative;
+          out $rd  : GPR:virt;
+          in  $lhs : GPR:virt;
+          in  $rhs : imm;
+
+          pattern eq($lhs, $rhs);
+      }
+
+      cost 2;
+
+      cond UImmFits12($rhs);
+
+      emit {
+          instr { opcode: "cmp"; src: [$lhs, $rhs]; uses: [$lhs]; };
+          instr { opcode: "cset"; dst: $rd; src: [eq]; def: $rd; };
+      }
+  }
+
   rule ICMP_ne {
 	match {
 	  commutative;
@@ -965,8 +985,8 @@ block comparisons {
 	  temp $tmp : GPR:virt;
 	  pattern eq($lhs, $imm);
 	}
-	cost 3;
-	cond !SImmFits12($imm);
+	cost 6;
+	cond !UImmFits12($imm);
 	emit {
 	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
 	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
@@ -986,8 +1006,8 @@ block comparisons {
 	  temp $tmp : GPR:virt;
 	  pattern ne($lhs, $imm);
 	}
-	cost 3;
-	cond !SImmFits12($imm);
+	cost 6;
+	cond !UImmFits12($imm);
 	emit {
 	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
 	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
@@ -1006,8 +1026,8 @@ block comparisons {
 	  temp $tmp : GPR:virt;
 	  pattern lt($lhs, $imm);
 	}
-	cost 2;
-	cond !SImmFits12($imm);
+	cost 6;
+	cond !UImmFits12($imm);
 	emit {
 	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
 	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
@@ -1026,8 +1046,8 @@ block comparisons {
 	  temp $tmp : GPR:virt;
 	  pattern le($lhs, $imm);
 	}
-	cost 3;
-	cond !SImmFits12($imm);
+	cost 6;
+	cond !UImmFits12($imm);
 	emit {
 	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
 	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
@@ -1046,8 +1066,8 @@ block comparisons {
 	  temp $tmp : GPR:virt;
 	  pattern gt($lhs, $imm);
 	}
-	cost 3;
-	cond !SImmFits12($imm);
+	cost 6;
+	cond !UImmFits12($imm);
 	emit {
 	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
 	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
@@ -1066,8 +1086,8 @@ block comparisons {
 	  temp $tmp : GPR:virt;
 	  pattern ge($lhs, $imm);
 	}
-	cost 3;
-	cond !SImmFits12($imm);
+	cost 6;
+	cond !UImmFits12($imm);
 	emit {
 	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
 	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };

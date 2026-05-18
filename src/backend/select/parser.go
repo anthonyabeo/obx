@@ -252,27 +252,34 @@ func (p *parser) parseRule() (*Rule, error) {
 	if err := p.expectKeyword("rule"); err != nil {
 		return nil, err
 	}
+
 	name, err := p.expectIdent("rule name")
 	if err != nil {
 		return nil, err
 	}
+
 	if err := p.expect(TokLBrace); err != nil {
 		return nil, err
 	}
+
 	rule := &Rule{Name: name}
 	for p.cur.Kind != TokRBrace {
 		if p.cur.Kind == TokEOF {
 			return nil, p.errorf("unterminated rule %q", name)
 		}
+
 		sec, err := p.parseRuleSection()
 		if err != nil {
 			return nil, err
 		}
+
 		rule.Sections = append(rule.Sections, sec)
 	}
+
 	if err := p.expect(TokRBrace); err != nil {
 		return nil, err
 	}
+
 	return rule, nil
 }
 
@@ -311,20 +318,25 @@ func (p *parser) parseMatchSection() (*MatchSection, error) {
 	if err := p.expect(TokLBrace); err != nil {
 		return nil, err
 	}
+
 	ms := &MatchSection{}
 	for p.cur.Kind != TokRBrace {
 		if p.cur.Kind == TokEOF {
 			return nil, p.errorf("unterminated match section")
 		}
+
 		item, err := p.parseMatchItem()
 		if err != nil {
 			return nil, err
 		}
+
 		ms.Items = append(ms.Items, item)
 	}
+
 	if err := p.expect(TokRBrace); err != nil {
 		return nil, err
 	}
+
 	return ms, nil
 }
 
@@ -352,17 +364,21 @@ func (p *parser) parseMatchItem() (MatchItem, error) {
 func (p *parser) parseBinding() (*Binding, error) {
 	dir := p.cur.Lit
 	p.advance()
+
 	name, err := p.expectIdent("binding name")
 	if err != nil {
 		return nil, err
 	}
+
 	if err := p.expect(TokColon); err != nil {
 		return nil, err
 	}
+
 	ts, err := p.parseTypeSpec()
 	if err != nil {
 		return nil, err
 	}
+
 	b := &Binding{Dir: dir, Name: name, Type: ts}
 	if p.cur.Kind == TokEqual {
 		p.advance()
@@ -384,6 +400,7 @@ func (p *parser) parseTypeSpec() (TypeSpec, error) {
 	if err != nil {
 		return TypeSpec{}, err
 	}
+
 	ts := TypeSpec{Kind: kind}
 
 	// Optional second component: ":" Ident.
@@ -404,13 +421,16 @@ func (p *parser) parsePatternDeclItem() (*PatternDecl, error) {
 	if err := p.expectKeyword("pattern"); err != nil {
 		return nil, err
 	}
+
 	pat, err := p.parsePatternExpr()
 	if err != nil {
 		return nil, err
 	}
+
 	if err := p.expect(TokSemi); err != nil {
 		return nil, err
 	}
+
 	return &PatternDecl{Pattern: pat}, nil
 }
 
@@ -821,23 +841,28 @@ func (p *parser) parsePatternExpr() (*PatternExpr, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	pat := &PatternExpr{Name: name}
 	if p.cur.Kind != TokLParen {
 		return pat, nil
 	}
+
 	p.advance() // consume "("
 	if p.cur.Kind == TokRParen {
 		p.advance()
 		return pat, nil
 	}
+
 	args, err := p.parsePatternArgs()
 	if err != nil {
 		return nil, err
 	}
 	pat.Args = args
+
 	if err := p.expect(TokRParen); err != nil {
 		return nil, err
 	}
+
 	return pat, nil
 }
 
@@ -851,11 +876,13 @@ func (p *parser) parsePatternArgs() ([]PatternArg, error) {
 			return nil, err
 		}
 		args = append(args, arg)
+
 		if p.cur.Kind != TokComma {
 			break
 		}
 		p.advance()
 	}
+
 	return args, nil
 }
 

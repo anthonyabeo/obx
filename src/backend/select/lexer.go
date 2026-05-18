@@ -224,4 +224,3 @@ func isIdentStart(r rune) bool {
 func isIdentPart(r rune) bool {
 	return isIdentStart(r) || unicode.IsDigit(r) || r == '-' || r == '.'
 }
-
