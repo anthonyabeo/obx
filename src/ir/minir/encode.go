@@ -71,12 +71,14 @@ const (
 
 // ── value opcodes ─────────────────────────────────────────────────────────────
 const (
-	valNil        byte = 0x00
-	valConstInt   byte = 0x01
-	valConstFloat byte = 0x02
-	valConstNamed byte = 0x03
-	valTemp       byte = 0x04
-	valGlobalRef  byte = 0x05
+	valNil         byte = 0x00
+	valConstInt    byte = 0x01
+	valConstFloat  byte = 0x02
+	valConstNamed  byte = 0x03
+	valTemp        byte = 0x04
+	valGlobalRef   byte = 0x05
+	valConstString byte = 0x06 // [str] NameStr, [str] Value
+	valConstNil    byte = 0x07 // [str] NameStr, [T] type
 )
 
 // ── instruction opcodes ───────────────────────────────────────────────────────
@@ -234,7 +236,7 @@ func EncodeValue(w io.Writer, v Value) error {
 		return encWriteU8(w, valNil)
 	}
 	switch x := v.(type) {
-	case *Constant:
+	case *IntegerConst:
 		if x.NameStr != "" {
 			if err := encWriteU8(w, valConstNamed); err != nil {
 				return err
@@ -242,46 +244,61 @@ func EncodeValue(w io.Writer, v Value) error {
 			if err := encWriteString(w, x.NameStr); err != nil {
 				return err
 			}
-			// store the numeric value as i64 if possible
-			switch iv := x.Val.(type) {
-			case int:
-				return encWriteI64(w, int64(iv))
-			case int64:
-				return encWriteI64(w, iv)
-			case float64:
-				bits := math.Float64bits(iv)
-				return encWriteU64(w, bits)
-			default:
-				return encWriteI64(w, 0)
-			}
+			return encWriteI64(w, int64(x.Value))
 		}
-		switch cv := x.Val.(type) {
-		case int:
-			if err := encWriteU8(w, valConstInt); err != nil {
-				return err
-			}
-			return encWriteI64(w, int64(cv))
-		case int64:
-			if err := encWriteU8(w, valConstInt); err != nil {
-				return err
-			}
-			return encWriteI64(w, cv)
-		case float32:
-			if err := encWriteU8(w, valConstFloat); err != nil {
-				return err
-			}
-			return encWriteU64(w, math.Float64bits(float64(cv)))
-		case float64:
-			if err := encWriteU8(w, valConstFloat); err != nil {
-				return err
-			}
-			return encWriteU64(w, math.Float64bits(cv))
-		default:
-			if err := encWriteU8(w, valConstInt); err != nil {
-				return err
-			}
-			return encWriteI64(w, 0)
+		if err := encWriteU8(w, valConstInt); err != nil {
+			return err
 		}
+		return encWriteI64(w, int64(x.Value))
+
+	case *FloatConst:
+		if x.NameStr != "" {
+			if err := encWriteU8(w, valConstNamed); err != nil {
+				return err
+			}
+			if err := encWriteString(w, x.NameStr); err != nil {
+				return err
+			}
+			return encWriteU64(w, math.Float64bits(x.Value))
+		}
+		if err := encWriteU8(w, valConstFloat); err != nil {
+			return err
+		}
+		return encWriteU64(w, math.Float64bits(x.Value))
+
+	case *NilConst:
+		if err := encWriteU8(w, valConstNil); err != nil {
+			return err
+		}
+		if err := encWriteString(w, x.NameStr); err != nil {
+			return err
+		}
+		return EncodeType(w, x.Ty)
+
+	case *StringConst:
+		if err := encWriteU8(w, valConstString); err != nil {
+			return err
+		}
+		if err := encWriteString(w, x.NameStr); err != nil {
+			return err
+		}
+		return encWriteString(w, x.Value)
+
+	case *AggregateConst:
+		// Best-effort: encode numerically when possible, otherwise write zero.
+		if x.NameStr != "" {
+			if err := encWriteU8(w, valConstNamed); err != nil {
+				return err
+			}
+			if err := encWriteString(w, x.NameStr); err != nil {
+				return err
+			}
+			return encWriteI64(w, toInt64(x.Val))
+		}
+		if err := encWriteU8(w, valConstInt); err != nil {
+			return err
+		}
+		return encWriteI64(w, toInt64(x.Val))
 
 	case *Temp:
 		if err := encWriteU8(w, valTemp); err != nil {

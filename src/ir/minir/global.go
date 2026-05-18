@@ -37,10 +37,11 @@ func (lk Linkage) String() string {
 // operand of LoadInst / StoreInst without first materializing it into a *Temp.
 type GlobalRef struct {
 	GlobalName string
-	Ty         *PointerType // pointer to the global's element type
+	Ty         Type // pointer to the global's element type
 }
 
 func (g *GlobalRef) Type() Type     { return g.Ty }
+func (g *GlobalRef) SetType(t Type) { g.Ty = t }
 func (g *GlobalRef) String() string { return "@" + g.GlobalName }
 func (g *GlobalRef) IsConst() bool  { return false }
 
@@ -55,7 +56,7 @@ func (g *GlobalRef) IsMem() bool { return true }
 type GlobalVar struct {
 	Name    string
 	Ty      Type
-	Init    *Constant // optional literal initialiser; nil → zero-initialised
+	Init    Constant // optional literal initializer; nil → zero-initialized
 	Linkage Linkage
 	ref     *GlobalRef // lazily created, stable address value
 }
@@ -76,7 +77,7 @@ func (g *GlobalVar) Ref() *GlobalRef {
 type GlobalConst struct {
 	Name    string
 	Ty      Type
-	Init    *Constant // required; must be a literal constant value
+	Init    Constant // required; must be a literal constant value
 	Linkage Linkage
 	ref     *GlobalRef // lazily created, stable address value
 }

@@ -43,6 +43,17 @@ func New(dctx *compiler.Context) *Lowerer {
 	}
 }
 
+// Lower is a convenience package-level entry point that lowers a HIR program
+// using a default (nil-context) Lowerer. It is equivalent to
+//
+//	New(nil).Lower(prog)
+//
+// and is provided primarily for use in tests and tooling where a full compiler
+// context is not available.
+func Lower(prog *desugar.Program) *Program {
+	return New(nil).Lower(prog)
+}
+
 // currentModule is a package-level hook used by LowerType to register
 // module-scoped constants (vtable arrays, RTTI PODs) while lowering a
 // particular module. It is set by Lower() for the module currently being
@@ -276,9 +287,9 @@ func (l *Lowerer) lowerExternalFunc(d *desugar.Function) {
 	l.mod.Externals = append(l.mod.Externals, ef)
 }
 
-// lowerConstant evaluates a Literal expression to a *Constant without
+// lowerConstant evaluates a Literal expression to a Constant without
 // requiring an active basic block.  Returns nil for non-literal expressions.
-func lowerConstant(expr desugar.Expr) *Constant {
+func lowerConstant(expr desugar.Expr) Constant {
 	lit, ok := expr.(*desugar.Literal)
 	if !ok {
 		return nil
@@ -460,8 +471,8 @@ func LowerType(ty types.Type) Type {
 			if t.Layout.RTTIName != "" {
 				// name symbol
 				nameSym := t.Layout.RTTIName + "_name"
-				nameConst := NewConst(nameSym, t.String(), NewArrayType(len(t.String())+1, primI32))
-				nameGV := &GlobalConst{Name: nameSym, Ty: nameConst.Ty, Init: nameConst, Linkage: PrivateLinkage}
+			nameConst := NewConst(nameSym, t.String(), NewArrayType(len(t.String())+1, primI32))
+			nameGV := &GlobalConst{Name: nameSym, Ty: nameConst.Type(), Init: nameConst, Linkage: PrivateLinkage}
 				currentModule.Constants = append(currentModule.Constants, nameGV)
 				_ = currentModule.SymTab.Define(nameSym, nameGV.Ref())
 
@@ -1339,15 +1350,14 @@ func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *Temp {
 		for _, idxExpr := range e.Index {
 			idxVal := l.lowerValue(idxExpr)
 			// If the index lowered to a constant, fold it into compile-time offsets.
-			if c, ok := idxVal.(*Constant); ok {
-				// Convert constant to int using canonical helper. This centralizes
-				// conversions and benefits from NewConst's canonicalization.
-				if n, err := ConstantToInt(c); err == nil {
-					offsets = append(offsets, n)
+			if c, ok := idxVal.(Constant); ok {
+				// If the index lowered to a constant, fold it into compile-time offsets.
+				if n, ok2 := AsInt64(c); ok2 {
+					offsets = append(offsets, int(n))
 				} else {
 					// Emit warning and conservatively treat as zero index so
 					// lowering can continue.
-					msg := fmt.Sprintf("lowerIndexAddr: cannot convert constant index %v: %v", c.Val, err)
+					msg := fmt.Sprintf("lowerIndexAddr: cannot fold non-integer constant index %v", c)
 					// Attempt to use idxExpr range when available.
 					var start, end int
 					if lit, ok := idxExpr.(*desugar.Literal); ok {

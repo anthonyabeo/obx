@@ -217,7 +217,7 @@ func TestLoadForward_AllocaForwarded(t *testing.T) {
 		t.Fatal("ICmpInst not found after forwarding")
 	}
 	// %v must have been replaced with the constant 99.
-	if _, isConst := cmp.Left.(*minir.Constant); !isConst {
+	if _, isConst := cmp.Left.(minir.Constant); !isConst {
 		t.Errorf("expected icmp left to be a Constant after forwarding, got %T (%s)",
 			cmp.Left, cmp.Left)
 	}

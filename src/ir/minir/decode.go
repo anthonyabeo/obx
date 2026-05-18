@@ -195,6 +195,28 @@ func DecodeValue(r io.Reader) (Value, error) {
 		}
 		return NewConst(name, int64(v), I64()), nil
 
+	case valConstString:
+		name, err := decReadString(r)
+		if err != nil {
+			return nil, err
+		}
+		val, err := decReadString(r)
+		if err != nil {
+			return nil, err
+		}
+		return ConstString(name, val), nil
+
+	case valConstNil:
+		name, err := decReadString(r)
+		if err != nil {
+			return nil, err
+		}
+		ty, err := DecodeType(r)
+		if err != nil {
+			return nil, err
+		}
+		return ConstNil(name, ty), nil
+
 	case valTemp:
 		nameStr, err := decReadString(r)
 		if err != nil {
@@ -811,7 +833,7 @@ func decodeGlobalVar(payload []byte) (*GlobalVar, error) {
 		if err != nil {
 			return nil, err
 		}
-		if c, ok := init.(*Constant); ok {
+		if c, ok := init.(Constant); ok {
 			gv.Init = c
 		}
 	}
@@ -837,7 +859,7 @@ func decodeGlobalConst(payload []byte) (*GlobalConst, error) {
 		return nil, err
 	}
 	gc := &GlobalConst{Name: name, Linkage: Linkage(linkageByte), Ty: ty}
-	if c, ok := init.(*Constant); ok {
+	if c, ok := init.(Constant); ok {
 		gc.Init = c
 	}
 	return gc, nil

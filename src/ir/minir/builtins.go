@@ -809,8 +809,8 @@ func builtinPCall(l *Lowerer, call *desugar.FuncCall) Value {
 		if calleeName == "" {
 			calleeName = fmt.Sprintf("%%t%d", v.ID)
 		}
-	case *Constant:
-		calleeName = fmt.Sprintf("%v", v.Val)
+	case Constant:
+		calleeName = v.String()
 	default:
 		calleeName = callee.String()
 	}

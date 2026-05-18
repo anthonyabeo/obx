@@ -30,9 +30,10 @@ func ValueString(v Value) string {
 	switch x := v.(type) {
 	case *Temp:
 		return TempString(x)
-	case *Constant:
-		// Constants no longer carry a ":type" suffix in their textual
-		// representation; Constant.String() already returns the short form.
+	case Constant:
+		if x.Name() != "" {
+			return x.Name()
+		}
 		return x.String()
 	default:
 		return v.String()
@@ -49,11 +50,11 @@ func ShortValueString(v Value) string {
 	switch x := v.(type) {
 	case *Temp:
 		return x.String()
-	case *Constant:
-		if x.NameStr != "" {
-			return x.NameStr
+	case Constant:
+		if x.Name() != "" {
+			return x.Name()
 		}
-		return fmt.Sprintf("%v", x.Val)
+		return x.String()
 	default:
 		return v.String()
 	}
