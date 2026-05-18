@@ -149,10 +149,10 @@ func TestPipelineDriverPassThroughStages(t *testing.T) {
 
 func TestBackendStageRegistry(t *testing.T) {
 	available := backend.AvailableStages()
-	if len(available) != 6 {
-		t.Fatalf("expected 6 registered backend stages, got %d", len(available))
+	if len(available) != 8 {
+		t.Fatalf("expected 8 registered backend stages, got %d", len(available))
 	}
-	want := []string{"assemble", "instruction-scheduling", "instruction-selection", "legalization", "link", "register-allocation"}
+	want := []string{"assemble", "call-lowering", "instruction-scheduling", "instruction-selection", "legalization", "link", "register-allocation", "switch-lowering"}
 	for i := range want {
 		if available[i] != want[i] {
 			t.Fatalf("available[%d] = %q, want %q", i, available[i], want[i])

@@ -18,13 +18,15 @@ import (
 //
 // Current implementation:
 //  1. Lower(minir -> backend/mir)
-//  2. InstructionSelection
-//  3. Legalization (target-aware post-pass)
-//  4. InstructionScheduling (stub)
-//  5. RegisterAllocation
-//  6. Assemble (optional callback)
-//  7. Link (optional callback)
-//  8. BuildPlans(target lowering helpers)
+//  2. CallLowering   (ABI arg/result expansion; runs before instruction selection)
+//  3. SwitchLowering (switch → compare-chain or jump-table; runs before instruction selection)
+//  4. InstructionSelection
+//  5. Legalization (target-aware post-pass)
+//  6. InstructionScheduling (stub)
+//  7. RegisterAllocation
+//  8. Assemble (optional callback)
+//  9. Link (optional callback)
+// 10. BuildPlans (phi helpers; call/switch plans are empty after steps 2-3)
 type PipelineDriver struct {
 	Target   target.Target
 	Selector *selector.Selector
@@ -125,6 +127,36 @@ func (p *PipelineDriver) Legalization(prog *mir.Program) (*mir.Program, error) {
 // InstructionScheduling is currently a stub.
 func (p *PipelineDriver) InstructionScheduling(prog *mir.Program) (*mir.Program, error) {
 	return p.passThrough("instruction scheduling", prog)
+}
+
+// CallLowering expands each *mir.CallInstr into ABI-explicit moves + a bare call.
+func (p *PipelineDriver) CallLowering(prog *mir.Program) (*mir.Program, error) {
+	if p == nil {
+		return nil, fmt.Errorf("backend pipeline: nil driver")
+	}
+	if prog == nil {
+		return nil, fmt.Errorf("backend pipeline: nil MIR program before call lowering")
+	}
+	if p.Target == nil {
+		return nil, fmt.Errorf("backend pipeline: nil target before call lowering")
+	}
+	return lower.LowerCallsInProgram(prog, p.Target)
+}
+
+// SwitchLowering rewrites each *mir.SwitchInstr into a compare-chain
+// (CompareInstr + CondBrInstr sequence, new blocks added) or a single
+// MachineTerm{Op:"switch_table"} for dense jump-table cases.
+func (p *PipelineDriver) SwitchLowering(prog *mir.Program) (*mir.Program, error) {
+	if p == nil {
+		return nil, fmt.Errorf("backend pipeline: nil driver")
+	}
+	if prog == nil {
+		return nil, fmt.Errorf("backend pipeline: nil MIR program before switch lowering")
+	}
+	if p.Target == nil {
+		return nil, fmt.Errorf("backend pipeline: nil target before switch lowering")
+	}
+	return lower.LowerSwitchesInProgram(prog, p.Target)
 }
 
 // RegisterAllocation ...

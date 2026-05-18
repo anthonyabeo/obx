@@ -1099,5 +1099,42 @@ block comparisons {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Call lowering.
+//
+// After the call-lowering pre-pass (lower.LowerCallsInProgram) every
+// *mir.CallInstr has empty Args and nil Dst.  classifyInstr therefore
+// produces matchNode{op:"call", args:[callee]}, so the single-element
+// pattern call($callee) matches every call regardless of original arity.
+// ---------------------------------------------------------------------------
+
+block calls {
+
+  // Direct call to a named symbol:  bl _foo
+  rule CALL_direct {
+	match {
+	  in $callee : symbol;
+	  pattern call($callee);
+	}
+	cost 1;
+	emit {
+	  instr { opcode: "bl"; src: [$callee]; uses: []; };
+	}
+  }
+
+  // Indirect call through a register:  blr $fp
+  rule CALL_indirect {
+	match {
+	  in $callee : GPR:virt;
+	  pattern call($callee);
+	}
+	cost 1;
+	emit {
+	  instr { opcode: "blr"; src: [$callee]; uses: [$callee]; };
+	}
+  }
+
+}
+
 }
 

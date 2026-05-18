@@ -8,7 +8,7 @@ import (
 
 type registerAllocationStage struct{}
 
-func (s *registerAllocationStage) Name() string { return backend.DefaultStageOrder[3] }
+func (s *registerAllocationStage) Name() string { return backend.DefaultStageOrder[5] }
 func (s *registerAllocationStage) Enabled(tgt target.Target) bool {
 	return tgt != nil
 }
@@ -17,5 +17,5 @@ func (s *registerAllocationStage) Run(p *backend.PipelineDriver, prog *mir.Progr
 }
 
 func init() {
-	backend.RegisterStage(backend.DefaultStageOrder[3], func() backend.Stage { return &registerAllocationStage{} })
+	backend.RegisterStage(backend.DefaultStageOrder[5], func() backend.Stage { return &registerAllocationStage{} })
 }

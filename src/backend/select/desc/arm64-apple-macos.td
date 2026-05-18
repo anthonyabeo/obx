@@ -251,13 +251,13 @@ block arithmetic {
   	cost 2;
   	cond ShamtFits6($sh);
   	emit {
-  	  instr {
-  	    opcode: "sub";
+      instr {
+        opcode: "sub";
         dst: $rd;
         src: [$lhs, $rhs, asr, $sh];
         def: $rd;
         uses: [$lhs, $rhs];
-  	  }
+      };
   	}
   }
 
@@ -346,13 +346,13 @@ block arithmetic {
   	cost 2;
   	cond ShamtFits6($sh);
   	emit {
-  	  instr {
-  	    opcode: "and";
-  	    dst: $rd;
-  	    src: [$lhs, $rhs, lsr, $sh];
-  	    def: $rd;
-  	    uses: [$lhs, $rhs];
-  	  }
+      instr {
+        opcode: "and";
+        dst: $rd;
+        src: [$lhs, $rhs, lsr, $sh];
+        def: $rd;
+        uses: [$lhs, $rhs];
+      };
     }
   }
 
@@ -368,13 +368,13 @@ block arithmetic {
   	cost 2;
   	cond ShamtFits6($sh);
   	emit {
-  	  instr {
-  	    opcode: "and";
-  	    dst: $rd;
-  	    src: [$lhs, $rhs, asr, $sh];
-  	    def: $rd;
-  	    uses: [$lhs, $rhs];
-  	  }
+      instr {
+       opcode: "and";
+       dst: $rd;
+       src: [$lhs, $rhs, asr, $sh];
+       def: $rd;
+     uses: [$lhs, $rhs];
+     };
   	}
   }
 
@@ -597,11 +597,11 @@ block arithmetic {
 	cost 2;
     emit {
         instr {
-          opcode: "madd",
-          dst: $rd,
-          src: [$lhs, $rhs, $addend],
-          def: $rd,
-          uses: [$lhs, $rhs, $addend]
+          opcode: "madd";
+          dst: $rd;
+          src: [$lhs, $rhs, $addend];
+          def: $rd;
+          uses: [$lhs, $rhs, $addend];
         };
     }
   }
@@ -617,11 +617,11 @@ block arithmetic {
 	cost 2;
     emit {
         instr {
-          opcode: "msub",
-          dst: $rd,
-          src: [$lhs, $rhs, $subend],
-          def: $rd,
-          uses: [$lhs, $rhs, $subend]
+          opcode: "msub";
+          dst: $rd;
+          src: [$lhs, $rhs, $subend];
+          def: $rd;
+          uses: [$lhs, $rhs, $subend];
         };
     }
   }
@@ -1695,6 +1695,45 @@ block comparisons {
         instr { opcode: "cset"; dst: $rd; src: [ge]; def: $rd; };
     }
   }
+
+}
+
+// ---------------------------------------------------------------------------
+// Call lowering.
+//
+// After the call-lowering pre-pass (lower.LowerCallsInProgram) every
+// *mir.CallInstr has empty Args and nil Dst.  classifyInstr therefore
+// produces matchNode{op:"call", args:[callee]}, so the single-element
+// pattern call($callee) matches every call regardless of original arity.
+// ---------------------------------------------------------------------------
+
+block calls {
+
+  // Direct call to a named symbol:  bl _foo
+  rule CALL_direct {
+    match {
+      in $callee : symbol;
+      pattern call($callee);
+    }
+    cost 1;
+    emit {
+      instr { opcode: "bl"; src: [$callee]; uses: []; };
+    }
+  }
+
+  // Indirect call through a register:  blr $fp
+  rule CALL_indirect {
+    match {
+      in $callee : GPR:virt;
+      pattern call($callee);
+    }
+    cost 1;
+    emit {
+      instr { opcode: "blr"; src: [$callee]; uses: [$callee]; };
+    }
+  }
+
+}
 
 }
 

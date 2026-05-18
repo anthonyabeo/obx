@@ -23,12 +23,14 @@ var stageRegistry = map[string]StageFactory{}
 
 // DefaultStageOrder is the canonical backend pipeline phase order.
 var DefaultStageOrder = []string{
-	"instruction-selection",
-	"legalization",
-	"instruction-scheduling",
-	"register-allocation",
-	"assemble",
-	"link",
+	"call-lowering",          // [0]  ABI arg/result expansion; runs before instruction selection
+	"switch-lowering",        // [1]  switch terminator expansion; runs before instruction selection
+	"instruction-selection",  // [2]
+	"legalization",           // [3]
+	"instruction-scheduling", // [4]
+	"register-allocation",    // [5]
+	"assemble",               // [6]
+	"link",                   // [7]
 }
 
 // RegisterStage makes a backend pipeline stage available by name.

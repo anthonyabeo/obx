@@ -59,7 +59,7 @@ func TestBackendDescriptorFilesParseAndCoverCoreRules(t *testing.T) {
 		}
 		rules := map[string]struct{}{}
 		collectRuleNames(f.Targets[0].Items, rules)
-		for _, want := range []string{"LOADmem", "LOADrr", "LOADsym", "STOREmem", "STORErr", "JMP", "RET_void", "MOVrr", "MOVzero", "MOVany"} {
+		for _, want := range []string{"LOADmem", "LOADrr", "LOADsym", "STOREmem", "STORErr", "JMP", "RET_void", "MOVrr", "MOVzero", "MOVany", "CALL_direct", "CALL_indirect"} {
 			if _, ok := rules[want]; !ok {
 				t.Fatalf("%s: missing rule %q", name, want)
 			}
@@ -253,6 +253,64 @@ func TestArm64DescriptorSelectsCoreInstructions(t *testing.T) {
 	}
 	if mt, ok := outRet.Term.(*mir.MachineTerm); !ok || mt.Op != "ret" || len(mt.Srcs) != 1 || mt.Srcs[0].String() != "42" {
 		t.Fatalf("return term = %#v", outRet.Term)
+	}
+}
+
+func TestArm64DescriptorSelectsCallDirect(t *testing.T) {
+	parsed, err := ParseFilePath(descriptorPath(t, "arm64.td"))
+	if err != nil {
+		t.Fatalf("ParseFilePath failed: %v", err)
+	}
+	sel, err := New(parsed)
+	if err != nil {
+		t.Fatalf("New selector failed: %v", err)
+	}
+
+	// Simulate a bare call as produced by LowerCallsInProgram.
+	call := &mir.CallInstr{
+		Callee: mir.NewSymbol("foo", mir.NewScalarType("i64", 8)),
+		Args:   nil,
+		Dst:    nil,
+	}
+	selected, err := sel.SelectInstr(call)
+	if err != nil {
+		t.Fatalf("SelectInstr(CALL_direct) failed: %v", err)
+	}
+	if len(selected) != 1 {
+		t.Fatalf("expected 1 machine instr, got %d", len(selected))
+	}
+	mi, ok := selected[0].(*mir.MachineInstr)
+	if !ok || mi.Op != "bl" {
+		t.Fatalf("expected MachineInstr{op:bl}, got %#v", selected[0])
+	}
+}
+
+func TestArm64DescriptorSelectsCallIndirect(t *testing.T) {
+	parsed, err := ParseFilePath(descriptorPath(t, "arm64.td"))
+	if err != nil {
+		t.Fatalf("ParseFilePath failed: %v", err)
+	}
+	sel, err := New(parsed)
+	if err != nil {
+		t.Fatalf("New selector failed: %v", err)
+	}
+
+	// Indirect call: callee is a virtual register (function pointer).
+	call := &mir.CallInstr{
+		Callee: mir.NewRegister("fp", mir.VirtualReg, mir.NewScalarType("i64", 8)),
+		Args:   nil,
+		Dst:    nil,
+	}
+	selected, err := sel.SelectInstr(call)
+	if err != nil {
+		t.Fatalf("SelectInstr(CALL_indirect) failed: %v", err)
+	}
+	if len(selected) != 1 {
+		t.Fatalf("expected 1 machine instr, got %d", len(selected))
+	}
+	mi, ok := selected[0].(*mir.MachineInstr)
+	if !ok || mi.Op != "blr" {
+		t.Fatalf("expected MachineInstr{op:blr}, got %#v", selected[0])
 	}
 }
 
