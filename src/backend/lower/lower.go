@@ -22,6 +22,7 @@ func LowerProgram(prog *minir.Program) (*mir.Program, error) {
 	if prog == nil {
 		return mir.NewProgram(), nil
 	}
+
 	out := mir.NewProgram()
 	for _, mod := range prog.Modules {
 		m, err := LowerModule(mod)
@@ -30,6 +31,7 @@ func LowerProgram(prog *minir.Program) (*mir.Program, error) {
 		}
 		out.AddModule(m)
 	}
+
 	return out, nil
 }
 
@@ -79,10 +81,12 @@ func LowerFunction(fn *minir.Function, globals map[string]*mir.Symbol) (*mir.Fun
 	if fn == nil {
 		return nil, fmt.Errorf("lower function: nil function")
 	}
+
 	resultTy, err := lowerType(fn.Result)
 	if err != nil {
 		return nil, fmt.Errorf("function %s result: %w", fn.FnName, err)
 	}
+
 	out := mir.NewFunction(fn.FnName, resultTy)
 	regByTemp := make(map[*minir.Temp]*mir.Register)
 	blockByLabel := make(map[string]*mir.Block)
@@ -266,7 +270,7 @@ func lowerTerminator(term minir.Terminator, regByTemp map[*minir.Temp]*mir.Regis
 	case *minir.JumpInst:
 		return &mir.JumpInstr{Target: t.Target}, nil
 	case *minir.CondBrInst:
-		cond, err := lowerTemp(t.Cond, regByTemp)
+		cond, err := lowerOperand(t.Cond, regByTemp, globals)
 		if err != nil {
 			return nil, err
 		}
@@ -275,7 +279,7 @@ func lowerTerminator(term minir.Terminator, regByTemp map[*minir.Temp]*mir.Regis
 		if t.Result == nil {
 			return &mir.ReturnInstr{}, nil
 		}
-		val, err := lowerTemp(t.Result, regByTemp)
+		val, err := lowerOperand(t.Result, regByTemp, globals)
 		if err != nil {
 			return nil, err
 		}
@@ -290,13 +294,17 @@ func lowerTerminator(term minir.Terminator, regByTemp map[*minir.Temp]*mir.Regis
 		}
 		return &mir.HaltInstr{Code: val}, nil
 	case *minir.SwitchInst:
-		key, err := lowerTemp(t.Key, regByTemp)
+		key, err := lowerOperand(t.Key, regByTemp, globals)
 		if err != nil {
 			return nil, err
 		}
 		arms := make([]mir.SwitchArm, 0, len(t.Arms))
 		for _, arm := range t.Arms {
-			arms = append(arms, mir.SwitchArm{Value: mir.NewImmediate(arm.Val, lowerTempType(t.Key)), Label: arm.Label})
+			ty, err := lowerType(t.Key.Type())
+			if err != nil {
+				return nil, err
+			}
+			arms = append(arms, mir.SwitchArm{Value: mir.NewImmediate(arm.Val, ty), Label: arm.Label})
 		}
 		return &mir.SwitchInstr{Value: key, Default: t.Default, Arms: arms}, nil
 	default:
@@ -308,13 +316,14 @@ func lowerOperand(v minir.Value, regByTemp map[*minir.Temp]*mir.Register, global
 	switch x := v.(type) {
 	case *minir.Temp:
 		return lowerTemp(x, regByTemp)
-	case *minir.Constant:
+	case minir.Constant:
 		return lowerConstant(x)
 	case *minir.GlobalRef:
 		if sym, ok := globals[x.GlobalName]; ok {
 			return sym, nil
 		}
-		return mir.NewSymbol(x.GlobalName, lowerPointerElemType(x.Ty)), nil
+		ty, _ := lowerType(x.Ty)
+		return mir.NewSymbol(x.GlobalName, ty), nil
 	default:
 		return nil, fmt.Errorf("unsupported operand type %T", v)
 	}
@@ -336,7 +345,7 @@ func lowerTemp(t *minir.Temp, regByTemp map[*minir.Temp]*mir.Register) (*mir.Reg
 	return r, nil
 }
 
-func lowerConstant(c *minir.Constant) (*mir.Immediate, error) {
+func lowerConstant(c minir.Constant) (*mir.Immediate, error) {
 	if c == nil {
 		return nil, fmt.Errorf("nil constant")
 	}
@@ -344,7 +353,24 @@ func lowerConstant(c *minir.Constant) (*mir.Immediate, error) {
 	if err != nil {
 		return nil, err
 	}
-	return mir.NewImmediate(c.Val, ty), nil
+	// Extract a concrete Go value suitable for mir.Immediate.
+	switch x := c.(type) {
+	case *minir.IntegerConst:
+		if x.Signed {
+			return mir.NewImmediate(int64(x.Value), ty), nil
+		}
+		return mir.NewImmediate(x.Value, ty), nil
+	case *minir.FloatConst:
+		return mir.NewImmediate(x.Value, ty), nil
+	case *minir.StringConst:
+		return mir.NewImmediate(x.Value, ty), nil
+	case *minir.NilConst:
+		return mir.NewImmediate(int64(0), ty), nil
+	case *minir.AggregateConst:
+		return mir.NewImmediate(x.Val, ty), nil
+	default:
+		return mir.NewImmediate(int64(0), ty), nil
+	}
 }
 
 func lowerGlobalVar(g *minir.GlobalVar) (*mir.GlobalDecl, *mir.Symbol, error) {
@@ -404,10 +430,26 @@ func lowerType(ty minir.Type) (*mir.Type, error) {
 		switch strings.ToLower(t.String()) {
 		case "i1":
 			return mir.NewScalarType("i1", 1), nil
+		case "i8":
+			return mir.NewScalarType("i8", 1), nil
+		case "i16":
+			return mir.NewScalarType("i16", 2), nil
 		case "i32":
 			return mir.NewScalarType("i32", 4), nil
 		case "i64":
 			return mir.NewScalarType("i64", 8), nil
+		case "u8":
+			return mir.NewScalarType("u8", 1), nil
+		case "u16":
+			return mir.NewScalarType("u16", 2), nil
+		case "u32":
+			return mir.NewScalarType("u32", 4), nil
+		case "u64":
+			return mir.NewScalarType("u64", 8), nil
+		case "f32":
+			return mir.NewScalarType("f32", 4), nil
+		case "f64":
+			return mir.NewScalarType("f64", 8), nil
 		default:
 			return nil, fmt.Errorf("unsupported primitive type %s", t.String())
 		}

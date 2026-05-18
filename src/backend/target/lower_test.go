@@ -174,4 +174,17 @@ func TestRegistryLookupAndAvailable(t *testing.T) {
 			t.Fatalf("Lookup(%s) returned target %q", name, got)
 		}
 	}
+
+	for _, alias := range []string{Arm64AppleMacosName, AArch64AppleDarwinName} {
+		tgt, err := Lookup(alias)
+		if err != nil {
+			t.Fatalf("Lookup(%s) failed: %v", alias, err)
+		}
+		if tgt == nil {
+			t.Fatalf("Lookup(%s) returned nil", alias)
+		}
+		if got := tgt.Name(); got != Arm64Name {
+			t.Fatalf("Lookup(%s) returned target %q, want %q", alias, got, Arm64Name)
+		}
+	}
 }

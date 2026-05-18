@@ -33,7 +33,6 @@ func (r *Register) String() string {
 	}
 	return r.Name
 }
-
 func (r *Register) Type() *Type {
 	if r == nil {
 		return nil
@@ -54,7 +53,6 @@ func (l *Label) String() string {
 	}
 	return l.Name
 }
-
 func (*Label) Type() *Type { return nil }
 
 // Symbol names a module-level global or external symbol.
@@ -71,7 +69,6 @@ func (s *Symbol) String() string {
 	}
 	return s.Name
 }
-
 func (s *Symbol) Type() *Type {
 	if s == nil {
 		return nil
@@ -93,7 +90,6 @@ func (i *Immediate) String() string {
 	}
 	return fmt.Sprint(i.Value)
 }
-
 func (i *Immediate) Type() *Type {
 	if i == nil {
 		return nil
@@ -121,11 +117,9 @@ func (m *Memory) String() string {
 	}
 	return fmt.Sprintf("[%s + %s]", m.Base, m.Offset)
 }
-
 func (m *Memory) Type() *Type {
 	if m == nil {
 		return nil
 	}
 	return m.Ty
 }
-

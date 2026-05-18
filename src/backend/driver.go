@@ -127,7 +127,7 @@ func (p *PipelineDriver) InstructionScheduling(prog *mir.Program) (*mir.Program,
 	return p.passThrough("instruction scheduling", prog)
 }
 
-// RegisterAllocation is currently a stub.
+// RegisterAllocation ...
 func (p *PipelineDriver) RegisterAllocation(prog *mir.Program) (*mir.Program, error) {
 	if p == nil {
 		return nil, fmt.Errorf("backend pipeline: nil driver")
@@ -160,14 +160,17 @@ func (p *PipelineDriver) loadSelector() (*selector.Selector, error) {
 	if p == nil || p.Target == nil {
 		return nil, nil
 	}
+
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		return nil, fmt.Errorf("backend pipeline: unable to locate selector descriptors")
 	}
+
 	path := filepath.Join(filepath.Dir(file), "select", "desc", p.Target.Name()+".td")
 	sel, err := selector.ParseSelectorFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("backend pipeline: load selector for %s: %w", p.Target.Name(), err)
 	}
+
 	return sel, nil
 }
