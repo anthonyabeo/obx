@@ -172,7 +172,7 @@ func compileSubdir(
 	}
 
 	hirProg := desugar.NewGenerator(obx, ctx).Generate()
-	mirProg := minir.Lower(hirProg)
+	mirProg := minir.New(ctx).Lower(hirProg)
 
 	// Save bundles and collect results.
 	outSubdir := filepath.Join(cacheDir, subdirName)
@@ -268,7 +268,7 @@ func compileRootModules(
 	}
 
 	hirProg := desugar.NewGenerator(obx, ctx).Generate()
-	mirProg := minir.Lower(hirProg)
+	mirProg := minir.New(ctx).Lower(hirProg)
 
 	modToFile := make(map[string]string)
 	for _, h := range rootHeaders {

@@ -153,7 +153,8 @@ precedence over obx.mod values.`,
 		hirGen := desugar.NewGenerator(obx, ctx)
 		hirProgram := hirGen.Generate()
 
-		lowered := minir.LowerWithContext(hirProgram, ctx)
+		lowerer := minir.New(ctx)
+		lowered := lowerer.Lower(hirProgram)
 		mergePrecompiledMinirModules(lowered, preBundles)
 		dedupMinirExternals(lowered)
 
@@ -161,6 +162,7 @@ precedence over obx.mod values.`,
 			for _, fn := range mod.Functions {
 				miniropt.Mem2Reg(fn)
 				miniropt.LoadForward(fn)
+				//miniropt.ConstFold(fn)
 				miniropt.CleanCFG(fn)
 			}
 		}
@@ -198,6 +200,8 @@ precedence over obx.mod values.`,
 			}
 		}
 
+		fmt.Println("Backend MIR lowering complete.")
+
 		backendTarget, err := backendTargetFor(mach.Name())
 		if err != nil {
 			log.Fatalf("build: %v", err)
@@ -229,7 +233,5 @@ precedence over obx.mod values.`,
 		if buildArgs.Verbose {
 			fmt.Printf("Backend pipeline lowered %d module(s) and prepared %d function plan(s)\n", len(bridge.MIR.Modules), len(bridge.Plans))
 		}
-
-		fmt.Println("Backend MIR lowering complete.")
 	},
 }

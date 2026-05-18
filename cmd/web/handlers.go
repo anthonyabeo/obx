@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"path"
@@ -25,6 +26,7 @@ import (
 	"github.com/anthonyabeo/obx/src/support/diag/formatter"
 	"github.com/anthonyabeo/obx/src/support/source"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	zlog "github.com/rs/zerolog/log"
 )
 
 //go:embed static/*
@@ -469,7 +471,9 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var graphs []graphEntry
-	lowered := minir.Lower(hirProgram)
+
+	lowered := minir.New(ctx).Lower(hirProgram)
+
 	// Merge any precompiled stdlib minir modules so downstream emit/analysis
 	// can see the stdlib modules without re-lowering them. Prefer already
 	// lowered modules produced from the HIR; only append missing preBundles.
@@ -493,9 +497,17 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 		for _, fn := range mod.Functions {
 			miniropt.Mem2Reg(fn)
 			miniropt.LoadForward(fn)
-			miniropt.CleanCFG(fn)
+			//miniropt.CleanCFG(fn)
 		}
 	}
+
+	if verifyErrs := minir.VerifyProgram(lowered); len(verifyErrs) > 0 {
+		for _, verr := range verifyErrs {
+			zlog.Error().Err(verr).Msg("build: minir verification failed")
+		}
+		log.Fatalf("build: minir verification failed with %d error(s)", len(verifyErrs))
+	}
+
 	for _, mod := range lowered.Modules {
 		for _, fn := range mod.Functions {
 			dotSrc := fn.OutputDOT()
@@ -740,7 +752,7 @@ func (s *Server) HandleMinir(w http.ResponseWriter, r *http.Request) {
 
 	// ── lower and emit ────────────────────────────────────────────────────
 	hirProgram := desugar.NewGenerator(obx, ctx).Generate()
-	lowered := minir.Lower(hirProgram)
+	lowered := minir.New(ctx).Lower(hirProgram)
 	// Promote non-escaping scalar allocas, forward store-to-load pairs,
 	// then run CFG cleanup passes.
 	for _, mod := range lowered.Modules {

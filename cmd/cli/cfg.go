@@ -105,7 +105,7 @@ otherwise the module entry or the first lowered function is used.`,
 		// Lower and pick target function
 		gen := desugar.NewGenerator(obx, ctx)
 		prog := gen.Generate()
-		lowered := minir.Lower(prog)
+		lowered := minir.New(ctx).Lower(prog)
 		mergePrecompiledMinirModules(lowered, preBundles)
 		dedupMinirExternals(lowered)
 
