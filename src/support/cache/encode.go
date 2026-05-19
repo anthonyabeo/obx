@@ -242,4 +242,3 @@ func propsWire(p ast.IdentProps) byte {
 		return PropsUnexported
 	}
 }
-

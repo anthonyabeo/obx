@@ -421,6 +421,9 @@ func classifyTerm(term mir.Terminator) matchNode {
 		}
 		return matchNode{op: "ret", args: []mir.Operand{t.Value}}
 	case *mir.HaltInstr:
+		if t.Code == nil {
+			return matchNode{op: "halt"}
+		}
 		return matchNode{op: "halt", args: []mir.Operand{t.Code}}
 	case *mir.SwitchInstr:
 		args := make([]mir.Operand, 0, 1+len(t.Arms))

@@ -550,4 +550,3 @@ func defProcToExternalFunc(pd *DefProc, st *types.ProcedureType, modDLL string) 
 		},
 	}
 }
-

@@ -796,11 +796,8 @@ block control {
 	}
 	cost 1;
 	emit {
-	  instr {
-		opcode: "bne";
-		src: [$cond, $true, $false];
-		uses: [$cond];
-	  };
+	  instr { opcode: "cmp"; src: [$cond, 0]; uses: [$cond]; };
+	  instr { opcode: "bne"; src: [$cond, $true, $false]; uses: [$cond]; };
 	}
   }
 
@@ -855,6 +852,16 @@ block control {
 	cost 1;
 	emit {
 	  instr { opcode: "halt"; src: [$code]; };
+	}
+  }
+
+  rule HALT_nocode {
+	match {
+	  pattern halt();
+	}
+	cost 2;
+	emit {
+	  instr { opcode: "halt"; };
 	}
   }
 }

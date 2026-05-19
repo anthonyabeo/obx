@@ -143,4 +143,3 @@ end Foo`)
 		t.Fatalf("module SymTab missing %q", "Foo$StdOut")
 	}
 }
-
