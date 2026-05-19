@@ -95,10 +95,12 @@ func LowerFunction(fn *minir.Function, globals map[string]*mir.Symbol) (*mir.Fun
 		if p == nil {
 			return nil, fmt.Errorf("function %s has nil parameter %d", fn.FnName, i)
 		}
+
 		ty, err := lowerType(p.Type())
 		if err != nil {
 			return nil, fmt.Errorf("parameter %s: %w", p.String(), err)
 		}
+
 		out.AddParam(&mir.Param{Name: lowerTempName(p), Type: ty, Kind: lowerParamKind(fn.ParamKinds, i)})
 		regByTemp[p] = mir.NewRegister(lowerTempName(p), mir.VirtualReg, ty)
 	}

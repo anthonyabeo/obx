@@ -197,6 +197,93 @@ func TestMaterializeEdgeBlocksRedirectsCriticalEdge(t *testing.T) {
 	}
 }
 
+// TestColorGraphPrecolorsParams verifies that function parameters are mapped to
+// the correct ABI argument registers before graph coloring runs.
+// On ARM64 the first int param must map to x0, the second to x1, etc.
+func TestColorGraphPrecolorsParams(t *testing.T) {
+	i64 := mir.NewScalarType("i64", 8)
+	abi := target.ABI{
+		WordSize:    8,
+		Align:       16,
+		IntArgRegs:  []string{"x0", "x1", "x2", "x3"},
+		IntRetRegs:  []string{"x0"},
+		CallerSaved: []string{"x0", "x1", "x2", "x3", "x9", "x10"},
+		CalleeSaved: []string{"x19", "x20"},
+		StackPointer: "sp",
+		FramePointer: "x29",
+		LinkRegister: "x30",
+	}
+
+	// Build a minimal function:  define i64 @add(i64 %a, i64 %b) { ret %a }
+	fn := mir.NewFunction("add", i64)
+	fn.AddParam(&mir.Param{Name: "a", Type: i64})
+	fn.AddParam(&mir.Param{Name: "b", Type: i64})
+
+	blk := mir.NewBlock(0, "entry")
+	blk.Term = &mir.ReturnInstr{Value: &mir.Register{Name: "a", Kind: mir.VirtualReg, Ty: i64}}
+	fn.AddBlock(blk)
+	fn.SetEntry(blk)
+	fn.SetExit(blk)
+
+	analysis := analyzeFunction(fn)
+	colors, scratch := abiColorPools(abi)
+
+	result, err := colorGraph(fn, analysis, colors, scratch, abi)
+	if err != nil {
+		t.Fatalf("colorGraph failed: %v", err)
+	}
+
+	if got := result.mapVRegToPReg["a"]; got != "x0" {
+		t.Errorf("first parameter %q mapped to %q, want %q", "a", got, "x0")
+	}
+	if got := result.mapVRegToPReg["b"]; got != "x1" {
+		t.Errorf("second parameter %q mapped to %q, want %q", "b", got, "x1")
+	}
+}
+
+// TestColorGraphPrecolorsThreeParams verifies three-parameter pre-coloring.
+func TestColorGraphPrecolorsThreeParams(t *testing.T) {
+	i64 := mir.NewScalarType("i64", 8)
+	abi := target.ABI{
+		WordSize:    8,
+		Align:       16,
+		IntArgRegs:  []string{"x0", "x1", "x2", "x3"},
+		IntRetRegs:  []string{"x0"},
+		CallerSaved: []string{"x0", "x1", "x2", "x3", "x9", "x10"},
+		CalleeSaved: []string{"x19", "x20"},
+		StackPointer: "sp",
+		FramePointer: "x29",
+		LinkRegister: "x30",
+	}
+
+	fn := mir.NewFunction("fib", i64)
+	fn.AddParam(&mir.Param{Name: "n", Type: i64})
+	fn.AddParam(&mir.Param{Name: "m", Type: i64})
+	fn.AddParam(&mir.Param{Name: "k", Type: i64})
+
+	blk := mir.NewBlock(0, "entry")
+	blk.Term = &mir.ReturnInstr{Value: &mir.Register{Name: "n", Kind: mir.VirtualReg, Ty: i64}}
+	fn.AddBlock(blk)
+	fn.SetEntry(blk)
+	fn.SetExit(blk)
+
+	analysis := analyzeFunction(fn)
+	colors, scratch := abiColorPools(abi)
+
+	result, err := colorGraph(fn, analysis, colors, scratch, abi)
+	if err != nil {
+		t.Fatalf("colorGraph failed: %v", err)
+	}
+
+	for i, tc := range []struct{ param, want string }{
+		{"n", "x0"}, {"m", "x1"}, {"k", "x2"},
+	} {
+		if got := result.mapVRegToPReg[tc.param]; got != tc.want {
+			t.Errorf("param[%d] %q mapped to %q, want %q", i, tc.param, got, tc.want)
+		}
+	}
+}
+
 func TestRunOnEmptyProgram(t *testing.T) {
 	prog := mir.NewProgram()
 	out, err := Run(prog, target.NewRISCV64Target())

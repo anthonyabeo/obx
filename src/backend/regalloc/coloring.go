@@ -24,7 +24,30 @@ type graphNode struct {
 }
 
 func colorGraph(fn *mir.Function, fa *functionAnalysis, colors, scratch []string, abi target.ABI) (*regAllocResult, error) {
-	_ = fn
+	// Build pre-coloring for function parameters mapped to ABI argument registers.
+	// Integer and floating-point parameters use independent index counters so
+	// that mixed signatures (e.g., func(int, float, int)) map correctly.
+	precolored := make(map[string]string)
+	intIdx, floatIdx := 0, 0
+	for _, param := range fn.Params {
+		if param == nil {
+			continue
+		}
+		if target.IsFloatType(param.Type) {
+			if reg, ok := abi.FloatArgReg(floatIdx); ok {
+				precolored[param.Name] = reg
+			}
+			// Params beyond FloatArgRegs are stack-passed; no pre-coloring needed.
+			floatIdx++
+		} else {
+			if reg, ok := abi.ArgReg(intIdx); ok {
+				precolored[param.Name] = reg
+			}
+			// Params beyond IntArgRegs are stack-passed; no pre-coloring needed.
+			intIdx++
+		}
+	}
+
 	nodes := make(map[string]*graphNode)
 	for _, ba := range fa.blocks {
 		for _, item := range ba.items {
@@ -122,6 +145,23 @@ func colorGraph(fn *mir.Function, fa *functionAnalysis, colors, scratch []string
 		degree[name] = len(node.neighbors)
 	}
 
+	// Remove pre-colored parameter nodes from the simplification work-list.
+	// They are already assigned to their ABI registers and must not be re-colored.
+	// Adjust neighbor degrees as if the pre-colored node had been simplified.
+	for name := range precolored {
+		if !remaining[name] {
+			continue
+		}
+		delete(remaining, name)
+		if node, ok := nodes[name]; ok {
+			for neigh := range node.neighbors {
+				if remaining[neigh] {
+					degree[neigh]--
+				}
+			}
+		}
+	}
+
 	order := make([]string, 0, len(nodes))
 	for name := range nodes {
 		order = append(order, name)
@@ -157,6 +197,12 @@ func colorGraph(fn *mir.Function, fa *functionAnalysis, colors, scratch []string
 		spillSlots:    make(map[string]int),
 		savedRegs:     make([]string, 0),
 		scratchRegs:   append([]string(nil), scratch...),
+	}
+
+	// Seed the result with pre-colored parameters so that neighbor color
+	// selection naturally avoids these registers.
+	for name, preg := range precolored {
+		res.mapVRegToPReg[name] = preg
 	}
 
 	usedSaved := make(map[string]bool)
