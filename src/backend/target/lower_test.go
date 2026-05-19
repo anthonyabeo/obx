@@ -188,3 +188,82 @@ func TestRegistryLookupAndAvailable(t *testing.T) {
 		}
 	}
 }
+
+func TestEmitARM64MachineInstrFormatsCSetConditionCode(t *testing.T) {
+	got := emitARM64MachineInstr(&mir.MachineInstr{
+		Op:   "cset",
+		Dsts: []*mir.Register{mir.NewRegister("x1", mir.PhysicalReg, mir.NewScalarType("i1", 1))},
+		Srcs: []mir.Operand{&mir.Label{Name: "eq"}},
+	})
+	if got != "cset x1, eq" {
+		t.Fatalf("emitARM64MachineInstr(cset) = %q, want %q", got, "cset x1, eq")
+	}
+}
+
+func TestEmitARM64HaltWithImmediateCode(t *testing.T) {
+	got := emitARM64Terminator(&mir.HaltInstr{
+		Code: mir.NewImmediate(1, mir.NewScalarType("i32", 4)),
+	})
+	expected := "mov w0, #1\n\tbl _exit"
+	if got != expected {
+		t.Fatalf("emitARM64Terminator(HaltInstr with immediate) =\n%q\nwant\n%q", got, expected)
+	}
+}
+
+func TestEmitARM64HaltWithRegisterCode(t *testing.T) {
+	got := emitARM64Terminator(&mir.HaltInstr{
+		Code: mir.NewRegister("x0", mir.PhysicalReg, mir.NewScalarType("i32", 4)),
+	})
+	expected := "bl _exit"
+	if got != expected {
+		t.Fatalf("emitARM64Terminator(HaltInstr with register x0) =\n%q\nwant\n%q", got, expected)
+	}
+}
+
+func TestEmitARM64HaltWithNilCode(t *testing.T) {
+	got := emitARM64Terminator(&mir.HaltInstr{
+		Code: nil,
+	})
+	expected := "mov w0, #1\n\tbl _exit"
+	if got != expected {
+		t.Fatalf("emitARM64Terminator(HaltInstr with nil code) =\n%q\nwant\n%q", got, expected)
+	}
+}
+
+// TestEmitARM64CondBranchBothPaths verifies that the MachineTerm "bne" handler
+// emits both the conditional branch to the true label and the unconditional
+// branch to the false label.  The "cmp" prefix is emitted separately by the
+// descriptor rule (BRnz) as a termPrefix instruction; the terminal handler
+// itself should NOT re-emit it.
+func TestEmitARM64CondBranchBothPaths(t *testing.T) {
+	i1 := mir.NewScalarType("i1", 1)
+	cond := mir.NewRegister("x8", mir.PhysicalReg, i1)
+	trueLabel := &mir.Label{Name: "if_then"}
+	falseLabel := &mir.Label{Name: "if_else"}
+
+	term := mir.NewMachineTerm("bne",
+		[]mir.Operand{cond, trueLabel, falseLabel},
+		[]string{"if_then", "if_else"},
+	)
+
+	got := emitARM64Terminator(term)
+	want := "b.ne Lif_then\n\tb Lif_else"
+	if got != want {
+		t.Fatalf("emitARM64Terminator(bne cond, Ltrue, Lfalse) =\n%q\nwant\n%q", got, want)
+	}
+}
+
+// TestEmitARM64CondBranchCondBrInstr verifies the CondBrInstr fallback (used
+// when the descriptor rule does not match) still emits the full sequence.
+func TestEmitARM64CondBranchCondBrInstr(t *testing.T) {
+	i1 := mir.NewScalarType("i1", 1)
+	cond := mir.NewRegister("x8", mir.PhysicalReg, i1)
+
+	term := &mir.CondBrInstr{Cond: cond, TrueLabel: "then_0", FalseLabel: "else_1"}
+	got := emitARM64Terminator(term)
+	want := "cmp x8, #0\n\tb.ne Lthen_0\n\tb Lelse_1"
+	if got != want {
+		t.Fatalf("emitARM64Terminator(CondBrInstr) =\n%q\nwant\n%q", got, want)
+	}
+}
+

@@ -167,7 +167,7 @@ func returnMoveInstr(tgt target.Target, src mir.Operand, retReg string) mir.Inst
 	case strings.Contains(name, "rv64") || strings.Contains(name, "riscv"):
 		return mir.NewMachineInstr("addi", []*mir.Register{dst}, []mir.Operand{src, zero})
 	case strings.Contains(name, "arm64") || strings.Contains(name, "aarch64"):
-		return mir.NewMachineInstr("add", []*mir.Register{dst}, []mir.Operand{src, zero})
+		return mir.NewMachineInstr("mov", []*mir.Register{dst}, []mir.Operand{src})
 	default:
 		return mir.NewMachineInstr("mov", []*mir.Register{dst}, []mir.Operand{src})
 	}

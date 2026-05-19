@@ -15,7 +15,7 @@ func TestRunInsertsAbiReturnMove(t *testing.T) {
 		wantRet string
 	}{
 		{name: "riscv", target: target.RV64IMAFDName, wantOp: "addi", wantRet: "a0"},
-		{name: "arm64", target: target.Arm64Name, wantOp: "add", wantRet: "x0"},
+		{name: "arm64", target: target.Arm64Name, wantOp: "mov", wantRet: "x0"},
 	}
 
 	for _, tc := range tests {
@@ -55,6 +55,12 @@ func TestRunInsertsAbiReturnMove(t *testing.T) {
 			}
 			if len(mi.Dsts) != 1 || mi.Dsts[0] == nil || mi.Dsts[0].Name != tc.wantRet {
 				t.Fatalf("mi.Dsts = %#v, want %q", mi.Dsts, tc.wantRet)
+			}
+			if tc.target == target.Arm64Name {
+				if len(mi.Srcs) != 1 || mi.Srcs[0].String() != "v0" {
+					t.Fatalf("mi.Srcs = %#v", mi.Srcs)
+				}
+				return
 			}
 			if len(mi.Srcs) != 2 || mi.Srcs[0].String() != "v0" || mi.Srcs[1].String() != "0" {
 				t.Fatalf("mi.Srcs = %#v", mi.Srcs)

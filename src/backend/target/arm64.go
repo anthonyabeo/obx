@@ -185,6 +185,15 @@ func emitARM64MachineInstr(i *mir.MachineInstr) string {
 		}
 	case "cmp":
 		return formatGenericARM64(i)
+	case "cset":
+		if len(i.Dsts) > 0 && len(i.Srcs) > 0 {
+			cond := formatARM64Operand(i.Srcs[0])
+			if l, ok := i.Srcs[0].(*mir.Label); ok {
+				cond = strings.ToLower(l.Name)
+			}
+			return fmt.Sprintf("cset %s, %s", formatARM64Operand(i.Dsts[0]), cond)
+		}
+		return formatGenericARM64(i)
 	case "cmp.eq", "cmp.ne", "cmp.lt", "cmp.le", "cmp.gt", "cmp.ge":
 		if len(i.Dsts) > 0 && len(i.Srcs) >= 2 {
 			return fmt.Sprintf("cmp %s, %s\n\tcset %s, %s", formatARM64Operand(i.Srcs[0]), formatARM64Operand(i.Srcs[1]), formatARM64Operand(i.Dsts[0]), arm64CondSuffix(op))
@@ -203,6 +212,24 @@ func emitARM64MachineInstr(i *mir.MachineInstr) string {
 		return "; " + op
 	}
 	return formatGenericARM64(i)
+}
+
+func emitARM64Halt(code mir.Operand) string {
+	// Use bl _exit so the shell captures the non-zero exit code.
+	// macOS libc _exit(n) terminates the process with exit status n.
+	if code == nil {
+		// Default to exit code 1 (assertion failure / explicit halt).
+		return "mov w0, #1\n\tbl _exit"
+	}
+
+	codeStr := formatARM64Operand(code)
+	// x0 and w0 are the same physical register on AArch64; no move needed.
+	if codeStr == "x0" || codeStr == "w0" {
+		return "bl _exit"
+	}
+
+	// Move exit code into w0 (32-bit arg register 0) then call _exit.
+	return fmt.Sprintf("mov w0, %s\n\tbl _exit", codeStr)
 }
 
 func emitARM64Terminator(term mir.Terminator) string {
@@ -228,6 +255,10 @@ func emitARM64Terminator(term mir.Terminator) string {
 				return fmt.Sprintf("cmp %s, #0\n\tb.ne %s\n\tb %s", formatARM64Operand(t.Srcs[0]), arm64Label(t.Targets[0]), arm64Label(t.Targets[1]))
 			}
 		case "beq", "bne", "blt", "ble", "bgt", "bge":
+			if len(t.Targets) >= 2 {
+				return fmt.Sprintf("%s %s\n\tb %s",
+					arm64BranchOpcode(op), arm64Label(t.Targets[0]), arm64Label(t.Targets[1]))
+			}
 			if len(t.Targets) > 0 {
 				return fmt.Sprintf("%s %s", arm64BranchOpcode(op), arm64Label(t.Targets[0]))
 			}
@@ -237,7 +268,11 @@ func emitARM64Terminator(term mir.Terminator) string {
 				return "b " + arm64Label(t.Targets[len(t.Targets)-1])
 			}
 		case "halt":
-			return "brk #0"
+			var code mir.Operand
+			if len(t.Srcs) > 0 {
+				code = t.Srcs[0]
+			}
+			return emitARM64Halt(code)
 		}
 	case *mir.JumpInstr:
 		return "b " + arm64Label(t.Target)
@@ -249,7 +284,7 @@ func emitARM64Terminator(term mir.Terminator) string {
 		}
 		return "ldp x29, x30, [sp], #16\n\tret"
 	case *mir.HaltInstr:
-		return "brk #0"
+		return emitARM64Halt(t.Code)
 	case *mir.SwitchInstr:
 		if len(t.Arms) > 0 {
 			return "b " + arm64Label(t.Default)
@@ -356,4 +391,3 @@ func arm64BranchOpcode(op string) string {
 		return "b"
 	}
 }
-
