@@ -87,6 +87,10 @@ func TestStrengthReduce_MulByPow2_Right(t *testing.T) {
 		t.Fatal("expected StrengthReduce to reduce x*8")
 	}
 
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
+	}
+
 	if findOp(entry, "mul") != nil {
 		t.Fatal("expected mul to be gone after strength reduction")
 	}
@@ -128,6 +132,10 @@ func TestStrengthReduce_MulByPow2_Left(t *testing.T) {
 		t.Fatal("expected StrengthReduce to reduce 4*x")
 	}
 
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
+	}
+
 	shl := findOp(entry, "shl")
 	if shl == nil {
 		t.Fatal("expected shl instruction")
@@ -153,9 +161,17 @@ func TestStrengthReduce_MulByTwo(t *testing.T) {
 		&minir.StoreInst{Val: dst, Addr: g.Ref()},
 	})
 
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("precondition verify: %v", errs)
+	}
+
 	changed := miniropt.StrengthReduce(fn)
 	if changed == 0 {
 		t.Fatal("expected StrengthReduce to reduce x*2")
+	}
+
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
 	}
 
 	shl := findOp(entry, "shl")
@@ -191,6 +207,10 @@ func TestStrengthReduce_DivByPow2_Unsigned(t *testing.T) {
 		t.Fatal("expected StrengthReduce to reduce x/4 (unsigned)")
 	}
 
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
+	}
+
 	if findOp(entry, "div") != nil {
 		t.Fatal("expected div to be gone")
 	}
@@ -223,9 +243,17 @@ func TestStrengthReduce_DivByPow2_Signed_NoReduction(t *testing.T) {
 		&minir.StoreInst{Val: dst, Addr: g.Ref()},
 	})
 
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("precondition verify: %v", errs)
+	}
+
 	changed := miniropt.StrengthReduce(fn)
 	if changed != 0 {
 		t.Fatalf("expected NO reduction for signed x/4, got %d changes", changed)
+	}
+
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
 	}
 }
 
@@ -251,6 +279,10 @@ func TestStrengthReduce_ModByPow2_Unsigned(t *testing.T) {
 	changed := miniropt.StrengthReduce(fn)
 	if changed == 0 {
 		t.Fatal("expected StrengthReduce to reduce x%8 (unsigned)")
+	}
+
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
 	}
 
 	if findOp(entry, "mod") != nil {
@@ -287,9 +319,17 @@ func TestStrengthReduce_NoOpOnNonPow2(t *testing.T) {
 		&minir.StoreInst{Val: dst, Addr: g.Ref()},
 	})
 
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("precondition verify: %v", errs)
+	}
+
 	changed := miniropt.StrengthReduce(fn)
 	if changed != 0 {
 		t.Fatalf("expected no reduction for x*3 (non-power-of-two), got %d", changed)
+	}
+
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
 	}
 }
 
@@ -353,6 +393,10 @@ func TestStrengthReduce_ChainedWithAlgebraicSimplify(t *testing.T) {
 	srChanged := miniropt.StrengthReduce(fn)
 	if srChanged == 0 {
 		t.Fatal("expected StrengthReduce to make changes")
+	}
+
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
 	}
 
 	simChanged := miniropt.AlgebraicSimplify(fn)

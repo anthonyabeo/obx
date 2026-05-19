@@ -17,6 +17,8 @@ import (
 //   - ICmpInst / FCmpInst over two constants of the same kind
 //   - PhiInst     where every arm carries the same value (uniform phi)
 //   - CastInst    where the source is a constant and CoerceConst succeeds
+//   - CondBrInst  where Cond is a constant → replaced with JumpInst; dead block pruned
+//   - SwitchInst  where Key is a constant  → replaced with JumpInst; dead blocks pruned
 func ConstantFold(fn *minir.Function) int {
 	if fn == nil || fn.Entry == nil {
 		return 0
@@ -24,7 +26,6 @@ func ConstantFold(fn *minir.Function) int {
 
 	total := 0
 	for {
-		keepTemp := tempOnlyUses(fn)
 		subst := make(map[*minir.Temp]minir.Value)
 		toDelete := make(map[minir.Instr]bool)
 		iterChanges := 0
@@ -48,17 +49,14 @@ func ConstantFold(fn *minir.Function) int {
 				}
 
 				if v, ok := foldInstruction(ins); ok {
-					if applyScalarValue(blk, i, ins, def, v, keepTemp[def], subst, toDelete) {
+					if applyScalarValue(ins, def, v, subst, toDelete) {
 						iterChanges++
 					}
 				}
 			}
 		}
 
-		if iterChanges == 0 {
-			break
-		}
-
+		// Commit deletions (no op when toDelete is empty).
 		for _, blk := range fn.Blocks {
 			rebuilt := blk.Instrs[:0]
 			for _, ins := range blk.Instrs {
@@ -74,7 +72,14 @@ func ConstantFold(fn *minir.Function) int {
 			}
 		}
 
-		total += iterChanges
+		// Replace constant-conditioned terminators with unconditional jumps and
+		// prune now-dead successors from the CFG.
+		sc := simplifyConstantTerminators(fn)
+
+		total += iterChanges + sc
+		if iterChanges == 0 && sc == 0 {
+			break
+		}
 	}
 
 	return total
@@ -314,3 +319,91 @@ func simplifyPhi(phi *minir.PhiInst) (minir.Value, bool) {
 	return first, true
 }
 
+// simplifyConstantTerminators replaces CondBrInst and SwitchInst terminators
+// whose controlling value is a compile-time constant with an unconditional
+// JumpInst to the taken successor and disconnects dead successor(s) from the
+// CFG.  RemoveDeadBlocks is called to prune all blocks that become unreachable.
+// Returns the number of terminators rewritten.
+func simplifyConstantTerminators(fn *minir.Function) int {
+	changed := 0
+	for _, b := range fn.Blocks {
+		switch t := b.Term.(type) {
+		case *minir.CondBrInst:
+			c, ok := t.Cond.(*minir.IntegerConst)
+			if !ok {
+				continue
+			}
+
+			var takenLabel, deadLabel string
+			if unsignedIntValue(c) != 0 {
+				takenLabel, deadLabel = t.TrueLabel, t.FalseLabel
+			} else {
+				takenLabel, deadLabel = t.FalseLabel, t.TrueLabel
+			}
+
+			// Replace terminator with unconditional jump.
+			jmp := &minir.JumpInst{Target: takenLabel}
+			b.Instrs[len(b.Instrs)-1] = jmp
+			b.Term = jmp
+
+			// Disconnect dead successor.
+			if deadBlk := fn.GetBlock(deadLabel); deadBlk != nil {
+				delete(b.Succs, deadBlk.ID)
+				b.SuccOrder = removeFromOrder(b.SuccOrder, deadBlk.ID)
+				delete(deadBlk.Preds, b.ID)
+				deadBlk.PredOrder = removeFromOrder(deadBlk.PredOrder, b.ID)
+			}
+			changed++
+
+		case *minir.SwitchInst:
+			c, ok := t.Key.(*minir.IntegerConst)
+			if !ok {
+				continue
+			}
+
+			keyVal := int(signedIntValue(c))
+			takenLabel := t.Default
+			for _, arm := range t.Arms {
+				if arm.Val == keyVal {
+					takenLabel = arm.Label
+					break
+				}
+			}
+
+			// Replace terminator with unconditional jump.
+			jmp := &minir.JumpInst{Target: takenLabel}
+			b.Instrs[len(b.Instrs)-1] = jmp
+			b.Term = jmp
+
+			// Disconnect all non-taken arm successors.
+			for _, arm := range t.Arms {
+				if arm.Label == takenLabel {
+					continue
+				}
+				if deadBlk := fn.GetBlock(arm.Label); deadBlk != nil {
+					delete(b.Succs, deadBlk.ID)
+					b.SuccOrder = removeFromOrder(b.SuccOrder, deadBlk.ID)
+					delete(deadBlk.Preds, b.ID)
+					deadBlk.PredOrder = removeFromOrder(deadBlk.PredOrder, b.ID)
+				}
+			}
+
+			// Disconnect the default target if it wasn't the taken branch.
+			if t.Default != takenLabel {
+				if deadBlk := fn.GetBlock(t.Default); deadBlk != nil {
+					delete(b.Succs, deadBlk.ID)
+					b.SuccOrder = removeFromOrder(b.SuccOrder, deadBlk.ID)
+					delete(deadBlk.Preds, b.ID)
+					deadBlk.PredOrder = removeFromOrder(deadBlk.PredOrder, b.ID)
+				}
+			}
+			changed++
+		}
+	}
+
+	if changed > 0 {
+		RemoveDeadBlocks(fn)
+	}
+
+	return changed
+}

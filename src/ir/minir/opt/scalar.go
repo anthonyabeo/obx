@@ -10,12 +10,9 @@ import (
 // ── shared helpers used across fold.go, simplify.go, and strength.go ─────────
 
 func applyScalarValue(
-	blk *minir.Block,
-	idx int,
 	ins minir.Instr,
 	def *minir.Temp,
 	v minir.Value,
-	keepTemp bool,
 	subst map[*minir.Temp]minir.Value,
 	toDelete map[minir.Instr]bool,
 ) bool {
@@ -23,60 +20,9 @@ func applyScalarValue(
 		return false
 	}
 
-	if v.IsConst() {
-		if keepTemp {
-			mat := materializeScalarConst(def, v)
-			if mat == nil || sameInstr(ins, mat) {
-				return false
-			}
-			blk.Instrs[idx] = mat
-			return true
-		}
-	}
-
 	subst[def] = v
 	toDelete[ins] = true
 	return true
-}
-
-func tempOnlyUses(fn *minir.Function) map[*minir.Temp]bool {
-	out := make(map[*minir.Temp]bool)
-	for _, blk := range fn.Blocks {
-		for _, ins := range blk.Instrs {
-			switch t := ins.(type) {
-			case *minir.ReturnInst:
-				if t.Result != nil {
-					out[t.Result] = true
-				}
-			case *minir.CondBrInst:
-				if t.Cond != nil {
-					out[t.Cond] = true
-				}
-			case *minir.SwitchInst:
-				if t.Key != nil {
-					out[t.Key] = true
-				}
-			}
-		}
-	}
-	return out
-}
-
-func materializeScalarConst(dst *minir.Temp, v minir.Value) minir.Instr {
-	if dst == nil || v == nil {
-		return nil
-	}
-	switch c := v.(type) {
-	case *minir.IntegerConst:
-		if isBoolType(dst.Type()) || c.BitWidth == 1 {
-			return &minir.BinaryInst{Dst: dst, Op: "xor", Left: c, Right: minir.ConstBool("false", false)}
-		}
-		return &minir.BinaryInst{Dst: dst, Op: "add", Left: c, Right: zeroValueForType(dst.Type())}
-	case *minir.FloatConst:
-		return &minir.BinaryInst{Dst: dst, Op: "add", Left: c, Right: zeroValueForType(dst.Type())}
-	default:
-		return nil
-	}
 }
 
 func sameInstr(a, b minir.Instr) bool {
@@ -237,7 +183,3 @@ func valueType(dst *minir.Temp, v minir.Value) minir.Type {
 	}
 	return nil
 }
-
-
-
-

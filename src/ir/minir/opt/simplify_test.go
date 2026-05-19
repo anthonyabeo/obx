@@ -384,22 +384,15 @@ func TestAlgebraicSimplify_ICmpSelf(t *testing.T) {
 				t.Fatalf("expected AlgebraicSimplify to simplify x %s x", tc.pred)
 			}
 
-			// The simplified result is materialised as a xor (bool materialiser).
-			xorBin := func(b *minir.Block) *minir.BinaryInst {
-				for _, ins := range b.Instrs {
-					if bin, ok := ins.(*minir.BinaryInst); ok && bin.Op == "xor" {
-						return bin
-					}
-				}
-				return nil
-			}(fn.Entry)
-
-			if xorBin == nil {
-				t.Fatal("expected bool to be materialised as xor in entry")
-			}
-			lc, ok := xorBin.Left.(*minir.IntegerConst)
+			// ReturnInst.Result is now Value; the constant propagates directly
+			// into it without materialization as a xor.
+			retInst, ok := exit.Instrs[len(exit.Instrs)-1].(*minir.ReturnInst)
 			if !ok {
-				t.Fatalf("expected IntegerConst on left of xor, got %T", xorBin.Left)
+				t.Fatal("expected return instruction in exit")
+			}
+			lc, ok := retInst.Result.(*minir.IntegerConst)
+			if !ok {
+				t.Fatalf("expected return result to be *IntegerConst, got %T", retInst.Result)
 			}
 			gotBool := lc.AsUint() != 0
 			if gotBool != tc.wantVal {
@@ -429,4 +422,3 @@ func TestAlgebraicSimplify_NoOpOnGenericBinary(t *testing.T) {
 		t.Fatalf("expected no changes for x+y with no identities, got %d", changed)
 	}
 }
-

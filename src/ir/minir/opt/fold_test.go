@@ -16,7 +16,7 @@ import (
 func buildFoldFn(name string, entryInstrs []minir.Instr) (*minir.Block, *minir.Block, *minir.Function) {
 	entry := &minir.Block{
 		ID:    0,
-		Label: name + "_entry",
+		Label: "entry",
 		Preds: map[int]*minir.Block{},
 		Succs: map[int]*minir.Block{},
 	}
@@ -65,14 +65,6 @@ func findStore(b *minir.Block) *minir.StoreInst {
 	return nil
 }
 
-// printFunctionIR is a helper that prints the IR before and after optimization.
-func printFunctionIR(t *testing.T, fn *minir.Function, label string, beforeFn, afterFn func(*minir.Function)) {
-	t.Logf("\n=== %s ===\nBEFORE:\n%s", label, minir.FormatFunction(fn))
-	beforeFn(fn)
-	t.Logf("\nAFTER:\n%s", minir.FormatFunction(fn))
-	afterFn(fn)
-}
-
 // ── integer binary constant-fold tests ────────────────────────────────────────
 
 func TestConstantFold_IntegerBinaryOps(t *testing.T) {
@@ -81,11 +73,11 @@ func TestConstantFold_IntegerBinaryOps(t *testing.T) {
 	g := &minir.GlobalVar{Name: "gFoldBin", Ty: i32, Linkage: minir.InternalLinkage}
 
 	tests := []struct {
-		name     string
-		op       string
-		left     int64
-		right    int64
-		wantVal  int64
+		name    string
+		op      string
+		left    int64
+		right   int64
+		wantVal int64
 	}{
 		{"add", "add", 2, 3, 5},
 		{"sub", "sub", 10, 4, 6},
@@ -316,8 +308,8 @@ func TestConstantFold_ICmp(t *testing.T) {
 					Right: minir.ConstInt("", tc.right, i32),
 				},
 			})
-			// Wire cmpDst into ReturnInst so keepTemp is set and the fold
-			// materialises the constant rather than substituting it.
+			// Wire cmpDst into ReturnInst — its Result is now Value, so the folded
+			// constant is propagated directly without materialisation.
 			fn.Result = bTy
 			exit.Instrs = []minir.Instr{&minir.ReturnInst{Result: cmpDst}}
 			exit.Term = exit.Instrs[0].(minir.Terminator)
@@ -331,14 +323,18 @@ func TestConstantFold_ICmp(t *testing.T) {
 				t.Fatal("expected ConstantFold to make changes")
 			}
 
-			// The comparison was folded and materialised as a xor (bool materialiser).
-			xorBin := findBinary(fn.Entry, "xor")
-			if xorBin == nil {
-				t.Fatal("expected folded comparison to be materialised as xor in entry block")
+			if errs := minir.VerifyIR(fn); len(errs) != 0 {
+				t.Fatalf("postcondition verify: %v", errs)
 			}
-			lc, ok := xorBin.Left.(*minir.IntegerConst)
+
+			// The comparison result should be propagated directly into ReturnInst.Result.
+			retInst, ok := exit.Instrs[len(exit.Instrs)-1].(*minir.ReturnInst)
 			if !ok {
-				t.Fatalf("expected bool constant on left of xor, got %T", xorBin.Left)
+				t.Fatal("expected return instruction in exit")
+			}
+			lc, ok := retInst.Result.(*minir.IntegerConst)
+			if !ok {
+				t.Fatalf("expected return result to be *IntegerConst (folded bool), got %T", retInst.Result)
 			}
 			gotBool := lc.AsUint() != 0
 			if gotBool != tc.wantVal {
@@ -442,6 +438,10 @@ func TestConstantFold_PropagatesAcrossInstructions(t *testing.T) {
 		t.Fatal("expected ConstantFold to make changes")
 	}
 
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
+	}
+
 	if findBinary(entry, "add") != nil {
 		t.Fatal("expected add to be eliminated")
 	}
@@ -473,7 +473,7 @@ func TestConstantFold_NoOpOnVariableOperands(t *testing.T) {
 	i32 := minir.I32()
 	g := &minir.GlobalVar{Name: "gFoldNoop", Ty: i32, Linkage: minir.InternalLinkage}
 
-	x := minir.NewTemp("x", i32)    // variable — not a constant
+	x := minir.NewTemp("x", i32) // variable — not a constant
 	dst := minir.NewAnonTemp(i32)
 	_, _, fn := buildFoldFn("fold_noop", []minir.Instr{
 		&minir.BinaryInst{Dst: dst, Op: "add", Left: x, Right: minir.ConstInt("", 1, i32)},
@@ -487,6 +487,10 @@ func TestConstantFold_NoOpOnVariableOperands(t *testing.T) {
 	changed := miniropt.ConstantFold(fn)
 	if changed != 0 {
 		t.Fatalf("expected no changes on variable operands, got %d", changed)
+	}
+
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
 	}
 }
 
@@ -536,9 +540,17 @@ func TestConstantFold_UniformPhiEliminated(t *testing.T) {
 		Blocks: map[int]*minir.Block{entry.ID: entry, join.ID: join, exit.ID: exit},
 	}
 
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("precondition verify: %v", errs)
+	}
+
 	changed := miniropt.ConstantFold(fn)
 	if changed == 0 {
 		t.Fatal("expected ConstantFold to eliminate uniform phi")
+	}
+
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
 	}
 
 	// After folding the phi should be gone and the store should carry the constant.
@@ -575,22 +587,31 @@ func TestConstantFold_FoldAndReturn(t *testing.T) {
 		t.Fatalf("precondition verify: %v", errs)
 	}
 
+	t.Logf("==========BEFORE:==========\n%s", minir.FormatFunction(fn))
+
 	changed := miniropt.ConstantFold(fn)
 	if changed == 0 {
 		t.Fatal("expected ConstantFold to fold 2+3")
 	}
 
-	// The add should have been materialized (not deleted) since tDst is in a return.
-	// Since tDst is used in a return, it won't be substituted; instead a materializer
-	// instruction will be created in entry.
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
+	}
+
+	t.Logf("\n==========AFTER==========\n%s", minir.FormatFunction(fn))
+
+	// ReturnInst.Result is now Value; the constant 5 must be propagated directly
+	// (no materialisation into tDst).
 	retInst, ok := exit.Instrs[len(exit.Instrs)-1].(*minir.ReturnInst)
 	if !ok {
 		t.Fatal("expected return instruction in exit")
 	}
-	// After folding, retInst.Result should still be tDst, but tDst was materialized
-	// with the constant 5 in the entry block
-	if retInst.Result != tDst {
-		t.Fatalf("expected return to use tDst, got %T %v", retInst.Result, retInst.Result)
+	c, ok := retInst.Result.(*minir.IntegerConst)
+	if !ok {
+		t.Fatalf("expected return result to be *IntegerConst, got %T %v", retInst.Result, retInst.Result)
+	}
+	if c.Value != 5 {
+		t.Fatalf("expected return result = 5, got %v", c.Value)
 	}
 
 	if errs := minir.VerifyIR(fn); len(errs) != 0 {
@@ -602,7 +623,7 @@ func TestConstantFold_FoldAndReturn(t *testing.T) {
 
 func TestConstantFold_ComparisonAndBranchSimplification(t *testing.T) {
 	// Before: %a = add 1, 2; %b = icmp eq %a, 3; br %b, %then, %else
-	// After: add is folded to 3, icmp is folded, b is materialized
+	// After:  add and icmp are eliminated; CondBrInst.Cond holds constant true directly.
 	minir.ResetTempCounter()
 	i32 := minir.I32()
 	bTy := minir.I1()
@@ -648,32 +669,51 @@ func TestConstantFold_ComparisonAndBranchSimplification(t *testing.T) {
 		t.Fatalf("precondition verify: %v", errs)
 	}
 
+	t.Logf("==========BEFORE:==========\n%s", minir.FormatFunction(fn))
+
 	changed := miniropt.ConstantFold(fn)
 	if changed == 0 {
 		t.Fatal("expected ConstantFold to fold the add and comparison")
 	}
 
-	// After folding, the add should be eliminated
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
+	}
+	t.Logf("==========AFTER:==========\n%s", minir.FormatFunction(fn))
+
+	// Both the add and the icmp must be eliminated.
 	if findBinary(entry, "add") != nil {
 		t.Fatal("expected add to be eliminated")
 	}
-
-	// The branch should remain with b materialized as a constant-producing instruction
-	term := entry.Term
-	if _, ok := term.(*minir.CondBrInst); !ok {
-		t.Fatalf("expected CondBrInst terminator, got %T", term)
-	}
-
-	// Check that b was materialized with a constant (xor for bool)
-	found := false
 	for _, ins := range entry.Instrs {
-		if bin, ok := ins.(*minir.BinaryInst); ok && bin.Dst == b {
-			found = true
-			break
+		if _, ok := ins.(*minir.ICmpInst); ok {
+			t.Fatal("expected icmp to be eliminated")
 		}
 	}
-	if !found {
-		t.Fatal("expected b to be materialized as a constant-producing instruction")
+
+	// The conditional branch must now be an unconditional JumpInst to "then";
+	// the constant-cond CondBrInst was simplified by simplifyConstantTerminators.
+	term := entry.Term
+	jmpTerm, ok := term.(*minir.JumpInst)
+	if !ok {
+		t.Fatalf("expected JumpInst terminator after simplification, got %T", term)
+	}
+	if jmpTerm.Target != thenBlk.Label {
+		t.Fatalf("expected jump to %q, got %q", thenBlk.Label, jmpTerm.Target)
+	}
+
+	// The dead "else" block must have been removed from fn.Blocks.
+	for _, blk := range fn.Blocks {
+		if blk == elseBlk {
+			t.Fatal("expected else block to be removed from fn.Blocks")
+		}
+	}
+
+	// No materialised BinaryInst standing in for b.
+	for _, ins := range entry.Instrs {
+		if bin, ok2 := ins.(*minir.BinaryInst); ok2 && bin.Dst == b {
+			t.Fatal("expected b NOT to be materialised; found a BinaryInst for it")
+		}
 	}
 
 	if errs := minir.VerifyIR(fn); len(errs) != 0 {
@@ -708,6 +748,10 @@ func TestConstantFold_DivideByZeroNotFolded(t *testing.T) {
 	// fold should succeed (folding the add), but div by 0 should NOT be folded
 	if changed == 0 {
 		t.Fatal("expected ConstantFold to at least fold the 1+2")
+	}
+
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
 	}
 
 	// Verify the add was folded but div remains
@@ -775,6 +819,10 @@ func TestConstantFold_NonUniformPhiNotFolded(t *testing.T) {
 		t.Fatal("expected ConstantFold to fold the binary ops")
 	}
 
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
+	}
+
 	// Check that phi was not eliminated (should still reference folded temps or constants)
 	phiFound := false
 	for _, ins := range exit.Instrs {
@@ -828,6 +876,10 @@ func TestConstantFold_StoreAndCallPreserved(t *testing.T) {
 	t.Logf("\nAFTER:\n%s", minir.FormatFunction(fn))
 	if changed == 0 {
 		t.Fatal("expected ConstantFold to fold the binary ops")
+	}
+
+	if errs := minir.VerifyIR(fn); len(errs) != 0 {
+		t.Fatalf("postcondition verify: %v", errs)
 	}
 
 	// Check that store still exists

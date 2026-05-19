@@ -34,7 +34,6 @@ func AlgebraicSimplify(fn *minir.Function) int {
 
 	total := 0
 	for {
-		keepTemp := tempOnlyUses(fn)
 		subst := make(map[*minir.Temp]minir.Value)
 		toDelete := make(map[minir.Instr]bool)
 		iterChanges := 0
@@ -58,15 +57,11 @@ func AlgebraicSimplify(fn *minir.Function) int {
 				}
 
 				if v, ok := simplifyInstruction(ins); ok {
-					if applyScalarValue(blk, i, ins, def, v, keepTemp[def], subst, toDelete) {
+					if applyScalarValue(ins, def, v, subst, toDelete) {
 						iterChanges++
 					}
 				}
 			}
-		}
-
-		if iterChanges == 0 {
-			break
 		}
 
 		for _, blk := range fn.Blocks {
@@ -84,7 +79,14 @@ func AlgebraicSimplify(fn *minir.Function) int {
 			}
 		}
 
-		total += iterChanges
+		// Replace constant-conditioned terminators with unconditional jumps and
+		// prune now-dead successors from the CFG.
+		sc := simplifyConstantTerminators(fn)
+
+		total += iterChanges + sc
+		if iterChanges == 0 && sc == 0 {
+			break
+		}
 	}
 
 	return total
@@ -186,4 +188,3 @@ func simplifyInstruction(ins minir.Instr) (minir.Value, bool) {
 	}
 	return nil, false
 }
-

@@ -14,16 +14,13 @@ import (
 //     alloca's definition sites (blocks that contain a StoreInst to it).
 //  3. Walk the dominator tree, maintaining a per-alloca value stack:
 //     • StoreInst  → push the stored value; mark for deletion.
-//     • LoadInst   → replace load result with stack top; mark for deletion
-//     (or replace with a materialiser instruction when the
-//     reaching value is a constant and the result must remain
-//     a *Temp, e.g. ReturnInst.Result).
+//     • LoadInst   → record subst[load.Dst] = reaching value (temp or constant)
+//     and mark the load for deletion.
 //     • φ-node arm → fill with the current stack top before recursing into
 //     each dominated successor.
 //  4. Apply the substitution map (loadTemp → reachingValue) across the whole
 //     function, rebuilding only instructions that reference a substituted temp.
-//  5. Delete promoted AllocaInst and any remaining StoreInst / LoadInst that
-//     were not already replaced by materialisers.
+//  5. Delete promoted AllocaInst and any remaining StoreInst / LoadInst.
 //
 // SROA limitation: aggregate (RecordType, ArrayType) allocas are not promoted;
 // they are left unchanged and are the intended target of a future SROA pass.
@@ -153,7 +150,7 @@ func Mem2Reg(fn *minir.Function) int {
 		}
 
 		// (b) Walk instructions, handling loads and stores.
-		for i, ins := range b.Instrs {
+		for _, ins := range b.Instrs {
 			if _, isPhi := ins.(*minir.PhiInst); isPhi {
 				continue // phi nodes already handled above
 			}
@@ -169,18 +166,11 @@ func Mem2Reg(fn *minir.Function) int {
 					continue // not a promoted alloca
 				}
 				reaching := topOrZero(stacks[a], a.AllocType)
-				if t, ok := reaching.(*minir.Temp); ok {
-					// Direct temp: record substitution and delete the load.
-					subst[instr.Dst] = t
-					toDelete[ins] = true
-				} else {
-					// Constant: replace the load with a materialiser so that the
-					// load's Dst *Temp remains a valid SSA definition (needed in
-					// positions like ReturnInst.Result where only *Temp is allowed).
-					b.Instrs[i] = materializeConst(instr.Dst, reaching)
-					// The old LoadInst pointer is no longer in Instrs; toDelete
-					// refers to the original pointer which won't be found.
-				}
+				// All instruction use-positions accept Value, so temps and
+				// constants are treated identically: record the substitution
+				// and delete the load.
+				subst[instr.Dst] = reaching
+				toDelete[ins] = true
 
 			case *minir.StoreInst:
 				addrTemp, ok := instr.Addr.(*minir.Temp)
@@ -254,9 +244,9 @@ func Mem2Reg(fn *minir.Function) int {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 // topOrZero returns the top value on the per-alloca stack, or a zero constant
-// of the alloca's element type when the stack is empty (the variable is used
-// on a path where no store dominates the load — undefined behaviour in
-// well-typed source, but we produce something verifier-legal here).
+// of the alloca's element type when the stack is empty. (The variable is used
+// on a path where no store dominates the load — undefined behavior in
+// well-typed source, but we produce something verifier-legal here.)
 func topOrZero(stack []minir.Value, ty minir.Type) minir.Value {
 	if len(stack) > 0 {
 		return stack[len(stack)-1]
@@ -280,28 +270,6 @@ func zeroForType(ty minir.Type) minir.Value {
 		return minir.NewConst("null", int64(0), ty)
 	default:
 		return minir.NewConst("0", int64(0), ty)
-	}
-}
-
-// materializeConst replaces a LoadInst with a BinaryInst that copies the
-// constant value into the same destination temp.  This preserves the temp as a
-// valid SSA definition so callers (e.g. ReturnInst.Result) keep a *Temp.
-// The result is trivially constant-foldable in the next optimisation pass.
-func materializeConst(dst *minir.Temp, v minir.Value) minir.Instr {
-	ty := dst.Type()
-	if pt, ok := ty.(*minir.PrimitiveType); ok && pt.String() == "i1" {
-		return &minir.BinaryInst{
-			Dst:   dst,
-			Op:    "xor",
-			Left:  v,
-			Right: minir.NewConst("false", int64(0), ty),
-		}
-	}
-	return &minir.BinaryInst{
-		Dst:   dst,
-		Op:    "add",
-		Left:  v,
-		Right: minir.NewConst("0", int64(0), ty),
 	}
 }
 
@@ -345,11 +313,6 @@ func applySubst(
 // replaceInInstr returns a version of ins where every use in subst has been
 // replaced with its mapped value.  Returns the original pointer when nothing
 // changed (no allocation).
-//
-// For instruction fields typed as *Temp (ReturnInst.Result, CondBrInst.Cond,
-// SwitchInst.Key) we only substitute *Temp → *Temp to avoid introducing a
-// type mismatch; constant reaching values are handled upstream by
-// materializeConst which ensures those temps remain valid SSA definitions.
 func replaceInInstr(ins minir.Instr, subst map[*minir.Temp]minir.Value) minir.Instr {
 	if len(subst) == 0 {
 		return ins
@@ -362,19 +325,6 @@ func replaceInInstr(ins minir.Instr, subst map[*minir.Temp]minir.Value) minir.In
 			}
 		}
 		return v
-	}
-
-	// For positions that only accept *Temp, only allow *Temp replacements.
-	subTemp := func(t *minir.Temp) *minir.Temp {
-		if t == nil {
-			return nil
-		}
-		if r, found := subst[t]; found {
-			if rt, ok := r.(*minir.Temp); ok {
-				return rt
-			}
-		}
-		return t
 	}
 
 	switch i := ins.(type) {
@@ -481,24 +431,21 @@ func replaceInInstr(ins minir.Instr, subst map[*minir.Temp]minir.Value) minir.In
 		}
 
 	case *minir.ReturnInst:
-		// ReturnInst.Result is typed *Temp; only *Temp → *Temp substitutions apply.
-		nr := subTemp(i.Result)
+		nr := sub(i.Result)
 		if nr == i.Result {
 			return ins
 		}
 		return &minir.ReturnInst{Result: nr}
 
 	case *minir.CondBrInst:
-		// CondBrInst.Cond is *Temp.
-		nc := subTemp(i.Cond)
+		nc := sub(i.Cond)
 		if nc == i.Cond {
 			return ins
 		}
 		return &minir.CondBrInst{Cond: nc, TrueLabel: i.TrueLabel, FalseLabel: i.FalseLabel}
 
 	case *minir.SwitchInst:
-		// SwitchInst.Key is *Temp.
-		nk := subTemp(i.Key)
+		nk := sub(i.Key)
 		if nk == i.Key {
 			return ins
 		}
