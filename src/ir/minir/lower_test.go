@@ -1,10 +1,9 @@
-package lower
+package minir
 
 import (
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
-	"github.com/anthonyabeo/obx/src/ir/minir"
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
@@ -37,7 +36,7 @@ func hirLit(val string, ty types.Type) *desugar.Literal {
 	return &desugar.Literal{Kind: token.INT32_LIT, Value: val, SemaType: ty}
 }
 
-func checkLower(t *testing.T, label string, prog *minir.Program) {
+func checkLower(t *testing.T, label string, prog *Program) {
 	t.Helper()
 	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 {
 		mods := 0
@@ -49,14 +48,14 @@ func checkLower(t *testing.T, label string, prog *minir.Program) {
 		t.Fatalf("%s: expected 1 module with 1 function, got %d module(s) / %d function(s)", label, mods, fns)
 	}
 	fn := prog.Modules[0].Functions[0]
-	errs := minir.VerifyIR(fn)
+	errs := VerifyIR(fn)
 	for _, e := range errs {
 		t.Logf("%s verify error: %s", label, e.Error())
 	}
 	if len(errs) != 0 {
 		t.Fatalf("%s: expected no verify errors, got %d", label, len(errs))
 	}
-	t.Logf("%s:\n%s", label, minir.FormatFunction(fn))
+	t.Logf("%s:\n%s", label, FormatFunction(fn))
 }
 
 // ── 1. identity(x: INT32): INT32 = RETURN x ──────────────────────────────────
@@ -287,7 +286,7 @@ func TestLower_Increment(t *testing.T) {
 	}
 	p := lfn.Params[0]
 	// VAR params should be incoming pointer/address temps
-	if _, ok := p.Type().(*minir.PointerType); !ok {
+	if _, ok := p.Type().(*PointerType); !ok {
 		t.Fatalf("increment: expected param to be pointer type, got %T", p.Type())
 	}
 	if !p.IsAddr {
@@ -337,7 +336,7 @@ func TestLower_InParam(t *testing.T) {
 	}
 	p := lfn.Params[0]
 	// IN params should be incoming pointer/address temps
-	if _, ok := p.Type().(*minir.PointerType); !ok {
+	if _, ok := p.Type().(*PointerType); !ok {
 		t.Fatalf("increment_in: expected param to be pointer type, got %T", p.Type())
 	}
 	if !p.IsAddr {

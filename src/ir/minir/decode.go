@@ -529,7 +529,7 @@ func DecodeInstr(r io.Reader) (Instr, error) {
 		return &HaltInst{Code: code}, nil
 
 	case opRet:
-		result, err := decodeTemp(r)
+		result, err := DecodeValue(r)
 		if err != nil {
 			return nil, err
 		}
@@ -543,7 +543,7 @@ func DecodeInstr(r io.Reader) (Instr, error) {
 		return &JumpInst{Target: target}, nil
 
 	case opCondBr:
-		cond, err := decodeTemp(r)
+		cond, err := DecodeValue(r)
 		if err != nil {
 			return nil, err
 		}
@@ -558,7 +558,7 @@ func DecodeInstr(r io.Reader) (Instr, error) {
 		return &CondBrInst{Cond: cond, TrueLabel: trueLabel, FalseLabel: falseLabel}, nil
 
 	case opSwitch:
-		key, err := decodeTemp(r)
+		key, err := DecodeValue(r)
 		if err != nil {
 			return nil, err
 		}

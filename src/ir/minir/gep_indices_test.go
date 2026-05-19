@@ -1,10 +1,6 @@
-package core
+package minir
 
-import (
-	"testing"
-
-	"github.com/anthonyabeo/obx/src/ir/minir/lower"
-)
+import "testing"
 
 // helper: compute strides for a nested ArrayType. Returns -1 for a stride that
 // depends on an open (Len==0) dimension in the suffix.
@@ -83,16 +79,15 @@ func computeStrides(a *ArrayType) []int {
 }
 
 func TestGEP_MixedIndices_Ai2j(t *testing.T) {
-	//tempIDCounter = 0
-	lower.ResetTempCounter()
+	tempIDCounter = 0
 
 	// type: [3 x [4 x [5 x i32]]]
 	arr := NewArrayType(3, NewArrayType(4, NewArrayType(5, I32())))
-	base := lower.NewTemp("a", Ptr(arr))
+	base := NewTemp("a", Ptr(arr))
 	base.IsAddr = true
-	i := lower.NewTemp("i", I32())
-	j := lower.NewTemp("j", I32())
-	dst := lower.NewTemp("dst", Ptr(I32()))
+	i := NewTemp("i", I32())
+	j := NewTemp("j", I32())
+	dst := NewTemp("dst", Ptr(I32()))
 
 	// represent a[i][2][j] -> Offsets [0,2,0], Indices [i,j]
 	gep := &GEPInst{Dst: dst, Base: base, ElemType: arr, Offsets: []int{0, 2, 0}, Indices: []Value{i, j}}
@@ -123,13 +118,12 @@ func TestGEP_MixedIndices_Ai2j(t *testing.T) {
 }
 
 func TestGEP_AllConst_A2_3_4(t *testing.T) {
-	//tempIDCounter = 0
-	lower.ResetTempCounter()
+	tempIDCounter = 0
 
 	arr := NewArrayType(2, NewArrayType(3, NewArrayType(4, I32())))
-	base := lower.NewTemp("b", Ptr(arr))
+	base := NewTemp("b", Ptr(arr))
 	base.IsAddr = true
-	dst := lower.NewTemp("d", Ptr(I32()))
+	dst := NewTemp("d", Ptr(I32()))
 	gep := &GEPInst{Dst: dst, Base: base, ElemType: arr, Offsets: []int{2, 3, 4}, Indices: nil}
 
 	if len(gep.Offsets) != 3 {
@@ -145,14 +139,13 @@ func TestGEP_AllConst_A2_3_4(t *testing.T) {
 }
 
 func TestGEP_AllDynamic_AiAj(t *testing.T) {
-	//tempIDCounter = 0
-	lower.ResetTempCounter()
+	tempIDCounter = 0
 	arr := NewArrayType(0, NewArrayType(0, I32()))
-	base := lower.NewTemp("c", Ptr(arr))
+	base := NewTemp("c", Ptr(arr))
 	base.IsAddr = true
-	i := lower.NewTemp("i", I32())
-	j := lower.NewTemp("j", I32())
-	dst := lower.NewTemp("dst2", Ptr(I32()))
+	i := NewTemp("i", I32())
+	j := NewTemp("j", I32())
+	dst := NewTemp("dst2", Ptr(I32()))
 	gep := &GEPInst{Dst: dst, Base: base, ElemType: arr, Offsets: []int{0, 0}, Indices: []Value{i, j}}
 
 	if len(gep.Offsets) != 2 {

@@ -1,4 +1,4 @@
-package lower
+package minir
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
-	"github.com/anthonyabeo/obx/src/ir/minir"
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
@@ -19,16 +18,16 @@ import (
 // Lowerer translates desugared HIR functions into minir Functions.
 type Lowerer struct {
 	// module-level state (shared across all functions in the program)
-	mod *minir.Module // the module being built; set by Lower()
+	mod *Module // the module being built; set by Lower()
 
 	// per-function mutable state, reset by lowerFunction
-	blockSeq int                    // monotone block-ID counter
-	labelSeq int                    // label-suffix counter
-	fn       *minir.Function        // function currently being lowered
-	curBlock *minir.Block           // active basic block
-	varEnv   map[string]*minir.Temp // variable name → alloca address temp (IsAddr=true)
-	constEnv map[string]minir.Value // constant name → pre-computed Value
-	loopExit map[string]string      // loop label → exit-block label; "" = innermost loop
+	blockSeq int               // monotone block-ID counter
+	labelSeq int               // label-suffix counter
+	fn       *Function         // function currently being lowered
+	curBlock *Block            // active basic block
+	varEnv   map[string]*Temp  // variable name → alloca address temp (IsAddr=true)
+	constEnv map[string]Value  // constant name → pre-computed Value
+	loopExit map[string]string // loop label → exit-block label; "" = innermost loop
 	// diagnostics/context
 	dctx     *compiler.Context
 	reported map[string]bool // dedupe map keyed by rttiName@module
@@ -37,8 +36,8 @@ type Lowerer struct {
 func New(dctx *compiler.Context) *Lowerer {
 	return &Lowerer{
 		dctx:     dctx,
-		varEnv:   make(map[string]*minir.Temp),
-		constEnv: make(map[string]minir.Value),
+		varEnv:   make(map[string]*Temp),
+		constEnv: make(map[string]Value),
 		loopExit: make(map[string]string),
 		reported: make(map[string]bool),
 	}
@@ -51,7 +50,7 @@ func New(dctx *compiler.Context) *Lowerer {
 //
 // and is provided primarily for use in tests and tooling where a full compiler
 // context is not available.
-func Lower(prog *desugar.Program) *minir.Program {
+func Lower(prog *desugar.Program) *Program {
 	return New(nil).Lower(prog)
 }
 
@@ -69,11 +68,11 @@ func Lower(prog *desugar.Program) *minir.Program {
 //
 //  2. Function bodies: each non-external function is lowered; global variables
 //     resolve directly to their *GlobalRef address.
-func (l *Lowerer) Lower(prog *desugar.Program) *minir.Program {
-	outProg := &minir.Program{}
+func (l *Lowerer) Lower(prog *desugar.Program) *Program {
+	outProg := &Program{}
 
 	for _, hirMod := range prog.Modules {
-		mod := &minir.Module{Name: hirMod.Name}
+		mod := &Module{Name: hirMod.Name}
 		l.mod = mod
 		// expose module to LowerType so it can emit module-level constants
 		currentModule = mod
@@ -111,18 +110,18 @@ func (l *Lowerer) Lower(prog *desugar.Program) *minir.Program {
 
 // ── function lowering ─────────────────────────────────────────────────────────
 
-func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *minir.Function {
+func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 	// reset per-function state
 	l.blockSeq = 0
 	l.labelSeq = 0
-	l.varEnv = make(map[string]*minir.Temp)
-	l.constEnv = make(map[string]minir.Value)
+	l.varEnv = make(map[string]*Temp)
+	l.constEnv = make(map[string]Value)
 	l.loopExit = make(map[string]string)
 
-	fn := &minir.Function{
+	fn := &Function{
 		FnName:     hirFn.FnName(),
 		Result:     LowerType(hirFn.Result),
-		Blocks:     make(map[int]*minir.Block),
+		Blocks:     make(map[int]*Block),
 		ParamKinds: make([]desugar.ParamKind, 0),
 	}
 	l.fn = fn
@@ -155,7 +154,7 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *minir.Function {
 	// continuation after an all-branches-return if-else) must not create a
 	// spurious edge to fn.Exit.
 	if l.curBlock != nil && l.curBlock.Term == nil {
-		j := &minir.JumpInst{Target: fn.Exit.Label}
+		j := &JumpInst{Target: fn.Exit.Label}
 		l.emit(j)
 		l.curBlock.Term = j
 		if _, live := fn.Blocks[l.curBlock.ID]; live {
@@ -173,7 +172,7 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *minir.Function {
 	// by later phases.
 	l.switchTo(fn.Exit)
 
-	ret := &minir.ReturnInst{}
+	ret := &ReturnInst{}
 	l.emit(ret)
 	fn.Exit.Term = ret
 
@@ -188,10 +187,10 @@ func (l *Lowerer) lowerParams(params []*desugar.Param) {
 	for _, p := range params {
 		et := LowerType(p.Typ)
 		if et == nil {
-			et = minir.I32()
+			et = I32()
 		}
 
-		var param *minir.Temp
+		var param *Temp
 		if p.Kind == desugar.VarParam || p.Kind == desugar.InParam {
 			// Expect a pointer parameter for VAR/IN semantics.
 			param = l.newAddrTemp(p.Name, et)
@@ -220,11 +219,11 @@ func (l *Lowerer) lowerLocals(locals []desugar.Decl) {
 		case *desugar.Variable:
 			vt := LowerType(d.Type)
 			if vt == nil {
-				vt = minir.I32()
+				vt = I32()
 			}
 
 			addr := l.newAddrTemp(d.Name, vt)
-			l.emit(&minir.AllocaInst{Dst: addr, AllocType: vt})
+			l.emit(&AllocaInst{Dst: addr, AllocType: vt})
 
 			key := d.Mangled
 			if key == "" {
@@ -289,20 +288,22 @@ func (l *Lowerer) lowerStmt(s desugar.Stmt) {
 func (l *Lowerer) lowerAssign(st *desugar.AssignStmt) {
 	addr := l.lowerAddr(st.Left)
 	val := l.lowerValue(st.Right)
-	l.emit(&minir.StoreInst{Val: val, Addr: addr})
+	l.emit(&StoreInst{Val: val, Addr: addr})
 }
 
 func (l *Lowerer) lowerReturn(st *desugar.ReturnStmt) {
 	// Emit a ReturnInst in the current block. The return value (if any)
 	// is materialized into a temp so the ReturnInst holds a proper SSA def.
-	var result *minir.Temp
+	var result *Temp
 	if st.Result != nil {
 		v := l.lowerValue(st.Result)
 		result = l.ensureTemp(v, LowerType(st.Result.Type()))
 	}
-	ret := &minir.ReturnInst{Result: result}
+
+	ret := &ReturnInst{Result: result}
 	l.emit(ret)
 	l.curBlock.Term = ret
+
 	// Wire a CFG edge to the canonical exit block so all return paths are
 	// visible in the CFG — mirrors the pattern used in builtinHalt.
 	if l.fn != nil && l.fn.Exit != nil {
@@ -333,7 +334,7 @@ func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 
 	for i, br := range branches {
 		condVal := l.lowerValue(br.cond)
-		condTemp := l.ensureTemp(condVal, minir.I1())
+		condTemp := l.ensureTemp(condVal, I1())
 
 		trueLabel := l.newLabel(fmt.Sprintf("if_then_%d", i))
 		var falseLabel string
@@ -347,7 +348,7 @@ func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 			hasLiveJumpToEnd = true
 		}
 
-		cbr := &minir.CondBrInst{Cond: condTemp, TrueLabel: trueLabel, FalseLabel: falseLabel}
+		cbr := &CondBrInst{Cond: condTemp, TrueLabel: trueLabel, FalseLabel: falseLabel}
 		l.emit(cbr)
 		l.curBlock.Term = cbr
 
@@ -356,7 +357,7 @@ func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 		l.switchTo(thenBlk)
 		l.lowerStmts(br.body)
 		if l.curBlock.Term == nil {
-			j := &minir.JumpInst{Target: endLabel}
+			j := &JumpInst{Target: endLabel}
 			l.emit(j)
 			l.curBlock.Term = j
 			// Count as live only when curBlock is a registered live block.
@@ -375,7 +376,7 @@ func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 	if st.Else != nil {
 		l.lowerStmts(st.Else)
 		if l.curBlock.Term == nil {
-			j := &minir.JumpInst{Target: endLabel}
+			j := &JumpInst{Target: endLabel}
 			l.emit(j)
 			l.curBlock.Term = j
 			if _, live := l.fn.Blocks[l.curBlock.ID]; live {
@@ -403,7 +404,7 @@ func (l *Lowerer) lowerLoop(st *desugar.LoopStmt) {
 	}
 
 	// unconditional jump into loop header
-	j := &minir.JumpInst{Target: loopLabel}
+	j := &JumpInst{Target: loopLabel}
 	l.emit(j)
 	l.curBlock.Term = j
 
@@ -422,7 +423,7 @@ func (l *Lowerer) lowerLoop(st *desugar.LoopStmt) {
 
 	// back-edge (only when the current block is not already terminated)
 	if l.curBlock.Term == nil {
-		back := &minir.JumpInst{Target: loopLabel}
+		back := &JumpInst{Target: loopLabel}
 		l.emit(back)
 		l.curBlock.Term = back
 	}
@@ -443,7 +444,7 @@ func (l *Lowerer) lowerExit(st *desugar.ExitStmt) {
 	if target == "" {
 		target = l.loopExit[""]
 	}
-	j := &minir.JumpInst{Target: target}
+	j := &JumpInst{Target: target}
 	l.emit(j)
 	l.curBlock.Term = j
 	// orphan block – not added to fn.Blocks
@@ -465,7 +466,7 @@ func (l *Lowerer) lowerCase(st *desugar.CaseStmt) {
 	}
 
 	keyVal := l.lowerValue(st.Expr)
-	keyTemp := l.ensureTemp(keyVal, minir.I32())
+	keyTemp := l.ensureTemp(keyVal, I32())
 
 	// emit per-case check chains; each case may have multiple label ranges
 	for caseIdx, c := range st.Cases {
@@ -505,7 +506,7 @@ func (l *Lowerer) lowerCase(st *desugar.CaseStmt) {
 		l.switchTo(bodyBlk)
 		l.lowerStmts(c.Body)
 		if l.curBlock.Term == nil {
-			j := &minir.JumpInst{Target: endLabel}
+			j := &JumpInst{Target: endLabel}
 			l.emit(j)
 			l.curBlock.Term = j
 		}
@@ -518,7 +519,7 @@ func (l *Lowerer) lowerCase(st *desugar.CaseStmt) {
 		l.switchTo(elseBlk)
 		l.lowerStmts(st.Else)
 		if l.curBlock.Term == nil {
-			j := &minir.JumpInst{Target: endLabel}
+			j := &JumpInst{Target: endLabel}
 			l.emit(j)
 			l.curBlock.Term = j
 		}
@@ -529,7 +530,7 @@ func (l *Lowerer) lowerCase(st *desugar.CaseStmt) {
 	l.switchTo(endBlk)
 }
 
-func (l *Lowerer) emitCaseTest(key *minir.Temp, lr *desugar.LabelRange, bodyLabel, fallLabel string) {
+func (l *Lowerer) emitCaseTest(key *Temp, lr *desugar.LabelRange, bodyLabel, fallLabel string) {
 	loVal := l.lowerValue(lr.Low)
 	singleton := lr.Low == lr.High
 	if !singleton {
@@ -540,21 +541,21 @@ func (l *Lowerer) emitCaseTest(key *minir.Temp, lr *desugar.LabelRange, bodyLabe
 		}
 	}
 	if singleton {
-		cmp := NewAnonTemp(minir.I1())
-		l.emit(&minir.ICmpInst{Dst: cmp, Pred: "eq", Left: key, Right: loVal})
-		br := &minir.CondBrInst{Cond: cmp, TrueLabel: bodyLabel, FalseLabel: fallLabel}
+		cmp := NewAnonTemp(I1())
+		l.emit(&ICmpInst{Dst: cmp, Pred: "eq", Left: key, Right: loVal})
+		br := &CondBrInst{Cond: cmp, TrueLabel: bodyLabel, FalseLabel: fallLabel}
 		l.emit(br)
 		l.curBlock.Term = br
 		return
 	}
 	hiVal := l.lowerValue(lr.High)
-	loOk := NewAnonTemp(minir.I1())
-	hiOk := NewAnonTemp(minir.I1())
-	both := NewAnonTemp(minir.I1())
-	l.emit(&minir.ICmpInst{Dst: loOk, Pred: "sge", Left: key, Right: loVal})
-	l.emit(&minir.ICmpInst{Dst: hiOk, Pred: "sle", Left: key, Right: hiVal})
-	l.emit(&minir.BinaryInst{Dst: both, Op: "and", Left: loOk, Right: hiOk})
-	br := &minir.CondBrInst{Cond: both, TrueLabel: bodyLabel, FalseLabel: fallLabel}
+	loOk := NewAnonTemp(I1())
+	hiOk := NewAnonTemp(I1())
+	both := NewAnonTemp(I1())
+	l.emit(&ICmpInst{Dst: loOk, Pred: "sge", Left: key, Right: loVal})
+	l.emit(&ICmpInst{Dst: hiOk, Pred: "sle", Left: key, Right: hiVal})
+	l.emit(&BinaryInst{Dst: both, Op: "and", Left: loOk, Right: hiOk})
+	br := &CondBrInst{Cond: both, TrueLabel: bodyLabel, FalseLabel: fallLabel}
 	l.emit(br)
 	l.curBlock.Term = br
 }
@@ -574,7 +575,7 @@ func (l *Lowerer) lowerCallStmt(call *desugar.FuncCall) {
 	// Determine which formals expect addresses (VAR/IN) when possible.
 	formalAddr := l.formalAddrForCall(call)
 
-	var args []minir.Value
+	var args []Value
 	for i, a := range call.Args {
 		needAddr := false
 		if formalAddr != nil && i < len(formalAddr) {
@@ -587,19 +588,19 @@ func (l *Lowerer) lowerCallStmt(call *desugar.FuncCall) {
 		}
 	}
 
-	l.emit(&minir.CallInst{Callee: callee, Args: args})
+	l.emit(&CallInst{Callee: callee, Args: args})
 }
 
 // ── expression lowering ───────────────────────────────────────────────────────
 
-func (l *Lowerer) lowerValue(expr desugar.Expr) minir.Value {
+func (l *Lowerer) lowerValue(expr desugar.Expr) Value {
 	switch e := expr.(type) {
 	case *desugar.Literal:
 		return l.lowerLiteralExpr(e)
 	case *desugar.VariableRef:
 		addr := l.resolveVar(e.Mangled, e.Name)
 		dst := NewTemp(e.Name, LowerType(e.SemaType))
-		l.emit(&minir.LoadInst{Dst: dst, Addr: addr})
+		l.emit(&LoadInst{Dst: dst, Addr: addr})
 		return dst
 	case *desugar.ConstantRef:
 		if cv, ok := l.constEnv[e.Name]; ok {
@@ -623,18 +624,18 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) minir.Value {
 	case *desugar.Param:
 		v := l.resolveVar(e.Name, e.Name)
 		// If v is an address-like value (alloca temp or global), load from it.
-		if minir.IsAddrValue(v) {
+		if IsAddrValue(v) {
 			dst := NewTemp(e.Name, LowerType(e.Typ))
-			l.emit(&minir.LoadInst{Dst: dst, Addr: v})
+			l.emit(&LoadInst{Dst: dst, Addr: v})
 			return dst
 		}
 		// Otherwise v is a value temp (ValueParam) — return it directly.
-		if t, ok := v.(*minir.Temp); ok {
+		if t, ok := v.(*Temp); ok {
 			return t
 		}
 		// Fallback: materialize via a load into a temp
 		dst := NewTemp(e.Name, LowerType(e.Typ))
-		l.emit(&minir.BinaryInst{Dst: dst, Op: "add", Left: v, Right: minir.NewConst("0", int64(0), dst.Type())})
+		l.emit(&BinaryInst{Dst: dst, Op: "add", Left: v, Right: NewConst("0", int64(0), dst.Type())})
 		return dst
 	case *desugar.BinaryExpr:
 		return l.lowerBinary(e)
@@ -645,19 +646,19 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) minir.Value {
 	case *desugar.FieldAccess:
 		addr := l.lowerFieldAddr(e)
 		dst := NewAnonTemp(LowerType(e.SemaType))
-		l.emit(&minir.LoadInst{Dst: dst, Addr: addr})
+		l.emit(&LoadInst{Dst: dst, Addr: addr})
 		return dst
 	case *desugar.IndexExpr:
 		addr := l.lowerIndexAddr(e)
 		dst := NewAnonTemp(LowerType(e.SemaType))
-		l.emit(&minir.LoadInst{Dst: dst, Addr: addr})
+		l.emit(&LoadInst{Dst: dst, Addr: addr})
 		return dst
 	case *desugar.DerefExpr:
 		ptrVal := l.lowerValue(e.Pointer)
-		ptrTemp := l.ensureTemp(ptrVal, minir.Ptr(LowerType(e.SemaType)))
+		ptrTemp := l.ensureTemp(ptrVal, Ptr(LowerType(e.SemaType)))
 		ptrTemp.IsAddr = true
 		dst := NewAnonTemp(LowerType(e.SemaType))
-		l.emit(&minir.LoadInst{Dst: dst, Addr: ptrTemp})
+		l.emit(&LoadInst{Dst: dst, Addr: ptrTemp})
 		return dst
 	case *desugar.TypeRef:
 		// A type denotation used as a value (e.g. SIZE(T), DEFAULT(T)).
@@ -665,16 +666,16 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) minir.Value {
 		// before this path for type-query forms.
 		ty := LowerType(e.UnderType)
 		if ty == nil {
-			ty = minir.I32()
+			ty = I32()
 		}
-		return minir.NewConst("0", int64(0), ty)
+		return NewConst("0", int64(0), ty)
 	case *desugar.TypeGuardExpr:
 		// Lower the subject expression to a pointer/value temp we can pass to
 		// a runtime helper. We keep the helper responsible for the subtype
 		// walk; on failure we emit a HaltInst to abort as required.
 		subj := l.lowerValue(e.Expr)
 		// ensure a pointer-like temp for passing to the runtime helper
-		obj := l.ensureTemp(subj, minir.Ptr(minir.I32()))
+		obj := l.ensureTemp(subj, Ptr(I32()))
 
 		// Resolve target RTTI symbol name using the shared helper.
 		rttiName := rttiNameForType(e.Typ)
@@ -689,19 +690,19 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) minir.Value {
 
 		// Inline numeric-ID based subtype walk.
 		// Load instance RTTI pointer from object header (vptr at offset 0).
-		instRTTIPtr := NewAnonTemp(minir.Ptr(minir.I32()))
+		instRTTIPtr := NewAnonTemp(Ptr(I32()))
 		// Treat obj as an address (pointer-to-object) for the load.
 		obj.IsAddr = true
-		l.emit(&minir.LoadInst{Dst: instRTTIPtr, Addr: obj})
+		l.emit(&LoadInst{Dst: instRTTIPtr, Addr: obj})
 		instRTTIPtr.IsAddr = true // it points into RTTI memory; mark addressable for GEP
 
 		// Use the shared RTTI POD record type descriptor.
 		rttiRec := rttiPODRecordType()
 		// GEP to field 0 (ID)
 		idAddr := l.newAddrTemp("rtti.id", rttiRec)
-		l.emit(&minir.GEPInst{Dst: idAddr, Base: instRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
-		instID := NewAnonTemp(minir.I64())
-		l.emit(&minir.LoadInst{Dst: instID, Addr: idAddr})
+		l.emit(&GEPInst{Dst: idAddr, Base: instRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
+		instID := NewAnonTemp(I64())
+		l.emit(&LoadInst{Dst: instID, Addr: idAddr})
 
 		// Resolve target ID from rttiID map (assigned during LowerType emission).
 		tid := rttiID[rttiName]
@@ -709,7 +710,7 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) minir.Value {
 			// no id assigned: conservatively continue
 			return obj
 		}
-		targetConst := minir.NewConst(fmt.Sprintf("%d", tid), int64(tid), minir.I64())
+		targetConst := NewConst(fmt.Sprintf("%d", tid), int64(tid), I64())
 
 		// Prepare basic blocks: check-loop, mismatch, load-next-id, pass, fail.
 		startLabel := l.newLabel("tg.check")
@@ -719,7 +720,7 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) minir.Value {
 		loadNextLabel := l.newLabel("tg.loadnext")
 
 		// Jump into the check block
-		j := &minir.JumpInst{Target: startLabel}
+		j := &JumpInst{Target: startLabel}
 		l.emit(j)
 		l.curBlock.Term = j
 
@@ -737,37 +738,37 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) minir.Value {
 		prevLabel := l.curBlock.Label
 
 		// Pre-declare temps defined in later blocks (for phi referencing)
-		nextRTTIPtr := NewAnonTemp(minir.Ptr(minir.I32())) // defined in mismatchBlk
-		nextID := NewAnonTemp(minir.I64())                 // defined in loadNextBlk
+		nextRTTIPtr := NewAnonTemp(Ptr(I32())) // defined in mismatchBlk
+		nextID := NewAnonTemp(I64())           // defined in loadNextBlk
 
 		// ── start block: phis + compare ─────────────────────────────────────
 		l.switchTo(startBlk)
-		phiID := NewAnonTemp(minir.I64())
-		phiPtr := NewAnonTemp(minir.Ptr(minir.I32()))
+		phiID := NewAnonTemp(I64())
+		phiPtr := NewAnonTemp(Ptr(I32()))
 		phiPtr.IsAddr = true // mark addressable so it can be used as GEP base in mismatch
-		l.emit(&minir.PhiInst{Dst: phiPtr, Args: []minir.PhiArm{
+		l.emit(&PhiInst{Dst: phiPtr, Args: []PhiArm{
 			{BlockLabel: prevLabel, Val: instRTTIPtr},
 			{BlockLabel: loadNextLabel, Val: nextRTTIPtr},
 		}})
-		l.emit(&minir.PhiInst{Dst: phiID, Args: []minir.PhiArm{
+		l.emit(&PhiInst{Dst: phiID, Args: []PhiArm{
 			{BlockLabel: prevLabel, Val: instID},
 			{BlockLabel: loadNextLabel, Val: nextID},
 		}})
-		cmp := NewAnonTemp(minir.I1())
-		l.emit(&minir.ICmpInst{Dst: cmp, Pred: "eq", Left: phiID, Right: targetConst})
-		cbr := &minir.CondBrInst{Cond: cmp, TrueLabel: passLabel, FalseLabel: mismatchLabel}
+		cmp := NewAnonTemp(I1())
+		l.emit(&ICmpInst{Dst: cmp, Pred: "eq", Left: phiID, Right: targetConst})
+		cbr := &CondBrInst{Cond: cmp, TrueLabel: passLabel, FalseLabel: mismatchLabel}
 		l.emit(cbr)
 		l.curBlock.Term = cbr
 
 		// ── mismatch block: load base ptr, check null ────────────────────────
 		l.switchTo(mismatchBlk)
 		baseAddr := l.newAddrTemp("rtti.base", rttiRec)
-		l.emit(&minir.GEPInst{Dst: baseAddr, Base: phiPtr, ElemType: rttiRec, Offsets: []int{1}})
-		l.emit(&minir.LoadInst{Dst: nextRTTIPtr, Addr: baseAddr})
-		zeroPtr := minir.NewConst("0", int64(0), minir.Ptr(minir.I32()))
-		isNull := NewAnonTemp(minir.I1())
-		l.emit(&minir.ICmpInst{Dst: isNull, Pred: "eq", Left: nextRTTIPtr, Right: zeroPtr})
-		brNull := &minir.CondBrInst{Cond: isNull, TrueLabel: failLabel, FalseLabel: loadNextLabel}
+		l.emit(&GEPInst{Dst: baseAddr, Base: phiPtr, ElemType: rttiRec, Offsets: []int{1}})
+		l.emit(&LoadInst{Dst: nextRTTIPtr, Addr: baseAddr})
+		zeroPtr := NewConst("0", int64(0), Ptr(I32()))
+		isNull := NewAnonTemp(I1())
+		l.emit(&ICmpInst{Dst: isNull, Pred: "eq", Left: nextRTTIPtr, Right: zeroPtr})
+		brNull := &CondBrInst{Cond: isNull, TrueLabel: failLabel, FalseLabel: loadNextLabel}
 		l.emit(brNull)
 		l.curBlock.Term = brNull
 
@@ -775,15 +776,15 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) minir.Value {
 		l.switchTo(loadNextBlk)
 		nextRTTIPtr.IsAddr = true // mark addressable for GEP in this block
 		baseIDAddr := l.newAddrTemp("rtti.id2", rttiRec)
-		l.emit(&minir.GEPInst{Dst: baseIDAddr, Base: nextRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
-		l.emit(&minir.LoadInst{Dst: nextID, Addr: baseIDAddr})
-		jBack := &minir.JumpInst{Target: startLabel}
+		l.emit(&GEPInst{Dst: baseIDAddr, Base: nextRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
+		l.emit(&LoadInst{Dst: nextID, Addr: baseIDAddr})
+		jBack := &JumpInst{Target: startLabel}
 		l.emit(jBack)
 		l.curBlock.Term = jBack
 
 		// ── fail block: emit Halt ────────────────────────────────────────────
 		l.switchTo(failBlk)
-		halt := &minir.HaltInst{Code: minir.NewConst("1", int64(1), minir.I32())}
+		halt := &HaltInst{Code: NewConst("1", int64(1), I32())}
 		l.emit(halt)
 		failBlk.Term = halt
 		if l.fn != nil && l.fn.Exit != nil {
@@ -800,7 +801,7 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) minir.Value {
 	case *desugar.ModuleRef:
 		// Module handle: represent as an opaque pointer-sized constant carrying
 		// the module name (used by LDMOD/LDCMD).
-		return minir.NewConst(e.Name, e.Name, minir.Ptr(minir.I32()))
+		return NewConst(e.Name, e.Name, Ptr(I32()))
 	case *desugar.SetExpr:
 		return l.lowerSetExpr(e)
 	case *desugar.RangeExpr:
@@ -815,28 +816,28 @@ func (l *Lowerer) lowerValue(expr desugar.Expr) minir.Value {
 		// Conservative fallback: return a zero constant of the expression's type
 		ty := LowerType(expr.Type())
 		if ty == nil {
-			ty = minir.I32()
+			ty = I32()
 		}
 
-		if ty == minir.I1() {
-			return minir.NewConst("false", int64(0), minir.I1())
+		if ty == I1() {
+			return NewConst("false", int64(0), I1())
 		}
 
-		return minir.NewConst("0", int64(0), ty)
+		return NewConst("0", int64(0), ty)
 	}
 }
 
 // lowerAddr returns a Value representing the address of an lvalue.
 // The result is either an IsAddr=true *Temp (stack alloca) or a *GlobalRef
 // (module-scope variable / constant) — both satisfy isAddrValue.
-func (l *Lowerer) lowerAddr(expr desugar.Expr) minir.Value {
+func (l *Lowerer) lowerAddr(expr desugar.Expr) Value {
 	switch e := expr.(type) {
 	case *desugar.VariableRef:
 		return l.resolveVar(e.Mangled, e.Name)
 	case *desugar.Param:
 		v := l.resolveVar(e.Name, e.Name)
 		// Forbid taking the address of a ValueParam (non-address temp).
-		if !minir.IsAddrValue(v) {
+		if !IsAddrValue(v) {
 			// Attempt to take address of a non-addressable value parameter.
 			// Emit a warning and create an addressable stack slot, storing the
 			// parameter value into it so lowering can continue.
@@ -844,11 +845,11 @@ func (l *Lowerer) lowerAddr(expr desugar.Expr) minir.Value {
 			l.reportLoweringDiagnostic(msg, e.StartOffset, e.EndOffset)
 			pt := LowerType(e.Typ)
 			if pt == nil {
-				pt = minir.I32()
+				pt = I32()
 			}
 			addr := l.newAddrTemp(e.Name, pt)
-			l.emit(&minir.AllocaInst{Dst: addr, AllocType: pt})
-			l.emit(&minir.StoreInst{Val: v, Addr: addr})
+			l.emit(&AllocaInst{Dst: addr, AllocType: pt})
+			l.emit(&StoreInst{Val: v, Addr: addr})
 			return addr
 		}
 		return v
@@ -858,7 +859,7 @@ func (l *Lowerer) lowerAddr(expr desugar.Expr) minir.Value {
 		return l.lowerIndexAddr(e)
 	case *desugar.DerefExpr:
 		ptrVal := l.lowerValue(e.Pointer)
-		t := l.ensureTemp(ptrVal, minir.Ptr(LowerType(e.SemaType)))
+		t := l.ensureTemp(ptrVal, Ptr(LowerType(e.SemaType)))
 		t.IsAddr = true
 		return t
 	default:
@@ -875,25 +876,25 @@ func (l *Lowerer) lowerAddr(expr desugar.Expr) minir.Value {
 		val := l.lowerValue(expr)
 		ty := LowerType(expr.Type())
 		if ty == nil {
-			ty = minir.I32()
+			ty = I32()
 		}
 
 		addr := l.newAddrTemp("", ty)
-		l.emit(&minir.AllocaInst{Dst: addr, AllocType: ty})
-		l.emit(&minir.StoreInst{Val: val, Addr: addr})
+		l.emit(&AllocaInst{Dst: addr, AllocType: ty})
+		l.emit(&StoreInst{Val: val, Addr: addr})
 
 		return addr
 	}
 }
 
-func (l *Lowerer) lowerFieldAddr(e *desugar.FieldAccess) *minir.Temp {
+func (l *Lowerer) lowerFieldAddr(e *desugar.FieldAccess) *Temp {
 	base := l.lowerAddr(e.Record)
 	ft := LowerType(e.SemaType)
 	dst := l.newAddrTemp(e.Field, ft)
 
-	var recTy *minir.RecordType
-	if pt, ok := base.Type().(*minir.PointerType); ok {
-		recTy, _ = pt.Elem.(*minir.RecordType)
+	var recTy *RecordType
+	if pt, ok := base.Type().(*PointerType); ok {
+		recTy, _ = pt.Elem.(*RecordType)
 	}
 
 	var elemType = ft
@@ -905,30 +906,30 @@ func (l *Lowerer) lowerFieldAddr(e *desugar.FieldAccess) *minir.Temp {
 		elemType = recTy
 	}
 
-	l.emit(&minir.GEPInst{Dst: dst, Base: base, ElemType: elemType, Offsets: offsets, Indices: nil})
+	l.emit(&GEPInst{Dst: dst, Base: base, ElemType: elemType, Offsets: offsets, Indices: nil})
 
 	return dst
 }
 
-func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *minir.Temp {
+func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *Temp {
 	base := l.lowerAddr(e.Array)
 	et := LowerType(e.SemaType)
 	dst := l.newAddrTemp("", et)
 
 	var offsets []int
-	var indices []minir.Value
+	var indices []Value
 	if len(e.Index) == 0 {
 		offsets = []int{0}
 		indices = nil
 	} else {
 		offsets = make([]int, 0, len(e.Index))
-		indices = make([]minir.Value, 0)
+		indices = make([]Value, 0)
 		for _, idxExpr := range e.Index {
 			idxVal := l.lowerValue(idxExpr)
 			// If the index lowered to a constant, fold it into compile-time offsets.
-			if c, ok := idxVal.(minir.Constant); ok {
+			if c, ok := idxVal.(Constant); ok {
 				// If the index lowered to a constant, fold it into compile-time offsets.
-				if n, ok2 := minir.AsInt64(c); ok2 {
+				if n, ok2 := AsInt64(c); ok2 {
 					offsets = append(offsets, int(n))
 				} else {
 					// Emit warning and conservatively treat as zero index so
@@ -952,21 +953,21 @@ func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *minir.Temp {
 	}
 
 	var elemType = et
-	var arrTy *minir.ArrayType
-	if pt, ok := base.Type().(*minir.PointerType); ok {
-		arrTy, _ = pt.Elem.(*minir.ArrayType)
+	var arrTy *ArrayType
+	if pt, ok := base.Type().(*PointerType); ok {
+		arrTy, _ = pt.Elem.(*ArrayType)
 	}
 
 	if arrTy != nil {
 		elemType = arrTy
 	}
 
-	l.emit(&minir.GEPInst{Dst: dst, Base: base, ElemType: elemType, Offsets: offsets, Indices: indices})
+	l.emit(&GEPInst{Dst: dst, Base: base, ElemType: elemType, Offsets: offsets, Indices: indices})
 
 	return dst
 }
 
-func (l *Lowerer) lowerBinary(e *desugar.BinaryExpr) minir.Value {
+func (l *Lowerer) lowerBinary(e *desugar.BinaryExpr) Value {
 	// IS must be handled before lowering both operands as values because the
 	// right-hand side is a type denotation (TypeRef), not a runtime value.
 	if e.Op == token.IS {
@@ -980,76 +981,76 @@ func (l *Lowerer) lowerBinary(e *desugar.BinaryExpr) minir.Value {
 	right := l.lowerValue(e.Right)
 	ty := LowerType(e.SemaType)
 	if ty == nil {
-		ty = minir.I32()
+		ty = I32()
 	}
 
 	switch e.Op {
 	case token.EQUAL, token.NEQ, token.LESS, token.LEQ, token.GREAT, token.GEQ:
 		left, right = l.alignOperands(left, right)
 		pred := tokenToICmpPred(e.Op)
-		dst := NewAnonTemp(minir.I1())
+		dst := NewAnonTemp(I1())
 
 		if isFloatVal(left) || isFloatVal(right) {
-			l.emit(&minir.FCmpInst{ICmpInst: minir.ICmpInst{Dst: dst, Pred: pred, Left: left, Right: right}})
+			l.emit(&FCmpInst{ICmpInst: ICmpInst{Dst: dst, Pred: pred, Left: left, Right: right}})
 		} else {
-			l.emit(&minir.ICmpInst{Dst: dst, Pred: pred, Left: left, Right: right})
+			l.emit(&ICmpInst{Dst: dst, Pred: pred, Left: left, Right: right})
 		}
 
 		return dst
 	case token.AND:
 		left, right = l.sameWidthOperands(left, right, ty)
 		dst := NewAnonTemp(ty)
-		l.emit(&minir.BinaryInst{Dst: dst, Op: "and", Left: left, Right: right})
+		l.emit(&BinaryInst{Dst: dst, Op: "and", Left: left, Right: right})
 		return dst
 	case token.OR:
 		left, right = l.sameWidthOperands(left, right, ty)
 		dst := NewAnonTemp(ty)
-		l.emit(&minir.BinaryInst{Dst: dst, Op: "or", Left: left, Right: right})
+		l.emit(&BinaryInst{Dst: dst, Op: "or", Left: left, Right: right})
 		return dst
 	case token.IN:
-		left, right = l.sameWidthOperands(left, right, minir.U32())
+		left, right = l.sameWidthOperands(left, right, U32())
 		// set membership: ((1 << left) & right) != 0
-		one := minir.NewConst("1", int64(1), minir.U32())
-		shifted := NewAnonTemp(minir.U32())
-		l.emit(&minir.BinaryInst{Dst: shifted, Op: "shl", Left: one, Right: left})
+		one := NewConst("1", int64(1), U32())
+		shifted := NewAnonTemp(U32())
+		l.emit(&BinaryInst{Dst: shifted, Op: "shl", Left: one, Right: left})
 
-		andRes := NewAnonTemp(minir.U32())
-		l.emit(&minir.BinaryInst{Dst: andRes, Op: "and", Left: shifted, Right: right})
+		andRes := NewAnonTemp(U32())
+		l.emit(&BinaryInst{Dst: andRes, Op: "and", Left: shifted, Right: right})
 
-		zero := minir.NewConst("0", int64(0), minir.U32())
-		dst := NewAnonTemp(minir.I1())
-		l.emit(&minir.ICmpInst{Dst: dst, Pred: "ne", Left: andRes, Right: zero})
+		zero := NewConst("0", int64(0), U32())
+		dst := NewAnonTemp(I1())
+		l.emit(&ICmpInst{Dst: dst, Pred: "ne", Left: andRes, Right: zero})
 
 		return dst
 	default:
 		left, right = l.sameWidthOperands(left, right, ty)
 		op := tokenToArithOp(e.Op)
 		dst := NewAnonTemp(ty)
-		l.emit(&minir.BinaryInst{Dst: dst, Op: op, Left: left, Right: right})
+		l.emit(&BinaryInst{Dst: dst, Op: op, Left: left, Right: right})
 
 		return dst
 	}
 }
 
-func (l *Lowerer) lowerUnary(e *desugar.UnaryExpr) minir.Value {
+func (l *Lowerer) lowerUnary(e *desugar.UnaryExpr) Value {
 	operand := l.lowerValue(e.Operand)
 	ty := LowerType(e.SemaType)
 	if ty == nil {
-		ty = minir.I32()
+		ty = I32()
 	}
 
 	switch e.Op {
 	case token.NOT:
-		operand = l.sameType(operand, minir.I1())
-		one := minir.NewConst("true", int64(1), minir.I1())
-		dst := NewAnonTemp(minir.I1())
-		l.emit(&minir.BinaryInst{Dst: dst, Op: "xor", Left: operand, Right: one})
+		operand = l.sameType(operand, I1())
+		one := NewConst("true", int64(1), I1())
+		dst := NewAnonTemp(I1())
+		l.emit(&BinaryInst{Dst: dst, Op: "xor", Left: operand, Right: one})
 		return dst
 	case token.MINUS:
 		operand = coerceToType(operand, ty)
-		zero := minir.NewConst("0", int64(0), ty)
+		zero := NewConst("0", int64(0), ty)
 		dst := NewAnonTemp(ty)
-		l.emit(&minir.BinaryInst{Dst: dst, Op: "sub", Left: zero, Right: operand})
+		l.emit(&BinaryInst{Dst: dst, Op: "sub", Left: zero, Right: operand})
 		return dst
 	default:
 		return operand
@@ -1063,9 +1064,9 @@ func (l *Lowerer) lowerUnary(e *desugar.UnaryExpr) minir.Value {
 // For integer target types the coercion is annotation-only (coerceToType —
 // no CastInst emitted).  Float and pointer targets still go through sameType
 // so that the appropriate fpext/fptrunc/bitcast instruction is emitted.
-func (l *Lowerer) sameWidthOperands(left, right minir.Value, ty minir.Type) (minir.Value, minir.Value) {
+func (l *Lowerer) sameWidthOperands(left, right Value, ty Type) (Value, Value) {
 	if ty != nil {
-		if minir.IsIntType(ty) {
+		if IsIntType(ty) {
 			// Implicit integer promotion: annotate without emitting a cast.
 			left = coerceToType(left, ty)
 			right = coerceToType(right, ty)
@@ -1090,7 +1091,7 @@ func (l *Lowerer) sameWidthOperands(left, right minir.Value, ty minir.Type) (min
 // both sides are annotation-coerced (coerceToType — no CastInst emitted).
 // All other combinations (float-float, int-float, pointer) fall back to the
 // explicit sameType path.
-func (l *Lowerer) alignOperands(left, right minir.Value) (minir.Value, minir.Value) {
+func (l *Lowerer) alignOperands(left, right Value) (Value, Value) {
 	if left == nil || right == nil {
 		return left, right
 	}
@@ -1138,26 +1139,26 @@ func (l *Lowerer) alignOperands(left, right minir.Value) (minir.Value, minir.Val
 // bitmask.  Each singleton element contributes bit (1 << elem); each
 // RangeExpr element contributes a contiguous run of bits.  The result is
 // a u32 *Temp (or a zero *Constant when the set is empty).
-func (l *Lowerer) lowerSetExpr(s *desugar.SetExpr) minir.Value {
+func (l *Lowerer) lowerSetExpr(s *desugar.SetExpr) Value {
 	if len(s.Elems) == 0 {
-		return minir.NewConst("0", int64(0), minir.U32())
+		return NewConst("0", int64(0), U32())
 	}
 
-	var acc minir.Value = minir.NewConst("0", int64(0), minir.U32())
+	var acc Value = NewConst("0", int64(0), U32())
 	for _, elem := range s.Elems {
-		var mask minir.Value
+		var mask Value
 		if re, ok := elem.(*desugar.RangeExpr); ok {
 			mask = l.lowerRangeExpr(re)
 		} else {
 			// singleton: mask = 1 << elem
 			idx := l.lowerValue(elem)
-			one := minir.NewConst("1", int64(1), minir.U32())
-			shifted := NewAnonTemp(minir.U32())
-			l.emit(&minir.BinaryInst{Dst: shifted, Op: "shl", Left: one, Right: idx})
+			one := NewConst("1", int64(1), U32())
+			shifted := NewAnonTemp(U32())
+			l.emit(&BinaryInst{Dst: shifted, Op: "shl", Left: one, Right: idx})
 			mask = shifted
 		}
-		newAcc := NewAnonTemp(minir.U32())
-		l.emit(&minir.BinaryInst{Dst: newAcc, Op: "or", Left: acc, Right: mask})
+		newAcc := NewAnonTemp(U32())
+		l.emit(&BinaryInst{Dst: newAcc, Op: "or", Left: acc, Right: mask})
 		acc = newAcc
 	}
 	return acc
@@ -1171,31 +1172,31 @@ func (l *Lowerer) lowerSetExpr(s *desugar.SetExpr) minir.Value {
 //	length = (high + 1) - low          // number of bits to set
 //	ones   = (1 << length) - 1         // a run of `length` consecutive 1-bits
 //	mask   = ones << low               // shift the run to start at bit `low`
-func (l *Lowerer) lowerRangeExpr(e *desugar.RangeExpr) minir.Value {
+func (l *Lowerer) lowerRangeExpr(e *desugar.RangeExpr) Value {
 	low := l.lowerValue(e.Low)
-	var high minir.Value
+	var high Value
 	if e.High != nil {
 		high = l.lowerValue(e.High)
 	} else {
 		high = low
 	}
-	one := minir.NewConst("1", int64(1), minir.U32())
+	one := NewConst("1", int64(1), U32())
 
 	// length = (high + 1) - low
-	highPlusOne := NewAnonTemp(minir.U32())
-	l.emit(&minir.BinaryInst{Dst: highPlusOne, Op: "add", Left: high, Right: one})
-	length := NewAnonTemp(minir.U32())
-	l.emit(&minir.BinaryInst{Dst: length, Op: "sub", Left: highPlusOne, Right: low})
+	highPlusOne := NewAnonTemp(U32())
+	l.emit(&BinaryInst{Dst: highPlusOne, Op: "add", Left: high, Right: one})
+	length := NewAnonTemp(U32())
+	l.emit(&BinaryInst{Dst: length, Op: "sub", Left: highPlusOne, Right: low})
 
 	// ones = (1 << length) - 1
-	shifted := NewAnonTemp(minir.U32())
-	l.emit(&minir.BinaryInst{Dst: shifted, Op: "shl", Left: one, Right: length})
-	ones := NewAnonTemp(minir.U32())
-	l.emit(&minir.BinaryInst{Dst: ones, Op: "sub", Left: shifted, Right: one})
+	shifted := NewAnonTemp(U32())
+	l.emit(&BinaryInst{Dst: shifted, Op: "shl", Left: one, Right: length})
+	ones := NewAnonTemp(U32())
+	l.emit(&BinaryInst{Dst: ones, Op: "sub", Left: shifted, Right: one})
 
 	// mask = ones << low
-	mask := NewAnonTemp(minir.U32())
-	l.emit(&minir.BinaryInst{Dst: mask, Op: "shl", Left: ones, Right: low})
+	mask := NewAnonTemp(U32())
+	l.emit(&BinaryInst{Dst: mask, Op: "shl", Left: ones, Right: low})
 	return mask
 }
 
@@ -1205,12 +1206,12 @@ func (l *Lowerer) lowerRangeExpr(e *desugar.RangeExpr) minir.Value {
 // After returning, l.curBlock is the merge/continuation block that the caller
 // can continue emitting into.  Returns a conservative i1 false constant temp
 // when RTTI metadata is unavailable.
-func (l *Lowerer) lowerISCheck(obj minir.Value, rttiName string, start, end int) *minir.Temp {
-	falseTemp := func() *minir.Temp {
-		dst := NewAnonTemp(minir.I1())
-		l.emit(&minir.BinaryInst{Dst: dst, Op: "xor",
-			Left:  minir.NewConst("false", int64(0), minir.I1()),
-			Right: minir.NewConst("false", int64(0), minir.I1()),
+func (l *Lowerer) lowerISCheck(obj Value, rttiName string, start, end int) *Temp {
+	falseTemp := func() *Temp {
+		dst := NewAnonTemp(I1())
+		l.emit(&BinaryInst{Dst: dst, Op: "xor",
+			Left:  NewConst("false", int64(0), I1()),
+			Right: NewConst("false", int64(0), I1()),
 		})
 		return dst
 	}
@@ -1231,22 +1232,22 @@ func (l *Lowerer) lowerISCheck(obj minir.Value, rttiName string, start, end int)
 		l.reportMissingRTTI(rttiName, start, end)
 		return falseTemp()
 	}
-	targetConst := minir.NewConst(fmt.Sprintf("%d", tid), int64(tid), minir.I64())
+	targetConst := NewConst(fmt.Sprintf("%d", tid), int64(tid), I64())
 
 	rttiRec := rttiPODRecordType()
 
 	// Load the RTTI pointer from the object header (vptr at offset 0).
-	objTemp := l.ensureTemp(obj, minir.Ptr(minir.I32()))
+	objTemp := l.ensureTemp(obj, Ptr(I32()))
 	objTemp.IsAddr = true
-	instRTTIPtr := NewAnonTemp(minir.Ptr(minir.I32()))
-	l.emit(&minir.LoadInst{Dst: instRTTIPtr, Addr: objTemp})
+	instRTTIPtr := NewAnonTemp(Ptr(I32()))
+	l.emit(&LoadInst{Dst: instRTTIPtr, Addr: objTemp})
 	instRTTIPtr.IsAddr = true // points into RTTI memory
 
 	// Load initial ID field.
 	idAddr0 := l.newAddrTemp("is.id", rttiRec)
-	l.emit(&minir.GEPInst{Dst: idAddr0, Base: instRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
-	instID := NewAnonTemp(minir.I64())
-	l.emit(&minir.LoadInst{Dst: instID, Addr: idAddr0})
+	l.emit(&GEPInst{Dst: idAddr0, Base: instRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
+	instID := NewAnonTemp(I64())
+	l.emit(&LoadInst{Dst: instID, Addr: idAddr0})
 
 	// Labels.
 	preludeLabel := l.curBlock.Label
@@ -1258,7 +1259,7 @@ func (l *Lowerer) lowerISCheck(obj minir.Value, rttiName string, start, end int)
 	mergeLabel := l.newLabel("is.merge")
 
 	// Jump from prelude into the loop header.
-	jPre := &minir.JumpInst{Target: startLabel}
+	jPre := &JumpInst{Target: startLabel}
 	l.emit(jPre)
 	l.curBlock.Term = jPre
 
@@ -1278,37 +1279,37 @@ func (l *Lowerer) lowerISCheck(obj minir.Value, rttiName string, start, end int)
 
 	// Pre-declare temps that will be defined in later blocks so phi arms can
 	// reference them before their defining blocks are emitted.
-	nextRTTIPtr := NewAnonTemp(minir.Ptr(minir.I32())) // defined in mismatchBlk
-	nextID := NewAnonTemp(minir.I64())                 // defined in loadNextBlk
+	nextRTTIPtr := NewAnonTemp(Ptr(I32())) // defined in mismatchBlk
+	nextID := NewAnonTemp(I64())           // defined in loadNextBlk
 
 	// ── start block: phis + compare ─────────────────────────────────────────
 	l.switchTo(startBlk)
-	phiPtr := NewAnonTemp(minir.Ptr(minir.I32()))
+	phiPtr := NewAnonTemp(Ptr(I32()))
 	phiPtr.IsAddr = true // will be used as GEP base in mismatch
-	phiID := NewAnonTemp(minir.I64())
-	l.emit(&minir.PhiInst{Dst: phiPtr, Args: []minir.PhiArm{
+	phiID := NewAnonTemp(I64())
+	l.emit(&PhiInst{Dst: phiPtr, Args: []PhiArm{
 		{BlockLabel: preludeLabel, Val: instRTTIPtr},
 		{BlockLabel: loadNextLabel, Val: nextRTTIPtr},
 	}})
-	l.emit(&minir.PhiInst{Dst: phiID, Args: []minir.PhiArm{
+	l.emit(&PhiInst{Dst: phiID, Args: []PhiArm{
 		{BlockLabel: preludeLabel, Val: instID},
 		{BlockLabel: loadNextLabel, Val: nextID},
 	}})
-	cmp := NewAnonTemp(minir.I1())
-	l.emit(&minir.ICmpInst{Dst: cmp, Pred: "eq", Left: phiID, Right: targetConst})
-	cbrStart := &minir.CondBrInst{Cond: cmp, TrueLabel: foundLabel, FalseLabel: mismatchLabel}
+	cmp := NewAnonTemp(I1())
+	l.emit(&ICmpInst{Dst: cmp, Pred: "eq", Left: phiID, Right: targetConst})
+	cbrStart := &CondBrInst{Cond: cmp, TrueLabel: foundLabel, FalseLabel: mismatchLabel}
 	l.emit(cbrStart)
 	l.curBlock.Term = cbrStart
 
 	// ── mismatch block: load base ptr, null-check ───────────────────────────
 	l.switchTo(mismatchBlk)
 	baseAddr := l.newAddrTemp("is.base", rttiRec)
-	l.emit(&minir.GEPInst{Dst: baseAddr, Base: phiPtr, ElemType: rttiRec, Offsets: []int{1}})
-	l.emit(&minir.LoadInst{Dst: nextRTTIPtr, Addr: baseAddr})
-	zeroPtr := minir.NewConst("0", int64(0), minir.Ptr(minir.I32()))
-	isNull := NewAnonTemp(minir.I1())
-	l.emit(&minir.ICmpInst{Dst: isNull, Pred: "eq", Left: nextRTTIPtr, Right: zeroPtr})
-	cbrMismatch := &minir.CondBrInst{Cond: isNull, TrueLabel: notFoundLabel, FalseLabel: loadNextLabel}
+	l.emit(&GEPInst{Dst: baseAddr, Base: phiPtr, ElemType: rttiRec, Offsets: []int{1}})
+	l.emit(&LoadInst{Dst: nextRTTIPtr, Addr: baseAddr})
+	zeroPtr := NewConst("0", int64(0), Ptr(I32()))
+	isNull := NewAnonTemp(I1())
+	l.emit(&ICmpInst{Dst: isNull, Pred: "eq", Left: nextRTTIPtr, Right: zeroPtr})
+	cbrMismatch := &CondBrInst{Cond: isNull, TrueLabel: notFoundLabel, FalseLabel: loadNextLabel}
 	l.emit(cbrMismatch)
 	l.curBlock.Term = cbrMismatch
 
@@ -1316,30 +1317,30 @@ func (l *Lowerer) lowerISCheck(obj minir.Value, rttiName string, start, end int)
 	l.switchTo(loadNextBlk)
 	nextRTTIPtr.IsAddr = true // mark addressable for GEP
 	baseIDAddr := l.newAddrTemp("is.id2", rttiRec)
-	l.emit(&minir.GEPInst{Dst: baseIDAddr, Base: nextRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
-	l.emit(&minir.LoadInst{Dst: nextID, Addr: baseIDAddr})
-	jBack := &minir.JumpInst{Target: startLabel}
+	l.emit(&GEPInst{Dst: baseIDAddr, Base: nextRTTIPtr, ElemType: rttiRec, Offsets: []int{0}})
+	l.emit(&LoadInst{Dst: nextID, Addr: baseIDAddr})
+	jBack := &JumpInst{Target: startLabel}
 	l.emit(jBack)
 	l.curBlock.Term = jBack
 
 	// ── found block: jump to merge ──────────────────────────────────────────
 	l.switchTo(foundBlk)
-	jFound := &minir.JumpInst{Target: mergeLabel}
+	jFound := &JumpInst{Target: mergeLabel}
 	l.emit(jFound)
 	foundBlk.Term = jFound
 
 	// ── notFound block: jump to merge ───────────────────────────────────────
 	l.switchTo(notFoundBlk)
-	jNotFound := &minir.JumpInst{Target: mergeLabel}
+	jNotFound := &JumpInst{Target: mergeLabel}
 	l.emit(jNotFound)
 	notFoundBlk.Term = jNotFound
 
 	// ── merge block: phi boolean result ─────────────────────────────────────
 	l.switchTo(mergeBlk)
-	result := NewAnonTemp(minir.I1())
-	l.emit(&minir.PhiInst{Dst: result, Args: []minir.PhiArm{
-		{BlockLabel: foundLabel, Val: minir.NewConst("true", int64(1), minir.I1())},
-		{BlockLabel: notFoundLabel, Val: minir.NewConst("false", int64(0), minir.I1())},
+	result := NewAnonTemp(I1())
+	l.emit(&PhiInst{Dst: result, Args: []PhiArm{
+		{BlockLabel: foundLabel, Val: NewConst("true", int64(1), I1())},
+		{BlockLabel: notFoundLabel, Val: NewConst("false", int64(0), I1())},
 	}})
 	// l.curBlock is now mergeBlk; caller continues here.
 	return result
@@ -1465,7 +1466,7 @@ func (l *Lowerer) lowerWith(st *desugar.WithStmt) {
 		// body will be unreachable.  That is the conservative safe choice.
 
 		// Branch: IS matched → body, IS failed → next check / else / end.
-		cbr := &minir.CondBrInst{Cond: cond, TrueLabel: bodyLabels[i], FalseLabel: nextLabel}
+		cbr := &CondBrInst{Cond: cond, TrueLabel: bodyLabels[i], FalseLabel: nextLabel}
 		l.emit(cbr)
 		l.curBlock.Term = cbr
 
@@ -1476,7 +1477,7 @@ func (l *Lowerer) lowerWith(st *desugar.WithStmt) {
 		l.lowerStmts(guard.Body)
 		// Fall through to end unless already terminated.
 		if l.curBlock != nil && l.curBlock.Term == nil {
-			jEnd := &minir.JumpInst{Target: endLabel}
+			jEnd := &JumpInst{Target: endLabel}
 			l.emit(jEnd)
 			l.curBlock.Term = jEnd
 		}
@@ -1492,7 +1493,7 @@ func (l *Lowerer) lowerWith(st *desugar.WithStmt) {
 			l.switchTo(elseBlk)
 			l.lowerStmts(st.Else)
 			if l.curBlock != nil && l.curBlock.Term == nil {
-				jEnd := &minir.JumpInst{Target: endLabel}
+				jEnd := &JumpInst{Target: endLabel}
 				l.emit(jEnd)
 				l.curBlock.Term = jEnd
 			}
@@ -1504,7 +1505,7 @@ func (l *Lowerer) lowerWith(st *desugar.WithStmt) {
 	l.switchTo(endBlk)
 }
 
-func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) minir.Value {
+func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
 	// Dispatch to inline builtin lowering first.
 	if fn, ok := builtinLowering[strings.ToLower(call.Func.Name)]; ok {
 		v := fn(l, call)
@@ -1518,14 +1519,14 @@ func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) minir.Value {
 		l.reportLoweringDiagnostic(msg, call.StartOffset, call.EndOffset)
 		rt := LowerType(call.RetType)
 		if rt == nil {
-			rt = minir.I32()
+			rt = I32()
 		}
 
-		if rt == minir.I1() {
-			return minir.NewConst("false", int64(0), minir.I1())
+		if rt == I1() {
+			return NewConst("false", int64(0), I1())
 		}
 
-		return minir.NewConst("0", int64(0), rt)
+		return NewConst("0", int64(0), rt)
 	}
 
 	callee := call.Func.Mangled
@@ -1536,7 +1537,7 @@ func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) minir.Value {
 	// Determine which formals expect addresses (VAR/IN) when possible.
 	formalAddr := l.formalAddrForCall(call)
 
-	var args []minir.Value
+	var args []Value
 	for i, a := range call.Args {
 		needAddr := false
 		if formalAddr != nil && i < len(formalAddr) {
@@ -1549,31 +1550,31 @@ func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) minir.Value {
 		}
 	}
 
-	var dst *minir.Temp
+	var dst *Temp
 	rt := LowerType(call.RetType)
 	if rt != nil {
 		dst = NewAnonTemp(rt)
 	}
 
-	l.emit(&minir.CallInst{Dst: dst, Callee: callee, Args: args})
+	l.emit(&CallInst{Dst: dst, Callee: callee, Args: args})
 	if dst != nil {
 		return dst
 	}
 
-	return minir.NewConst("0", int64(0), minir.I32())
+	return NewConst("0", int64(0), I32())
 }
 
-func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) minir.Value {
+func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) Value {
 	lit, ok := expr.(*desugar.Literal)
 	if !ok {
 		l.reportLoweringDiagnostic(fmt.Sprintf("lowerLiteralExpr: expected *desugar.Literal, got %T", expr),
 			expr.Pos(), expr.End())
-		return minir.NewConst("0", int64(0), minir.I32())
+		return NewConst("0", int64(0), I32())
 	}
 
 	ty := LowerType(lit.SemaType)
 	if ty == nil {
-		ty = minir.I32()
+		ty = I32()
 	}
 
 	switch lit.Kind {
@@ -1582,9 +1583,9 @@ func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) minir.Value {
 		if err != nil {
 			l.reportLoweringDiagnostic(fmt.Sprintf("lowerLiteralExpr: cannot parse byte literal %q: %v",
 				lit.Value, err), lit.StartOffset, lit.EndOffset)
-			return minir.NewConst(lit.Value, lit.Value, ty)
+			return NewConst(lit.Value, lit.Value, ty)
 		}
-		return minir.NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
+		return NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
 	case token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
 		v := lit.Value
 		var iv int64
@@ -1596,10 +1597,10 @@ func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) minir.Value {
 			iv, err = strconv.ParseInt(v, 10, 64)
 		}
 		if err != nil {
-			return minir.NewConst(lit.Value, lit.Value, ty)
+			return NewConst(lit.Value, lit.Value, ty)
 		}
 
-		return minir.NewConst(fmt.Sprintf("%d", iv), iv, ty)
+		return NewConst(fmt.Sprintf("%d", iv), iv, ty)
 	case token.REAL_LIT, token.LONGREAL_LIT:
 		v := lit.Value
 		norm := strings.ReplaceAll(v, "D", "E")
@@ -1608,11 +1609,11 @@ func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) minir.Value {
 		norm = strings.ReplaceAll(norm, "s", "E")
 		fv, _ := strconv.ParseFloat(norm, 64)
 		name := strconv.FormatFloat(fv, 'g', -1, 64)
-		return minir.NewConst(name, fv, ty)
+		return NewConst(name, fv, ty)
 	case token.TRUE:
-		return minir.NewConst("true", int64(1), minir.I1())
+		return NewConst("true", int64(1), I1())
 	case token.FALSE:
-		return minir.NewConst("false", int64(0), minir.I1())
+		return NewConst("false", int64(0), I1())
 	case token.CHAR_LIT:
 		v := lit.Value
 		var iv uint64
@@ -1627,10 +1628,10 @@ func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) minir.Value {
 		if err != nil {
 			l.reportLoweringDiagnostic(fmt.Sprintf("lowerLiteralExpr: cannot parse char literal %q: %v",
 				lit.Value, err), lit.StartOffset, lit.EndOffset)
-			return minir.NewConst(lit.Value, lit.Value, ty)
+			return NewConst(lit.Value, lit.Value, ty)
 		}
 
-		return minir.NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
+		return NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
 	case token.WCHAR_LIT:
 		v := lit.Value
 		var iv uint64
@@ -1645,28 +1646,28 @@ func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) minir.Value {
 		if err != nil {
 			l.reportLoweringDiagnostic(fmt.Sprintf("lowerLiteralExpr: cannot parse char literal %q: %v",
 				lit.Value, err), lit.StartOffset, lit.EndOffset)
-			return minir.NewConst(lit.Value, lit.Value, ty)
+			return NewConst(lit.Value, lit.Value, ty)
 		}
 
-		return minir.NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
+		return NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
 	case token.STR_LIT, token.HEX_STR_LIT:
-		return minir.NewConst(lit.Value, lit.Value, minir.NewArrayType(len(lit.Value)+1, minir.U16()))
+		return NewConst(lit.Value, lit.Value, NewArrayType(len(lit.Value)+1, U16()))
 	case token.NIL:
-		return minir.NewConst("nil", int64(0), minir.Ptr(minir.Void()))
+		return NewConst("nil", int64(0), Ptr(Void()))
 	default:
 		iv, err := strconv.ParseInt(lit.Value, 10, 64)
 		if err == nil {
-			return minir.NewConst(lit.Value, iv, ty)
+			return NewConst(lit.Value, iv, ty)
 		}
-		return minir.NewConst(lit.Value, lit.Value, ty)
+		return NewConst(lit.Value, lit.Value, ty)
 	}
 }
 
 // ── CFG wiring ────────────────────────────────────────────────────────────────
 
 // linkCFG inspects all block terminators and populates Preds/Succs maps.
-func linkCFG(fn *minir.Function) {
-	labelMap := make(map[string]*minir.Block, len(fn.Blocks))
+func linkCFG(fn *Function) {
+	labelMap := make(map[string]*Block, len(fn.Blocks))
 	for _, b := range fn.Blocks {
 		labelMap[b.Label] = b
 	}
@@ -1676,11 +1677,11 @@ func linkCFG(fn *minir.Function) {
 		}
 		var targets []string
 		switch t := b.Term.(type) {
-		case *minir.JumpInst:
+		case *JumpInst:
 			targets = []string{t.Target}
-		case *minir.CondBrInst:
+		case *CondBrInst:
 			targets = []string{t.TrueLabel, t.FalseLabel}
-		case *minir.SwitchInst:
+		case *SwitchInst:
 			targets = []string{t.Default}
 			for _, a := range t.Arms {
 				targets = append(targets, a.Label)
@@ -1722,7 +1723,7 @@ func (l *Lowerer) formalAddrForCall(call *desugar.FuncCall) []bool {
 		for _, ef := range l.mod.Externals {
 			if ef.Name == callee && ef.Sig != nil {
 				for _, pt := range ef.Sig.Params {
-					if _, ok := pt.(*minir.PointerType); ok {
+					if _, ok := pt.(*PointerType); ok {
 						formalAddr = append(formalAddr, true)
 					} else {
 						formalAddr = append(formalAddr, false)
@@ -1745,21 +1746,21 @@ func (l *Lowerer) formalAddrForCall(call *desugar.FuncCall) []bool {
 	return formalAddr
 }
 
-func (l *Lowerer) newBlock(label string) *minir.Block {
+func (l *Lowerer) newBlock(label string) *Block {
 	id := l.blockSeq
 	l.blockSeq++
-	return &minir.Block{
+	return &Block{
 		ID:     id,
 		Label:  label,
-		Preds:  make(map[int]*minir.Block),
-		Succs:  make(map[int]*minir.Block),
+		Preds:  make(map[int]*Block),
+		Succs:  make(map[int]*Block),
 		Parent: l.fn,
 	}
 }
 
-func (l *Lowerer) switchTo(b *minir.Block) { l.curBlock = b }
+func (l *Lowerer) switchTo(b *Block) { l.curBlock = b }
 
-func (l *Lowerer) emit(i minir.Instr) { l.curBlock.Instrs = append(l.curBlock.Instrs, i) }
+func (l *Lowerer) emit(i Instr) { l.curBlock.Instrs = append(l.curBlock.Instrs, i) }
 
 func (l *Lowerer) newLabel(prefix string) string {
 	s := fmt.Sprintf("%s.%d", prefix, l.labelSeq)
@@ -1767,11 +1768,11 @@ func (l *Lowerer) newLabel(prefix string) string {
 	return s
 }
 
-func (l *Lowerer) newAddrTemp(name string, ty minir.Type) *minir.Temp {
+func (l *Lowerer) newAddrTemp(name string, ty Type) *Temp {
 	if ty == nil {
-		ty = minir.I32()
+		ty = I32()
 	}
-	t := NewTemp(name, minir.Ptr(ty))
+	t := NewTemp(name, Ptr(ty))
 	t.IsAddr = true
 	return t
 }
@@ -1783,7 +1784,7 @@ func (l *Lowerer) newAddrTemp(name string, ty minir.Type) *minir.Temp {
 //     *Constant value for module-scope constants)
 //
 // Panics when the name is not found in either scope.
-func (l *Lowerer) resolveVar(mangled, bare string) minir.Value {
+func (l *Lowerer) resolveVar(mangled, bare string) Value {
 	if mangled != "" {
 		if t, ok := l.varEnv[mangled]; ok {
 			return t
@@ -1809,38 +1810,38 @@ func (l *Lowerer) resolveVar(mangled, bare string) minir.Value {
 	msg := fmt.Sprintf("lowerer: undefined variable %q / %q", mangled, bare)
 	l.reportLoweringDiagnostic(msg, 0, 0)
 	// Create an addressable alloca as a fallback.
-	addr := l.newAddrTemp(bare, minir.I32())
-	l.emit(&minir.AllocaInst{Dst: addr, AllocType: minir.I32()})
+	addr := l.newAddrTemp(bare, I32())
+	l.emit(&AllocaInst{Dst: addr, AllocType: I32()})
 	return addr
 }
 
 // ensureTemp coerces v to a *Temp. Constants are materialized via a trivial
 // identity (add 0 / xor false) so the result is a proper SSA def.
-func (l *Lowerer) ensureTemp(v minir.Value, ty minir.Type) *minir.Temp {
-	if t, ok := v.(*minir.Temp); ok {
+func (l *Lowerer) ensureTemp(v Value, ty Type) *Temp {
+	if t, ok := v.(*Temp); ok {
 		return t
 	}
 	if ty == nil {
-		ty = minir.I32()
+		ty = I32()
 	}
 	dst := NewAnonTemp(ty)
-	if ty == minir.I1() {
-		zero := minir.NewConst("false", int64(0), minir.I1())
-		l.emit(&minir.BinaryInst{Dst: dst, Op: "xor", Left: v, Right: zero})
+	if ty == I1() {
+		zero := NewConst("false", int64(0), I1())
+		l.emit(&BinaryInst{Dst: dst, Op: "xor", Left: v, Right: zero})
 	} else {
-		zero := minir.NewConst("0", int64(0), ty)
-		l.emit(&minir.BinaryInst{Dst: dst, Op: "add", Left: v, Right: zero})
+		zero := NewConst("0", int64(0), ty)
+		l.emit(&BinaryInst{Dst: dst, Op: "add", Left: v, Right: zero})
 	}
 	return dst
 }
 
 // isFloatVal reports whether v's type is f32 or f64.
-func isFloatVal(v minir.Value) bool {
+func isFloatVal(v Value) bool {
 	if v == nil {
 		return false
 	}
 	t := v.Type()
-	return t == minir.F32() || t == minir.F64()
+	return t == F32() || t == F64()
 }
 
 // tokenToICmpPred maps a comparison token to an ICmpInst predicate string.

@@ -1,4 +1,4 @@
-package core
+package minir
 
 // Instr is the common interface for all instructions.
 type Instr interface {
@@ -20,7 +20,7 @@ type PhiArm struct {
 	Val        Value
 }
 
-// PhiInst selects a value based on predecessor.
+// PhiInst selects a value based on a predecessor.
 type PhiInst struct {
 	Dst  *Temp
 	Args []PhiArm
@@ -178,7 +178,7 @@ func (h *HaltInst) isTerminator() {}
 
 // ReturnInst returns from a function.
 type ReturnInst struct {
-	Result *Temp // nil for void
+	Result Value // nil for void
 }
 
 func (r *ReturnInst) String() string { return FormatInstr(r) }
@@ -201,7 +201,7 @@ func (j *JumpInst) isTerminator()  {}
 
 // CondBrInst is a conditional branch terminator.
 type CondBrInst struct {
-	Cond                  *Temp
+	Cond                  Value
 	TrueLabel, FalseLabel string
 }
 
@@ -217,7 +217,7 @@ type SwitchArm struct {
 
 // SwitchInst is a simple switch terminator.
 type SwitchInst struct {
-	Key     *Temp
+	Key     Value
 	Default string
 	Arms    []SwitchArm
 }

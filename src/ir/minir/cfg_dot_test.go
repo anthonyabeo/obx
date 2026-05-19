@@ -1,11 +1,10 @@
-package core
+package minir
 
 import (
 	"strings"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
-	"github.com/anthonyabeo/obx/src/ir/minir/lower"
 	"github.com/anthonyabeo/obx/src/sema/types"
 )
 
@@ -22,7 +21,7 @@ func makeIdentity() *desugar.Function {
 }
 
 func TestDOT_Identity(t *testing.T) {
-	prog := lower.Lower(&desugar.Program{Modules: []*desugar.Module{{Decls: []desugar.Decl{makeIdentity()}}}})
+	prog := Lower(&desugar.Program{Modules: []*desugar.Module{{Decls: []desugar.Decl{makeIdentity()}}}})
 	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 {
 		t.Fatalf("expected 1 module with 1 fn")
 	}
@@ -60,7 +59,7 @@ func TestDOT_CountedLoop(t *testing.T) {
 			&desugar.ReturnStmt{Result: sRef},
 		}},
 	}
-	prog := lower.Lower(&desugar.Program{Modules: []*desugar.Module{{Decls: []desugar.Decl{fn}}}})
+	prog := Lower(&desugar.Program{Modules: []*desugar.Module{{Decls: []desugar.Decl{fn}}}})
 	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 {
 		t.Fatalf("expected 1 module with 1 fn")
 	}
@@ -89,7 +88,7 @@ func TestDOT_Case(t *testing.T) {
 			},
 		}},
 	}
-	prog := lower.Lower(&desugar.Program{Modules: []*desugar.Module{{Decls: []desugar.Decl{fn}}}})
+	prog := Lower(&desugar.Program{Modules: []*desugar.Module{{Decls: []desugar.Decl{fn}}}})
 	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 {
 		t.Fatalf("expected 1 module with 1 fn")
 	}
@@ -119,7 +118,7 @@ func TestDOT_NoForbiddenEntities(t *testing.T) {
 			&desugar.ReturnStmt{Result: strConst},
 		}},
 	}
-	prog := lower.Lower(&desugar.Program{Modules: []*desugar.Module{{Decls: []desugar.Decl{fn}}}})
+	prog := Lower(&desugar.Program{Modules: []*desugar.Module{{Decls: []desugar.Decl{fn}}}})
 	if len(prog.Modules) != 1 || len(prog.Modules[0].Functions) != 1 {
 		t.Fatal("expected 1 module with 1 function")
 	}

@@ -1,4 +1,4 @@
-package core
+package minir
 
 // encode.go — binary serialisation of a minir.Module.
 //
@@ -553,7 +553,7 @@ func EncodeInstr(w io.Writer, ins Instr) error {
 		if err := encWriteU8(w, opRet); err != nil {
 			return err
 		}
-		if err := encodeTemp(w, v.Result); err != nil {
+		if err := EncodeValue(w, v.Result); err != nil {
 			return err
 		}
 
@@ -569,7 +569,7 @@ func EncodeInstr(w io.Writer, ins Instr) error {
 		if err := encWriteU8(w, opCondBr); err != nil {
 			return err
 		}
-		if err := encodeTemp(w, v.Cond); err != nil {
+		if err := EncodeValue(w, v.Cond); err != nil {
 			return err
 		}
 		if err := encWriteString(w, v.TrueLabel); err != nil {
@@ -583,7 +583,7 @@ func EncodeInstr(w io.Writer, ins Instr) error {
 		if err := encWriteU8(w, opSwitch); err != nil {
 			return err
 		}
-		if err := encodeTemp(w, v.Key); err != nil {
+		if err := EncodeValue(w, v.Key); err != nil {
 			return err
 		}
 		if err := encWriteString(w, v.Default); err != nil {

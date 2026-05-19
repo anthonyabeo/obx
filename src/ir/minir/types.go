@@ -272,7 +272,7 @@ var ptrCache = map[string]*PointerType{}
 // Ptr returns a canonical PointerType for elem (normalizes elem first).
 func Ptr(elem Type) *PointerType {
 	if elem == nil {
-		return &PointerType{Elem: nil}
+		return &PointerType{Elem: primVoid}
 	}
 	ne := NormalizeType(elem)
 	key := ne.String()
