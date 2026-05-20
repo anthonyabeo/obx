@@ -117,9 +117,14 @@ func CombineBlocks(fn *minir.Function) bool {
 		// Reroute Bj's successors to Bi.
 		bi.Succs = bj.Succs
 		for _, succ := range bj.Succs {
-			for pid, pred := range succ.Preds {
+			for _, pred := range succ.Preds {
 				if pred == bj {
-					succ.Preds[pid] = bi
+					fn.ReplaceEdge(bi, bj, succ)
+					for _, ins := range succ.Instrs {
+						if phi, ok := ins.(*minir.PhiInst); ok {
+							phi.ReplaceIncomingBlock(bj.Label, bi.Label)
+						}
+					}
 				}
 			}
 		}
@@ -131,7 +136,7 @@ func CombineBlocks(fn *minir.Function) bool {
 }
 
 // RemoveEmptyBlocks bypasses blocks that contain only a single unconditional
-// jump (i.e. empty dispatch blocks).  All predecessors of Bi are rewired to
+// jump (i.e., empty dispatch blocks).  All predecessors of Bi are rewired to
 // jump directly to Bj.  Bi is then removed from fn.Blocks. fn.Entry and
 // fn.Exit are never bypassed.  Returns true when at least one block was
 // removed.
@@ -176,18 +181,14 @@ func RemoveEmptyBlocks(fn *minir.Function) bool {
 						t.FalseLabel = bj.Label
 					}
 				}
-				// Update Succs of pred: replace Bi with Bj.
-				delete(pred.Succs, bi.ID)
-				pred.Succs[bj.ID] = bj
-				pred.SuccOrder = replaceInOrder(pred.SuccOrder, bi.ID, bj.ID)
 
-				// Add pred to Bj's predecessors.
-				bj.AddPred(pred)
+				fn.ReplaceEdge(pred, bi, bj)
+				for _, ins := range bj.Instrs {
+					if phi, ok := ins.(*minir.PhiInst); ok {
+						phi.ReplaceIncomingBlock(bi.Label, pred.Label)
+					}
+				}
 			}
-
-			// Remove Bi from Bj's predecessor list.
-			delete(bj.Preds, bi.ID)
-			bj.PredOrder = removeFromOrder(bj.PredOrder, bi.ID)
 
 			fn.RemoveBlock(bi)
 			changed = true
@@ -308,8 +309,9 @@ func HoistBranch(fn *minir.Function) bool {
 		bi.Term = inlined
 
 		// Update Bi's successors to the two branch targets.
-		delete(bi.Succs, bj.ID)
-		bi.SuccOrder = removeFromOrder(bi.SuccOrder, bj.ID)
+		//delete(bi.Succs, bj.ID)
+		bi.RemoveSucc(bj)
+		//bi.SuccOrder = removeFromOrder(bi.SuccOrder, bj.ID)
 		bi.AddSucc(trueTarget)
 		bi.AddSucc(falseTarget)
 
@@ -318,8 +320,9 @@ func HoistBranch(fn *minir.Function) bool {
 		falseTarget.AddPred(bi)
 
 		// Remove Bi from Bj's predecessor list since Bi no longer jumps to Bj.
-		delete(bj.Preds, bi.ID)
-		bj.PredOrder = removeFromOrder(bj.PredOrder, bi.ID)
+		//delete(bj.Preds, bi.ID)
+		//bj.PredOrder = removeFromOrder(bj.PredOrder, bi.ID)
+		bj.RemovePred(bi)
 
 		changed = true
 	}

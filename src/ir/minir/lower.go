@@ -28,6 +28,10 @@ type Lowerer struct {
 	varEnv   map[string]*Temp  // variable name → alloca address temp (IsAddr=true)
 	constEnv map[string]Value  // constant name → pre-computed Value
 	loopExit map[string]string // loop label → exit-block label; "" = innermost loop
+
+	exitPreds  []string
+	exitValues []Value
+
 	// diagnostics/context
 	dctx     *compiler.Context
 	reported map[string]bool // dedupe map keyed by rttiName@module
@@ -117,6 +121,8 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 	l.varEnv = make(map[string]*Temp)
 	l.constEnv = make(map[string]Value)
 	l.loopExit = make(map[string]string)
+	l.exitPreds = l.exitPreds[:0]
+	l.exitValues = l.exitValues[:0]
 
 	fn := &Function{
 		FnName:     hirFn.FnName(),
@@ -167,12 +173,30 @@ func (l *Lowerer) lowerFunction(hirFn *desugar.Function) *Function {
 	// per-site wiring because AddSucc/AddPred are no-ops for existing links).
 	linkCFG(fn)
 
-	// Keep the exit as a simple sentinel return; actual return values and
-	// halting semantics remain in their original blocks and are handled
-	// by later phases.
+	// The exit block is the canonical place where all functions return.
+	// All return paths jump here via JumpInst; no direct ReturnInstr elsewhere.
 	l.switchTo(fn.Exit)
 
-	ret := &ReturnInst{}
+	var retVal Value
+	if len(l.exitValues) == 1 {
+		retVal = l.exitValues[0]
+	} else if len(l.exitValues) > 1 {
+		// Multiple return paths with different values require a phi in the exit block.
+		t := NewAnonTemp(fn.Result)
+		retVal = t
+
+		phi := &PhiInst{Dst: t}
+		for i, v := range l.exitValues {
+			phi.Args = append(phi.Args, PhiArm{
+				BlockLabel: l.exitPreds[i],
+				Val:        v,
+			})
+		}
+
+		l.emit(phi)
+	}
+
+	ret := &ReturnInst{Result: retVal}
 	l.emit(ret)
 	fn.Exit.Term = ret
 
@@ -292,36 +316,34 @@ func (l *Lowerer) lowerAssign(st *desugar.AssignStmt) {
 }
 
 func (l *Lowerer) lowerReturn(st *desugar.ReturnStmt) {
-	// Emit a ReturnInst in the current block. The return value (if any)
-	// is materialized into a temp so the ReturnInst holds a proper SSA def.
-	var result *Temp
+	var result Value
 	if st.Result != nil {
-		v := l.lowerValue(st.Result)
-		result = l.ensureTemp(v, LowerType(st.Result.Type()))
+		result = l.lowerValue(st.Result)
+		// Coerce the return value to match function return type
+		if l.fn.Result != nil {
+			result = l.coerceValue(result, l.fn.Result)
+		}
 	}
 
-	ret := &ReturnInst{Result: result}
-	l.emit(ret)
-	l.curBlock.Term = ret
+	// Record the return value and predecessor block for phi construction in the exit block.
+	if result != nil && l.fn.Result != nil {
+		l.exitValues = append(l.exitValues, result)
+		l.exitPreds = append(l.exitPreds, l.curBlock.Label)
+	}
 
-	// Wire a CFG edge to the canonical exit block so all return paths are
-	// visible in the CFG — mirrors the pattern used in builtinHalt.
+	// Jump to the canonical exit block (the only place to exit)
 	if l.fn != nil && l.fn.Exit != nil {
+		jmp := &JumpInst{Target: l.fn.Exit.Label}
+		l.emit(jmp)
+		l.curBlock.Term = jmp
+
 		l.curBlock.AddSucc(l.fn.Exit)
 		l.fn.Exit.AddPred(l.curBlock)
 	}
-	// Switch to an orphan block so unreachable code after RETURN emits into
-	// a block that is NOT in fn.Blocks, and is therefore ignored by the verifier.
-	dead := l.newBlock(l.newLabel("dead"))
-	l.switchTo(dead)
 }
 
 func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 	endLabel := l.newLabel("if_end")
-	// hasLiveJumpToEnd tracks whether any live (in-fn.Blocks) block provides
-	// a path to endLabel.  When false, endBlk is unreachable and need not be
-	// added to fn.Blocks.
-	hasLiveJumpToEnd := false
 
 	type branch struct {
 		cond desugar.Expr
@@ -334,7 +356,6 @@ func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 
 	for i, br := range branches {
 		condVal := l.lowerValue(br.cond)
-		condTemp := l.ensureTemp(condVal, I1())
 
 		trueLabel := l.newLabel(fmt.Sprintf("if_then_%d", i))
 		var falseLabel string
@@ -344,11 +365,9 @@ func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 			falseLabel = l.newLabel("if_else")
 		} else {
 			falseLabel = endLabel
-			// The CondBr's false path leads directly to endLabel from a live block.
-			hasLiveJumpToEnd = true
 		}
 
-		cbr := &CondBrInst{Cond: condTemp, TrueLabel: trueLabel, FalseLabel: falseLabel}
+		cbr := &CondBrInst{Cond: condVal, TrueLabel: trueLabel, FalseLabel: falseLabel}
 		l.emit(cbr)
 		l.curBlock.Term = cbr
 
@@ -360,10 +379,6 @@ func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 			j := &JumpInst{Target: endLabel}
 			l.emit(j)
 			l.curBlock.Term = j
-			// Count as live only when curBlock is a registered live block.
-			if _, live := l.fn.Blocks[l.curBlock.ID]; live {
-				hasLiveJumpToEnd = true
-			}
 		}
 
 		if falseLabel != endLabel {
@@ -379,19 +394,11 @@ func (l *Lowerer) lowerIf(st *desugar.IfStmt) {
 			j := &JumpInst{Target: endLabel}
 			l.emit(j)
 			l.curBlock.Term = j
-			if _, live := l.fn.Blocks[l.curBlock.ID]; live {
-				hasLiveJumpToEnd = true
-			}
 		}
 	}
 
 	endBlk := l.newBlock(endLabel)
-	// Only register endBlk when at least one live predecessor jumps to it;
-	// otherwise every branch terminated (e.g. all paths return) and endBlk
-	// would be an orphaned, unreachable block in fn.Blocks.
-	if hasLiveJumpToEnd {
-		l.fn.Blocks[endBlk.ID] = endBlk
-	}
+	l.fn.Blocks[endBlk.ID] = endBlk
 	l.switchTo(endBlk)
 }
 
@@ -1135,6 +1142,38 @@ func (l *Lowerer) alignOperands(left, right Value) (Value, Value) {
 	return left, right
 }
 
+// coerceValue coerces a single value to a target type, following the same
+// strategy as sameWidthOperands for single operands.
+//
+// For integer target types the coercion is annotation-only (coerceToType —
+// no CastInst emitted).  Float and pointer targets still go through sameType
+// so that the appropriate fpext/fptrunc/bitcast instruction is emitted.
+//
+// This is particularly useful for ensuring return values match the declared
+// function return type, but may be used anywhere a single value must match
+// a target type for type safety.
+//
+// Returns val unchanged if either val or ty is nil, or if val's type already
+// matches ty.
+func (l *Lowerer) coerceValue(val Value, ty Type) Value {
+	if val == nil || ty == nil {
+		return val
+	}
+
+	vty := val.Type()
+	if vty != nil && vty.Equal(ty) {
+		return val
+	}
+
+	// Integer target: implicit coercion via annotation only
+	if IsIntType(ty) {
+		return coerceToType(val, ty)
+	}
+
+	// Float / pointer: explicit cast instruction required
+	return l.sameType(val, ty)
+}
+
 // lowerSetExpr materializes a SET literal `{e1, e2, e3..n}` as a unsigned 32-bit
 // bitmask.  Each singleton element contributes bit (1 << elem); each
 // RangeExpr element contributes a contiguous run of bits.  The result is
@@ -1587,20 +1626,13 @@ func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) Value {
 		}
 		return NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
 	case token.INT8_LIT, token.INT16_LIT, token.INT32_LIT, token.INT64_LIT:
-		v := lit.Value
-		var iv int64
-		var err error
-		if strings.HasSuffix(v, "h") || strings.HasSuffix(v, "H") {
-			v2 := v[:len(v)-1]
-			iv, err = strconv.ParseInt(v2, 16, 64)
-		} else {
-			iv, err = strconv.ParseInt(v, 10, 64)
-		}
+		integer, err := parseIntegerConst(lit.Value, lit.Kind, LowerType(lit.SemaType))
 		if err != nil {
+			l.reportLoweringDiagnostic(fmt.Sprintf("lowerLiteralExpr: cannot parse integer literal %q: %v",
+				lit.Value, err), lit.StartOffset, lit.EndOffset)
 			return NewConst(lit.Value, lit.Value, ty)
 		}
-
-		return NewConst(fmt.Sprintf("%d", iv), iv, ty)
+		return integer
 	case token.REAL_LIT, token.LONGREAL_LIT:
 		v := lit.Value
 		norm := strings.ReplaceAll(v, "D", "E")
@@ -1882,4 +1914,36 @@ func tokenToArithOp(op token.Kind) string {
 	default:
 		return "add"
 	}
+}
+
+func parseIntegerConst(value string, kind token.Kind, ty Type) (Constant, error) {
+	var bitSize int
+	switch kind {
+	case token.INT8:
+		bitSize = 8
+	case token.INT16:
+		bitSize = 16
+	case token.INT32:
+		bitSize = 32
+	case token.INT64:
+		bitSize = 64
+	default:
+		return nil, fmt.Errorf("parseIntegerConst: invalid kind %v", kind)
+	}
+
+	v := value
+	var iv int64
+	var err error
+	if strings.HasSuffix(v, "h") || strings.HasSuffix(v, "H") {
+		v2 := v[:len(v)-1]
+		iv, err = strconv.ParseInt(v2, 16, bitSize)
+	} else {
+		iv, err = strconv.ParseInt(v, 10, bitSize)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return NewConst(fmt.Sprintf("%d", iv), iv, ty), nil
 }

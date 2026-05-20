@@ -346,7 +346,7 @@ func (g Generator) VisitIfStmt(stmt *ast.IfStmt) any {
 	var elifs []*ElseIfBranch
 	for _, branch := range stmt.ElseIfBranches {
 		brCond := branch.BoolExpr.Accept(g).(Expr)
-		brThen := g.visitStmtSeq(stmt.ThenPath)
+		brThen := g.visitStmtSeq(branch.ThenPath)
 
 		elifs = append(elifs, &ElseIfBranch{Cond: brCond, Body: brThen})
 	}

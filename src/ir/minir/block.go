@@ -16,6 +16,7 @@ type Block struct {
 	Label  string
 	Instrs []Instr
 	Term   Terminator // should equal last instruction in Instrs
+	Phis   []*PhiInst
 
 	// fast lookup maps
 	Preds map[int]*Block
@@ -52,6 +53,36 @@ func (b *Block) AddPred(p *Block) {
 	}
 	b.Preds[p.ID] = p
 	b.PredOrder = append(b.PredOrder, p.ID)
+}
+
+// RemoveSucc unlinks s as a successor of b (and updates ordering). It does not
+// update the corresponding pred on s; callers should maintain both sides.
+func (b *Block) RemoveSucc(s *Block) {
+	if b.Succs == nil {
+		return
+	}
+
+	if _, ok := b.Succs[s.ID]; !ok {
+		return
+	}
+
+	delete(b.Succs, s.ID)
+	b.SuccOrder = removeID(b.SuccOrder, s.ID)
+}
+
+// RemovePred unlinks p as a predecessor of b (and updates ordering). It does not
+// update the corresponding succ on p; callers should maintain both sides.
+func (b *Block) RemovePred(p *Block) {
+	if b.Preds == nil {
+		return
+	}
+
+	if _, ok := b.Preds[p.ID]; !ok {
+		return
+	}
+
+	delete(b.Preds, p.ID)
+	b.PredOrder = removeID(b.PredOrder, p.ID)
 }
 
 // SortedSuccs returns successors in deterministic order: if SuccOrder is populated, it is used;
@@ -131,29 +162,60 @@ func (f *Function) GetBlock(label string) *Block {
 	return nil
 }
 
-// RemoveBlock removes b from the function's block map.
-// It does not update predecessor/successor lists of other blocks; callers are
-// responsible for maintaining CFG consistency before calling RemoveBlock.
+// RemoveBlock removes b from the function's block map and removes all edges
+// to/from b. It does not update any phi nodes in b's successors to remove
+// incoming edges from b; callers should maintain phi nodes as needed.
 func (f *Function) RemoveBlock(b *Block) {
+	for _, succ := range b.Succs {
+		succ.RemovePred(b)
+	}
+	for _, pred := range b.Preds {
+		pred.RemoveSucc(b)
+	}
 	delete(f.Blocks, b.ID)
 }
 
-func (f *Function) RemoveEdge(from *Block, to *Block) {
-	delete(from.Succs, to.ID)
-	delete(to.Preds, from.ID)
-
-	removeID := func(ids []int, target int) []int {
-		for i, id := range ids {
-			if id == target {
-				return append(ids[:i], ids[i+1:]...)
-			}
-		}
-		return ids
+// AddEdge adds a control flow edge from `from` to `to` and updates both blocks'
+// pred/succ maps and ordering.
+func (f *Function) AddEdge(from *Block, to *Block) {
+	if from == nil || to == nil {
+		panic("AddEdge: nil block")
 	}
 
-	// update ordering slices
-	from.SuccOrder = removeID(from.SuccOrder, to.ID)
-	to.PredOrder = removeID(to.PredOrder, from.ID)
+	from.AddSucc(to)
+	to.AddPred(from)
+}
+
+func removeID(ids []int, target int) []int {
+	for i, id := range ids {
+		if id == target {
+			return append(ids[:i], ids[i+1:]...)
+		}
+	}
+	return ids
+}
+
+// RemoveEdge removes the control flow edge from `from` to `to` and updates both
+// blocks' pred/succ maps and ordering.
+func (f *Function) RemoveEdge(from *Block, to *Block) {
+	if from == nil || to == nil {
+		panic("RemoveEdge: nil block")
+	}
+
+	from.RemoveSucc(to)
+	to.RemovePred(from)
+}
+
+// ReplaceEdge replaces the edge from `from` to `oldTo` with an edge from `from` to `newTo`,
+// and updates all relevant predecessor/successor maps and ordering. It also adds a new
+// incoming edge from `from` to `newTo`.
+func (f *Function) ReplaceEdge(from, oldTo, newTo *Block) {
+	if from == nil || oldTo == nil || newTo == nil {
+		panic("ReplaceEdge: nil block")
+	}
+
+	f.RemoveEdge(from, oldTo)
+	f.AddEdge(from, newTo)
 }
 
 // DFSOrder returns block IDs in depth-first order starting from entry.
