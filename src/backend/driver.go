@@ -24,9 +24,10 @@ import (
 //  5. Legalization (target-aware post-pass)
 //  6. InstructionScheduling (stub)
 //  7. RegisterAllocation
-//  8. Assemble (optional callback)
-//  9. Link (optional callback)
-// 10. BuildPlans (phi helpers; call/switch plans are empty after steps 2-3)
+//  8. PrologueEpilogue (emit prologue/epilogue based on frame layout)
+//  9. Assemble (optional callback)
+//  10. Link (optional callback)
+//  11. BuildPlans (phi helpers; call/switch plans are empty after steps 2-3)
 type PipelineDriver struct {
 	Target   target.Target
 	Selector *selector.Selector
@@ -169,6 +170,22 @@ func (p *PipelineDriver) RegisterAllocation(prog *mir.Program) (*mir.Program, er
 	}
 
 	return regalloc.Run(prog, p.Target)
+}
+
+// PrologueEpilogue emits prologue and epilogue instructions based on frame layout.
+// This runs after register allocation when frame information is available.
+func (p *PipelineDriver) PrologueEpilogue(prog *mir.Program) (*mir.Program, error) {
+	if p == nil {
+		return nil, fmt.Errorf("backend pipeline: nil driver")
+	}
+	if prog == nil {
+		return nil, fmt.Errorf("backend pipeline: nil MIR program before prologue/epilogue")
+	}
+	if p.Target == nil {
+		return nil, fmt.Errorf("backend pipeline: nil target before prologue/epilogue")
+	}
+
+	return prog, legalize.EmitPrologueEpilogue(prog, p.Target)
 }
 
 func (p *PipelineDriver) passThrough(stage string, prog *mir.Program) (*mir.Program, error) {

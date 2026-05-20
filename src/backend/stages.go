@@ -29,8 +29,9 @@ var DefaultStageOrder = []string{
 	"legalization",           // [3]
 	"instruction-scheduling", // [4]
 	"register-allocation",    // [5]
-	"assemble",               // [6]
-	"link",                   // [7]
+	"prologue-epilogue",      // [6]  Emit prologue/epilogue based on frame layout (after regalloc)
+	"assemble",               // [7]
+	"link",                   // [8]
 }
 
 // RegisterStage makes a backend pipeline stage available by name.
