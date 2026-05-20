@@ -10,6 +10,7 @@ type RISCV64Target struct {
 func NewRISCV64Target() *RISCV64Target {
 	return &RISCV64Target{
 		BaseTarget: NewBaseTarget(RV64IMAFDName, ABI{
+			Name:                "LP64D",
 			WordSize:            8,
 			Align:               16,
 			IntArgRegs:          []string{"a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7"},

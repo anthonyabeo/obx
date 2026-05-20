@@ -9,6 +9,8 @@ import (
 // ABI describes the call-convention and stack-shape metadata that all
 // targets share in the first backend pass.
 type ABI struct {
+	Name string
+
 	WordSize int
 	Align    int
 

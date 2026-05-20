@@ -15,6 +15,7 @@ type ARM64Target struct {
 
 var arm64Default = &ARM64Target{
 	BaseTarget: NewBaseTarget(Arm64Name, ABI{
+		Name:                "AAPCS64",
 		WordSize:            8,
 		Align:               16,
 		IntArgRegs:          []string{"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7"},
@@ -101,9 +102,14 @@ func emitARM64Function(fn *mir.Function) string {
 	buf.WriteString("\t.globl " + mangled + "\n")
 	buf.WriteString(mangled + ":\n")
 
-	// Minimal AAPCS64 prologue suitable for the smoke-test programs.
-	buf.WriteString("\tstp x29, x30, [sp, #-16]!\n")
-	buf.WriteString("\tmov x29, sp\n")
+	// Emit an inline AAPCS64 prologue only when no frame-layout information
+	// is available (i.e. the register-allocator / prologue-epilogue pass has
+	// not run).  When fn.Frame != nil the prologue_epilogue pass has already
+	// prepended proper MachineInstrs to fn.Entry.Instrs.
+	if fn.Frame == nil {
+		buf.WriteString("\tstp x29, x30, [sp, #-16]!\n")
+		buf.WriteString("\tmov x29, sp\n")
+	}
 
 	for _, block := range fn.Blocks {
 		if block == nil {
@@ -171,6 +177,57 @@ func emitARM64MachineInstr(i *mir.MachineInstr) string {
 		return "nop"
 	case "mov", "add", "sub", "mul", "and", "orr", "eor", "lsl", "lsr", "asr", "madd", "msub":
 		return formatGenericARM64(i)
+
+	// ── Frame prologue / epilogue ─────────────────────────────────────────────
+	//
+	// stp.pre  Rn, Rm, [base, #offset]!   — pre-indexed store pair (allocates frame)
+	// stp      Rn, Rm, [base, #offset]    — signed-offset store pair
+	// ldp      Rn, Rm, [base, #offset]    — signed-offset load pair
+	// ldp.post Rn, Rm, [base], #offset    — post-indexed load pair (frees frame)
+	// str      Rn, [base, #offset]        — single-register store  (odd-register save)
+	// ldr      Rn, [base, #offset]        — single-register load   (odd-register restore)
+	case "stp.pre":
+		// stp Rn, Rm, [base, #offset]!
+		if len(i.Srcs) >= 3 {
+			r1 := formatARM64Operand(i.Srcs[0])
+			r2 := formatARM64Operand(i.Srcs[1])
+			return fmt.Sprintf("stp %s, %s, %s!", r1, r2, formatARM64Mem(i.Srcs[2]))
+		}
+	case "stp":
+		// stp Rn, Rm, [base, #offset]
+		if len(i.Srcs) >= 3 {
+			r1 := formatARM64Operand(i.Srcs[0])
+			r2 := formatARM64Operand(i.Srcs[1])
+			return fmt.Sprintf("stp %s, %s, %s", r1, r2, formatARM64Mem(i.Srcs[2]))
+		}
+	case "ldp":
+		// ldp Rn, Rm, [base, #offset]
+		if len(i.Dsts) >= 2 && len(i.Srcs) >= 1 {
+			r1 := formatARM64Operand(i.Dsts[0])
+			r2 := formatARM64Operand(i.Dsts[1])
+			return fmt.Sprintf("ldp %s, %s, %s", r1, r2, formatARM64Mem(i.Srcs[0]))
+		}
+	case "ldp.post":
+		// ldp Rn, Rm, [base], #offset
+		// Srcs[0] = Memory{base, nil}  → "[base]"
+		// Srcs[1] = Immediate(offset)  → "#offset"
+		if len(i.Dsts) >= 2 && len(i.Srcs) >= 2 {
+			r1 := formatARM64Operand(i.Dsts[0])
+			r2 := formatARM64Operand(i.Dsts[1])
+			base := formatARM64Mem(i.Srcs[0])
+			postOff := formatARM64Operand(i.Srcs[1])
+			return fmt.Sprintf("ldp %s, %s, %s, %s", r1, r2, base, postOff)
+		}
+	case "str":
+		// str Rn, [base, #offset]  — MachineInstr form (odd-register spill)
+		if len(i.Srcs) >= 2 {
+			return fmt.Sprintf("str %s, %s", formatARM64Operand(i.Srcs[0]), formatARM64Mem(i.Srcs[1]))
+		}
+	case "ldr":
+		// ldr Rn, [base, #offset]  — MachineInstr form (odd-register reload)
+		if len(i.Dsts) >= 1 && len(i.Srcs) >= 1 {
+			return fmt.Sprintf("ldr %s, %s", formatARM64Operand(i.Dsts[0]), formatARM64Mem(i.Srcs[0]))
+		}
 	case "load":
 		if len(i.Dsts) > 0 && len(i.Srcs) > 0 {
 			if sym, ok := i.Srcs[0].(*mir.Symbol); ok {
@@ -248,6 +305,17 @@ func emitARM64Terminator(term mir.Terminator) string {
 				}
 			}
 			return "ldp x29, x30, [sp], #16\n\tret"
+		case "ret.bare":
+			// The prologue_epilogue pass has already inserted the ldp/addi restore
+			// instructions into the exit block's Instrs.  Only the architectural
+			// "ret" is needed here.
+			if len(t.Srcs) > 0 && t.Srcs[0] != nil {
+				opStr := formatARM64Operand(t.Srcs[0])
+				if opStr != "x0" && opStr != "w0" {
+					return fmt.Sprintf("mov x0, %s\n\tret", opStr)
+				}
+			}
+			return "ret"
 		case "j":
 			if len(t.Targets) > 0 {
 				return "b " + arm64Label(t.Targets[0])
@@ -281,6 +349,7 @@ func emitARM64Terminator(term mir.Terminator) string {
 	case *mir.CondBrInstr:
 		return fmt.Sprintf("cmp %s, #0\n\tb.ne %s\n\tb %s", formatARM64Operand(t.Cond), arm64Label(t.TrueLabel), arm64Label(t.FalseLabel))
 	case *mir.ReturnInstr:
+		// Standard inline epilogue + ret (fallback when prologue_epilogue pass was not run).
 		if t.Value != nil {
 			return fmt.Sprintf("mov x0, %s\n\tldp x29, x30, [sp], #16\n\tret", formatARM64Operand(t.Value))
 		}
