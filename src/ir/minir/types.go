@@ -248,6 +248,7 @@ var (
 	primU8   = &PrimitiveType{Name: "u8"}
 	primU16  = &PrimitiveType{Name: "u16"}
 	primU32  = &PrimitiveType{Name: "u32"}
+	primU64  = &PrimitiveType{Name: "u64"}
 	primF32  = &PrimitiveType{Name: "f32"}
 	primF64  = &PrimitiveType{Name: "f64"}
 	primVoid = &PrimitiveType{Name: "void"}
@@ -257,6 +258,7 @@ func I1() *PrimitiveType   { return primI1 }
 func U8() *PrimitiveType   { return primU8 }
 func U16() *PrimitiveType  { return primU16 }
 func U32() *PrimitiveType  { return primU32 }
+func U64() *PrimitiveType  { return primU64 }
 func I8() *PrimitiveType   { return primI8 }
 func I16() *PrimitiveType  { return primI16 }
 func I32() *PrimitiveType  { return primI32 }
@@ -295,6 +297,10 @@ func NormalizeType(t Type) Type {
 		switch tt.String() {
 		case "i1":
 			return primI1
+		case "i8":
+			return primI8
+		case "i16":
+			return primI16
 		case "i32":
 			return primI32
 		case "i64":
@@ -303,6 +309,16 @@ func NormalizeType(t Type) Type {
 			return primF32
 		case "f64":
 			return primF64
+		case "u8":
+			return primU8
+		case "u16":
+			return primU16
+		case "u32":
+			return primU32
+		case "u64":
+			return primU64
+		case "void":
+			return primVoid
 		default:
 			return tt
 		}

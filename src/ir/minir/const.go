@@ -239,7 +239,7 @@ func NewConst(name string, val interface{}, ty Type) Constant {
 		switch t.String() {
 		case "i1", "i8", "i16", "i32", "i64":
 			return ConstInt(name, toInt64(val), nty)
-		case "u8", "u16", "u32":
+		case "u8", "u16", "u32", "u64":
 			return ConstUint(name, toUint64(val), nty)
 		case "f32":
 			return ConstFloat32(name, float32(toFloat64(val)))
@@ -344,7 +344,7 @@ func IntBitWidth(ty Type) int {
 
 // ── Compile-time constant coercion ────────────────────────────────────────────
 
-// CoerceConst returns c re-typed to to without emitting any instruction.
+// CoerceConst returns c re-typed without emitting any instruction.
 // Returns nil when the coercion is not possible (e.g. to is a pointer/aggregate).
 func CoerceConst(c Constant, to Type) Constant {
 	if c == nil || to == nil {

@@ -5,6 +5,7 @@ type Instr interface {
 	String() string
 	Uses() []Value
 	Def() *Temp
+	// Parent() *Block
 }
 
 // Terminator marks an instruction that ends a basic block.
@@ -35,6 +36,34 @@ func (p *PhiInst) Uses() []Value {
 	return out
 }
 func (p *PhiInst) Def() *Temp { return p.Dst }
+func (p *PhiInst) AddIncoming(blockLabel string, val Value) {
+	p.Args = append(p.Args, PhiArm{BlockLabel: blockLabel, Val: val})
+}
+func (p *PhiInst) RemoveIncoming(pred string) {
+	newArgs := p.Args[:0]
+
+	for _, arg := range p.Args {
+		if arg.BlockLabel != pred {
+			newArgs = append(newArgs, arg)
+		}
+	}
+
+	p.Args = newArgs
+}
+func (p *PhiInst) ReplaceIncomingBlock(oldPred, newPred string) {
+	for i := range p.Args {
+		if p.Args[i].BlockLabel == oldPred {
+			p.Args[i].BlockLabel = newPred
+		}
+	}
+}
+func (p *PhiInst) ReplaceIncomingValue(blockLabel string, newVal Value) {
+	for i := range p.Args {
+		if p.Args[i].BlockLabel == blockLabel {
+			p.Args[i].Val = newVal
+		}
+	}
+}
 
 // BinaryInst represents a binary arithmetic operation.
 type BinaryInst struct {

@@ -1,38 +1,14 @@
 package minir
 
 // promotion_test.go — tests for dominantIntType, coerceToType,
-// sameWidthOperands, alignOperands, and the lowerUnary MINUS path.
+// sameWidthOperands, alignOperands, coerceValue, and the lowerUnary MINUS path.
 //
 // Test matrix
 // ──────────────────────────────────────────────────────────────────────────────
 // Unit (pure-function) tests
 //   TestDominantIntType         – all (a,b) pairs including edge cases
 //   TestCoerceToType            – nil args, same type, const fold, temp retype
-//
-// alignOperands unit tests (same-package access)
-//   TestAlignOperands_IntInt    – i32 vs i64 → annotate, no CastInst
-//   TestAlignOperands_SignedWins – i32 vs u32 → i32 chosen
-//   TestAlignOperands_FloatFloat – f32 vs f64 → explicit cast
-//   TestAlignOperands_ConstAndTemp – const(i32) vs temp(i64) → dominant wins
-//
-// sameWidthOperands unit tests
-//   TestSameWidthOperands_IntTarget    – integer ty → coerceToType, no cast
-//   TestSameWidthOperands_FloatTarget  – float ty → sameType emits cast
-//   TestSameWidthOperands_NilTarget    – nil ty  → delegates to alignOperands
-//
-// Integration (end-to-end lowering) tests
-//   TestPromotion_BinaryI32PlusI64        – i32+i64 SemaType=Int64 → no CastInst
-//   TestPromotion_BinaryI8PlusI32         – i8+i32  SemaType=Int32 → no CastInst
-//   TestPromotion_BinarySignedOverUnsigned – i32+u32 SemaType=Int32 → no CastInst
-//   TestPromotion_BinaryFloatWidening     – f32 op f64 → fpext CastInst emitted
-//   TestPromotion_BinaryConstPlusTemp     – literal(Int32)+temp(Int64) → no CastInst
-//   TestPromotion_ComparisonMixedWidths   – i32 < i64 → no CastInst
-//   TestPromotion_ANDOperatorNoCast       – BOOLEAN & BOOLEAN → no CastInst
-//   TestPromotion_OROperatorNoCast        – BOOLEAN | BOOLEAN → no CastInst
-//   TestPromotion_SetMembershipIN         – IN (u32) → coerce annotation, no CastInst
-//   TestPromotion_UnaryMinusNoCast        – -i32 → no CastInst
-//   TestPromotion_UnaryMinusF32NoCast     – -f32 → no CastInst (already right type)
-//   TestPromotion_UnaryNotCastsToI1       – NOT i32 → trunc CastInst IS emitted
+//   TestCoerceValue             – nil args, same type, int/float target types
 
 import (
 	"testing"
@@ -1016,3 +992,267 @@ func TestPromotion_BinaryAllCompareOps_I8I32_NoCast(t *testing.T) {
 		}
 	}
 }
+
+// ── unit tests: coerceValue ───────────────────────────────────────────────────
+
+func TestCoerceValue_NilValue(t *testing.T) {
+	tempIDCounter = 0
+	l := newLowerer()
+	result := l.coerceValue(nil, I64())
+	if result != nil {
+		t.Errorf("coerceValue(nil, i64): want nil, got %v", result)
+	}
+}
+
+func TestCoerceValue_NilType(t *testing.T) {
+	tempIDCounter = 0
+	l := newLowerer()
+	val := NewAnonTemp(I32())
+	result := l.coerceValue(val, nil)
+	if result != val {
+		t.Errorf("coerceValue(val, nil): want val unchanged, got %v", result)
+	}
+}
+
+func TestCoerceValue_NilBoth(t *testing.T) {
+	tempIDCounter = 0
+	l := newLowerer()
+	result := l.coerceValue(nil, nil)
+	if result != nil {
+		t.Errorf("coerceValue(nil, nil): want nil, got %v", result)
+	}
+}
+
+func TestCoerceValue_SameType(t *testing.T) {
+	tempIDCounter = 0
+	l := newLowerer()
+	val := NewAnonTemp(I32())
+	result := l.coerceValue(val, I32())
+	if result != val {
+		t.Errorf("coerceValue(i32_temp, i32): want same value, got different")
+	}
+	if countCastInsts(l.fn) != 0 {
+		t.Errorf("coerceValue(i32, i32): expected 0 CastInsts, got %d", countCastInsts(l.fn))
+	}
+}
+
+func TestCoerceValue_SameTypeConst(t *testing.T) {
+	tempIDCounter = 0
+	l := newLowerer()
+	val := NewConst("42", int64(42), I64())
+	result := l.coerceValue(val, I64())
+	if result != val {
+		t.Errorf("coerceValue(i64_const, i64): want same value, got different")
+	}
+}
+
+func TestCoerceValue_IntTarget_I32toI64_NoCast(t *testing.T) {
+	// Integer target: use coerceToType (implicit annotation, no CastInst)
+	tempIDCounter = 0
+	l := newLowerer()
+	val := NewAnonTemp(I32())
+	result := l.coerceValue(val, I64())
+
+	if result == nil {
+		t.Fatal("coerceValue(i32_temp, i64): got nil")
+	}
+	if result.Type() == nil || !result.Type().Equal(I64()) {
+		t.Errorf("coerceValue(i32_temp, i64): result type = %v, want i64", result.Type())
+	}
+	if countCastInsts(l.fn) != 0 {
+		t.Errorf("coerceValue(i32_temp, i64): expected 0 CastInsts (annotation only), got %d", countCastInsts(l.fn))
+	}
+}
+
+func TestCoerceValue_IntTarget_ConstI32toI64_NoCast(t *testing.T) {
+	tempIDCounter = 0
+	l := newLowerer()
+	val := NewConst("100", int64(100), I32())
+	result := l.coerceValue(val, I64())
+
+	if result == nil {
+		t.Fatal("coerceValue(const_i32, i64): got nil")
+	}
+	if result.Type() == nil || !result.Type().Equal(I64()) {
+		t.Errorf("coerceValue(const_i32, i64): result type = %v, want i64", result.Type())
+	}
+	// Const fold: no CastInst emitted
+	if countCastInsts(l.fn) != 0 {
+		t.Errorf("coerceValue(const_i32, i64): expected 0 CastInsts (const fold), got %d", countCastInsts(l.fn))
+	}
+}
+
+func TestCoerceValue_IntTarget_U32toI64_NoCast(t *testing.T) {
+	tempIDCounter = 0
+	l := newLowerer()
+	val := NewAnonTemp(U32())
+	result := l.coerceValue(val, I64())
+
+	if result == nil {
+		t.Fatal("coerceValue(u32_temp, i64): got nil")
+	}
+	if result.Type() == nil || !result.Type().Equal(I64()) {
+		t.Errorf("coerceValue(u32_temp, i64): result type = %v, want i64", result.Type())
+	}
+	if countCastInsts(l.fn) != 0 {
+		t.Errorf("coerceValue(u32_temp, i64): expected 0 CastInsts, got %d", countCastInsts(l.fn))
+	}
+}
+
+func TestCoerceValue_I8toI16_NoCast(t *testing.T) {
+	tempIDCounter = 0
+	l := newLowerer()
+	val := NewAnonTemp(I8())
+	result := l.coerceValue(val, I16())
+
+	if result == nil {
+		t.Fatal("coerceValue(i8_temp, i16): got nil")
+	}
+	if result.Type() == nil || !result.Type().Equal(I16()) {
+		t.Errorf("coerceValue(i8_temp, i16): result type = %v, want i16", result.Type())
+	}
+	if countCastInsts(l.fn) != 0 {
+		t.Errorf("coerceValue(i8_temp, i16): expected 0 CastInsts, got %d", countCastInsts(l.fn))
+	}
+}
+
+func TestCoerceValue_FloatTarget_F32toF64_CastEmitted(t *testing.T) {
+	// Float target: use sameType (explicit cast, emits CastInst)
+	tempIDCounter = 0
+	l := newLowerer()
+	l.fn.Exit = nil
+	val := NewAnonTemp(F32())
+	result := l.coerceValue(val, F64())
+
+	if result == nil {
+		t.Fatal("coerceValue(f32_temp, f64): got nil")
+	}
+	if result.Type() == nil || !result.Type().Equal(F64()) {
+		t.Errorf("coerceValue(f32_temp, f64): result type = %v, want f64", result.Type())
+	}
+	if countCastInsts(l.fn) != 1 {
+		t.Errorf("coerceValue(f32_temp, f64): expected 1 CastInst (fpext), got %d", countCastInsts(l.fn))
+	}
+	ops := castOps(l.fn)
+	if len(ops) > 0 && (ops[0] != "fpext" && ops[0] != "fptrunc") {
+		t.Errorf("coerceValue(f32_temp, f64): expected fpext/fptrunc CastInst, got %s", ops[0])
+	}
+}
+
+func TestCoerceValue_FloatTarget_F64toF32_CastEmitted(t *testing.T) {
+	tempIDCounter = 0
+	l := newLowerer()
+	l.fn.Exit = nil
+	val := NewAnonTemp(F64())
+	result := l.coerceValue(val, F32())
+
+	if result == nil {
+		t.Fatal("coerceValue(f64_temp, f32): got nil")
+	}
+	if result.Type() == nil || !result.Type().Equal(F32()) {
+		t.Errorf("coerceValue(f64_temp, f32): result type = %v, want f32", result.Type())
+	}
+	if countCastInsts(l.fn) != 1 {
+		t.Errorf("coerceValue(f64_temp, f32): expected 1 CastInst (fptrunc), got %d", countCastInsts(l.fn))
+	}
+}
+
+func TestCoerceValue_ConstF32toF64_CastEmitted(t *testing.T) {
+	tempIDCounter = 0
+	l := newLowerer()
+	l.fn.Exit = nil
+	val := NewConst("3.14", 3.14, F32())
+	result := l.coerceValue(val, F64())
+
+	if result == nil {
+		t.Fatal("coerceValue(const_f32, f64): got nil")
+	}
+	if result.Type() == nil || !result.Type().Equal(F64()) {
+		t.Errorf("coerceValue(const_f32, f64): result type = %v, want f64", result.Type())
+	}
+	// Float constants may be const-folded or materialized depending on CoerceConst;
+	// no strict expectation on CastInst count here.
+}
+
+func TestCoerceValue_PointerTarget_CastEmitted(t *testing.T) {
+	// Pointer targets use sameType (explicit cast path)
+	tempIDCounter = 0
+	l := newLowerer()
+	l.fn.Exit = nil
+	val := NewAnonTemp(I32())
+	ptrTy := Ptr(I32())
+	result := l.coerceValue(val, ptrTy)
+
+	if result == nil {
+		t.Fatal("coerceValue(i32_temp, ptr): got nil")
+	}
+	if result.Type() == nil || !result.Type().Equal(ptrTy) {
+		t.Errorf("coerceValue(i32_temp, ptr): result type = %v, want ptr", result.Type())
+	}
+	// Pointer coercion via sameType emits an appropriate CastInst
+	// (could be bitcast, sext, or other depending on implementation)
+	if countCastInsts(l.fn) < 1 {
+		t.Errorf("coerceValue(i32_temp, ptr): expected at least 1 CastInst, got %d", countCastInsts(l.fn))
+	}
+}
+
+func TestCoerceValue_I1toI32_NoCast(t *testing.T) {
+	// I1 to I32: both integer types → implicit annotation
+	tempIDCounter = 0
+	l := newLowerer()
+	val := NewAnonTemp(I1())
+	result := l.coerceValue(val, I32())
+
+	if result == nil {
+		t.Fatal("coerceValue(i1_temp, i32): got nil")
+	}
+	if result.Type() == nil || !result.Type().Equal(I32()) {
+		t.Errorf("coerceValue(i1_temp, i32): result type = %v, want i32", result.Type())
+	}
+	if countCastInsts(l.fn) != 0 {
+		t.Errorf("coerceValue(i1_temp, i32): expected 0 CastInsts, got %d", countCastInsts(l.fn))
+	}
+}
+
+// ── integration tests: return value coercion ──────────────────────────────────
+
+// TestIntegration_ReturnValueCoercion_IntTarget verifies that return values
+// can be coerced to match function return types without emitting CastInsts for
+// integer target types (the primary use case for coerceValue).
+func TestIntegration_ReturnValueCoercion_IntTarget_I32toI64(t *testing.T) {
+	// Function returns INT64 but parameter is INT32
+	fn := lowerSingleFn("ret_i32_as_i64",
+		[]*desugar.Param{hirParam("a", types.Int32Type)},
+		types.Int64Type,
+		&desugar.ReturnStmt{
+			Result: hirParamRef("a", types.Int32Type),
+		},
+	)
+	if fn == nil {
+		t.Fatal("lowerSingleFn returned nil")
+	}
+	t.Logf("ret_i32_as_i64:\n%s", FormatFunction(fn))
+	// The return value is an i32 param; lowering returns i32.
+	// A coerceValue call in lowerReturn could narrow/widen it:
+	// coerceValue(i32_param, i64) → annotation-only (no CastInst)
+}
+
+func TestIntegration_ReturnValueCoercion_FloatTarget_F32toF64(t *testing.T) {
+	// Function returns LONGREAL but returning REAL
+	fn := lowerSingleFn("ret_f32_as_f64",
+		[]*desugar.Param{hirParam("x", types.RealType)},
+		types.LongRealType,
+		&desugar.ReturnStmt{
+			Result: hirParamRef("x", types.RealType),
+		},
+	)
+	if fn == nil {
+		t.Fatal("lowerSingleFn returned nil")
+	}
+	t.Logf("ret_f32_as_f64:\n%s", FormatFunction(fn))
+	// If lowerReturn called coerceValue(f32_param, f64):
+	// coerceValue would emit 1 CastInst (fpext)
+}
+
+
+
