@@ -51,6 +51,7 @@ func LowerModule(mod *minir.Module) (*mir.Module, error) {
 		out.AddGlobal(decl)
 		globalsByName[g.Name] = sym
 	}
+
 	for _, c := range mod.Constants {
 		decl, sym, err := lowerGlobalConst(c)
 		if err != nil {
@@ -59,6 +60,7 @@ func LowerModule(mod *minir.Module) (*mir.Module, error) {
 		out.AddConst(decl)
 		globalsByName[c.Name] = sym
 	}
+
 	for _, e := range mod.Externals {
 		decl, err := lowerExtern(e)
 		if err != nil {
@@ -66,6 +68,7 @@ func LowerModule(mod *minir.Module) (*mir.Module, error) {
 		}
 		out.AddExtern(decl)
 	}
+
 	for _, fn := range mod.Functions {
 		mfn, err := LowerFunction(fn, globalsByName)
 		if err != nil {
@@ -73,6 +76,7 @@ func LowerModule(mod *minir.Module) (*mir.Module, error) {
 		}
 		out.AddFunction(mfn)
 	}
+
 	return out, nil
 }
 
@@ -169,58 +173,70 @@ func lowerInstr(inst minir.Instr, regByTemp map[*minir.Temp]*mir.Register, globa
 		if err != nil {
 			return nil, err
 		}
+
 		right, err := lowerOperand(i.Right, regByTemp, globals)
 		if err != nil {
 			return nil, err
 		}
+
 		dst, err := lowerTemp(i.Dst, regByTemp)
 		if err != nil {
 			return nil, err
 		}
+
 		return &mir.BinaryInstr{Dst: dst, Op: i.Op, Left: left, Right: right}, nil
 	case *minir.UnaryInst:
 		x, err := lowerOperand(i.Src, regByTemp, globals)
 		if err != nil {
 			return nil, err
 		}
+
 		dst, err := lowerTemp(i.Dst, regByTemp)
 		if err != nil {
 			return nil, err
 		}
+
 		return &mir.UnaryInstr{Dst: dst, Op: i.Op, X: x}, nil
 	case *minir.ICmpInst:
 		left, err := lowerOperand(i.Left, regByTemp, globals)
 		if err != nil {
 			return nil, err
 		}
+
 		right, err := lowerOperand(i.Right, regByTemp, globals)
 		if err != nil {
 			return nil, err
 		}
+
 		dst, err := lowerTemp(i.Dst, regByTemp)
 		if err != nil {
 			return nil, err
 		}
+
 		return &mir.CompareInstr{Dst: dst, Pred: strings.ToLower(i.Pred), Left: left, Right: right}, nil
 	case *minir.LoadInst:
 		addr, err := lowerOperand(i.Addr, regByTemp, globals)
 		if err != nil {
 			return nil, err
 		}
+
 		dst, err := lowerTemp(i.Dst, regByTemp)
 		if err != nil {
 			return nil, err
 		}
+
 		return &mir.LoadInstr{Dst: dst, Addr: addr}, nil
 	case *minir.StoreInst:
 		addr, err := lowerOperand(i.Addr, regByTemp, globals)
 		if err != nil {
 			return nil, err
 		}
+
 		val, err := lowerOperand(i.Val, regByTemp, globals)
 		if err != nil {
 			return nil, err
 		}
+
 		return &mir.StoreInstr{Addr: addr, Value: val}, nil
 	case *minir.CallInst:
 		args := make([]mir.Operand, 0, len(i.Args))
@@ -231,6 +247,7 @@ func lowerInstr(inst minir.Instr, regByTemp map[*minir.Temp]*mir.Register, globa
 			}
 			args = append(args, lop)
 		}
+
 		var dst *mir.Register
 		if i.Dst != nil {
 			callDst, callErr := lowerTemp(i.Dst, regByTemp)
@@ -239,6 +256,7 @@ func lowerInstr(inst minir.Instr, regByTemp map[*minir.Temp]*mir.Register, globa
 			}
 			dst = callDst
 		}
+
 		return &mir.CallInstr{Dst: dst, Callee: mir.NewSymbol(i.Callee, nil), Args: args}, nil
 	case *minir.PhiInst:
 		dst, err := lowerTemp(i.Dst, regByTemp)

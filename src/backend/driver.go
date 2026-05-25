@@ -17,17 +17,18 @@ import (
 // PipelineDriver orchestrates the backend pipeline stages.
 //
 // Current implementation:
-//  1. Lower(minir -> backend/mir)
-//  2. CallLowering   (ABI arg/result expansion; runs before instruction selection)
-//  3. SwitchLowering (switch → compare-chain or jump-table; runs before instruction selection)
+//  1. Lower           (minir -> backend/mir)
+//  2. CallLowering    (ABI arg/result expansion; runs before instruction selection)
+//  3. SwitchLowering  (switch → compare-chain or jump-table; runs before instruction selection)
 //  4. InstructionSelection
-//  5. Legalization (target-aware post-pass)
+//  5. Legalization    (target-aware post-pass)
 //  6. InstructionScheduling (stub)
 //  7. RegisterAllocation
 //  8. PrologueEpilogue (emit prologue/epilogue based on frame layout)
-//  9. Assemble (optional callback)
-//  10. Link (optional callback)
-//  11. BuildPlans (phi helpers; call/switch plans are empty after steps 2-3)
+//  9. Assemble        (optional callback)
+//  10. Link           (optional callback)
+//  11. BuildPlans     (compute phi/switch/call plans with physical registers from regalloc)
+//  12. PhiRemoval     (remove phi nodes post-BuildPlans, insert move sequences on edges)
 type PipelineDriver struct {
 	Target   target.Target
 	Selector *selector.Selector
@@ -57,7 +58,7 @@ func (p *PipelineDriver) Run(prog *minir.Program) (*lower.LoweredProgram, error)
 		p.Selector = sel
 	}
 
-	mprog, err := lower.LowerProgram(prog)
+	mprog, err := p.Lower(prog)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +80,14 @@ func (p *PipelineDriver) Run(prog *minir.Program) (*lower.LoweredProgram, error)
 	plans, err := selector.BuildPlans(mprog, p.Target)
 	if err != nil {
 		return nil, err
+	}
+
+	// PhiRemoval runs post-BuildPlans, after regalloc has assigned physical registers.
+	// At this point, phi arms contain physical registers and BuildPlans has pre-computed
+	// the phi plans from the MIR. We now remove the phi nodes and insert move sequences.
+	mprog, err = p.PhiRemoval(mprog)
+	if err != nil {
+		return nil, fmt.Errorf("backend post-build phi removal: %w", err)
 	}
 
 	return &lower.LoweredProgram{MIR: mprog, Plans: plans}, nil
@@ -158,6 +167,22 @@ func (p *PipelineDriver) SwitchLowering(prog *mir.Program) (*mir.Program, error)
 		return nil, fmt.Errorf("backend pipeline: nil target before switch lowering")
 	}
 	return lower.LowerSwitchesInProgram(prog, p.Target)
+}
+
+// PhiRemoval removes phi nodes from the MIR program after register allocation.
+// At this point, phi arms have been renamed to physical registers by regalloc,
+// and RemovePhisInProgram will replace phis with explicit move sequences.
+func (p *PipelineDriver) PhiRemoval(prog *mir.Program) (*mir.Program, error) {
+	if p == nil {
+		return nil, fmt.Errorf("backend pipeline: nil driver")
+	}
+	if prog == nil {
+		return nil, fmt.Errorf("backend pipeline: nil MIR program before phi removal")
+	}
+	if p.Target == nil {
+		return nil, fmt.Errorf("backend pipeline: nil target before phi removal")
+	}
+	return lower.RemovePhisInProgram(prog, p.Target)
 }
 
 // RegisterAllocation ...

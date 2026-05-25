@@ -21,7 +21,7 @@ import (
 //     where entryI is the block label for value low+i (gaps filled with default).
 //     The emitter handles this terminator ad-hoc.
 //
-// After this pass no *mir.SwitchInstr terminators remain in the program.
+// After this pass, no *mir.SwitchInstr terminators remain in the program.
 func LowerSwitchesInProgram(prog *mir.Program, tgt target.Target) (*mir.Program, error) {
 	if prog == nil {
 		return mir.NewProgram(), nil
@@ -74,6 +74,7 @@ func LowerSwitchesInFunction(fn *mir.Function, tgt target.Target) error {
 		if err != nil {
 			return fmt.Errorf("block %s: %w", block.Label, err)
 		}
+
 		newBlocks, err := lowerSwitchBlock(block, sw, plan, &nextID)
 		if err != nil {
 			return fmt.Errorf("block %s: %w", block.Label, err)
@@ -193,4 +194,3 @@ func maxFnBlockID(fn *mir.Function) int {
 	}
 	return max
 }
-
