@@ -29,22 +29,36 @@ block arithmetic {
 	}
 	cost 1;
 	emit {
-	  instr {
-		opcode: "add";
-		dst: $rd;
-		src: [$lhs, $rhs];
-		def: $rd;
-		uses: [$lhs, $rhs];
-	  };
+	  instr { opcode: "add"; dst: $rd; src: [$lhs, $rhs]; def: $rd; uses: [$lhs, $rhs]; };
+	}
+  }
+
+  rule ADDri_large {
+	match {
+	  commutative;
+	  out $rd : GPR:virt;
+	  in $lhs : GPR:virt;
+	  in $imm : imm;
+	  temp $tmp : GPR:virt;
+	  pattern add($lhs, $imm);
+	}
+	cost 2;
+	cond !FitsAddSubImm($imm);
+	emit {
+	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
+	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
+	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
+	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
+	  instr { opcode: "add"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
 	}
   }
 
   // add(rd, lhs, imm)  ->  add rd, lhs, #imm
   //
   // ARM64 encodes the add-immediate form with a compact immediate field.
-  // We keep the constraint conservative here: signed 12-bit immediates only.
-  // If a larger constant is needed, a later materialization rule should be
-  // added above this one.
+  // We keep the constraint conservative here: unsigned 12-bit immediates only
+  // (optionally shifted left by 12). If a larger constant is needed, a later
+  // materialization rule should be added above this one.
   rule ADDri {
 	match {
 	  commutative;
@@ -54,15 +68,9 @@ block arithmetic {
 	  pattern add($lhs, $imm);
 	}
 	cost 1;
-	cond SImmFits12($imm);
+	cond FitsAddSubImm($imm);
 	emit {
-	  instr {
-		opcode: "add";
-		dst: $rd;
-		src: [$lhs, $imm];
-		def: $rd;
-		uses: [$lhs];
-	  };
+	  instr { opcode: "add"; dst: $rd; src: [$lhs, $imm]; def: $rd; uses: [$lhs]; };
 	}
   }
 
@@ -70,7 +78,7 @@ block arithmetic {
   //
   // This covers the shifted-register addressing/arithmetic form that ARM64
   // uses extensively for strength-reduced index math.
-  rule ADD_shifted {
+  rule ADD_shifted_lsl {
 	match {
 	  commutative;
 	  out $rd : GPR:virt;
@@ -83,13 +91,57 @@ block arithmetic {
 	cond ShamtFits6($sh);
 	emit {
 	  instr {
-		opcode: "add";
-		dst: $rd;
-		src: [$lhs, $rhs, $sh];
-		def: $rd;
-		uses: [$lhs, $rhs];
+	    opcode: "add";
+	    dst: $rd;
+	    src: [$lhs, $rhs, lsl ,$sh];
+	    def: $rd;
+	    uses: [$lhs, $rhs];
 	  };
 	}
+  }
+
+  rule ADD_shifted_lsr {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern add($lhs, lshr($rhs, $sh));
+  	}
+  	cost 2;
+  	cond ShamtFits6($sh);
+  	emit {
+  	  instr {
+  	    opcode: "add";
+  	    dst: $rd;
+  	    src: [$lhs, $rhs, lsr, $sh];
+  	    def: $rd;
+  	    uses: [$lhs, $rhs];
+  	  };
+  	}
+  }
+
+  rule ADD_shifted_asr {
+    match {
+      commutative;
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $rhs : GPR:virt;
+      in $sh : imm;
+      pattern add($lhs, ashr($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+      instr {
+        opcode: "add";
+        dst: $rd;
+        src: [$lhs, $rhs, asr, $sh];
+        def: $rd;
+        uses: [$lhs, $rhs];
+      };
+    }
   }
 
   // ----- Subtraction -----
@@ -116,29 +168,9 @@ block arithmetic {
 	  pattern sub($lhs, $imm);
 	}
 	cost 1;
-	cond UImmFits12($imm);
+	cond FitsAddSubImm($imm);
 	emit {
 	  instr { opcode: "sub"; dst: $rd; src: [$lhs, $imm]; def: $rd; uses: [$lhs]; };
-	}
-  }
-
-  rule ADDri_large {
-	match {
-	  commutative;
-	  out $rd : GPR:virt;
-	  in $lhs : GPR:virt;
-	  in $imm : imm;
-	  temp $tmp : GPR:virt;
-	  pattern add($lhs, $imm);
-	}
-	cost 2;
-	cond !SImmFits12($imm);
-	emit {
-	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "add"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
 	}
   }
 
@@ -150,8 +182,8 @@ block arithmetic {
 	  temp $tmp : GPR:virt;
 	  pattern sub($lhs, $imm);
 	}
-	cost 2;
-	cond !SImmFits12($imm);
+	cost 5;
+	cond !FitsAddSubImm($imm);
 	emit {
 	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
 	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
@@ -161,6 +193,75 @@ block arithmetic {
 	}
   }
 
+  rule SUB_shifted_lsl {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern sub($lhs, lshl($rhs, $sh));
+  	}
+  	cost 2;
+  	cond ShamtFits6($sh);
+  	emit {
+  	  instr {
+  	    opcode: "sub";
+  	    dst: $rd;
+  	    src: [$lhs, $rhs, lsl ,$sh];
+  	    def: $rd;
+  	    uses: [$lhs, $rhs];
+  	  };
+  	}
+  }
+
+  rule SUB_shifted_lsr {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern sub($lhs, lshr($rhs, $sh));
+
+  	}
+  	cost 2;
+  	cond ShamtFits6($sh);
+  	emit {
+  	  instr {
+  	    opcode: "sub";
+  	    dst: $rd;
+  	     src: [$lhs, $rhs, lsr, $sh];
+  	     def: $rd;
+  	     uses: [$lhs, $rhs];
+
+  	  };
+  	}
+  }
+
+  rule SUB_shifted_asr {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern sub($lhs, ashr($rhs, $sh));
+  	}
+  	cost 2;
+  	cond ShamtFits6($sh);
+  	emit {
+      instr {
+        opcode: "sub";
+        dst: $rd;
+        src: [$lhs, $rhs, asr, $sh];
+        def: $rd;
+        uses: [$lhs, $rhs];
+      };
+  	}
+  }
+
+  // ----- AND -----
   rule ANDrr {
 	match {
 	  commutative;
@@ -175,6 +276,109 @@ block arithmetic {
 	}
   }
 
+  rule ANDri {
+    match {
+      commutative;
+      out $rd : GPR:virt;
+      in $lhs : GPR:virt;
+      in $imm : imm;
+      pattern and($lhs, $imm);
+    }
+    cost 1;
+    cond FitsLogicalImm($imm);
+    emit {
+        instr { opcode: "and"; dst: $rd; src: [$lhs, $imm]; def: $rd; uses: [$lhs]; };
+    }
+  }
+
+  rule ANDri_large {
+  	match {
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $imm : imm;
+  	  temp $tmp : GPR:virt;
+  	  pattern and($lhs, $imm);
+  	}
+  	cost 2;
+  	cond !FitsLogicalImm($imm);
+  	emit {
+  	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "and"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
+  	}
+  }
+
+  rule AND_shifted_lsl {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern and($lhs, lshl($rhs, $sh));
+
+  	}
+  	cost 2;
+  	cond ShamtFits6($sh);
+  	emit {
+  	  instr {
+  	    opcode: "and";
+  	    dst: $rd;
+  	    src: [$lhs, $rhs, lsl, $sh];
+  	    def: $rd;
+  	    uses: [$lhs, $rhs];
+  	  };
+  	}
+  }
+
+  rule AND_shifted_lsr {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern and($lhs, lshr($rhs, $sh));
+  	}
+
+  	cost 2;
+  	cond ShamtFits6($sh);
+  	emit {
+      instr {
+        opcode: "and";
+        dst: $rd;
+        src: [$lhs, $rhs, lsr, $sh];
+        def: $rd;
+        uses: [$lhs, $rhs];
+      };
+    }
+  }
+
+  rule AND_shifted_asr {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern and($lhs, ashr($rhs, $sh));
+  	}
+  	cost 2;
+  	cond ShamtFits6($sh);
+  	emit {
+      instr {
+       opcode: "and";
+       dst: $rd;
+       src: [$lhs, $rhs, asr, $sh];
+       def: $rd;
+     uses: [$lhs, $rhs];
+     };
+  	}
+  }
+
+  // ----- OR -----
   rule ORrr {
 	match {
 	  commutative;
@@ -189,6 +393,80 @@ block arithmetic {
 	}
   }
 
+  rule ORri {
+    match {
+      commutative;
+        out $rd : GPR:virt;
+        in $lhs : GPR:virt;
+        in $imm : imm;
+        pattern or($lhs, $imm);
+    }
+    cost 1;
+    cond FitsLogicalImm($imm);
+    emit { instr { opcode: "orr"; dst: $rd; src: [$lhs, $imm]; def: $rd; uses: [$lhs]; };}
+  }
+
+  rule ORri_large {
+  	match {
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $imm : imm;
+  	  temp $tmp : GPR:virt;
+  	  pattern or($lhs, $imm);
+  	}
+  	cost 2;
+  	emit {
+  	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "orr"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
+  	}
+  }
+
+  rule OR_shifted_lsl {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern or($lhs, lshl($rhs, $sh));
+  	}
+  	cost 2;
+  	cond ShamtFits6($sh);
+  	emit { instr { opcode: "orr"; dst: $rd; src: [$lhs, $rhs, lsl, $sh]; def: $rd; uses: [$lhs, $rhs]; };}
+  }
+
+  rule OR_shifted_lsr {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern or($lhs, lshr($rhs, $sh));
+  	}
+  	cost 2;
+    cond ShamtFits6($sh);
+    emit { instr { opcode: "orr"; dst: $rd; src: [$lhs, $rhs, lsr, $sh]; def: $rd; uses: [$lhs, $rhs]; };}
+  }
+
+  rule OR_shifted_asr {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern or($lhs, ashr($rhs, $sh));
+  	}
+  	cost 2;
+    cond ShamtFits6($sh);
+    emit { instr { opcode: "orr"; dst: $rd; src: [$lhs, $rhs, asr, $sh]; def: $rd; uses: [$lhs, $rhs]; };}
+  }
+
+  // ----- XOR -----
   rule XORrr {
 	match {
 	  commutative;
@@ -203,40 +481,17 @@ block arithmetic {
 	}
   }
 
-  rule ANDri_large {
-	match {
-	  out $rd : GPR:virt;
-	  in $lhs : GPR:virt;
-	  in $imm : imm;
-	  temp $tmp : GPR:virt;
-	  pattern and($lhs, $imm);
-	}
-	cost 2;
-	emit {
-	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "and"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
-	}
-  }
-
-  rule ORri_large {
-	match {
-	  out $rd : GPR:virt;
-	  in $lhs : GPR:virt;
-	  in $imm : imm;
-	  temp $tmp : GPR:virt;
-	  pattern or($lhs, $imm);
-	}
-	cost 2;
-	emit {
-	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "orr"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
-	}
+  rule XORri {
+    match {
+      commutative;
+        out $rd : GPR:virt;
+        in $lhs : GPR:virt;
+        in $imm : imm;
+        pattern xor($lhs, $imm);
+    }
+    cost 1;
+    cond FitsLogicalImm($imm);
+    emit { instr { opcode: "eor"; dst: $rd; src: [$lhs, $imm]; def: $rd; uses: [$lhs]; }; }
   }
 
   rule XORri_large {
@@ -255,6 +510,48 @@ block arithmetic {
 	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
 	  instr { opcode: "eor"; dst: $rd; src: [$lhs, $tmp]; def: $rd; uses: [$lhs, $tmp]; };
 	}
+  }
+
+  rule XOR_shifted_lsl {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern xor($lhs, lshl($rhs, $sh));
+  	}
+  	cost 2;
+    cond ShamtFits6($sh);
+    emit { instr { opcode: "eor"; dst: $rd; src: [$lhs, $rhs, lsl, $sh]; def: $rd; uses: [$lhs, $rhs]; }; }
+  }
+
+  rule XOR_shifted_lsr {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern xor($lhs, lshr($rhs, $sh));
+  	}
+  	cost 2;
+    cond ShamtFits6($sh);
+    emit { instr { opcode: "eor"; dst: $rd; src: [$lhs, $rhs, lsr, $sh]; def: $rd; uses: [$lhs, $rhs]; };}
+  }
+
+  rule XOR_shifted_asr {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $rhs : GPR:virt;
+  	  in $sh : imm;
+  	  pattern xor($lhs, ashr($rhs, $sh));
+  	}
+  	cost 2;
+    cond ShamtFits6($sh);
+    emit { instr { opcode: "eor"; dst: $rd; src: [$lhs, $rhs, asr, $sh]; def: $rd; uses: [$lhs, $rhs]; };}
   }
 
   // neg(rd, rs)  ->  sub rd, xzr, rs
@@ -285,14 +582,48 @@ block arithmetic {
 	}
 	cost 2;
 	emit {
-	  instr {
-		opcode: "mul";
-		dst: $rd;
-		src: [$lhs, $rhs];
-		def: $rd;
-		uses: [$lhs, $rhs];
-	  };
+	  instr { opcode: "mul"; dst: $rd; src: [$lhs, $rhs]; def: $rd; uses: [$lhs, $rhs]; };
 	}
+  }
+
+  rule mul_add {
+	match {
+	  out $rd : GPR:virt;
+	  in $lhs : GPR:virt;
+	  in $rhs : GPR:virt;
+	  in $addend : GPR:virt;
+	  pattern add(mul($lhs, $rhs), $addend);
+	}
+	cost 2;
+    emit {
+        instr {
+          opcode: "madd";
+          dst: $rd;
+          src: [$lhs, $rhs, $addend];
+          def: $rd;
+          uses: [$lhs, $rhs, $addend];
+        };
+    }
+  }
+
+  rule mul_sub {
+	match {
+	  out $rd : GPR:virt;
+	  in $lhs : GPR:virt;
+	  in $rhs : GPR:virt;
+	  in $subend : GPR:virt;
+	  pattern sub($subend, mul($lhs, $rhs));
+	}
+	cost 2;
+    emit {
+        instr {
+          opcode: "msub";
+          dst: $rd;
+          src: [$lhs, $rhs, $subend];
+          def: $rd;
+          uses: [$lhs, $rhs, $subend];
+        };
+    }
   }
 
   // sdiv(rd, lhs, rhs)  ->  sdiv rd, lhs, rhs
@@ -305,9 +636,7 @@ block arithmetic {
 	}
 	cost 4;
 	emit {
-	  instr {
-		opcode: "sdiv"; dst: $rd; src: [$lhs, $rhs]; def: $rd; uses: [$lhs, $rhs];
-	  };
+	  instr { opcode: "sdiv"; dst: $rd; src: [$lhs, $rhs]; def: $rd; uses: [$lhs, $rhs]; };
 	}
   }
 
@@ -325,8 +654,37 @@ block arithmetic {
 	}
 	cost 4;
 	emit {
-	  instr {
-		opcode: "udiv"; dst: $rd; src: [$lhs, $rhs]; def: $rd; uses: [$lhs, $rhs]; };
+	  instr { opcode: "udiv"; dst: $rd; src: [$lhs, $rhs]; def: $rd; uses: [$lhs, $rhs]; };
+	}
+  }
+
+  rule SREMrr {
+	match {
+	  out $rd : GPR:virt;
+	  in $lhs : GPR:virt;
+	  in $rhs : GPR:virt;
+	  temp $tmp : GPR:virt;
+	  pattern rem($lhs, $rhs);
+	}
+	cost 4;
+	emit {
+	  instr { opcode: "sdiv"; dst: $tmp; src: [$lhs, $rhs]; def: $tmp; uses: [$lhs, $rhs]; };
+	  instr { opcode: "msub"; dst: $rd; src: [$tmp, $rhs, $lhs]; def: $rd; uses: [$tmp, $rhs, $lhs]; };
+    }
+  }
+
+  rule UREMrr {
+	match {
+	  out $rd : GPR:virt;
+	  in $lhs : GPR:virt;
+	  in $rhs : GPR:virt;
+	  temp $tmp : GPR:virt;
+	  pattern urem($lhs, $rhs);
+	}
+	cost 4;
+	emit {
+	  instr { opcode: "udiv"; dst: $tmp; src: [$lhs, $rhs]; def: $tmp; uses: [$lhs, $rhs]; };
+	  instr { opcode: "msub"; dst: $rd; src: [$tmp, $rhs, $lhs]; def: $rd; uses: [$tmp, $rhs, $lhs]; };
 	}
   }
 
@@ -340,13 +698,7 @@ block arithmetic {
 	}
 	cost 1;
 	emit {
-	  instr {
-		opcode: "mvn";
-		dst: $rd;
-		src: [$rs];
-		def: $rd;
-		uses: [$rs];
-	  };
+	  instr { opcode: "mvn"; dst: $rd; src: [$rs]; def: $rd; uses: [$rs]; };
 	}
   }
 
@@ -362,13 +714,7 @@ block arithmetic {
 	cost 1;
 	cond ShamtFits6($sh);
 	emit {
-	  instr {
-		opcode: "lsl";
-		dst: $rd;
-		src: [$rs, $sh];
-		def: $rd;
-		uses: [$rs];
-	  };
+	  instr { opcode: "lsl"; dst: $rd; src: [$rs, $sh]; def: $rd; uses: [$rs]; };
 	}
   }
 
@@ -383,13 +729,7 @@ block arithmetic {
 	cost 1;
 	cond ShamtFits6($sh);
 	emit {
-	  instr {
-		opcode: "lsr";
-		dst: $rd;
-		src: [$rs, $sh];
-		def: $rd;
-		uses: [$rs];
-	  };
+	  instr { opcode: "lsr"; dst: $rd; src: [$rs, $sh]; def: $rd; uses: [$rs]; };
 	}
   }
 
@@ -404,29 +744,7 @@ block arithmetic {
 	cost 1;
 	cond ShamtFits6($sh);
 	emit {
-	  instr {
-		opcode: "asr";
-		dst: $rd;
-		src: [$rs, $sh];
-		def: $rd;
-		uses: [$rs];
-	  };
-	}
-  }
-
-  rule MOV_large_imm {
-	match {
-	  out $rd : GPR:virt;
-	  in $imm : imm;
-	  pattern mov($imm);
-	}
-	cost 0;
-	cond !SImmFits12($imm);
-	emit {
-	  instr { opcode: "movz"; dst: $rd; src: [imm16_0($imm)]; def: $rd; };
-	  instr { opcode: "movk"; dst: $rd; src: [$rd, imm16_1($imm), 16]; def: $rd; uses: [$rd]; };
-	  instr { opcode: "movk"; dst: $rd; src: [$rd, imm16_2($imm), 32]; def: $rd; uses: [$rd]; };
-	  instr { opcode: "movk"; dst: $rd; src: [$rd, imm16_3($imm), 48]; def: $rd; uses: [$rd]; };
+	  instr { opcode: "asr"; dst: $rd; src: [$rs, $sh]; def: $rd; uses: [$rs]; };
 	}
   }
 
@@ -466,16 +784,39 @@ block move {
 	  in $rs : GPR:virt;
 	  pattern mov($rs);
 	}
-	cost 0;
+	cost 1;
 	emit {
-	  instr {
-		opcode: "add";
-		dst: $rd;
-		src: [$rs, 0];
-		def: $rd;
-		uses: [$rs];
-	  };
+	  instr { opcode: "add"; dst: $rd; src: [$rs, 0]; def: $rd; uses: [$rs]; };
 	}
+  }
+
+  rule MOVimm {
+	match {
+	  out $rd : GPR:virt;
+      in $imm : imm;
+      pattern mov($imm);
+	}
+	cost 1;
+	cond UImmFits16($imm);
+	emit {
+	  instr { opcode: "movz"; dst: $rd; src: [$imm]; def: $rd; };
+	}
+  }
+
+  rule MOV_large_imm {
+    match {
+      out $rd : GPR:virt;
+      in $imm : imm;
+      pattern mov($imm);
+    }
+    cost 4;
+    cond !UImmFits16($imm);
+    emit {
+      instr { opcode: "movz"; dst: $rd; src: [imm16_0($imm)]; def: $rd; };
+      instr { opcode: "movk"; dst: $rd; src: [$rd, imm16_1($imm), 16]; def: $rd; uses: [$rd]; };
+      instr { opcode: "movk"; dst: $rd; src: [$rd, imm16_2($imm), 32]; def: $rd; uses: [$rd]; };
+      instr { opcode: "movk"; dst: $rd; src: [$rd, imm16_3($imm), 48]; def: $rd; uses: [$rd]; };
+    }
   }
 
   // mov(rd, xzr) -> add rd, xzr, #0
@@ -488,37 +829,26 @@ block move {
 	  in $xzr : GPR:phys;
 	  pattern mov($xzr);
 	}
-	cost 0;
+	cost 1;
 	emit {
-	  instr {
-		opcode: "add";
-		dst: $rd;
-		src: [$xzr, 0];
-		def: $rd;
-		uses: [$xzr];
-	  };
+	  instr { opcode: "add"; dst: $rd; src: [$xzr, 0]; def: $rd; uses: [$xzr]; };
 	}
   }
 
   // Fallback copy materialization for non-register operands (immediates,
   // symbols, or any other source the MIR may carry).
-  rule MOVany {
-	match {
-	  out $rd : GPR:virt;
-	  in $src : any;
-	  pattern mov($src);
-	}
-	cost 1;
-	emit {
-	  instr {
-		opcode: "mov";
-		dst: $rd;
-		src: [$src];
-		def: $rd;
-		uses: [$src];
-	  };
-	}
-  }
+  //rule MOVany {
+//	match {
+//	  out $rd : GPR:virt;
+//	  in $src : any;
+//	  pattern mov($src);
+//	}
+//	cost 1;
+//	emit {
+//	  instr { opcode: "mov"; dst: $rd; src: [$src]; def: $rd; uses: [$src]; };
+//	}
+ // }
+
 }
 
 // ---------------------------------------------------------------------------
@@ -543,13 +873,7 @@ block memory {
 	}
 	cost 1;
 	emit {
-	  instr {
-		opcode: "load";
-		dst: $rd;
-		src: [$addr];
-		def: $rd;
-		uses: [$addr];
-	  };
+	  instr { opcode: "load"; dst: $rd; src: [$addr]; def: $rd; uses: [$addr]; };
 	}
   }
 
@@ -561,13 +885,7 @@ block memory {
 	}
 	cost 1;
 	emit {
-	  instr {
-		opcode: "load";
-		dst: $rd;
-		src: [$ra];
-		def: $rd;
-		uses: [$ra];
-	  };
+	  instr { opcode: "load"; dst: $rd; src: [$ra]; def: $rd; uses: [$ra]; };
 	}
   }
 
@@ -579,14 +897,28 @@ block memory {
 	}
 	cost 1;
 	emit {
-	  instr {
-		opcode: "load";
-		dst: $rd;
-		src: [$sym];
-		def: $rd;
-		uses: [$sym];
-	  };
+	  instr { opcode: "load"; dst: $rd; src: [$sym]; def: $rd; uses: [$sym]; };
 	}
+  }
+
+  rule LOAD_large_off {
+  	match {
+  	  out $rd : GPR:virt;
+  	  in $base : GPR:virt;
+  	  in $off : imm;
+  	  temp $tmp : GPR:virt;
+  	  pattern load(mem($base, $off));
+  	}
+  	cost 2;
+  	cond !SImmFits12($off);
+  	emit {
+  	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($off)]; def: $tmp; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($off), 16]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($off), 32]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($off), 48]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "add"; dst: $tmp; src: [$base, $tmp]; def: $tmp; uses: [$base, $tmp]; };
+  	  instr { opcode: "load"; dst: $rd; src: [$tmp]; def: $rd; uses: [$tmp]; };
+  	}
   }
 
   // store(val, mem(base, offset)) -> store val, [base + offset]
@@ -601,11 +933,7 @@ block memory {
 	}
 	cost 1;
 	emit {
-	  instr {
-		opcode: "store";
-		src: [$val, $addr];
-		uses: [$val, $addr];
-	  };
+	  instr { opcode: "store"; src: [$val, $addr]; uses: [$val, $addr]; };
 	}
   }
 
@@ -617,11 +945,7 @@ block memory {
 	}
 	cost 1;
 	emit {
-	  instr {
-		opcode: "store";
-		src: [$val, $ra];
-		uses: [$val, $ra];
-	  };
+	  instr { opcode: "store"; src: [$val, $ra]; uses: [$val, $ra]; };
 	}
   }
 
@@ -634,17 +958,8 @@ block memory {
 	}
 	cost 2;
 	emit {
-	  instr {
-		opcode: "mov";
-		dst: $tmp;
-		src: [$val];
-		def: $tmp;
-	  };
-	  instr {
-		opcode: "store";
-		src: [$tmp, $ra];
-		uses: [$tmp, $ra];
-	  };
+	  instr { opcode: "mov"; dst: $tmp; src: [$val]; def: $tmp; };
+	  instr { opcode: "store"; src: [$tmp, $ra]; uses: [$tmp, $ra]; };
 	}
   }
 
@@ -657,17 +972,8 @@ block memory {
 	}
 	cost 2;
 	emit {
-	  instr {
-		opcode: "mov";
-		dst: $tmp;
-		src: [$val];
-		def: $tmp;
-	  };
-	  instr {
-		opcode: "store";
-		src: [$tmp, $ra];
-		uses: [$tmp, $ra];
-	  };
+	  instr { opcode: "mov"; dst: $tmp; src: [$val]; def: $tmp; };
+	  instr { opcode: "store"; src: [$tmp, $ra]; uses: [$tmp, $ra]; };
 	}
   }
 
@@ -679,11 +985,7 @@ block memory {
 	}
 	cost 1;
 	emit {
-	  instr {
-		opcode: "store";
-		src: [$val, $sym];
-		uses: [$val, $sym];
-	  };
+	  instr { opcode: "store"; src: [$val, $sym]; uses: [$val, $sym]; };
 	}
   }
 
@@ -696,37 +998,8 @@ block memory {
 	}
 	cost 2;
 	emit {
-	  instr {
-		opcode: "mov";
-		dst: $tmp;
-		src: [$val];
-		def: $tmp;
-	  };
-	  instr {
-		opcode: "store";
-		src: [$tmp, $sym];
-		uses: [$tmp, $sym];
-	  };
-	}
-  }
-
-  rule LOAD_large_off {
-	match {
-	  out $rd : GPR:virt;
-	  in $base : GPR:virt;
-	  in $off : imm;
-	  temp $tmp : GPR:virt;
-	  pattern load(mem($base, $off));
-	}
-	cost 2;
-	cond !SImmFits12($off);
-	emit {
-	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($off)]; def: $tmp; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($off), 16]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($off), 32]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($off), 48]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "add"; dst: $tmp; src: [$base, $tmp]; def: $tmp; uses: [$base, $tmp]; };
-	  instr { opcode: "load"; dst: $rd; src: [$tmp]; def: $rd; uses: [$tmp]; };
+	  instr { opcode: "mov"; dst: $tmp; src: [$val]; def: $tmp; };
+	  instr { opcode: "store"; src: [$tmp, $sym]; uses: [$tmp, $sym]; };
 	}
   }
 
@@ -739,17 +1012,8 @@ block memory {
 	}
 	cost 2;
 	emit {
-	  instr {
-		opcode: "mov";
-		dst: $tmp;
-		src: [$val];
-		def: $tmp;
-	  };
-	  instr {
-		opcode: "store";
-		src: [$tmp, $sym];
-		uses: [$tmp, $sym];
-	  };
+	  instr { opcode: "mov"; dst: $tmp; src: [$val]; def: $tmp; };
+	  instr { opcode: "store"; src: [$tmp, $sym]; uses: [$tmp, $sym]; };
 	}
   }
 
@@ -877,6 +1141,7 @@ block control {
 
 block comparisons {
 
+  // ------ EQ --------
   rule ICMP_eq {
 	match {
 	  commutative;
@@ -893,25 +1158,94 @@ block comparisons {
   }
 
   rule ICMP_eq_imm {
-      match {
-          commutative;
-          out $rd  : GPR:virt;
-          in  $lhs : GPR:virt;
-          in  $rhs : imm;
-
-          pattern eq($lhs, $rhs);
-      }
-
-      cost 2;
-
-      cond UImmFits12($rhs);
-
-      emit {
-          instr { opcode: "cmp"; src: [$lhs, $rhs]; uses: [$lhs]; };
-          instr { opcode: "cset"; dst: $rd; src: [eq]; def: $rd; };
-      }
+    match {
+      commutative;
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : imm;
+      pattern eq($lhs, $rhs);
+    }
+    cost 2;
+    cond FitsAddSubImm($rhs);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs]; uses: [$lhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [eq]; def: $rd; };
+    }
   }
 
+  rule ICMP_eq_large {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $imm : imm;
+  	  temp $tmp : GPR:virt;
+  	  pattern eq($lhs, $imm);
+  	}
+  	cost 3;
+  	cond !FitsAddSubImm($imm);
+  	emit {
+  	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "cmp"; src: [$lhs, $tmp]; uses: [$lhs, $tmp]; };
+  	  instr { opcode: "cset"; dst: $rd; src: [eq]; def: $rd; };
+  	}
+  }
+
+  rule ICMP_eq_shifted_lsl {
+    match {
+      commutative;
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern eq($lhs, lshl($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, lsl, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [eq]; def: $rd; };
+    }
+  }
+
+  rule ICMP_eq_shifted_lsr {
+    match {
+      commutative;
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern eq($lhs, lshr($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, lsr, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [eq]; def: $rd; };
+    }
+  }
+
+  rule ICMP_eq_shifted_asr {
+    match {
+      commutative;
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern eq($lhs, ashr($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, asr, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [eq]; def: $rd; };
+    }
+  }
+
+  // ------ NE --------
   rule ICMP_ne {
 	match {
 	  commutative;
@@ -927,6 +1261,92 @@ block comparisons {
 	}
   }
 
+  rule ICMP_ne_imm {
+    match {
+      commutative;
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : imm;
+      pattern ne($lhs, $rhs);
+    }
+    cost 2;
+    cond FitsAddSubImm($rhs);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs]; uses: [$lhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [ne]; def: $rd; };
+    }
+  }
+
+  rule ICMP_ne_large {
+  	match {
+  	  commutative;
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $imm : imm;
+  	  temp $tmp : GPR:virt;
+  	  pattern ne($lhs, $imm);
+  	}
+  	cost 3;
+  	cond !FitsAddSubImm($imm);
+  	emit {
+  	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "cmp"; src: [$lhs, $tmp]; uses: [$lhs, $tmp]; };
+  	  instr { opcode: "cset"; dst: $rd; src: [ne]; def: $rd; };
+  	}
+  }
+
+  rule ICMP_ne_shifted_lsl {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern ne($lhs, lshl($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, lsl, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [ne]; def: $rd; };
+    }
+  }
+
+  rule ICMP_ne_shifted_lsr {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern ne($lhs, lshr($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, lsr, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [ne]; def: $rd; };
+    }
+  }
+
+  rule ICMP_ne_shifted_asr {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern ne($lhs, ashr($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, asr, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [ne]; def: $rd; };
+    }
+  }
+
+  // ------ LT --------
   rule ICMP_lt {
 	match {
 	  out $rd : GPR:virt;
@@ -941,6 +1361,90 @@ block comparisons {
 	}
   }
 
+  rule ICMP_lt_imm {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : imm;
+      pattern lt($lhs, $rhs);
+    }
+    cost 2;
+    cond FitsAddSubImm($rhs);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs]; uses: [$lhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [lt]; def: $rd; };
+    }
+  }
+
+  rule ICMP_lt_large {
+  	match {
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $imm : imm;
+  	  temp $tmp : GPR:virt;
+  	  pattern lt($lhs, $imm);
+  	}
+  	cost 2;
+  	cond !FitsAddSubImm($imm);
+  	emit {
+  	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "cmp"; src: [$lhs, $tmp]; uses: [$lhs, $tmp]; };
+  	  instr { opcode: "cset"; dst: $rd; src: [lt]; def: $rd; };
+  	}
+  }
+
+  rule ICMP_lt_shifted_lsl {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern lt($lhs, lshl($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, lsl, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [lt]; def: $rd; };
+    }
+  }
+
+  rule ICMP_lt_shifted_lsr {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern lt($lhs, lshr($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, lsr, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [lt]; def: $rd; };
+    }
+  }
+
+  rule ICMP_lt_shifted_asr {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern lt($lhs, ashr($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, asr, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [lt]; def: $rd; };
+    }
+  }
+
+  // ------ LE --------
   rule ICMP_le {
 	match {
 	  out $rd : GPR:virt;
@@ -955,6 +1459,91 @@ block comparisons {
 	}
   }
 
+  rule ICMP_le_imm {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : imm;
+      pattern le($lhs, $rhs);
+    }
+    cost 2;
+    cond FitsAddSubImm($rhs);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs]; uses: [$lhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [le]; def: $rd; };
+    }
+  }
+
+  rule ICMP_le_large {
+	match {
+	  out $rd : GPR:virt;
+	  in $lhs : GPR:virt;
+	  in $imm : imm;
+	  temp $tmp : GPR:virt;
+	  pattern le($lhs, $imm);
+	}
+	cost 3;
+	cond !FitsAddSubImm($imm);
+	emit {
+	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
+	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
+	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
+	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
+	  instr { opcode: "cmp"; src: [$lhs, $tmp]; uses: [$lhs, $tmp]; };
+	  instr { opcode: "cset"; dst: $rd; src: [le]; def: $rd; };
+	}
+  }
+
+  rule ICMP_le_shifted_lsl {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern le($lhs, lshl($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, lsl, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [le]; def: $rd; };
+    }
+  }
+
+  rule ICMP_le_shifted_lsr {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern le($lhs, lshr($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, lsr, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [le]; def: $rd; };
+    }
+  }
+
+  rule ICMP_le_shifted_asr {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern le($lhs, ashr($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, asr, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [le]; def: $rd; };
+    }
+  }
+
+
+  // ------ GT --------
   rule ICMP_gt {
 	match {
 	  out $rd : GPR:virt;
@@ -969,6 +1558,90 @@ block comparisons {
 	}
   }
 
+  rule ICMP_gt_imm {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : imm;
+      pattern gt($lhs, $rhs);
+    }
+    cost 2;
+    cond FitsAddSubImm($rhs);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs]; uses: [$lhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [gt]; def: $rd; };
+    }
+  }
+
+  rule ICMP_gt_large {
+  	match {
+  	  out $rd : GPR:virt;
+  	  in $lhs : GPR:virt;
+  	  in $imm : imm;
+  	  temp $tmp : GPR:virt;
+  	  pattern gt($lhs, $imm);
+  	}
+  	cost 3;
+  	cond !FitsAddSubImm($imm);
+  	emit {
+  	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
+  	  instr { opcode: "cmp"; src: [$lhs, $tmp]; uses: [$lhs, $tmp]; };
+  	  instr { opcode: "cset"; dst: $rd; src: [gt]; def: $rd; };
+  	}
+  }
+
+  rule ICMP_gt_shifted_lsl {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern gt($lhs, lshl($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, lsl, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [gt]; def: $rd; };
+    }
+  }
+
+  rule ICMP_gt_shifted_lsr {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern gt($lhs, lshr($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, lsr, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [gt]; def: $rd; };
+    }
+  }
+
+  rule ICMP_gt_shifted_asr {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern gt($lhs, ashr($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, asr, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [gt]; def: $rd; };
+    }
+  }
+
+  // ------ GE --------
   rule ICMP_ge {
 	match {
 	  out $rd : GPR:virt;
@@ -983,106 +1656,19 @@ block comparisons {
 	}
   }
 
-  rule ICMP_eq_large {
-	match {
-	  commutative;
-	  out $rd : GPR:virt;
-	  in $lhs : GPR:virt;
-	  in $imm : imm;
-	  temp $tmp : GPR:virt;
-	  pattern eq($lhs, $imm);
-	}
-	cost 6;
-	cond !UImmFits12($imm);
-	emit {
-	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "cmp"; src: [$lhs, $tmp]; uses: [$lhs, $tmp]; };
-	  instr { opcode: "cset"; dst: $rd; src: [eq]; def: $rd; };
-	}
-  }
-
-  rule ICMP_ne_large {
-	match {
-	  commutative;
-	  out $rd : GPR:virt;
-	  in $lhs : GPR:virt;
-	  in $imm : imm;
-	  temp $tmp : GPR:virt;
-	  pattern ne($lhs, $imm);
-	}
-	cost 6;
-	cond !UImmFits12($imm);
-	emit {
-	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "cmp"; src: [$lhs, $tmp]; uses: [$lhs, $tmp]; };
-	  instr { opcode: "cset"; dst: $rd; src: [ne]; def: $rd; };
-	}
-  }
-
-  rule ICMP_lt_large {
-	match {
-	  out $rd : GPR:virt;
-	  in $lhs : GPR:virt;
-	  in $imm : imm;
-	  temp $tmp : GPR:virt;
-	  pattern lt($lhs, $imm);
-	}
-	cost 6;
-	cond !UImmFits12($imm);
-	emit {
-	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "cmp"; src: [$lhs, $tmp]; uses: [$lhs, $tmp]; };
-	  instr { opcode: "cset"; dst: $rd; src: [lt]; def: $rd; };
-	}
-  }
-
-  rule ICMP_le_large {
-	match {
-	  out $rd : GPR:virt;
-	  in $lhs : GPR:virt;
-	  in $imm : imm;
-	  temp $tmp : GPR:virt;
-	  pattern le($lhs, $imm);
-	}
-	cost 6;
-	cond !UImmFits12($imm);
-	emit {
-	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "cmp"; src: [$lhs, $tmp]; uses: [$lhs, $tmp]; };
-	  instr { opcode: "cset"; dst: $rd; src: [le]; def: $rd; };
-	}
-  }
-
-  rule ICMP_gt_large {
-	match {
-	  out $rd : GPR:virt;
-	  in $lhs : GPR:virt;
-	  in $imm : imm;
-	  temp $tmp : GPR:virt;
-	  pattern gt($lhs, $imm);
-	}
-	cost 6;
-	cond !UImmFits12($imm);
-	emit {
-	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_2($imm), 32]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_3($imm), 48]; def: $tmp; uses: [$tmp]; };
-	  instr { opcode: "cmp"; src: [$lhs, $tmp]; uses: [$lhs, $tmp]; };
-	  instr { opcode: "cset"; dst: $rd; src: [gt]; def: $rd; };
-	}
+  rule ICMP_ge_imm {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : imm;
+      pattern ge($lhs, $rhs);
+    }
+    cost 2;
+    cond FitsAddSubImm($rhs);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs]; uses: [$lhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [ge]; def: $rd; };
+    }
   }
 
   rule ICMP_ge_large {
@@ -1093,8 +1679,8 @@ block comparisons {
 	  temp $tmp : GPR:virt;
 	  pattern ge($lhs, $imm);
 	}
-	cost 6;
-	cond !UImmFits12($imm);
+	cost 3;
+	cond !FitsAddSubImm($imm);
 	emit {
 	  instr { opcode: "movz"; dst: $tmp; src: [imm16_0($imm)]; def: $tmp; };
 	  instr { opcode: "movk"; dst: $tmp; src: [$tmp, imm16_1($imm), 16]; def: $tmp; uses: [$tmp]; };
@@ -1104,6 +1690,23 @@ block comparisons {
 	  instr { opcode: "cset"; dst: $rd; src: [ge]; def: $rd; };
 	}
   }
+
+  rule ICMP_ge_shifted_lsl {
+    match {
+      out $rd  : GPR:virt;
+      in  $lhs : GPR:virt;
+      in  $rhs : GPR:virt;
+      in  $sh  : imm;
+      pattern ge($lhs, lshl($rhs, $sh));
+    }
+    cost 2;
+    cond ShamtFits6($sh);
+    emit {
+        instr { opcode: "cmp"; src: [$lhs, $rhs, lsl, $sh]; uses: [$lhs, $rhs]; };
+        instr { opcode: "cset"; dst: $rd; src: [ge]; def: $rd; };
+    }
+  }
+
 }
 
 // ---------------------------------------------------------------------------
@@ -1119,29 +1722,28 @@ block calls {
 
   // Direct call to a named symbol:  bl _foo
   rule CALL_direct {
-	match {
-	  in $callee : symbol;
-	  pattern call($callee);
-	}
-	cost 1;
-	emit {
-	  instr { opcode: "bl"; src: [$callee]; uses: []; };
-	}
+    match {
+      in $callee : symbol;
+      pattern call($callee);
+    }
+    cost 1;
+    emit {
+      instr { opcode: "bl"; src: [$callee]; uses: []; };
+    }
   }
 
   // Indirect call through a register:  blr $fp
   rule CALL_indirect {
-	match {
-	  in $callee : GPR:virt;
-	  pattern call($callee);
-	}
-	cost 1;
-	emit {
-	  instr { opcode: "blr"; src: [$callee]; uses: [$callee]; };
-	}
+    match {
+      in $callee : GPR:virt;
+      pattern call($callee);
+    }
+    cost 1;
+    emit {
+      instr { opcode: "blr"; src: [$callee]; uses: [$callee]; };
+    }
   }
 
 }
 
 }
-
