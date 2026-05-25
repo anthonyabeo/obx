@@ -39,6 +39,10 @@ func (p *PrimitiveType) String() string {
 		return "f32"
 	case "f64", "double", "float64":
 		return "f64"
+	case "void":
+		return "void"
+	case "nil":
+		return "nil"
 	default:
 		return p.Name
 	}

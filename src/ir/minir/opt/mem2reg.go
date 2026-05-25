@@ -89,7 +89,7 @@ func Mem2Reg(fn *minir.Function) int {
 					continue
 				}
 				// Never place φ-nodes in the exit block: it is a sentinel with
-				// only a void ret, and doing so creates dead phis for every
+				// only a ret, and doing so creates dead phis for every
 				// variable defined on only some return paths.
 				if fn.Exit != nil && y.ID == fn.Exit.ID {
 					continue

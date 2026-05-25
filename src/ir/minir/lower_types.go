@@ -184,10 +184,12 @@ func LowerType(ty types.Type) Type {
 			return F32()
 		case types.LONGREAL:
 			return F64()
-		case types.VOID, types.NIL, types.UNKNOWN:
+		case types.VOID:
+			return Void()
+		case types.NIL, types.UNKNOWN:
 			return nil
 		default:
-			return I32()
+			return nil
 		}
 	case *types.PointerType:
 		base := LowerType(t.Base)
@@ -289,6 +291,6 @@ func LowerType(ty types.Type) Type {
 	case *types.EnumType:
 		return U32()
 	default:
-		return I32()
+		return nil
 	}
 }

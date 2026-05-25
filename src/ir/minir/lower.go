@@ -211,6 +211,9 @@ func (l *Lowerer) lowerParams(params []*desugar.Param) {
 	for _, p := range params {
 		et := LowerType(p.Typ)
 		if et == nil {
+			msg := fmt.Sprintf("lowerParams: invalid type %s", p.Typ)
+			l.reportLoweringDiagnostic(msg, p.StartOffset, p.EndOffset)
+
 			et = I32()
 		}
 
@@ -269,8 +272,10 @@ func (l *Lowerer) lowerLocals(locals []desugar.Decl) {
 			if d.Name != "" {
 				l.constEnv[d.Name] = cv
 			}
-			//case *desugar.Function:
-			//case *desugar.Type:
+		case *desugar.Function:
+			// TODO implement local functions lowering
+		case *desugar.Type:
+			// TODO implement local types lowering
 		}
 	}
 }
@@ -312,6 +317,7 @@ func (l *Lowerer) lowerStmt(s desugar.Stmt) {
 func (l *Lowerer) lowerAssign(st *desugar.AssignStmt) {
 	addr := l.lowerAddr(st.Left)
 	val := l.lowerValue(st.Right)
+	val = l.coerceValue(val, addr.Type().(*PointerType).Elem) // coerce RHS to match LHS pointee type
 	l.emit(&StoreInst{Val: val, Addr: addr})
 }
 
@@ -845,11 +851,12 @@ func (l *Lowerer) lowerAddr(expr desugar.Expr) Value {
 		v := l.resolveVar(e.Name, e.Name)
 		// Forbid taking the address of a ValueParam (non-address temp).
 		if !IsAddrValue(v) {
-			// Attempt to take address of a non-addressable value parameter.
+			// Attempt to take the address of a non-addressable value parameter.
 			// Emit a warning and create an addressable stack slot, storing the
 			// parameter value into it so lowering can continue.
 			msg := fmt.Sprintf("lowerAddr: attempt to take address of value parameter '%s'", e.Name)
 			l.reportLoweringDiagnostic(msg, e.StartOffset, e.EndOffset)
+
 			pt := LowerType(e.Typ)
 			if pt == nil {
 				pt = I32()
@@ -869,6 +876,9 @@ func (l *Lowerer) lowerAddr(expr desugar.Expr) Value {
 		t := l.ensureTemp(ptrVal, Ptr(LowerType(e.SemaType)))
 		t.IsAddr = true
 		return t
+	case *desugar.TypeGuardExpr:
+		// TODO implement support for type guard address expressions
+		panic("lowerAddr: type guard address expressions not implemented")
 	default:
 		// Non-addressable lvalue expression — emit warning and materialize an
 		// addressable temporary by lowering the value and storing it to a new
@@ -1117,27 +1127,16 @@ func (l *Lowerer) alignOperands(left, right Value) (Value, Value) {
 
 	// Float or mixed: fall back to explicit-cast path (prefer casting constants).
 	if left.IsConst() && !right.IsConst() {
-		if rt != nil {
-			left = l.sameType(left, rt)
-		}
+		left = l.sameType(left, rt)
 		return left, right
 	}
 
 	if right.IsConst() && !left.IsConst() {
-		if lt != nil {
-			right = l.sameType(right, lt)
-		}
-		return left, right
-	}
-
-	if lt != nil {
 		right = l.sameType(right, lt)
 		return left, right
 	}
 
-	if rt != nil {
-		left = l.sameType(left, rt)
-	}
+	right = l.sameType(right, lt)
 
 	return left, right
 }
@@ -1556,6 +1555,7 @@ func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
 		// return a conservative zero value of the expected return type.
 		msg := fmt.Sprintf("lowerCallExpr: builtin %q returned nil in expression context", call.Func.Name)
 		l.reportLoweringDiagnostic(msg, call.StartOffset, call.EndOffset)
+
 		rt := LowerType(call.RetType)
 		if rt == nil {
 			rt = I32()
@@ -1591,7 +1591,7 @@ func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
 
 	var dst *Temp
 	rt := LowerType(call.RetType)
-	if rt != nil {
+	if rt != nil && rt != Void() {
 		dst = NewAnonTemp(rt)
 	}
 
@@ -1613,6 +1613,9 @@ func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) Value {
 
 	ty := LowerType(lit.SemaType)
 	if ty == nil {
+		msg := fmt.Sprintf("lowerLiteralExpr: invalid literal type %s", lit.SemaType)
+		l.reportLoweringDiagnostic(msg, lit.StartOffset, lit.EndOffset)
+
 		ty = I32()
 	}
 
@@ -1646,51 +1649,21 @@ func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) Value {
 		return NewConst("true", int64(1), I1())
 	case token.FALSE:
 		return NewConst("false", int64(0), I1())
-	case token.CHAR_LIT:
-		v := lit.Value
-		var iv uint64
-		var err error
-		if strings.HasSuffix(v, "x") || strings.HasSuffix(v, "X") {
-			v2 := v[:len(v)-1]
-			iv, err = strconv.ParseUint(v2, 16, 8)
-		} else {
-			iv, err = strconv.ParseUint(v, 16, 8)
-		}
-
+	case token.CHAR_LIT, token.WCHAR_LIT:
+		char, err := parseCharConst(lit.Value, lit.Kind, LowerType(lit.SemaType))
 		if err != nil {
 			l.reportLoweringDiagnostic(fmt.Sprintf("lowerLiteralExpr: cannot parse char literal %q: %v",
 				lit.Value, err), lit.StartOffset, lit.EndOffset)
-			return NewConst(lit.Value, lit.Value, ty)
 		}
-
-		return NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
-	case token.WCHAR_LIT:
-		v := lit.Value
-		var iv uint64
-		var err error
-		if strings.HasSuffix(v, "x") || strings.HasSuffix(v, "X") {
-			v2 := v[:len(v)-1]
-			iv, err = strconv.ParseUint(v2, 16, 16)
-		} else {
-			iv, err = strconv.ParseUint(v, 16, 16)
-		}
-
-		if err != nil {
-			l.reportLoweringDiagnostic(fmt.Sprintf("lowerLiteralExpr: cannot parse char literal %q: %v",
-				lit.Value, err), lit.StartOffset, lit.EndOffset)
-			return NewConst(lit.Value, lit.Value, ty)
-		}
-
-		return NewConst(fmt.Sprintf("%d", iv), int64(iv), ty)
+		return char
 	case token.STR_LIT, token.HEX_STR_LIT:
 		return NewConst(lit.Value, lit.Value, NewArrayType(len(lit.Value)+1, U16()))
 	case token.NIL:
 		return NewConst("nil", int64(0), Ptr(Void()))
 	default:
-		iv, err := strconv.ParseInt(lit.Value, 10, 64)
-		if err == nil {
-			return NewConst(lit.Value, iv, ty)
-		}
+		msg := fmt.Sprintf("lowerLiteralExpr: unknown literal kind %q", lit.Kind)
+		l.reportLoweringDiagnostic(msg, lit.StartOffset, lit.EndOffset)
+
 		return NewConst(lit.Value, lit.Value, ty)
 	}
 }
@@ -1884,13 +1857,13 @@ func tokenToICmpPred(op token.Kind) string {
 	case token.NEQ:
 		return "ne"
 	case token.LESS:
-		return "slt"
+		return "lt"
 	case token.LEQ:
-		return "sle"
+		return "le"
 	case token.GREAT:
-		return "sgt"
+		return "gt"
 	case token.GEQ:
-		return "sge"
+		return "ge"
 	default:
 		return "eq"
 	}
@@ -1939,6 +1912,34 @@ func parseIntegerConst(value string, kind token.Kind, ty Type) (Constant, error)
 		iv, err = strconv.ParseInt(v2, 16, bitSize)
 	} else {
 		iv, err = strconv.ParseInt(v, 10, bitSize)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return NewConst(fmt.Sprintf("%d", iv), iv, ty), nil
+}
+
+func parseCharConst(value string, kind token.Kind, ty Type) (Constant, error) {
+	var bitSize int
+	switch kind {
+	case token.CHAR_LIT:
+		bitSize = 8
+	case token.WCHAR_LIT:
+		bitSize = 16
+	default:
+		return nil, fmt.Errorf("parseCharConst: invalid kind %v", kind)
+	}
+
+	v := value
+	var iv uint64
+	var err error
+	if strings.HasSuffix(v, "x") || strings.HasSuffix(v, "X") {
+		v2 := v[:len(v)-1]
+		iv, err = strconv.ParseUint(v2, 16, bitSize)
+	} else {
+		iv, err = strconv.ParseUint(v, 16, bitSize)
 	}
 
 	if err != nil {
