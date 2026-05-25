@@ -17,18 +17,18 @@ import (
 // PipelineDriver orchestrates the backend pipeline stages.
 //
 // Current implementation:
-//  1. Lower           (minir -> backend/mir)
-//  2. CallLowering    (ABI arg/result expansion; runs before instruction selection)
-//  3. SwitchLowering  (switch → compare-chain or jump-table; runs before instruction selection)
+//  1. Lower                 (minir -> backend/mir)
+//  2. CallLowering          (ABI arg/result expansion; runs before instruction selection)
+//  3. SwitchLowering        (switch → compare-chain or jump-table; runs before instruction selection)
 //  4. InstructionSelection
-//  5. Legalization    (target-aware post-pass)
+//  5. Legalization          (target-aware post-pass)
 //  6. InstructionScheduling (stub)
 //  7. RegisterAllocation
-//  8. PrologueEpilogue (emit prologue/epilogue based on frame layout)
-//  9. Assemble        (optional callback)
-//  10. Link           (optional callback)
-//  11. BuildPlans     (compute phi/switch/call plans with physical registers from regalloc)
-//  12. PhiRemoval     (remove phi nodes post-BuildPlans, insert move sequences on edges)
+//  8. PrologueEpilogue      (emit prologue/epilogue based on frame layout)
+//  9. PhiRemoval            (remove phi nodes, insert move sequences on predecessor edges)
+//  10. Assemble             (optional callback)
+//  11. Link                 (optional callback)
+//  12. BuildPlans           (compute phi/switch/call plans; sees zero phis after removal)
 type PipelineDriver struct {
 	Target   target.Target
 	Selector *selector.Selector
@@ -82,13 +82,6 @@ func (p *PipelineDriver) Run(prog *minir.Program) (*lower.LoweredProgram, error)
 		return nil, err
 	}
 
-	// PhiRemoval runs post-BuildPlans, after regalloc has assigned physical registers.
-	// At this point, phi arms contain physical registers and BuildPlans has pre-computed
-	// the phi plans from the MIR. We now remove the phi nodes and insert move sequences.
-	mprog, err = p.PhiRemoval(mprog)
-	if err != nil {
-		return nil, fmt.Errorf("backend post-build phi removal: %w", err)
-	}
 
 	return &lower.LoweredProgram{MIR: mprog, Plans: plans}, nil
 }

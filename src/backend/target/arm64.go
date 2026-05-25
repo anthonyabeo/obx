@@ -301,10 +301,10 @@ func emitARM64Terminator(term mir.Terminator) string {
 		case "ret":
 			if len(t.Srcs) > 0 && t.Srcs[0] != nil {
 				if formatARM64Operand(t.Srcs[0]) != "x0" {
-					return fmt.Sprintf("mov x0, %s\n\tldp x29, x30, [sp], #16\n\tret", formatARM64Operand(t.Srcs[0]))
+					return fmt.Sprintf("mov x0, %s\n\tret", formatARM64Operand(t.Srcs[0]))
 				}
 			}
-			return "ldp x29, x30, [sp], #16\n\tret"
+			return "ret"
 		case "ret.bare":
 			// The prologue_epilogue pass has already inserted the ldp/addi restore
 			// instructions into the exit block's Instrs.  Only the architectural
@@ -349,11 +349,10 @@ func emitARM64Terminator(term mir.Terminator) string {
 	case *mir.CondBrInstr:
 		return fmt.Sprintf("cmp %s, #0\n\tb.ne %s\n\tb %s", formatARM64Operand(t.Cond), arm64Label(t.TrueLabel), arm64Label(t.FalseLabel))
 	case *mir.ReturnInstr:
-		// Standard inline epilogue + ret (fallback when prologue_epilogue pass was not run).
 		if t.Value != nil {
-			return fmt.Sprintf("mov x0, %s\n\tldp x29, x30, [sp], #16\n\tret", formatARM64Operand(t.Value))
+			return fmt.Sprintf("mov x0, %s\n\tret", formatARM64Operand(t.Value))
 		}
-		return "ldp x29, x30, [sp], #16\n\tret"
+		return "ret"
 	case *mir.HaltInstr:
 		return emitARM64Halt(t.Code)
 	case *mir.SwitchInstr:
