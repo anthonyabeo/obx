@@ -33,11 +33,13 @@ func TestLinearizeParallelCopyBreaksCycle(t *testing.T) {
 	if moves[0].Dst == nil || moves[0].Dst.Name != "__pc_tmp0" {
 		t.Fatalf("expected first move to save into temp, got %#v", moves[0].Dst)
 	}
-	if got := moves[1].Dst.Name; got != "x" {
-		t.Fatalf("expected second move to target x, got %s", got)
+	// dstIsPendingSource produces [tmp←y, y←x, x←tmp] — both y and x end up
+	// with the expected swapped values regardless of the internal ordering.
+	if got := moves[1].Dst.Name; got != "y" {
+		t.Fatalf("expected second move to target y, got %s", got)
 	}
-	if got := moves[2].Dst.Name; got != "y" {
-		t.Fatalf("expected third move to target y, got %s", got)
+	if got := moves[2].Dst.Name; got != "x" {
+		t.Fatalf("expected third move to target x, got %s", got)
 	}
 }
 
@@ -266,4 +268,3 @@ func TestEmitARM64CondBranchCondBrInstr(t *testing.T) {
 		t.Fatalf("emitARM64Terminator(CondBrInstr) =\n%q\nwant\n%q", got, want)
 	}
 }
-

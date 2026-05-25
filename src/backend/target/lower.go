@@ -126,6 +126,10 @@ func BuildPhiPlan(joinLabel string, phis []*mir.PhiInstr) (*PhiPlan, error) {
 
 // LinearizeParallelCopy resolves a simultaneous copy set into an ordered move
 // list, inserting temporary registers when cycles are present.
+//
+// Safety criterion: copy C is safe to emit when C.Dst is NOT a pending source,
+// i.e., no other pending copy still needs to READ C.Dst.  Emitting C first would
+// overwrite the value before the other copy reads it.
 func LinearizeParallelCopy(pc ParallelCopy) []Copy {
 	pending := append([]Copy(nil), pc.Copies...)
 	out := make([]Copy, 0, len(pending))
@@ -133,7 +137,7 @@ func LinearizeParallelCopy(pc ParallelCopy) []Copy {
 
 	for len(pending) > 0 {
 		progress := false
-		dstNames := pendingDstNames(pending)
+		srcNames := pendingSrcNames(pending)
 
 		for i := 0; i < len(pending); i++ {
 			c := pending[i]
@@ -142,7 +146,7 @@ func LinearizeParallelCopy(pc ParallelCopy) []Copy {
 				progress = true
 				break
 			}
-			if !srcIsPendingDest(c.Src, dstNames) {
+			if !dstIsPendingSource(c.Dst, srcNames) {
 				out = append(out, c)
 				pending = append(pending[:i], pending[i+1:]...)
 				progress = true
@@ -153,6 +157,7 @@ func LinearizeParallelCopy(pc ParallelCopy) []Copy {
 			continue
 		}
 
+		// All remaining copies form cycles; break the first one with a temp.
 		cycle := pending[0]
 		tmp := &mir.Register{Name: fmt.Sprintf("__pc_tmp%d", tmpSeq), Kind: mir.VirtualReg, Ty: copyType(cycle)}
 		tmpSeq++
@@ -289,22 +294,21 @@ func copyType(c Copy) *mir.Type {
 	return nil
 }
 
-func pendingDstNames(pending []Copy) map[string]struct{} {
+func pendingSrcNames(pending []Copy) map[string]struct{} {
 	set := make(map[string]struct{}, len(pending))
 	for _, c := range pending {
-		if c.Dst != nil {
-			set[c.Dst.Name] = struct{}{}
+		if reg, ok := c.Src.(*mir.Register); ok && reg != nil {
+			set[reg.Name] = struct{}{}
 		}
 	}
 	return set
 }
 
-func srcIsPendingDest(src mir.Operand, pending map[string]struct{}) bool {
-	reg, ok := src.(*mir.Register)
-	if !ok {
+func dstIsPendingSource(dst *mir.Register, srcNames map[string]struct{}) bool {
+	if dst == nil {
 		return false
 	}
-	_, ok = pending[reg.Name]
+	_, ok := srcNames[dst.Name]
 	return ok
 }
 

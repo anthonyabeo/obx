@@ -62,7 +62,7 @@ func allocateFunction(fn *mir.Function, tgt target.Target) (*mir.FrameLayout, er
 		return nil, err
 	}
 
-	frame := buildFrameLayout(alloc, abi)
+	frame := buildFrameLayout(alloc, fn, abi)
 	if err := rewriteFunction(fn, alloc, analysis, frame, abi); err != nil {
 		return nil, err
 	}

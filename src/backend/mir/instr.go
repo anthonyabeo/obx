@@ -62,6 +62,17 @@ func (i *StoreInstr) Defs() []*Register { return nil }
 func (i *StoreInstr) Uses() []Operand   { return useList(i.Addr, i.Value) }
 func (i *StoreInstr) String() string    { return fmt.Sprintf("store %s -> %s", i.Value, i.Addr) }
 
+// AllocaInstr allocates stack storage for surviving allocas (not promoted by Mem2Reg).
+// Dst receives the address; Size is the number of bytes to allocate.
+type AllocaInstr struct {
+	Dst  *Register
+	Size int // byte size of the allocated region
+}
+
+func (i *AllocaInstr) Defs() []*Register { return defs1(i.Dst) }
+func (i *AllocaInstr) Uses() []Operand   { return nil }
+func (i *AllocaInstr) String() string    { return fmt.Sprintf("alloca %s, #%d", i.Dst, i.Size) }
+
 // UnaryInstr applies Op to X and writes the result to Dst.
 type UnaryInstr struct {
 	Dst *Register
@@ -219,7 +230,7 @@ func (i *SwitchInstr) String() string { return fmt.Sprintf("switch %s", i.Value)
 
 // MachineInstr is a target-specific non-terminator instruction.
 type MachineInstr struct {
-	Op   string     // real machine opcode, e.g. "add", "addi", "ld", "sd"
+	Op   string // real machine opcode, e.g. "add", "addi", "ld", "sd"
 	Dsts []*Register
 	Srcs []Operand
 }
@@ -286,4 +297,3 @@ func (i *MachineTerm) String() string {
 	}
 	return out
 }
-

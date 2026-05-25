@@ -94,11 +94,11 @@ func TestLowerAndPlan(t *testing.T) {
 	if plans == nil {
 		t.Fatalf("expected plans for M.main")
 	}
-	if len(plans.Phi) != 1 {
-		t.Fatalf("expected one phi plan, got %d", len(plans.Phi))
-	}
-	if plans.Phi[0].JoinLabel != "join" || len(plans.Phi[0].Edges) != 2 {
-		t.Fatalf("unexpected phi plan: %#v", plans.Phi[0])
+	// Phi-removal now runs before BuildPlans (stage [7], before assemble [8]).
+	// By the time BuildPlans runs the phi nodes have been replaced with move
+	// sequences on predecessor edges, so the phi-plan list is empty.
+	if len(plans.Phi) != 0 {
+		t.Fatalf("expected zero phi plans (phi-removal ran before BuildPlans), got %d", len(plans.Phi))
 	}
 	if len(plans.Calls) != 0 || len(plans.Switch) != 0 {
 		t.Fatalf("unexpected non-empty plans: %#v", plans)
@@ -149,10 +149,10 @@ func TestPipelineDriverPassThroughStages(t *testing.T) {
 
 func TestBackendStageRegistry(t *testing.T) {
 	available := backend.AvailableStages()
-	if len(available) != 9 {
-		t.Fatalf("expected 9 registered backend stages, got %d: %v", len(available), available)
+	if len(available) != 10 {
+		t.Fatalf("expected 10 registered backend stages, got %d: %v", len(available), available)
 	}
-	want := []string{"assemble", "call-lowering", "instruction-scheduling", "instruction-selection", "legalization", "link", "prologue-epilogue", "register-allocation", "switch-lowering"}
+	want := []string{"assemble", "call-lowering", "instruction-scheduling", "instruction-selection", "legalization", "link", "phi-removal", "prologue-epilogue", "register-allocation", "switch-lowering"}
 	for i := range want {
 		if available[i] != want[i] {
 			t.Fatalf("available[%d] = %q, want %q", i, available[i], want[i])

@@ -257,11 +257,66 @@ func colorGraph(fn *mir.Function, fa *functionAnalysis, colors, scratch []string
 	return res, nil
 }
 
-func buildFrameLayout(alloc *regAllocResult, abi target.ABI) *mir.FrameLayout {
+// collectSurvivingAllocas gathers all AllocaInstr in the function.
+// Returns a map of alloca destination register names to their sizes.
+func collectSurvivingAllocas(fn *mir.Function) map[string]int {
+	allocas := make(map[string]int)
+	if fn == nil {
+		return allocas
+	}
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if alloca, ok := instr.(*mir.AllocaInstr); ok && alloca != nil && alloca.Dst != nil {
+				allocas[alloca.Dst.Name] = alloca.Size
+			}
+		}
+	}
+	return allocas
+}
+
+// functionHasCalls reports whether fn contains at least one call instruction.
+// A non-leaf function must save/restore the link register (bl overwrites it).
+func functionHasCalls(fn *mir.Function, abi target.ABI) {
+	for _, block := range fn.Blocks {
+		if block == nil {
+			continue
+		}
+		for _, instr := range block.Instrs {
+			if _, ok := instr.(*mir.CallInstr); ok {
+				fn.HasCalls = true
+			}
+
+			if instr, ok := instr.(*mir.MachineInstr); ok {
+				switch abi.Name {
+				case "AAPCS64":
+					if instr.Op == "bl" || instr.Op == "blr" {
+						fn.HasCalls = true
+						break
+					}
+				case "LP64D":
+					if instr.Op == "bl" {
+						fn.HasCalls = true
+						break
+					}
+				}
+			}
+		}
+	}
+	//fn.HasCalls = false
+}
+
+func buildFrameLayout(alloc *regAllocResult, fn *mir.Function, abi target.ABI) *mir.FrameLayout {
 	frame := mir.NewFrameLayout()
 	if alloc == nil {
 		return frame
 	}
+
+	// Collect surviving allocas from the function
+	allocas := collectSurvivingAllocas(fn)
+	functionHasCalls(fn, abi)
 
 	frame.SavedRegs = append(frame.SavedRegs, alloc.savedRegs...)
 	spillNames := make([]string, 0, len(alloc.spillSlots))
@@ -274,12 +329,55 @@ func buildFrameLayout(alloc *regAllocResult, abi target.ABI) *mir.FrameLayout {
 	if wordSize <= 0 {
 		wordSize = 8
 	}
+
+	// Layout allocas first (at negative offsets from frame pointer)
 	offset := 0
+	allocaNames := make([]string, 0, len(allocas))
+	for name := range allocas {
+		allocaNames = append(allocaNames, name)
+	}
+	sort.Strings(allocaNames)
+
+	for _, name := range allocaNames {
+		size := allocas[name]
+		if size <= 0 {
+			size = wordSize
+		}
+		offset -= size
+		frame.AllocaSlots[name] = offset
+	}
+
+	// Layout spill slots below allocas
 	for _, name := range spillNames {
 		offset -= wordSize
 		frame.SpillSlots[name] = offset
 	}
-	frame.TotalSize = alignUp((-offset)+len(frame.SavedRegs)*wordSize, abi.Align)
+
+	// Compute total frame size: allocas + spills + saved registers
+	allocaSize := 0
+	for _, size := range allocas {
+		if size <= 0 {
+			allocaSize += wordSize
+		} else {
+			allocaSize += size
+		}
+	}
+	spillSize := len(spillNames) * wordSize
+	savedSize := len(frame.SavedRegs) * wordSize
+
+	frame.TotalSize = alignUp(allocaSize+spillSize+savedSize, abi.Align)
+
+	// non-leaf functions that emit a `bl`/`jal` clobber the link
+	// register.  The ABI requires us to save lr (and fp) in the prologue; the
+	// frame must be at least large enough for that pair even when there are no
+	// spills or surviving allocas.
+	if fn != nil && fn.HasCalls && abi.LinkRegister != "" {
+		minSize := alignUp(2*wordSize, abi.Align)
+		if frame.TotalSize < minSize {
+			frame.TotalSize = minSize
+		}
+	}
+
 	return frame
 }
 

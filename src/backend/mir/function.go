@@ -17,12 +17,16 @@ type Local struct {
 // It is nil on a Function until the register-allocation stage runs.
 type FrameLayout struct {
 	// TotalSize is the total number of bytes allocated on the stack for this
-	// frame, including saved registers and spill slots.
+	// frame, including allocas, saved registers, and spill slots.
 	TotalSize int
 
 	// SavedRegs lists callee-saved physical register names that this function
 	// must preserve (i.e. those that are live across calls or clobbered).
 	SavedRegs []string
+
+	// AllocaSlots maps surviving alloca register names to their frame-relative
+	// byte offsets (measured from the frame pointer or stack pointer base).
+	AllocaSlots map[string]int
 
 	// SpillSlots maps virtual-register names to their frame-relative byte
 	// offsets (measured from the frame pointer or stack pointer base).
@@ -31,7 +35,10 @@ type FrameLayout struct {
 
 // NewFrameLayout returns an empty FrameLayout ready for population.
 func NewFrameLayout() *FrameLayout {
-	return &FrameLayout{SpillSlots: make(map[string]int)}
+	return &FrameLayout{
+		AllocaSlots: make(map[string]int),
+		SpillSlots:  make(map[string]int),
+	}
 }
 
 // Function is a machine-IR function with explicit blocks and CFG.

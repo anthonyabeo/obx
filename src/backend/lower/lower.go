@@ -275,7 +275,28 @@ func lowerInstr(inst minir.Instr, regByTemp map[*minir.Temp]*mir.Register, globa
 	case *minir.GEPInst:
 		return nil, fmt.Errorf("gep lowering not implemented in first bridge pass")
 	case *minir.AllocaInst:
-		return nil, fmt.Errorf("alloca lowering not implemented in first bridge pass")
+		if i.Dst == nil {
+			return nil, fmt.Errorf("alloca: destination temp is nil")
+		}
+		// Alloca instructions survive to the register allocation stage where they are
+		// assigned frame slots. Here we just lower the minir alloca to backend alloca.
+		dst, err := lowerTemp(i.Dst, regByTemp)
+		if err != nil {
+			return nil, err
+		}
+
+		// Compute the size of the allocated type
+		allocType, err := lowerType(i.AllocType)
+		if err != nil {
+			return nil, fmt.Errorf("alloca type: %w", err)
+		}
+
+		allocSize := 8 // default word size
+		if allocType != nil && allocType.Size > 0 {
+			allocSize = allocType.Size
+		}
+
+		return &mir.AllocaInstr{Dst: dst, Size: allocSize}, nil
 	case *minir.CastInst:
 		return nil, fmt.Errorf("cast lowering not implemented in first bridge pass")
 	case *minir.FCmpInst:

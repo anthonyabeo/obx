@@ -74,24 +74,33 @@ func (e *Emitter) EmitBlock(b *Block) (int, error) {
 		}
 	}
 
-	// emit terminator if present
-	//if b.Term != nil {
-	//	n, err = e.write("  ")
-	//	total += n
-	//	if err != nil {
-	//		return total, err
-	//	}
-	//	n, err = e.EmitInstr(b.Term)
-	//	total += n
-	//	if err != nil {
-	//		return total, err
-	//	}
-	//	n, err = e.write("\n")
-	//	total += n
-	//	if err != nil {
-	//		return total, err
-	//	}
-	//}
+	// emit terminator if present and not already the last instruction in Instrs
+	if b.Term != nil {
+		alreadyEmitted := false
+		for _, ins := range b.Instrs {
+			if ins == b.Term {
+				alreadyEmitted = true
+				break
+			}
+		}
+		if !alreadyEmitted {
+			n, err = e.write("  ")
+			total += n
+			if err != nil {
+				return total, err
+			}
+			n, err = e.EmitInstr(b.Term)
+			total += n
+			if err != nil {
+				return total, err
+			}
+			n, err = e.write("\n")
+			total += n
+			if err != nil {
+				return total, err
+			}
+		}
+	}
 
 	return total, nil
 }
