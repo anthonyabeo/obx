@@ -20,4 +20,3 @@ func (s *prologueEpilogueStage) Run(p *backend.PipelineDriver, prog *mir.Program
 func init() {
 	backend.RegisterStage(backend.DefaultStageOrder[6], func() backend.Stage { return &prologueEpilogueStage{} })
 }
-

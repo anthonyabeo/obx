@@ -8,7 +8,7 @@ import (
 
 type assemblyStage struct{}
 
-func (s *assemblyStage) Name() string                   { return backend.DefaultStageOrder[7] }
+func (s *assemblyStage) Name() string                   { return backend.DefaultStageOrder[8] }
 func (s *assemblyStage) Enabled(tgt target.Target) bool { return tgt != nil }
 func (s *assemblyStage) Run(p *backend.PipelineDriver, prog *mir.Program) (*mir.Program, error) {
 	if p == nil || p.Assemble == nil {
@@ -18,5 +18,5 @@ func (s *assemblyStage) Run(p *backend.PipelineDriver, prog *mir.Program) (*mir.
 }
 
 func init() {
-	backend.RegisterStage(backend.DefaultStageOrder[7], func() backend.Stage { return &assemblyStage{} })
+	backend.RegisterStage(backend.DefaultStageOrder[8], func() backend.Stage { return &assemblyStage{} })
 }

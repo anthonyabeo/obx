@@ -30,8 +30,9 @@ var DefaultStageOrder = []string{
 	"instruction-scheduling", // [4]
 	"register-allocation",    // [5]
 	"prologue-epilogue",      // [6]  Emit prologue/epilogue based on frame layout (after regalloc)
-	"assemble",               // [7]
-	"link",                   // [8]
+	"phi-removal",            // [7]  Eliminate phi nodes (insert moves on edges) before assembly
+	"assemble",               // [8]
+	"link",                   // [9]
 }
 
 // RegisterStage makes a backend pipeline stage available by name.

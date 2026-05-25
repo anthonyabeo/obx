@@ -8,7 +8,7 @@ import (
 
 type linkingStage struct{}
 
-func (s *linkingStage) Name() string                   { return backend.DefaultStageOrder[8] }
+func (s *linkingStage) Name() string                   { return backend.DefaultStageOrder[9] }
 func (s *linkingStage) Enabled(tgt target.Target) bool { return tgt != nil }
 func (s *linkingStage) Run(p *backend.PipelineDriver, prog *mir.Program) (*mir.Program, error) {
 	if p == nil || p.Link == nil {
@@ -18,5 +18,5 @@ func (s *linkingStage) Run(p *backend.PipelineDriver, prog *mir.Program) (*mir.P
 }
 
 func init() {
-	backend.RegisterStage(backend.DefaultStageOrder[8], func() backend.Stage { return &linkingStage{} })
+	backend.RegisterStage(backend.DefaultStageOrder[9], func() backend.Stage { return &linkingStage{} })
 }
