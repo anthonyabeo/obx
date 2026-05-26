@@ -73,6 +73,30 @@ func (i *AllocaInstr) Defs() []*Register { return defs1(i.Dst) }
 func (i *AllocaInstr) Uses() []Operand   { return nil }
 func (i *AllocaInstr) String() string    { return fmt.Sprintf("alloca %s, #%d", i.Dst, i.Size) }
 
+// GEPInstr computes an address from a base and array indices.
+// Base is the starting address; ElemType is the element type (determines strides).
+// Strides are pre-computed byte offsets for each dimension (computed during lowering).
+// Offsets are compile-time-constant indices (per dimension); 0 means use corresponding Index.
+// Indices are runtime-computed indices (one per dynamic dimension, in order).
+type GEPInstr struct {
+	Dst      *Register
+	Base     Operand
+	ElemType *Type        // the array element type (ArrayType); nil for scalar base
+	Strides  []int        // pre-computed bytes-per-element for each dimension (length = # dimensions)
+	Offsets  []int        // compile-time constant indices (0 = dynamic, consume from Indices)
+	Indices  []Operand    // runtime indices corresponding to each 0 in Offsets
+}
+
+func (i *GEPInstr) Defs() []*Register { return defs1(i.Dst) }
+func (i *GEPInstr) Uses() []Operand {
+	out := useList(i.Base)
+	out = append(out, i.Indices...)
+	return out
+}
+func (i *GEPInstr) String() string {
+	return fmt.Sprintf("gep %s, strides=%v, offs=%v", i.Dst, i.Strides, i.Offsets)
+}
+
 // UnaryInstr applies Op to X and writes the result to Dst.
 type UnaryInstr struct {
 	Dst *Register

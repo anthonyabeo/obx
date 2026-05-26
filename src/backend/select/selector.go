@@ -404,6 +404,22 @@ func classifyInstr(inst mir.Instr) matchNode {
 		return matchNode{op: strings.ToLower(i.Op), dst: firstRegister(i.Dsts), args: i.Srcs}
 	case *mir.MoveInstr:
 		return matchNode{op: "mov", dst: i.Dst, args: []mir.Operand{i.Src}}
+	case *mir.GEPInstr:
+		// Build args: base + all indices (strides/offsets are metadata for predicates)
+		args := make([]mir.Operand, 0, 1+len(i.Indices))
+		args = append(args, i.Base)
+		// Encode strides and offsets as fake "operands" for pattern matching
+		// First append stride operands: one per dimension
+		for _, stride := range i.Strides {
+			args = append(args, mir.NewImmediate(int64(stride), mir.NewScalarType("i64", 8)))
+		}
+		// Then append offset values: one per dimension
+		for _, offset := range i.Offsets {
+			args = append(args, mir.NewImmediate(int64(offset), mir.NewScalarType("i64", 8)))
+		}
+		// Finally, append the runtime indices
+		args = append(args, i.Indices...)
+		return matchNode{op: "gep", dst: i.Dst, args: args}
 	default:
 		return matchNode{}
 	}
@@ -1444,6 +1460,55 @@ func defaultPredicates(abi string) map[string]PredicateFunc {
 			}
 			want := emitString(args[0], env)
 			return want != "" && strings.EqualFold(want, abi)
+		},
+		// GEP optimization predicates
+
+		// IsPowerOf2 checks if a value is a power of 2
+		"IsPowerOf2": func(env map[string]any, args []*Value) bool {
+			if len(args) != 1 {
+				return false
+			}
+			v, ok := resolvePredicateInt(args[0], env)
+			if !ok || v <= 0 {
+				return false
+			}
+			// v is power of 2 iff v & (v-1) == 0
+			return v&(v-1) == 0
+		},
+
+		// IsScaleFactor checks if value is 1, 2, 4, or 8 (ARM64 addressing mode scales)
+		"IsScaleFactor": func(env map[string]any, args []*Value) bool {
+			if len(args) != 1 {
+				return false
+			}
+			v, ok := resolvePredicateInt(args[0], env)
+			return ok && (v == 1 || v == 2 || v == 4 || v == 8)
+		},
+
+		// Log2 computes log2 of a power-of-2 value (for shift amount)
+		"Log2": func(env map[string]any, args []*Value) bool {
+			if len(args) != 1 {
+				return false
+			}
+			v, ok := resolvePredicateInt(args[0], env)
+			if !ok || v <= 0 || (v&(v-1)) != 0 {
+				return false // not a power of 2
+			}
+			// Store log2 result; value is power of 2
+			return true
+		},
+
+		// CanFoldConstOffset checks if compile-time offset can be folded into immediate
+		"CanFoldConstOffset": func(env map[string]any, args []*Value) bool {
+			if len(args) != 1 {
+				return false
+			}
+			v, ok := resolvePredicateInt(args[0], env)
+			if !ok {
+				return false
+			}
+			// Check if offset fits in 12-bit signed immediate (ARM64) or 12-bit signed (RV64)
+			return v >= -2048 && v <= 4095
 		},
 	}
 }

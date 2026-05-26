@@ -273,7 +273,7 @@ func lowerInstr(inst minir.Instr, regByTemp map[*minir.Temp]*mir.Register, globa
 		}
 		return &mir.PhiInstr{Dst: dst, Arms: arms}, nil
 	case *minir.GEPInst:
-		return nil, fmt.Errorf("gep lowering not implemented in first bridge pass")
+		return lowerGEP(i, regByTemp, globals)
 	case *minir.AllocaInst:
 		if i.Dst == nil {
 			return nil, fmt.Errorf("alloca: destination temp is nil")
@@ -561,3 +561,109 @@ func lowerLinkage(l minir.Linkage) mir.Linkage {
 		return mir.InternalLinkage
 	}
 }
+
+// computeStrides computes byte strides for each dimension of an array type.
+// For nested arrays, strides are computed bottom-up (innermost first).
+// Returns nil for non-array types.
+// Example: for [3 x [4 x i32]], returns [16, 4] (stride of outermost dim is 4*4, innermost is 4).
+func computeStrides(elemType minir.Type) []int {
+	if elemType == nil {
+		return nil
+	}
+
+	arr, ok := elemType.(*minir.ArrayType)
+	if !ok {
+		return nil // scalar type, no strides needed
+	}
+
+	var strides []int
+
+	// Walk through nested arrays and collect lengths.
+	var dims []int
+	cur := arr
+	for cur != nil {
+		dims = append(dims, cur.Len)
+		nextArr, ok := cur.Elem.(*minir.ArrayType)
+		if !ok {
+			break
+		}
+		cur = nextArr
+	}
+
+	// Compute base elem size (the innermost type).
+	baseSize := 8 // default word size
+	if cur != nil && cur.Elem != nil {
+		if pt, ok := cur.Elem.(*minir.PrimitiveType); ok {
+			switch strings.ToLower(pt.String()) {
+			case "i1":
+				baseSize = 1
+			case "i8", "u8":
+				baseSize = 1
+			case "i16", "u16":
+				baseSize = 2
+			case "i32", "u32", "f32":
+				baseSize = 4
+			case "i64", "u64", "f64":
+				baseSize = 8
+			}
+		}
+	}
+
+	// Compute strides: stride[i] = stride[i+1] * dims[i+1], or baseSize for innermost.
+	strides = make([]int, len(dims))
+	for i := len(dims) - 1; i >= 0; i-- {
+		if i == len(dims)-1 {
+			strides[i] = baseSize
+		} else {
+			// stride for this dimension = stride of next dimension * length of next dimension
+			strides[i] = strides[i+1] * dims[i+1]
+		}
+	}
+
+	return strides
+}
+
+// lowerGEP converts a minir.GEPInst to mir.GEPInstr, computing strides and lowering operands.
+func lowerGEP(gepInst *minir.GEPInst, regByTemp map[*minir.Temp]*mir.Register, globals map[string]*mir.Symbol) (mir.Instr, error) {
+	if gepInst == nil {
+		return nil, fmt.Errorf("gep: nil instruction")
+	}
+
+	dst, err := lowerTemp(gepInst.Dst, regByTemp)
+	if err != nil {
+		return nil, fmt.Errorf("gep dst: %w", err)
+	}
+
+	base, err := lowerOperand(gepInst.Base, regByTemp, globals)
+	if err != nil {
+		return nil, fmt.Errorf("gep base: %w", err)
+	}
+
+	// Convert ElemType from minir to mir.Type; compute strides.
+	elemType, err := lowerType(gepInst.ElemType)
+	if err != nil {
+		return nil, fmt.Errorf("gep elem type: %w", err)
+	}
+
+	strides := computeStrides(gepInst.ElemType)
+
+	// Lower runtime indices.
+	indices := make([]mir.Operand, 0, len(gepInst.Indices))
+	for _, idx := range gepInst.Indices {
+		midx, err := lowerOperand(idx, regByTemp, globals)
+		if err != nil {
+			return nil, fmt.Errorf("gep index: %w", err)
+		}
+		indices = append(indices, midx)
+	}
+
+	return &mir.GEPInstr{
+		Dst:      dst,
+		Base:     base,
+		ElemType: elemType,
+		Strides:  strides,
+		Offsets:  gepInst.Offsets,
+		Indices:  indices,
+	}, nil
+}
+

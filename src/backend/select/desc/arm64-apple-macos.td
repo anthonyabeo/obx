@@ -1702,10 +1702,138 @@ block comparisons {
     cost 2;
     cond ShamtFits6($sh);
     emit {
-        instr { opcode: "cmp"; src: [$lhs, $rhs, lsl, $sh]; uses: [$lhs, $rhs]; };
-        instr { opcode: "cset"; dst: $rd; src: [ge]; def: $rd; };
+         instr { opcode: "cmp"; src: [$lhs, $rhs, lsl, $sh]; uses: [$lhs, $rhs]; };
+         instr { opcode: "cset"; dst: $rd; src: [ge]; def: $rd; };
+     }
+   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GEP (GetElementPointer) lowering
+  //
+  // Computes addresses from base pointers and array indices with strides.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // GEP with scalar base (no array indexing): just move the base
+  rule GEP_base {
+    match {
+      out $rd : GPR:virt;
+      in $base : GPR:virt;
+      pattern gep($base);
+    }
+    cost 1;
+    emit {
+      instr { opcode: "mov"; dst: $rd; src: [$base]; def: $rd; uses: [$base]; };
     }
   }
+
+  // GEP with stride = 1: base + idx (no shift or multiply)
+  rule GEP_stride_1 {
+    match {
+      out $rd : GPR:virt;
+      in $base : GPR:virt;
+      in $idx : GPR:virt;
+      pattern gep($base, $idx, 1);
+    }
+    cost 1;
+    emit {
+      instr { opcode: "add"; dst: $rd; src: [$base, $idx]; def: $rd; uses: [$base, $idx]; };
+    }
+  }
+
+  // GEP with stride = 2: base + (idx << 1) using shift
+  rule GEP_stride_2 {
+    match {
+      out $rd : GPR:virt;
+      in $base : GPR:virt;
+      in $idx : GPR:virt;
+      pattern gep($base, $idx, 2);
+    }
+    cost 1;
+    emit {
+      instr { opcode: "add"; dst: $rd; src: [$base, $idx, lsl, 1]; def: $rd; uses: [$base, $idx]; };
+    }
+  }
+
+  // GEP with stride = 4: base + (idx << 2) using shift
+  rule GEP_stride_4 {
+    match {
+      out $rd : GPR:virt;
+      in $base : GPR:virt;
+      in $idx : GPR:virt;
+      pattern gep($base, $idx, 4);
+    }
+    cost 1;
+    emit {
+      instr { opcode: "add"; dst: $rd; src: [$base, $idx, lsl, 2]; def: $rd; uses: [$base, $idx]; };
+    }
+  }
+
+  // GEP with stride = 8: base + (idx << 3) using shift
+  rule GEP_stride_8 {
+    match {
+      out $rd : GPR:virt;
+      in $base : GPR:virt;
+      in $idx : GPR:virt;
+      pattern gep($base, $idx, 8);
+    }
+    cost 1;
+    emit {
+      instr { opcode: "add"; dst: $rd; src: [$base, $idx, lsl, 3]; def: $rd; uses: [$base, $idx]; };
+    }
+  }
+
+  // GEP with 2D indexing on power-of-2 strides (4 and 8)
+  rule GEP_2d_4_8 {
+    match {
+      out $rd : GPR:virt;
+      in $base : GPR:virt;
+      in $i : GPR:virt;
+      in $j : GPR:virt;
+      temp $tmp : GPR:virt;
+      pattern gep($base, $i, 4, $j, 8);
+    }
+    cost 2;
+    emit {
+      instr { opcode: "add"; dst: $tmp; src: [$i, lsl, 2]; def: $tmp; uses: [$i]; };
+      instr { opcode: "add"; dst: $tmp; src: [$tmp, $j, lsl, 3]; def: $tmp; uses: [$tmp, $j]; };
+      instr { opcode: "add"; dst: $rd; src: [$base, $tmp]; def: $rd; uses: [$base, $tmp]; };
+    }
+  }
+
+  // GEP with arbitrary stride: general mul+add sequence
+  rule GEP_general {
+    match {
+      out $rd : GPR:virt;
+      in $base : GPR:virt;
+      in $idx : GPR:virt;
+      in $stride : imm;
+      temp $tmp : GPR:virt;
+      pattern gep($base, $idx, $stride);
+    }
+    cost 2;
+    emit {
+      instr { opcode: "mul"; dst: $tmp; src: [$idx, $stride]; def: $tmp; uses: [$idx]; };
+      instr { opcode: "add"; dst: $rd; src: [$base, $tmp]; def: $rd; uses: [$base, $tmp]; };
+    }
+  }
+
+  // Fallback: single dynamic index
+  rule GEP_single_idx {
+    match {
+      out $rd : GPR:virt;
+      in $base : GPR:virt;
+      in $idx : GPR:virt;
+      in $stride : imm;
+      pattern gep($base, $idx, $stride);
+    }
+    cost 2;
+    cond FitsAddSubImm($stride);
+    emit {
+      instr { opcode: "mul"; dst: $rd; src: [$idx, $stride]; def: $rd; uses: [$idx]; };
+      instr { opcode: "add"; dst: $rd; src: [$base, $rd]; def: $rd; uses: [$base, $rd]; };
+    }
+  }
+
 
 }
 

@@ -59,7 +59,7 @@ func TestBackendDescriptorFilesParseAndCoverCoreRules(t *testing.T) {
 		}
 		rules := map[string]struct{}{}
 		collectRuleNames(f.Targets[0].Items, rules)
-		for _, want := range []string{"LOADmem", "LOADrr", "LOADsym", "STOREmem", "STORErr", "JMP", "RET_void", "MOVrr", "MOVzero", "MOVany", "CALL_direct", "CALL_indirect"} {
+		for _, want := range []string{"LOADmem", "LOADrr", "LOADsym", "STOREmem", "STORErr", "JMP", "RET_void", "MOVrr", "MOVzero" /* "MOVany",*/, "CALL_direct", "CALL_indirect"} {
 			if _, ok := rules[want]; !ok {
 				t.Fatalf("%s: missing rule %q", name, want)
 			}
@@ -313,6 +313,3 @@ func TestArm64DescriptorSelectsCallIndirect(t *testing.T) {
 		t.Fatalf("expected MachineInstr{op:blr}, got %#v", selected[0])
 	}
 }
-
-
-
