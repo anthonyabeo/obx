@@ -448,11 +448,90 @@ func builtinDefault(l *Lowerer, call *desugar.FuncCall) Value {
 	return NewConst("0", int64(0), ty)
 }
 
+// inlineFloor emits the floor operation inline without a runtime call.
+//
+// Strategy:
+//  1. Constant argument: fold via math.Floor at compile time.
+//  2. Runtime argument:
+//     trunc  = fptosi x          ; truncate toward zero
+//     truncF = sitofp trunc      ; convert back to float for comparison
+//     cmp    = fcmp lt x, truncF ; true when x < trunc (negative non-integer)
+//     if cmp → result = trunc - 1
+//     else   → result = trunc
+//
+// dstTy must be I32() or I64().
+func inlineFloor(l *Lowerer, x Value, dstTy Type) Value {
+	// ── compile-time constant fold ──────────────────────────────────────────
+	if fc, ok := x.(*FloatConst); ok {
+		floored := math.Floor(fc.Value)
+		v := int64(floored)
+		return NewConst(fmt.Sprintf("%d", v), v, dstTy)
+	}
+
+	srcTy := x.Type() // f32 or f64
+
+	// ── runtime: truncate-toward-zero then adjust for negative non-integers ─
+	trunc := NewAnonTemp(dstTy)
+	l.emit(&CastInst{Dst: trunc, Op: "fptosi", Src: x})
+
+	// Convert back to float so we can compare with the original.
+	truncF := NewAnonTemp(srcTy)
+	l.emit(&CastInst{Dst: truncF, Op: "sitofp", Src: trunc})
+
+	// x < truncF  ⟺  fptosi went the wrong direction (x was negative + fractional).
+	cmp := NewAnonTemp(I1())
+	l.emit(&FCmpInst{ICmpInst: ICmpInst{Dst: cmp, Pred: "lt", Left: x, Right: truncF}})
+
+	adjLabel := l.newLabel("floor.adj")
+	noAdjLabel := l.newLabel("floor.noadj")
+	doneLabel := l.newLabel("floor.done")
+
+	cbr := &CondBrInst{Cond: cmp, TrueLabel: adjLabel, FalseLabel: noAdjLabel}
+	l.emit(cbr)
+	l.curBlock.Term = cbr
+
+	// Adjustment block: trunc - 1
+	adjBlk := l.newBlock(adjLabel)
+	l.fn.Blocks[adjBlk.ID] = adjBlk
+	l.switchTo(adjBlk)
+	one := NewConst("1", int64(1), dstTy)
+	adjVal := NewAnonTemp(dstTy)
+	l.emit(&BinaryInst{Dst: adjVal, Op: "sub", Left: trunc, Right: one})
+	adjJmp := &JumpInst{Target: doneLabel}
+	l.emit(adjJmp)
+	adjBlk.Term = adjJmp
+
+	// No-adjustment block: pass trunc through unchanged.
+	noAdjBlk := l.newBlock(noAdjLabel)
+	l.fn.Blocks[noAdjBlk.ID] = noAdjBlk
+	l.switchTo(noAdjBlk)
+	noAdjJmp := &JumpInst{Target: doneLabel}
+	l.emit(noAdjJmp)
+	noAdjBlk.Term = noAdjJmp
+
+	// Done: select result via phi.
+	doneBlk := l.newBlock(doneLabel)
+	l.fn.Blocks[doneBlk.ID] = doneBlk
+	l.switchTo(doneBlk)
+	result := NewAnonTemp(dstTy)
+	l.emit(&PhiInst{
+		Dst: result,
+		Args: []PhiArm{
+			{BlockLabel: adjLabel, Val: adjVal},
+			{BlockLabel: noAdjLabel, Val: trunc},
+		},
+	})
+	return result
+}
+
 func builtinFloor(l *Lowerer, call *desugar.FuncCall) Value {
 	x := l.lowerValue(call.Args[0])
-	dst := NewAnonTemp(I64())
-	l.emit(&CallInst{Dst: dst, Callee: "__obx_floor", Args: []Value{x}})
-	return dst
+	// REAL (f32) → INT32;  LONGREAL (f64) → INT64  (Oberon+ spec).
+	dstTy := I32()
+	if x.Type() == F64() {
+		dstTy = I64()
+	}
+	return inlineFloor(l, x, dstTy)
 }
 
 func builtinFlt(l *Lowerer, call *desugar.FuncCall) Value {
@@ -493,15 +572,40 @@ func builtinLen(l *Lowerer, call *desugar.FuncCall) Value {
 	if at, ok := semaType.(*types.ArrayType); ok {
 		dims := at.Dimensions()
 		if !at.IsOpen() && dim < len(dims) && dims[dim] >= 0 {
-			// Fixed array: return the length as a constant
+			// Fixed array: return the length as a constant.
 			return NewConst(fmt.Sprintf("%d", dims[dim]), int64(dims[dim]), I32())
 		}
+		// Open array: load dimension slot [dim] from the dope-vector header.
+		// Memory layout (per-allocation):
+		//   [dim0 : dimType] [dim1 : dimType] ... [dimN-1 : dimType] [data ...]
+		// where dimType is i32 (32-bit target) or i64 (64-bit target).
+		dt := l.dimType()
+		base := l.lowerAddr(call.Args[0])
+
+		// Re-type the base pointer as ptr(dimType) so the GEP arithmetic uses
+		// word-sized strides into the header.
+		dimBase := l.newAddrTemp("", dt)
+		l.emit(&CastInst{Dst: dimBase, Op: "bitcast", Src: base})
+
+		// GEP to the requested dimension slot.
+		slotAddr := l.newAddrTemp("", dt)
+		l.emit(&GEPInst{Dst: slotAddr, Base: dimBase, ElemType: dt, Offsets: []int{dim}})
+
+		// Load the dimension value.
+		loaded := NewAnonTemp(dt)
+		l.emit(&LoadInst{Dst: loaded, Addr: slotAddr})
+
+		// Oberon LEN always returns INTEGER (i32); truncate on 64-bit targets.
+		if dt == I64() {
+			r32 := NewAnonTemp(I32())
+			l.emit(&CastInst{Dst: r32, Op: "trunc", Src: loaded})
+			return r32
+		}
+		return loaded
 	}
-	// Open / dynamic array: delegate to runtime
-	addr := l.lowerAddr(call.Args[0])
-	dst := NewAnonTemp(I32())
-	l.emit(&CallInst{Dst: dst, Callee: "__obx_len", Args: []Value{addr}})
-	return dst
+	// TODO emit diagnostic for non-array type — should not occur after sema, but guard gracefully.
+	// Non-array type — should not occur after sema, but guard gracefully.
+	return NewConst("0", int64(0), I32())
 }
 
 func builtinLong(l *Lowerer, call *desugar.FuncCall) Value {
@@ -620,10 +724,29 @@ func builtinSize(l *Lowerer, call *desugar.FuncCall) Value {
 }
 
 func builtinStrLen(l *Lowerer, call *desugar.FuncCall) Value {
+	// STRLEN(s): dynamic length of the string excluding the terminating 0X
+	// (Oberon+ spec).  Delegates to the C standard-library strlen, which is
+	// named "strlen" on every supported OS (POSIX libc and Windows msvcrt).
+	//
+	// LEN(array_of_char) returns the allocated *capacity*, which may be larger
+	// than the actual string content.  STRLEN must therefore scan at runtime
+	// regardless of whether the array is open or fixed-size.
+	//
+	// strlen returns size_t; we truncate to i32 (Oberon INTEGER) on 64-bit
+	// targets since Oberon array lengths are always INTEGER-ranged.
+	//
+	// The caller is responsible for null termination; the semantic analyser
+	// enforces that the argument is ARRAY OF CHAR / WCHAR or a string literal.
 	addr := l.lowerAddr(call.Args[0])
-	dst := NewAnonTemp(I32())
-	l.emit(&CallInst{Dst: dst, Callee: "__obx_strlen", Args: []Value{addr}})
-	return dst
+	dt := l.dimType()
+	raw := NewAnonTemp(dt)
+	l.emit(&CallInst{Dst: raw, Callee: l.strlenFuncName(), Args: []Value{addr}})
+	if dt == I64() {
+		dst := NewAnonTemp(I32())
+		l.emit(&CastInst{Dst: dst, Op: "trunc", Src: raw})
+		return dst
+	}
+	return raw
 }
 
 func builtinWChar(l *Lowerer, call *desugar.FuncCall) Value {
@@ -699,10 +822,9 @@ func builtinASR(l *Lowerer, call *desugar.FuncCall) Value {
 }
 
 func builtinEntier(l *Lowerer, call *desugar.FuncCall) Value {
+	// ENTIER is the classic Oberon name for floor; always returns INT64.
 	x := l.lowerValue(call.Args[0])
-	dst := NewAnonTemp(I64())
-	l.emit(&CallInst{Dst: dst, Callee: "__obx_floor", Args: []Value{x}})
-	return dst
+	return inlineFloor(l, x, I64())
 }
 
 func builtinLSL(l *Lowerer, call *desugar.FuncCall) Value {
@@ -778,10 +900,102 @@ func builtinAssert(l *Lowerer, call *desugar.FuncCall) Value {
 }
 
 func builtinBytes(l *Lowerer, call *desugar.FuncCall) Value {
+	// BYTES(a, n): store the raw memory representation of n into array a.
+	// The desugar layer passes three arguments: (a, n, SIZE(n)) where the
+	// third is the byte count already computed at the call site.
+	//
+	// Spec requirement: if LEN(a) < SIZE(n) the program halts.
+	//
+	// Implementation:
+	//   1. Bounds check (compile-time when a is a fixed array, runtime otherwise).
+	//   2. memcpy(dst=&a[0], src=&n, count=SIZE(n))
 	dst := l.lowerAddr(call.Args[0])
 	src := l.lowerAddr(call.Args[1])
-	n := l.lowerValue(call.Args[2])
-	l.emit(&CallInst{Callee: "__obx_bytes", Args: []Value{dst, src, n}})
+
+	// copySize is SIZE(n) — already computed by the desugar layer as args[2].
+	copySize := l.lowerValue(call.Args[2])
+	dt := l.dimType()
+	copySizeDt := l.sameType(copySize, dt)
+
+	// ── bounds check ────────────────────────────────────────────────────────
+	// Determine LEN(a): compile-time constant for fixed arrays, dope-vector
+	// load for open arrays.
+	var aLen Value
+	semaType := call.Args[0].Type()
+	if nt, ok := semaType.(*types.NamedType); ok {
+		semaType = nt.Def
+	}
+	if at, ok := semaType.(*types.ArrayType); ok && !at.IsOpen() {
+		dims := at.Dimensions()
+		if len(dims) > 0 && dims[0] >= 0 {
+			aLen = NewConst(fmt.Sprintf("%d", dims[0]), int64(dims[0]), dt)
+		}
+	}
+	if aLen == nil {
+		// Open array: load LEN from dope-vector slot 0.
+		dimBase := l.newAddrTemp("", dt)
+		l.emit(&CastInst{Dst: dimBase, Op: "bitcast", Src: dst})
+		slotAddr := l.newAddrTemp("", dt)
+		l.emit(&GEPInst{Dst: slotAddr, Base: dimBase, ElemType: dt, Offsets: []int{0}})
+		loaded := NewAnonTemp(dt)
+		l.emit(&LoadInst{Dst: loaded, Addr: slotAddr})
+		aLen = loaded
+	}
+	aLenDt := l.sameType(aLen, dt)
+
+	// Compile-time fold: if both values are constants we can decide statically.
+	aLenConst, aLenIsConst := aLen.(Constant)
+	copySizeConst, copyIsConst := copySize.(Constant)
+	if aLenIsConst && copyIsConst {
+		aLenV, _ := AsInt64(aLenConst)
+		copyV, _ := AsInt64(copySizeConst)
+		if aLenV < copyV {
+			// Unconditional halt — spec says program halts.
+			haltCode := NewConst("1", int64(1), I32())
+			haltTemp := l.ensureTemp(haltCode, I32())
+			halt := &HaltInst{Code: haltTemp}
+			l.emit(halt)
+			l.curBlock.Term = halt
+			if l.fn != nil && l.fn.Exit != nil {
+				l.curBlock.AddSucc(l.fn.Exit)
+				l.fn.Exit.AddPred(l.curBlock)
+			}
+			dead := l.newBlock(l.newLabel("dead"))
+			l.switchTo(dead)
+			return nil
+		}
+		// aLen >= copySize: bounds check always passes — fall through to memcpy.
+	} else {
+		// Runtime bounds check: halt if aLen < copySize.
+		cmp := NewAnonTemp(I1())
+		l.emit(&ICmpInst{Dst: cmp, Pred: "lt", Left: aLenDt, Right: copySizeDt})
+
+		haltLabel := l.newLabel("bytes.halt")
+		okLabel := l.newLabel("bytes.ok")
+
+		cbr := &CondBrInst{Cond: cmp, TrueLabel: haltLabel, FalseLabel: okLabel}
+		l.emit(cbr)
+		l.curBlock.Term = cbr
+
+		haltBlk := l.newBlock(haltLabel)
+		l.fn.Blocks[haltBlk.ID] = haltBlk
+		l.switchTo(haltBlk)
+		haltCode := l.ensureTemp(NewConst("1", int64(1), I32()), I32())
+		halt := &HaltInst{Code: haltCode}
+		l.emit(halt)
+		haltBlk.Term = halt
+		if l.fn != nil && l.fn.Exit != nil {
+			haltBlk.AddSucc(l.fn.Exit)
+			l.fn.Exit.AddPred(haltBlk)
+		}
+
+		okBlk := l.newBlock(okLabel)
+		l.fn.Blocks[okBlk.ID] = okBlk
+		l.switchTo(okBlk)
+	}
+
+	// ── memcpy ──────────────────────────────────────────────────────────────
+	l.emit(&CallInst{Callee: l.memcpyFuncName(), Args: []Value{dst, src, copySizeDt}})
 	return nil
 }
 
@@ -860,13 +1074,13 @@ func builtinInc(l *Lowerer, call *desugar.FuncCall) Value {
 
 func builtinIncl(l *Lowerer, call *desugar.FuncCall) Value {
 	addr := l.lowerAddr(call.Args[0])
-	v := NewAnonTemp(I32())
+	v := NewAnonTemp(U32())
 	l.emit(&LoadInst{Dst: v, Addr: addr})
-	x := l.sameType(l.lowerValue(call.Args[1]), I32())
-	one := NewConst("1", int64(1), I32())
-	bit := NewAnonTemp(I32())
+	x := l.sameType(l.lowerValue(call.Args[1]), U32())
+	one := NewConst("1", int64(1), U32())
+	bit := NewAnonTemp(U32())
 	l.emit(&BinaryInst{Dst: bit, Op: "shl", Left: one, Right: x})
-	newV := NewAnonTemp(I32())
+	newV := NewAnonTemp(U32())
 	l.emit(&BinaryInst{Dst: newV, Op: "or", Left: v, Right: bit})
 	l.emit(&StoreInst{Val: newV, Addr: addr})
 	return nil
@@ -877,36 +1091,116 @@ func builtinNew(l *Lowerer, call *desugar.FuncCall) Value {
 
 	var ptr *Temp
 	if len(call.Args) > 1 {
-		// NEW(p, dim0, dim1, ...) — open-array allocation
-		var dims []Value
+		// NEW(v, x0, ..., xn) — v is POINTER TO open array.
+		//
+		// Allocates a single contiguous block with the dope-vector header
+		// followed immediately by the data:
+		//
+		//   [x0 : dimType] [x1 : dimType] ... [xN-1 : dimType]
+		//   [elem0] [elem1] ... [elem(x0*x1*...*xN-1 - 1)]
+		//
+		// totalSize = N*wordSize + x0*x1*...*xN-1 * sizeof(elem)
+		//
+		// After allocation each xi is stored into its header slot so that
+		// LEN(v, i) can read it back with a single load.
+		dims := make([]Value, 0, len(call.Args)-1)
 		for _, a := range call.Args[1:] {
 			dims = append(dims, l.lowerValue(a))
 		}
-		ptr = NewAnonTemp(Ptr(I32()))
-		l.emit(&CallInst{Dst: ptr, Callee: "__obx_alloc_open", Args: dims})
-	} else {
-		// NEW(p) — fixed-size allocation
-		width := call.Args[0].Type().Width()
-		if width <= 0 {
-			width = 4
+		ndims := len(dims)
+		dt := l.dimType()
+		ws := l.wordSize()
+
+		// Determine the element size by drilling through the pointer and
+		// open-array chain in the sema types down to the innermost element.
+		semaType := call.Args[0].Type()
+		if nt, ok := semaType.(*types.NamedType); ok {
+			semaType = nt.Def
 		}
-		sizeConst := NewConst(fmt.Sprintf("%d", width), int64(width), I32())
+		if pt, ok := semaType.(*types.PointerType); ok {
+			semaType = pt.Base
+		}
+		if nt, ok := semaType.(*types.NamedType); ok {
+			semaType = nt.Def
+		}
+		// Walk past all open-array wrappers to the concrete element type.
+		for {
+			at, ok := semaType.(*types.ArrayType)
+			if !ok || !at.IsOpen() {
+				break
+			}
+			semaType = at.Elem
+		}
+		elemWidth := int64(semaType.Width())
+		if elemWidth <= 0 {
+			elemWidth = ws
+		}
+
+		// Compute data size: prod(xi) * elemWidth using dimType arithmetic.
+		prod := l.sameType(dims[0], dt)
+		for _, d := range dims[1:] {
+			tmp := NewAnonTemp(dt)
+			l.emit(&BinaryInst{Dst: tmp, Op: "mul", Left: prod, Right: l.sameType(d, dt)})
+			prod = tmp
+		}
+		elemWidthConst := NewConst(fmt.Sprintf("%d", elemWidth), elemWidth, dt)
+		dataBytes := NewAnonTemp(dt)
+		l.emit(&BinaryInst{Dst: dataBytes, Op: "mul", Left: prod, Right: elemWidthConst})
+
+		// Add the header size: ndims * wordSize.
+		headerBytes := int64(ndims) * ws
+		headerConst := NewConst(fmt.Sprintf("%d", headerBytes), headerBytes, dt)
+		totalSize := NewAnonTemp(dt)
+		l.emit(&BinaryInst{Dst: totalSize, Op: "add", Left: dataBytes, Right: headerConst})
+
+		// Allocate the block via the target-OS allocator.
 		ptr = NewAnonTemp(Ptr(I32()))
-		l.emit(&CallInst{Dst: ptr, Callee: "__obx_alloc", Args: []Value{sizeConst}})
+		l.emit(&CallInst{Dst: ptr, Callee: l.allocFuncName(), Args: []Value{totalSize}})
+
+		// Write each dimension xi into slot i of the header.
+		dimBase := l.newAddrTemp("", dt)
+		l.emit(&CastInst{Dst: dimBase, Op: "bitcast", Src: ptr})
+		for i, d := range dims {
+			slotAddr := l.newAddrTemp("", dt)
+			l.emit(&GEPInst{Dst: slotAddr, Base: dimBase, ElemType: dt, Offsets: []int{i}})
+			l.emit(&StoreInst{Val: l.sameType(d, dt), Addr: slotAddr})
+		}
+	} else {
+		// NEW(v) — v is POINTER TO RECORD or fixed-size array.
+		// Allocate exactly sizeof(*v) bytes; no dope-vector header needed.
+		semaType := call.Args[0].Type()
+		if nt, ok := semaType.(*types.NamedType); ok {
+			semaType = nt.Def
+		}
+		if pt, ok := semaType.(*types.PointerType); ok {
+			semaType = pt.Base
+		}
+		width := semaType.Width()
+		if width <= 0 {
+			width = int(l.wordSize())
+		}
+		sizeConst := NewConst(fmt.Sprintf("%d", width), int64(width), l.dimType())
+		ptr = NewAnonTemp(Ptr(I32()))
+		l.emit(&CallInst{Dst: ptr, Callee: l.allocFuncName(), Args: []Value{sizeConst}})
 	}
+
 	l.emit(&StoreInst{Val: ptr, Addr: addr})
 	return nil
 }
 
 func builtinNumber(l *Lowerer, call *desugar.FuncCall) Value {
+	// NUMBER(v, a): reinterpret the raw bytes of array a as the type of v.
+	// Copies exactly SIZE(v) bytes from &a[0] into &v via memcpy.
+	// No bounds check: the semantic analyser guarantees SIZE(a) >= SIZE(v).
 	dst := l.lowerAddr(call.Args[0])
 	src := l.lowerAddr(call.Args[1])
 	width := call.Args[0].Type().Width()
 	if width <= 0 {
-		width = 4
+		width = int(l.wordSize())
 	}
-	sizeConst := NewConst(fmt.Sprintf("%d", width), int64(width), I32())
-	l.emit(&CallInst{Callee: "__obx_bytes", Args: []Value{dst, src, sizeConst}})
+	dt := l.dimType()
+	sizeConst := NewConst(fmt.Sprintf("%d", width), int64(width), dt)
+	l.emit(&CallInst{Callee: l.memcpyFuncName(), Args: []Value{dst, src, sizeConst}})
 	return nil
 }
 
@@ -937,33 +1231,131 @@ func builtinRaise(l *Lowerer, call *desugar.FuncCall) Value {
 }
 
 func builtinCopy(l *Lowerer, call *desugar.FuncCall) Value {
-	src := l.lowerAddr(call.Args[0])
-	dst := l.lowerAddr(call.Args[1])
-	l.emit(&CallInst{Callee: "__obx_copy", Args: []Value{src, dst}})
+	// COPY(x, v): v := x — copies the CHAR array / string x into v.
+	// Implemented as memcpy(dataDst, dataSrc, copySize) where:
+	//   • Fixed arrays: data pointer = base address, copySize = SIZE(v).
+	//   • Open arrays:  data pointer = base + NDims*wordSize (skip dope-vector
+	//     header); copySize = LEN(v) * sizeof(elem).
+	src := l.lowerAddr(call.Args[0]) // &x
+	dst := l.lowerAddr(call.Args[1]) // &v
+
+	dt := l.dimType()
+
+	var dataSrc Value = src
+	var dataDst Value = dst
+	var copySize Value
+
+	// ── destination size / data pointer ────────────────────────────────────
+	dstSema := call.Args[1].Type()
+	if nt, ok := dstSema.(*types.NamedType); ok {
+		dstSema = nt.Def
+	}
+	if at, ok := dstSema.(*types.ArrayType); ok && at.IsOpen() {
+		// Open ARRAY OF CHAR: skip the NDims-word dope-vector header.
+		ndims, innerSema := countOpenDims(at)
+		elemWidth := int64(innerSema.Width())
+		if elemWidth <= 0 {
+			elemWidth = 1 // CHAR is always 1 byte
+		}
+		// Data pointer: GEP past NDims dim-type slots.
+		dataStartDst := l.newAddrTemp("", l.dimType())
+		l.emit(&GEPInst{Dst: dataStartDst, Base: dst, ElemType: dt, Offsets: []int{ndims}})
+		dataDst = dataStartDst
+
+		// Copy size: LEN(v) * sizeof(elem).
+		dimBase := l.newAddrTemp("", dt)
+		l.emit(&CastInst{Dst: dimBase, Op: "bitcast", Src: dst})
+		slotAddr := l.newAddrTemp("", dt)
+		l.emit(&GEPInst{Dst: slotAddr, Base: dimBase, ElemType: dt, Offsets: []int{0}})
+		lenV := NewAnonTemp(dt)
+		l.emit(&LoadInst{Dst: lenV, Addr: slotAddr})
+		if elemWidth != 1 {
+			ewConst := NewConst(fmt.Sprintf("%d", elemWidth), elemWidth, dt)
+			cs := NewAnonTemp(dt)
+			l.emit(&BinaryInst{Dst: cs, Op: "mul", Left: lenV, Right: ewConst})
+			copySize = cs
+		} else {
+			copySize = lenV
+		}
+	} else {
+		// Fixed array: copySize = WIDTH(v).
+		width := dstSema.Width()
+		if width <= 0 {
+			width = int(l.wordSize())
+		}
+		copySize = NewConst(fmt.Sprintf("%d", width), int64(width), dt)
+	}
+
+	// ── source data pointer (skip header when x is also open) ──────────────
+	srcSema := call.Args[0].Type()
+	if nt, ok := srcSema.(*types.NamedType); ok {
+		srcSema = nt.Def
+	}
+	if srcAt, ok := srcSema.(*types.ArrayType); ok && srcAt.IsOpen() {
+		ndims, _ := countOpenDims(srcAt)
+		dataStartSrc := l.newAddrTemp("", l.dimType())
+		l.emit(&GEPInst{Dst: dataStartSrc, Base: src, ElemType: dt, Offsets: []int{ndims}})
+		dataSrc = dataStartSrc
+	}
+
+	l.emit(&CallInst{Callee: l.memcpyFuncName(), Args: []Value{dataDst, dataSrc, copySize}})
 	return nil
 }
 
 func builtinPack(l *Lowerer, call *desugar.FuncCall) Value {
+	// PACK(x, n): x := x * 2^n.
+	// Delegates to C scalbn(x, n) which implements exactly this operation.
+	// scalbn is in libm (POSIX) / msvcrt (Windows) under the same name.
 	xAddr := l.lowerAddr(call.Args[0])
 	xVal := NewAnonTemp(F64())
 	l.emit(&LoadInst{Dst: xVal, Addr: xAddr})
-	n := l.lowerValue(call.Args[1])
-	result := NewAnonTemp(F64())
-	l.emit(&CallInst{Dst: result, Callee: "__obx_pack", Args: []Value{xVal, n}})
-	l.emit(&StoreInst{Val: result, Addr: xAddr})
+	n := l.sameType(l.lowerValue(call.Args[1]), I32())
+
+	packed := NewAnonTemp(F64())
+	l.emit(&CallInst{Dst: packed, Callee: l.scalbnFuncName(), Args: []Value{xVal, n}})
+	l.emit(&StoreInst{Val: packed, Addr: xAddr})
 	return nil
 }
 
 func builtinUnpk(l *Lowerer, call *desugar.FuncCall) Value {
+	// UNPK(x, n): normalise x to mantissa ∈ [1.0, 2.0) and store the binary
+	// exponent in n, such that  x_in = mantissa * 2^n.
+	//
+	// Uses C frexp(x, &exp) which returns mantissa ∈ [0.5, 1.0) and exp such
+	// that  x = mantissa * 2^exp.  Oberon's [1.0, 2.0) range is obtained by:
+	//   oberon_mantissa = frexp_mantissa * 2.0
+	//   oberon_exp      = frexp_exp - 1
+	//
+	// frexp is in libm (POSIX) / msvcrt (Windows) under the same name.
 	xAddr := l.lowerAddr(call.Args[0])
-	eAddr := l.lowerAddr(call.Args[1])
+	nAddr := l.lowerAddr(call.Args[1])
+
 	xVal := NewAnonTemp(F64())
 	l.emit(&LoadInst{Dst: xVal, Addr: xAddr})
-	mantissa := NewAnonTemp(F64())
-	l.emit(&CallInst{Dst: mantissa, Callee: "__obx_unpack_m", Args: []Value{xVal}})
-	exponent := NewAnonTemp(I32())
-	l.emit(&CallInst{Dst: exponent, Callee: "__obx_unpack_e", Args: []Value{xVal}})
-	l.emit(&StoreInst{Val: mantissa, Addr: xAddr})
-	l.emit(&StoreInst{Val: exponent, Addr: eAddr})
+
+	// Allocate a stack slot for frexp's int* output parameter.
+	expSlot := l.newAddrTemp("", I32())
+	l.emit(&AllocaInst{Dst: expSlot, AllocType: I32()})
+
+	// Call frexp(x, &expSlot) → raw mantissa ∈ [0.5, 1.0).
+	rawMantissa := NewAnonTemp(F64())
+	l.emit(&CallInst{Dst: rawMantissa, Callee: l.frexpFuncName(), Args: []Value{xVal, expSlot}})
+
+	// Load the raw exponent.
+	rawExp := NewAnonTemp(I32())
+	l.emit(&LoadInst{Dst: rawExp, Addr: expSlot})
+
+	// Adjust to Oberon range: mantissa *= 2, exp -= 1.
+	two := NewConst("2.0", 2.0, F64())
+	obMantissa := NewAnonTemp(F64())
+	l.emit(&BinaryInst{Dst: obMantissa, Op: "fmul", Left: rawMantissa, Right: two})
+
+	one := NewConst("1", int64(1), I32())
+	obExp := NewAnonTemp(I32())
+	l.emit(&BinaryInst{Dst: obExp, Op: "sub", Left: rawExp, Right: one})
+
+	// Write results back.
+	l.emit(&StoreInst{Val: obMantissa, Addr: xAddr})
+	l.emit(&StoreInst{Val: obExp, Addr: nAddr})
 	return nil
 }

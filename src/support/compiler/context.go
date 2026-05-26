@@ -14,13 +14,18 @@ import (
 // built-in lowering.
 type TargetConfig struct {
 	// WordSize is the pointer / word size in bytes for the target machine
-	// (e.g. 8 for 64-bit targets).
+	// (e.g., 8 for 64-bit targets).
 	WordSize uint64
+
+	// OS identifies the target operating system.
+	// Recognized values: "linux", "darwin", "windows".
+	// An empty string is treated as a POSIX-compatible target.
+	OS string
 }
 
 // Context is the single object threaded through every compiler phase.
 //
-// The embedded *diag.Context promotes FileName, Source, and Reporter so all
+// The embedded *diag.Context promotes FileName, Source, and Reporter, so all
 // ctx.Reporter.Report(…) and ctx.Source.Span(…) call sites work without
 // changes.
 //
@@ -38,7 +43,7 @@ type Context struct {
 	// Target holds target-machine parameters used during IR lowering.
 	Target TargetConfig
 
-	// Directives holds compiler-supplied compile-time named constants that
+	// Directives hold compiler-supplied compile-time named constants that
 	// are visible inside <* IF … *> / <* ASSERT … *> source directives.
 	// Keys are case-sensitive. Values must be bool, int64, or float64.
 	// Looked up before ctx.Env so the build system can shadow language CONSTs.

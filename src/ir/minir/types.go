@@ -212,6 +212,48 @@ func NewArrayType(length int, elem Type) *ArrayType {
 	return &ArrayType{Len: length, Elem: NormalizeType(elem)}
 }
 
+// OpenArrayType is a heap-allocated open array whose first NDims words form a
+// dope-vector header storing the runtime dimension counts.  The data region
+// starts immediately after the header at byte offset NDims*wordSize, where
+// wordSize is resolved lazily from the Lowerer's TargetConfig at each use site.
+//
+// Only dimensions with a compile-time length of -1 (open) contribute to NDims;
+// fixed-length dimensions remain in a wrapping ArrayType as today.
+type OpenArrayType struct {
+	NDims int  // number of open (runtime-sized) dimensions
+	Elem  Type // element type of the innermost open dimension (normalized)
+}
+
+func (o *OpenArrayType) String() string {
+	elem := "<nil>"
+	if o.Elem != nil {
+		elem = o.Elem.String()
+	}
+	return fmt.Sprintf("[open %d x %s]", o.NDims, elem)
+}
+
+func (o *OpenArrayType) Equal(t Type) bool {
+	ot, ok := t.(*OpenArrayType)
+	if !ok {
+		return false
+	}
+	if o.NDims != ot.NDims {
+		return false
+	}
+	if (o.Elem == nil) != (ot.Elem == nil) {
+		return false
+	}
+	if o.Elem != nil && !o.Elem.Equal(ot.Elem) {
+		return false
+	}
+	return true
+}
+
+// NewOpenArrayType constructs an OpenArrayType and normalizes the element type.
+func NewOpenArrayType(ndims int, elem Type) *OpenArrayType {
+	return &OpenArrayType{NDims: ndims, Elem: NormalizeType(elem)}
+}
+
 // Temp is an SSA local / value produced by an instruction.
 type Temp struct {
 	ID      int
@@ -340,6 +382,8 @@ func NormalizeType(t Type) Type {
 		return NewRecordType(tt.TypeName, tt.Fields)
 	case *ArrayType:
 		return NewArrayType(tt.Len, tt.Elem)
+	case *OpenArrayType:
+		return NewOpenArrayType(tt.NDims, tt.Elem)
 	default:
 		return t
 	}

@@ -933,6 +933,20 @@ func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *Temp {
 	et := LowerType(e.SemaType)
 	dst := l.newAddrTemp("", et)
 
+	// Detect an OpenArrayType base.  When present, we must skip past the
+	// dope-vector header (NDims words of size wordSize) before indexing into
+	// the data region.
+	var headerNDims int
+	var innerElemType Type = et
+	if pt, ok := base.Type().(*PointerType); ok {
+		if oa, ok := pt.Elem.(*OpenArrayType); ok {
+			headerNDims = oa.NDims
+			if oa.Elem != nil {
+				innerElemType = oa.Elem
+			}
+		}
+	}
+
 	var offsets []int
 	var indices []Value
 	if len(e.Index) == 0 {
@@ -969,17 +983,34 @@ func (l *Lowerer) lowerIndexAddr(e *desugar.IndexExpr) *Temp {
 		}
 	}
 
-	var elemType = et
-	var arrTy *ArrayType
-	if pt, ok := base.Type().(*PointerType); ok {
-		arrTy, _ = pt.Elem.(*ArrayType)
+	// For open arrays, emit a preliminary GEP that skips past the
+	// NDims-word dope-vector header, then use the resulting pointer as the
+	// base for the actual element GEP.
+	effectiveBase := base
+	effectiveElemType := innerElemType
+	if headerNDims > 0 {
+		dt := l.dimType()
+		dataStart := l.newAddrTemp("", innerElemType)
+		l.emit(&GEPInst{
+			Dst:      dataStart,
+			Base:     base,
+			ElemType: dt,
+			Offsets:  []int{headerNDims},
+		})
+		effectiveBase = dataStart
 	}
 
-	if arrTy != nil {
-		elemType = arrTy
+	// For fixed arrays keep the existing behaviour: wrap the element type in
+	// the array type so the GEP uses element-stride arithmetic.
+	if headerNDims == 0 {
+		if pt, ok := base.Type().(*PointerType); ok {
+			if arrTy, ok := pt.Elem.(*ArrayType); ok {
+				effectiveElemType = arrTy
+			}
+		}
 	}
 
-	l.emit(&GEPInst{Dst: dst, Base: base, ElemType: elemType, Offsets: offsets, Indices: indices})
+	l.emit(&GEPInst{Dst: dst, Base: effectiveBase, ElemType: effectiveElemType, Offsets: offsets, Indices: indices})
 
 	return dst
 }
@@ -1780,6 +1811,122 @@ func (l *Lowerer) newAddrTemp(name string, ty Type) *Temp {
 	t := NewTemp(name, Ptr(ty))
 	t.IsAddr = true
 	return t
+}
+
+// ── target helpers ─────────────────────────────────────────────────────────────
+
+// wordSize returns the target pointer/word size in bytes (4 or 8).
+// Defaults to 4 when dctx is nil (e.g. in unit tests).
+func (l *Lowerer) wordSize() int64 {
+	if l.dctx != nil && l.dctx.Target.WordSize == 8 {
+		return 8
+	}
+	return 4
+}
+
+// dimType returns the IR integer type used for dope-vector dimension fields.
+// 64-bit targets (WordSize == 8) use i64; all others use i32.
+func (l *Lowerer) dimType() Type {
+	if l.wordSize() == 8 {
+		return I64()
+	}
+	return I32()
+}
+
+// strlenFuncName returns the C standard-library strlen symbol and ensures an
+// ExternalFunc declaration is registered in the current module.
+// The symbol is named "strlen" on every supported OS (POSIX libc / Windows msvcrt).
+// Its return type is size_t, represented as dimType() (i32 or i64).
+func (l *Lowerer) strlenFuncName() string {
+	const name = "strlen"
+	if l.mod != nil {
+		if _, ok := l.mod.SymTab.Lookup(name); !ok {
+			sig := &FunctionType{Params: []Type{Ptr(Void())}, Result: l.dimType()}
+			ef := &ExternalFunc{Name: name, Sig: sig, Linkage: ExternalLinkage}
+			l.mod.Externals = append(l.mod.Externals, ef)
+			_ = l.mod.SymTab.Define(name, &GlobalRef{GlobalName: name, Ty: Ptr(Void())})
+		}
+	}
+	return name
+}
+
+// memcpyFuncName returns the C standard-library memcpy symbol and ensures an
+// ExternalFunc declaration is registered in the current module.
+// The symbol is named "memcpy" on every supported OS (POSIX libc / Windows msvcrt).
+// Signature: memcpy(dst *void, src *void, n size_t) → *void
+func (l *Lowerer) memcpyFuncName() string {
+	const name = "memcpy"
+	if l.mod != nil {
+		if _, ok := l.mod.SymTab.Lookup(name); !ok {
+			dt := l.dimType()
+			sig := &FunctionType{
+				Params: []Type{Ptr(Void()), Ptr(Void()), dt},
+				Result: Ptr(Void()),
+			}
+			ef := &ExternalFunc{Name: name, Sig: sig, Linkage: ExternalLinkage}
+			l.mod.Externals = append(l.mod.Externals, ef)
+			_ = l.mod.SymTab.Define(name, &GlobalRef{GlobalName: name, Ty: Ptr(Void())})
+		}
+	}
+	return name
+}
+
+// scalbnFuncName returns the C math-library scalbn symbol and ensures an
+// ExternalFunc declaration is registered in the current module.
+// scalbn(x f64, n i32) → f64  i.e.  x * 2^n  (implements Oberon PACK).
+// Available as "scalbn" in libm (POSIX) and msvcrt (Windows).
+func (l *Lowerer) scalbnFuncName() string {
+	const name = "scalbn"
+	if l.mod != nil {
+		if _, ok := l.mod.SymTab.Lookup(name); !ok {
+			sig := &FunctionType{Params: []Type{F64(), I32()}, Result: F64()}
+			ef := &ExternalFunc{Name: name, Sig: sig, Linkage: ExternalLinkage}
+			l.mod.Externals = append(l.mod.Externals, ef)
+			_ = l.mod.SymTab.Define(name, &GlobalRef{GlobalName: name, Ty: Ptr(Void())})
+		}
+	}
+	return name
+}
+
+// frexpFuncName returns the C math-library frexp symbol and ensures an
+// ExternalFunc declaration is registered in the current module.
+// frexp(x f64, exp *i32) → f64  splits x into mantissa ∈ [0.5,1) and exponent.
+// Available as "frexp" in libm (POSIX) and msvcrt (Windows).
+func (l *Lowerer) frexpFuncName() string {
+	const name = "frexp"
+	if l.mod != nil {
+		if _, ok := l.mod.SymTab.Lookup(name); !ok {
+			sig := &FunctionType{Params: []Type{F64(), Ptr(I32())}, Result: F64()}
+			ef := &ExternalFunc{Name: name, Sig: sig, Linkage: ExternalLinkage}
+			l.mod.Externals = append(l.mod.Externals, ef)
+			_ = l.mod.SymTab.Define(name, &GlobalRef{GlobalName: name, Ty: Ptr(Void())})
+		}
+	}
+	return name
+}
+
+// allocFuncName returns the heap-allocator symbol appropriate for the target
+// OS, and ensures a matching ExternalFunc declaration is registered in the
+// current module so downstream passes (codegen, linker) can resolve it.
+//
+//   - POSIX targets (linux, darwin, and the default empty string): "malloc"
+//   - Windows: "HeapAlloc"
+func (l *Lowerer) allocFuncName() string {
+	name := "malloc"
+	if l.dctx != nil && l.dctx.Target.OS == "windows" {
+		name = "HeapAlloc"
+	}
+	// Register an ExternalFunc stub in the module when not already present so
+	// downstream passes see the dependency without relying on a hardcoded string.
+	if l.mod != nil {
+		if _, ok := l.mod.SymTab.Lookup(name); !ok {
+			sig := &FunctionType{Params: []Type{I64()}, Result: Ptr(Void())}
+			ef := &ExternalFunc{Name: name, Sig: sig, Linkage: ExternalLinkage}
+			l.mod.Externals = append(l.mod.Externals, ef)
+			_ = l.mod.SymTab.Define(name, &GlobalRef{GlobalName: name, Ty: Ptr(Void())})
+		}
+	}
+	return name
 }
 
 // resolveVar resolves a variable name to its address Value.

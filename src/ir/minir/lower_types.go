@@ -10,8 +10,33 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
-// Type/constant lowering and RTTI helpers live in this file so lower.go can
+// Type/constant lowering and RTTI helpers live in this file, so lower.go can
 // focus on control-flow and statement lowering.
+
+// countOpenDims walks a chain of *types.ArrayType nodes that begin with an
+// open dimension (Length == -1), counting how many consecutive open dimensions
+// exist.  It returns (count, innerElem) where innerElem is the first sema
+// type in the chain that is NOT an open array — either a fixed-length
+// ArrayType, a scalar, or a record.
+//
+// Examples:
+//
+//	ARRAY OF INTEGER           → (1, INTEGER)
+//	ARRAY OF ARRAY OF INTEGER  → (2, INTEGER)
+//	ARRAY 10 OF ARRAY OF T     → caller never reaches here (not open)
+func countOpenDims(at *types.ArrayType) (int, types.Type) {
+	n := 0
+	var cur types.Type = at
+	for {
+		arr, ok := cur.(*types.ArrayType)
+		if !ok || !arr.IsOpen() {
+			break
+		}
+		n++
+		cur = arr.Elem
+	}
+	return n, cur
+}
 
 // currentModule is a package-level hook used by LowerType to register
 // module-scoped constants (vtable arrays, RTTI PODs) while lowering a module.
@@ -204,11 +229,14 @@ func LowerType(ty types.Type) Type {
 		}
 		return Ptr(base)
 	case *types.ArrayType:
-		length := t.Length
-		if length < 0 {
-			length = 0
+		// Count consecutive open (Length == -1) dimensions from this node.
+		// Fixed dimensions are encoded as a wrapping ArrayType; only open
+		// ones get a dope-vector header slot.
+		if t.IsOpen() {
+			ndims, innerSema := countOpenDims(t)
+			return NewOpenArrayType(ndims, LowerType(innerSema))
 		}
-		return NewArrayType(length, LowerType(t.Elem))
+		return NewArrayType(t.Length, LowerType(t.Elem))
 	case *types.RecordType:
 		var fields []RecordField
 		offset := 0
