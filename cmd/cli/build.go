@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/anthonyabeo/obx/src/ir/minir"
 	zlog "github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -15,7 +16,6 @@ import (
 	_ "github.com/anthonyabeo/obx/src/backend/stages"
 	"github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/desugar"
-	"github.com/anthonyabeo/obx/src/ir/minir"
 	miniropt "github.com/anthonyabeo/obx/src/ir/minir/opt"
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/sema"
@@ -158,13 +158,38 @@ precedence over obx.mod values.`,
 		mergePrecompiledMinirModules(lowered, preBundles)
 		dedupMinirExternals(lowered)
 
-		for _, mod := range lowered.Modules {
-			for _, fn := range mod.Functions {
-				miniropt.Mem2Reg(fn)
-				miniropt.LoadForward(fn)
-				//miniropt.ConstFold(fn)
-				miniropt.CleanCFG(fn)
+		// ── 6. Run optimization passes ─────────────────────────────────────
+		pm := miniropt.NewPassManager()
+
+		// Configure passes based on CLI flags
+		if buildArgs.EnablePasses != "" {
+			// Explicit pass list overrides -O level
+			if err := pm.ConfigureFromPassList(buildArgs.EnablePasses); err != nil {
+				log.Fatalf("build: invalid pass list: %v", err)
 			}
+		} else {
+			// Use passes for the selected optimization level
+			pm.ConfigureFromLevel(buildArgs.OptLevel)
+		}
+
+		// Apply disable-passes filter
+		if buildArgs.DisablePasses != "" {
+			if err := pm.DisablePasses(buildArgs.DisablePasses); err != nil {
+				log.Fatalf("build: invalid disable-passes list: %v", err)
+			}
+		}
+
+		// Enable verbose output if requested
+		if buildArgs.Verbose {
+			pm.SetVerbose(true)
+			pm.SetLogWriter(os.Stdout)
+		}
+
+		// Run passes on the entire program
+		totalChanges := pm.RunOnProgram(lowered)
+		if buildArgs.Verbose {
+			stats := pm.Stats()
+			fmt.Printf("Passes applied: %d total changes across %d pass invocations\n", totalChanges, len(stats))
 		}
 
 		if verifyErrs := minir.VerifyProgram(lowered); len(verifyErrs) > 0 {
