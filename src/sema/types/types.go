@@ -58,21 +58,30 @@ func SameType(Ta, Tb Type) bool {
 			if namedA.Name == namedB.Name {
 				return true
 			}
-			// Cross-module: qualified name may differ (e.g. "Files.File" vs "File").
-			// Only treat them as the same when one is the qualified form of the other
-			// (i.e. one name is a suffix "<module>.<base>" of the other base name).
-			unqualA := namedA.Name
-			if i := strings.LastIndex(unqualA, "."); i >= 0 {
-				unqualA = unqualA[i+1:]
-			}
-			unqualB := namedB.Name
-			if i := strings.LastIndex(unqualB, "."); i >= 0 {
-				unqualB = unqualB[i+1:]
-			}
-			if unqualA == unqualB && namedA.Def != nil && namedA.Def == namedB.Def {
+		// Cross-module: qualified name may differ (e.g. "Files.File" vs "File").
+		// Only treat them as the same when one is the qualified form of the other
+		// (i.e. one name is a suffix "<module>.<base>" of the other base name).
+		unqualA := namedA.Name
+		if i := strings.LastIndex(unqualA, "."); i >= 0 {
+			unqualA = unqualA[i+1:]
+		}
+		unqualB := namedB.Name
+		if i := strings.LastIndex(unqualB, "."); i >= 0 {
+			unqualB = unqualB[i+1:]
+		}
+		if unqualA == unqualB {
+			// Fast path: identical Def pointers (inlined / same compilation unit).
+			if namedA.Def != nil && namedA.Def == namedB.Def {
 				return true
 			}
-			return false
+			// Slow path: different Def pointers can arise when the same module
+			// is decoded from cached .obxi bundles (each decode allocates fresh
+			// type instances).  Use aggregate-aware structural comparison so that
+			// record types with the same fields and base chain are treated as
+			// the same type across bundle-decode boundaries.
+			return identicalAggregate(Underlying(Ta), Underlying(Tb))
+		}
+		return false
 		}
 	}
 
@@ -524,5 +533,56 @@ func Identical(a, b Type) bool {
 	// Add more composite types as needed
 	default:
 		return false
+	}
+}
+
+// identicalAggregate performs a structural comparison for cross-module type
+// identity of aggregate types (records, CSTRUCTs, CUNIONs) that may have been
+// decoded from separate .obxi bundles and therefore have distinct Go pointers.
+// This should ONLY be called from the SameType NamedType cross-module path,
+// never directly, since Oberon uses name equivalence (not structural) for records.
+func identicalAggregate(a, b Type) bool {
+	switch a := a.(type) {
+	case *RecordType:
+		rb, ok := b.(*RecordType)
+		if !ok || len(a.Fields) != len(rb.Fields) {
+			return false
+		}
+		for i, f := range a.Fields {
+			if f.Name != rb.Fields[i].Name || !Identical(f.Type, rb.Fields[i].Type) {
+				return false
+			}
+		}
+		if (a.Base == nil) != (rb.Base == nil) {
+			return false
+		}
+		if a.Base != nil {
+			return identicalAggregate(a.Base, rb.Base)
+		}
+		return true
+	case *CStructType:
+		cb, ok := b.(*CStructType)
+		if !ok || len(a.Fields) != len(cb.Fields) {
+			return false
+		}
+		for i, f := range a.Fields {
+			if f.Name != cb.Fields[i].Name || !Identical(f.Type, cb.Fields[i].Type) {
+				return false
+			}
+		}
+		return true
+	case *CUnionType:
+		cb, ok := b.(*CUnionType)
+		if !ok || len(a.Fields) != len(cb.Fields) {
+			return false
+		}
+		for i, f := range a.Fields {
+			if f.Name != cb.Fields[i].Name || !Identical(f.Type, cb.Fields[i].Type) {
+				return false
+			}
+		}
+		return true
+	default:
+		return Identical(a, b)
 	}
 }

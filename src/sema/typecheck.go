@@ -347,6 +347,13 @@ func (t *TypeChecker) VisitDesignator(dsg *ast.Designator) any {
 				typ = field.Type
 				if s.Symbol != nil {
 					s.Symbol.SetType(field.Type)
+				} else {
+					// The resolver did not create a symbol for CSTRUCT field
+					// access (it only handles ast.RecordType). Synthesise a
+					// FieldSymbol so the HIR generator can recover the type.
+					sym := ast.NewFieldSymbol(s.Field, ast.Unexported, nil)
+					sym.SetType(field.Type)
+					s.Symbol = sym
 				}
 			} else {
 				field := rec.GetField(s.Field)
@@ -2459,7 +2466,10 @@ func (t *TypeChecker) VisitUnaryExpr(expr *ast.UnaryExpr) any {
 			switch e := expr.Operand.(type) {
 			case *ast.BasicLit:
 				if e.Kind == token.REAL_LIT || e.Kind == token.LONGREAL_LIT {
-					value, err := strconv.ParseFloat(e.Val, 64)
+					// Oberon+ uses 'D'/'d' for LONGREAL exponent and 'S'/'s' for REAL exponent.
+					// Normalise to 'E' so strconv.ParseFloat can understand.
+					normVal := strings.NewReplacer("D", "E", "d", "E", "S", "E", "s", "E").Replace(e.Val)
+					value, err := strconv.ParseFloat(normVal, 64)
 					if err != nil {
 						t.ctx.Reporter.Report(diag.Diagnostic{
 							Severity: diag.Fatal,
