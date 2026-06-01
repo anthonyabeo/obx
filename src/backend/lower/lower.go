@@ -544,10 +544,14 @@ func lowerType(ty minir.Type) (*mir.Type, error) {
 			return nil, fmt.Errorf("array element type: %w", err)
 		}
 		arrTy := mir.NewArrayType(elem, t.Len)
-		arrTy.Size = t.Len * mirSizeOf(elem)
+		arrTy.Size = minirTypeSize(t)
 		return arrTy, nil
 	case *minir.RecordType:
-		return nil, fmt.Errorf("record types are not supported in the first bridge pass")
+		recName := "record"
+		if t.TypeName != "" {
+			recName += "." + t.TypeName
+		}
+		return mir.NewScalarType(recName, minirTypeSize(t)), nil
 	case *minir.FunctionType:
 		return nil, fmt.Errorf("function types are not supported in the first bridge pass")
 	case *minir.OpenArrayType:
@@ -629,20 +633,7 @@ func computeStrides(elemType minir.Type) []int {
 	// Compute base elem size (the innermost type).
 	baseSize := 8 // default word size
 	if cur != nil && cur.Elem != nil {
-		if pt, ok := cur.Elem.(*minir.PrimitiveType); ok {
-			switch strings.ToLower(pt.String()) {
-			case "i1":
-				baseSize = 1
-			case "i8", "u8":
-				baseSize = 1
-			case "i16", "u16":
-				baseSize = 2
-			case "i32", "u32", "f32":
-				baseSize = 4
-			case "i64", "u64", "f64":
-				baseSize = 8
-			}
-		}
+		baseSize = minirTypeSize(cur.Elem)
 	}
 
 	// Compute strides: stride[i] = stride[i+1] * dims[i+1], or baseSize for innermost.
@@ -703,16 +694,51 @@ func lowerGEP(gepInst *minir.GEPInst, regByTemp map[*minir.Temp]*mir.Register, g
 	}, nil
 }
 
-// mirSizeOf returns the byte size of a lowered MIR type
-func mirSizeOf(ty *mir.Type) int {
+func minirTypeSize(ty minir.Type) int {
 	if ty == nil {
 		return 8
 	}
-	if ty.Size > 0 {
-		return ty.Size
+
+	switch t := ty.(type) {
+	case *minir.PrimitiveType:
+		switch strings.ToLower(t.String()) {
+		case "i1", "i8", "u8":
+			return 1
+		case "i16", "u16":
+			return 2
+		case "i32", "u32", "f32":
+			return 4
+		case "i64", "u64", "f64":
+			return 8
+		default:
+			return 8
+		}
+	case *minir.PointerType:
+		return 8
+	case *minir.ArrayType:
+		elem := minirTypeSize(t.Elem)
+		if t.Len <= 0 {
+			return elem
+		}
+		return t.Len * elem
+	case *minir.RecordType:
+		size := 0
+		for _, f := range t.Fields {
+			fieldSize := minirTypeSize(f.Type)
+			end := f.Offset + fieldSize
+			if end > size {
+				size = end
+			}
+		}
+		if size > 0 {
+			return size
+		}
+		return 8
+	case *minir.FunctionType:
+		return 8
+	case *minir.OpenArrayType:
+		return 8
+	default:
+		return 8
 	}
-	if ty.Len > 0 && ty.Elem != nil {
-		return ty.Len * mirSizeOf(ty.Elem)
-	}
-	return 8
 }

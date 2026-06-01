@@ -22,11 +22,16 @@ func (e VerifyError) Error() string {
 }
 
 // IsAddrValue reports whether v is a valid address operand for a memory
-// instruction: either an IsAddr=true *Temp (stack alloca) or a *GlobalRef.
+// instruction. Besides explicit address temps (IsAddr=true) and globals,
+// pointer-typed temps are also valid (e.g., function results like localtime()).
 func IsAddrValue(v Value) bool {
 	switch a := v.(type) {
 	case *Temp:
-		return a.IsAddr
+		if a.IsAddr {
+			return true
+		}
+		_, ok := NormalizeType(a.Type()).(*PointerType)
+		return ok
 	case *GlobalRef:
 		return true
 	}
@@ -182,38 +187,38 @@ func VerifyIR(fn *Function) []VerifyError {
 					}
 				}
 			case *ReturnInst:
-			if instr.Result != nil && fn.Result != nil {
-				rt := instr.Result.Type()
-				if rt != nil && !rt.Equal(fn.Result) {
-					add(bl, is, fmt.Sprintf("ReturnInst result type %q does not match function result type %q", rt, fn.Result))
+				if instr.Result != nil && fn.Result != nil {
+					rt := instr.Result.Type()
+					if rt != nil && !rt.Equal(fn.Result) {
+						add(bl, is, fmt.Sprintf("ReturnInst result type %q does not match function result type %q", rt, fn.Result))
+					}
 				}
-			}
-			if instr.Result != nil && fn.Result == nil {
-				add(bl, is, "ReturnInst returns a value but function result type is nil (void)")
-			}
-		case *BinaryInst:
-			if instr.Left != nil && instr.Right != nil {
-				lt, rt := instr.Left.Type(), instr.Right.Type()
-				if lt != nil && rt != nil && !lt.Equal(rt) {
-					add(bl, is, fmt.Sprintf("BinaryInst operand type mismatch: %q vs %q", lt, rt))
+				if instr.Result != nil && fn.Result == nil {
+					add(bl, is, "ReturnInst returns a value but function result type is nil (void)")
 				}
-			}
-		case *ICmpInst:
-			if instr.Left != nil && instr.Right != nil {
-				lt, rt := instr.Left.Type(), instr.Right.Type()
-				if lt != nil && rt != nil && !lt.Equal(rt) {
-					add(bl, is, fmt.Sprintf("ICmpInst operand type mismatch: %q vs %q", lt, rt))
+			case *BinaryInst:
+				if instr.Left != nil && instr.Right != nil {
+					lt, rt := instr.Left.Type(), instr.Right.Type()
+					if lt != nil && rt != nil && !lt.Equal(rt) {
+						add(bl, is, fmt.Sprintf("BinaryInst operand type mismatch: %q vs %q", lt, rt))
+					}
 				}
-			}
-		case *FCmpInst:
-			// FCmpInst embeds ICmpInst; compare types similarly
-			base := &instr.ICmpInst
-			if base.Left != nil && base.Right != nil {
-				lt, rt := base.Left.Type(), base.Right.Type()
-				if lt != nil && rt != nil && !lt.Equal(rt) {
-					add(bl, is, fmt.Sprintf("FCmpInst operand type mismatch: %q vs %q", lt, rt))
+			case *ICmpInst:
+				if instr.Left != nil && instr.Right != nil {
+					lt, rt := instr.Left.Type(), instr.Right.Type()
+					if lt != nil && rt != nil && !lt.Equal(rt) {
+						add(bl, is, fmt.Sprintf("ICmpInst operand type mismatch: %q vs %q", lt, rt))
+					}
 				}
-			}
+			case *FCmpInst:
+				// FCmpInst embeds ICmpInst; compare types similarly
+				base := &instr.ICmpInst
+				if base.Left != nil && base.Right != nil {
+					lt, rt := base.Left.Type(), base.Right.Type()
+					if lt != nil && rt != nil && !lt.Equal(rt) {
+						add(bl, is, fmt.Sprintf("FCmpInst operand type mismatch: %q vs %q", lt, rt))
+					}
+				}
 			}
 		}
 	}

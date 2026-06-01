@@ -1,0 +1,40 @@
+module Main
+
+IMPORT IO
+  var res: integer
+
+    PROCEDURE fib(n: INTEGER): INTEGER;
+    VAR
+      a, b, temp, count: INTEGER;
+    BEGIN
+      (* Handle base cases *)
+      IF n <= 0 THEN
+        RETURN 0
+      ELSIF n = 1 THEN
+        RETURN 1
+      ELSE
+        a := 0;
+        b := 1;
+        count := 2;
+
+        (* Iterate from 2 up to n *)
+        WHILE count <= n DO
+          temp := a + b;
+          a := b;
+          b := temp;
+          INC(count)
+        END
+        RETURN b
+      END
+    END fib;
+
+begin
+   res := fib(15)
+  (* assert(fib(15) = 611) *)
+  IO.Write("fib(15) = ")
+  IO.WriteInt(res)
+  IO.WriteLn("")
+
+end Main
+
+

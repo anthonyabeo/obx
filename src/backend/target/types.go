@@ -56,6 +56,15 @@ func (abi ABI) RetReg(i int) (string, bool) {
 	return abi.IntRetRegs[i], true
 }
 
+// FloatRetReg returns the register used for the i-th floating-point result,
+// if any.
+func (abi ABI) FloatRetReg(i int) (string, bool) {
+	if i < 0 || i >= len(abi.FloatRetRegs) {
+		return "", false
+	}
+	return abi.FloatRetRegs[i], true
+}
+
 // JumpTableDensity returns the density threshold used for switch lowering.
 func (abi ABI) JumpTableDensity() float64 {
 	if abi.JumpTableMinDensity > 0 {

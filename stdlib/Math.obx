@@ -70,7 +70,7 @@ proc Mod*(x: longreal; y: longreal): longreal begin return M.fmod(x, y) end Mod
 // ── Classification ────────────────────────────────────────────────────────────
 proc IsNaN*(x: longreal): boolean    begin return M.isnan(x) # 0    end IsNaN
 proc IsInf*(x: longreal): boolean    begin return M.isinf(x) # 0    end IsInf
-proc IsFinite*(x: longreal): boolean begin return M.isfinite(x) # 0 end IsFinite
+proc IsFinite*(x: longreal): boolean begin return ~IsNaN(x) & ~IsInf(x) end IsFinite
 
 // ── REAL (32-bit float) variants ──────────────────────────────────────────────
 proc SinF*(x: real): real   begin return M.sinf(x)   end SinF

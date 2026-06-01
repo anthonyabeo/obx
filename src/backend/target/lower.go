@@ -268,8 +268,9 @@ func BuildCallPlan(call *mir.CallInstr, abi ABI) (*CallPlan, error) {
 	}
 	plan := &CallPlan{Callee: call.Callee}
 
+	intArgIdx, floatArgIdx, stackArgIdx := 0, 0, 0
 	for i, arg := range call.Args {
-		if !supportsIntegerOperand(arg) {
+		if !supportsCallOperand(arg) {
 			tyStr := "<nil>"
 			if r, ok := arg.(*mir.Register); ok && r.Type() != nil {
 				tyStr = r.Type().String()
@@ -281,26 +282,51 @@ func BuildCallPlan(call *mir.CallInstr, abi ABI) (*CallPlan, error) {
 			return nil, fmt.Errorf("call argument %d (%s) has unsupported type %s", i, arg, tyStr)
 		}
 		loc := ArgLocation{Index: i, Value: arg}
-		if reg, ok := abi.ArgReg(i); ok {
-			loc.InRegister = true
-			loc.Register = reg
+		argIsFloat := isFloatOperand(arg)
+		if argIsFloat {
+			if reg, ok := abi.FloatArgReg(floatArgIdx); ok {
+				loc.InRegister = true
+				loc.Register = reg
+				floatArgIdx++
+			} else {
+				loc.StackOffset = stackArgIdx * abi.WordSize
+				stackArgIdx++
+				plan.StackBytes = loc.StackOffset + abi.WordSize
+			}
 		} else {
-			loc.StackOffset = (i - len(abi.IntArgRegs)) * abi.WordSize
-			plan.StackBytes = loc.StackOffset + abi.WordSize
+			if reg, ok := abi.ArgReg(intArgIdx); ok {
+				loc.InRegister = true
+				loc.Register = reg
+				intArgIdx++
+			} else {
+				loc.StackOffset = stackArgIdx * abi.WordSize
+				stackArgIdx++
+				plan.StackBytes = loc.StackOffset + abi.WordSize
+			}
 		}
 		plan.Args = append(plan.Args, loc)
 	}
 
 	if call.Dst != nil {
-		if !SupportsIntegerScalar(call.Dst.Type()) {
+		dstTy := call.Dst.Type()
+		if !SupportsIntegerScalar(dstTy) && !IsFloatType(dstTy) {
 			return nil, fmt.Errorf("call result %s has unsupported type", call.Dst)
 		}
 		res := &ResultLocation{}
-		if reg, ok := abi.RetReg(0); ok {
-			res.InRegister = true
-			res.Register = reg
+		if IsFloatType(dstTy) {
+			if reg, ok := abi.FloatRetReg(0); ok {
+				res.InRegister = true
+				res.Register = reg
+			} else {
+				res.StackOffset = 0
+			}
 		} else {
-			res.StackOffset = 0
+			if reg, ok := abi.RetReg(0); ok {
+				res.InRegister = true
+				res.Register = reg
+			} else {
+				res.StackOffset = 0
+			}
 		}
 		plan.Result = res
 	}
@@ -419,6 +445,35 @@ func supportsIntegerOperand(op mir.Operand) bool {
 		return SupportsIntegerScalar(v.Type())
 	case *mir.Symbol:
 		return SupportsIntegerScalar(v.Type())
+	default:
+		return false
+	}
+}
+
+func supportsCallOperand(op mir.Operand) bool {
+	if supportsIntegerOperand(op) {
+		return true
+	}
+	switch v := op.(type) {
+	case *mir.Register:
+		return IsFloatType(v.Type())
+	case *mir.Immediate:
+		return IsFloatType(v.Type())
+	case *mir.Symbol:
+		return IsFloatType(v.Type())
+	default:
+		return false
+	}
+}
+
+func isFloatOperand(op mir.Operand) bool {
+	switch v := op.(type) {
+	case *mir.Register:
+		return IsFloatType(v.Type())
+	case *mir.Immediate:
+		return IsFloatType(v.Type())
+	case *mir.Symbol:
+		return IsFloatType(v.Type())
 	default:
 		return false
 	}

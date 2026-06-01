@@ -111,7 +111,7 @@ func TestLower_PrependsImportedModuleInits(t *testing.T) {
 	}
 	call, ok := loweredInit.Entry.Instrs[0].(*CallInst)
 	if !ok {
-		t.Fatalf("first instruction = %T, want *CallInst", initFn.Entry.Instrs[0])
+		t.Fatalf("first instruction = %T, want *CallInst", loweredInit.Entry.Instrs[0])
 	}
 	if call.Callee != "__init_IO" {
 		t.Fatalf("first call callee = %q, want %q", call.Callee, "__init_IO")

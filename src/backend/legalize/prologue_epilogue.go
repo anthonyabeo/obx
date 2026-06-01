@@ -65,44 +65,52 @@ func emitFunctionPrologueEpilogue(mod *mir.Module, fn *mir.Function, tgt target.
 
 	epilogue := emitEpilogueInstrs(fn, abi)
 	if len(epilogue) > 0 {
-		// Prepend epilogue to exit block. This is always safe: it places the
-		// epilogue instructions before the existing body (if any) and before the
-		// terminator (which lives in block.Term, not block.Instrs).
-		fn.Exit.Instrs = append(epilogue, fn.Exit.Instrs...)
+		out := append([]mir.Instr(nil), fn.Exit.Instrs...)
 
 		// Replace ReturnInstr / MachineTerm "ret" with a bare "ret.bare" so the
 		// ARM64 emitter does not re-emit an inline ldp… ret. The epilogue
 		// instructions above have already taken care of the frame teardown.
 		switch term := fn.Exit.Term.(type) {
 		case *mir.ReturnInstr:
-			var srcs []mir.Operand
 			if term.Value != nil {
-				srcs = []mir.Operand{term.Value}
+				out = append(out, mir.NewMachineInstr("mov",
+					[]*mir.Register{mir.NewRegister("x0", mir.PhysicalReg, nil)},
+					[]mir.Operand{term.Value},
+				))
 			} else if mod != nil && mod.IsEntry && fn.Name == "__init_"+mod.Name {
 				// Only the entry module's own __init_<Name> function maps to C
 				// _main.  The OS reads x0 as the process exit code, so we must
 				// return 0 for a clean exit.  Append a "mov x0, #0" before the
 				// ret so that any leftover value in x0 does not cause a spurious
 				// failure.
-				fn.Exit.Instrs = append(fn.Exit.Instrs, &mir.MoveInstr{
-					Dst: &mir.Register{Name: "x0", Kind: mir.PhysicalReg},
-					Src: mir.NewImmediate(0, nil),
-				})
+				out = append(out, mir.NewMachineInstr("mov",
+					[]*mir.Register{mir.NewRegister("x0", mir.PhysicalReg, nil)},
+					[]mir.Operand{mir.NewImmediate(0, nil)},
+				))
 			}
-			fn.Exit.Term = mir.NewMachineTerm("ret.bare", srcs, nil)
+			fn.Exit.Term = mir.NewMachineTerm("ret.bare", nil, nil)
 		case *mir.MachineTerm:
 			if strings.EqualFold(term.Op, "ret") {
+				if len(term.Srcs) > 0 && term.Srcs[0] != nil {
+					out = append(out, mir.NewMachineInstr("mov",
+						[]*mir.Register{mir.NewRegister("x0", mir.PhysicalReg, nil)},
+						[]mir.Operand{term.Srcs[0]},
+					))
+				}
 				// For void __init_ functions (which become C _main), ensure x0=0
 				// so the OS sees a clean exit code rather than a leftover value.
 				if len(term.Srcs) == 0 && mod != nil && mod.IsEntry && fn.Name == "__init_"+mod.Name {
-					fn.Exit.Instrs = append(fn.Exit.Instrs, &mir.MoveInstr{
-						Dst: &mir.Register{Name: "x0", Kind: mir.PhysicalReg},
-						Src: mir.NewImmediate(0, nil),
-					})
+					out = append(out, mir.NewMachineInstr("mov",
+						[]*mir.Register{mir.NewRegister("x0", mir.PhysicalReg, nil)},
+						[]mir.Operand{mir.NewImmediate(0, nil)},
+					))
 				}
-				fn.Exit.Term = mir.NewMachineTerm("ret.bare", term.Srcs, nil)
+				fn.Exit.Term = mir.NewMachineTerm("ret.bare", nil, nil)
 			}
 		}
+
+		// Epilogue executes after any return-value move into x0 and before ret.bare.
+		fn.Exit.Instrs = append(out, epilogue...)
 	}
 
 	return nil
@@ -169,7 +177,13 @@ func emitARM64Prologue(fn *mir.Function, abi target.ABI) []mir.Instr {
 	}
 
 	var instrs []mir.Instr
-	frameSize := fn.Frame.TotalSize
+	var extra []string
+	for _, r := range fn.Frame.SavedRegs {
+		if r != "x29" && r != "x30" {
+			extra = append(extra, r)
+		}
+	}
+	frameSize := arm64EffectiveFrameSize(fn.Frame.TotalSize, len(extra))
 
 	x29 := mir.NewRegister("x29", mir.PhysicalReg, nil)
 	x30 := mir.NewRegister("x30", mir.PhysicalReg, nil)
@@ -184,11 +198,20 @@ func emitARM64Prologue(fn *mir.Function, abi target.ABI) []mir.Instr {
 		[]mir.Operand{x29, x30, mir.NewMemory(sp, negFrameSize, nil)},
 	))
 
-	// mov x29, sp — establish frame pointer pointing at the saved-fp slot.
-	instrs = append(instrs, mir.NewMachineInstr("mov",
-		[]*mir.Register{x29},
-		[]mir.Operand{sp},
-	))
+	// Establish frame pointer at the caller-SP equivalent (sp + frameSize).
+	// The allocator uses negative offsets from FP; anchoring FP to caller SP
+	// keeps all frame objects within the allocated stack area.
+	if frameSize != 0 {
+		instrs = append(instrs, mir.NewMachineInstr("add",
+			[]*mir.Register{x29},
+			[]mir.Operand{sp, mir.NewImmediate(frameSize, nil)},
+		))
+	} else {
+		instrs = append(instrs, mir.NewMachineInstr("mov",
+			[]*mir.Register{x29},
+			[]mir.Operand{sp},
+		))
+	}
 
 	// Save additional callee-saved registers (x19–x28) in pairs.
 	// x29 is at [sp+0], x30 at [sp+8]; extra pairs start at [sp+16].
@@ -197,12 +220,6 @@ func emitARM64Prologue(fn *mir.Function, abi target.ABI) []mir.Instr {
 	//   offset  32: stp regN+2, regN+3, [sp, #32]
 	//   …
 	//   odd tail:   str regLast,        [sp, #offset]
-	var extra []string
-	for _, r := range fn.Frame.SavedRegs {
-		if r != "x29" && r != "x30" {
-			extra = append(extra, r)
-		}
-	}
 	offset := 16
 	for i := 0; i+1 < len(extra); i += 2 {
 		r1 := mir.NewRegister(extra[i], mir.PhysicalReg, nil)
@@ -246,6 +263,7 @@ func emitARM64Epilogue(fn *mir.Function, abi target.ABI) []mir.Instr {
 			extra = append(extra, r)
 		}
 	}
+	frameSize = arm64EffectiveFrameSize(frameSize, len(extra))
 
 	// Compute the offset just past the last saved register (mirrors prologue).
 	numPairs := len(extra) / 2
@@ -281,6 +299,20 @@ func emitARM64Epilogue(fn *mir.Function, abi target.ABI) []mir.Instr {
 	))
 
 	return instrs
+}
+
+func arm64EffectiveFrameSize(base int, extraSaved int) int {
+	if base < 16 {
+		base = 16
+	}
+	need := 16 + extraSaved*8
+	if base < need {
+		base = need
+	}
+	if rem := base % 16; rem != 0 {
+		base += 16 - rem
+	}
+	return base
 }
 
 // ── RISC-V Prologue/Epilogue ──────────────────────────────────────────────

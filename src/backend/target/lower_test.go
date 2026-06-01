@@ -157,6 +157,38 @@ func TestBuildCallPlanAssignsRegistersAndStack(t *testing.T) {
 	}
 }
 
+func TestBuildCallPlanAssignsFloatRegisters(t *testing.T) {
+	tgt, err := Lookup(Arm64Name)
+	if err != nil {
+		t.Fatalf("Lookup(%s) failed: %v", Arm64Name, err)
+	}
+	call := &mir.CallInstr{
+		Dst:    mir.NewRegister("resf", mir.VirtualReg, mir.NewScalarType("f64", 8)),
+		Callee: mir.NewSymbol("foo", mir.NewScalarType("f64", 8)),
+		Args: []mir.Operand{
+			mir.NewImmediate(3.14, mir.NewScalarType("f64", 8)),
+			mir.NewImmediate(float32(2.5), mir.NewScalarType("f32", 4)),
+		},
+	}
+
+	plan, err := tgt.LowerCall(call)
+	if err != nil {
+		t.Fatalf("LowerCall failed: %v", err)
+	}
+	if len(plan.Args) != 2 {
+		t.Fatalf("expected 2 arg locations, got %d", len(plan.Args))
+	}
+	if !plan.Args[0].InRegister || plan.Args[0].Register != "d0" {
+		t.Fatalf("expected first float arg in d0, got %#v", plan.Args[0])
+	}
+	if !plan.Args[1].InRegister || plan.Args[1].Register != "d1" {
+		t.Fatalf("expected second float arg in d1, got %#v", plan.Args[1])
+	}
+	if plan.Result == nil || !plan.Result.InRegister || plan.Result.Register != "d0" {
+		t.Fatalf("expected float return value in d0, got %#v", plan.Result)
+	}
+}
+
 func TestRegistryLookupAndAvailable(t *testing.T) {
 	available := Available()
 	if len(available) != 2 {
@@ -460,6 +492,17 @@ func TestEmitARM64ModuleExportsNonExternGlobals(t *testing.T) {
 	}
 }
 
+func TestEmitARM64ModuleAddsInitStubWhenMissing(t *testing.T) {
+	mod := mir.NewModule("LibM")
+	asm := emitARM64Module(mod)
+	if !strings.Contains(asm, ".globl ___init_LibM") {
+		t.Fatalf("missing __init_ stub export in emitted module:\n%s", asm)
+	}
+	if !strings.Contains(asm, "___init_LibM:\n\tret") {
+		t.Fatalf("missing __init_ stub body in emitted module:\n%s", asm)
+	}
+}
+
 func TestEmitARM64MoveFromSymbolUsesAddressMaterialization(t *testing.T) {
 	got := emitARM64Move("x1", "__Lstr_abc")
 	if !strings.Contains(got, "adrp x1, __Lstr_abc@PAGE") {
@@ -470,3 +513,121 @@ func TestEmitARM64MoveFromSymbolUsesAddressMaterialization(t *testing.T) {
 	}
 }
 
+func TestEmitARM64MoveFloatImmediateToXRegUsesBitMaterialization(t *testing.T) {
+	got := emitARM64Move("x0", "#3.140000104904175")
+	if strings.Contains(got, "#3.140000104904175") {
+		t.Fatalf("expected float immediate to be bit-materialized, got %q", got)
+	}
+	if !strings.Contains(got, "mov") {
+		t.Fatalf("expected move sequence, got %q", got)
+	}
+}
+
+func TestEmitARM64MoveFloatImmediateToFloatRegUsesIntegerSeed(t *testing.T) {
+	got := emitARM64Move("d0", "#3.14")
+	if !strings.Contains(got, "fmov d0, x0") {
+		t.Fatalf("expected float move via integer seed register, got %q", got)
+	}
+	if strings.Contains(got, "#3.14") {
+		t.Fatalf("expected literal to be encoded as bits, got %q", got)
+	}
+}
+
+func TestFormatARM64OperandMapsTempStyleRegisterName(t *testing.T) {
+	got := formatARM64Operand(mir.NewRegister("t13", mir.PhysicalReg, mir.NewScalarType("i64", 8)))
+	if got != "x13" {
+		t.Fatalf("formatARM64Operand(t13) = %q, want x13", got)
+	}
+}
+
+func TestFormatARM64OperandHighTempFallsBackToScratch(t *testing.T) {
+	got := formatARM64Operand(mir.NewRegister("t900", mir.VirtualReg, mir.NewScalarType("i32", 4)))
+	if got != "w15" {
+		t.Fatalf("formatARM64Operand(t900) = %q, want w15", got)
+	}
+}
+
+func TestARM64LabelIsScopedPerFunction(t *testing.T) {
+	prev := arm64FuncLabelScope
+	arm64FuncLabelScope = "Strings$TrimLeft"
+	defer func() { arm64FuncLabelScope = prev }()
+
+	if got := arm64Label("if_end.2"); got != "LStrings$TrimLeft$if_end.2" {
+		t.Fatalf("scoped arm64Label = %q, want %q", got, "LStrings$TrimLeft$if_end.2")
+	}
+	if got := arm64Label("Strings$TrimLeft$if_end.2"); got != "LStrings$TrimLeft$if_end.2" {
+		t.Fatalf("already-scoped arm64Label = %q, want unchanged scoped label", got)
+	}
+}
+
+func TestEmitARM64MachineInstrAndWithSymbolMaterializesAddress(t *testing.T) {
+	dst := mir.NewRegister("x1", mir.PhysicalReg, mir.NewScalarType("i64", 8))
+	mi := &mir.MachineInstr{
+		Op:   "and",
+		Dsts: []*mir.Register{dst},
+		Srcs: []mir.Operand{mir.NewSymbol("_Lstr_deadbeef_0", nil), mir.NewImmediate(int64(255), mir.NewScalarType("i64", 8))},
+	}
+	out := emitARM64MachineInstr(mi)
+	if !strings.Contains(out, "adrp x9") || !strings.Contains(out, "and x1") {
+		t.Fatalf("expected symbol materialization for and, got %q", out)
+	}
+}
+
+func TestEmitARM64SIToFPUsesFloatDestinationReg(t *testing.T) {
+	i := &mir.MachineInstr{
+		Op:   "sitofp",
+		Dsts: []*mir.Register{mir.NewRegister("x0", mir.PhysicalReg, mir.NewScalarType("f64", 8))},
+		Srcs: []mir.Operand{mir.NewRegister("x1", mir.PhysicalReg, mir.NewScalarType("i64", 8))},
+	}
+	out := emitARM64MachineInstr(i)
+	if out != "scvtf d0, x1" {
+		t.Fatalf("sitofp emission = %q, want %q", out, "scvtf d0, x1")
+	}
+}
+
+func TestEmitARM64FloatDivWithImmediateMaterializesConstant(t *testing.T) {
+	i := &mir.MachineInstr{
+		Op:   "fdiv",
+		Dsts: []*mir.Register{mir.NewRegister("x0", mir.PhysicalReg, mir.NewScalarType("f64", 8))},
+		Srcs: []mir.Operand{mir.NewRegister("x1", mir.PhysicalReg, mir.NewScalarType("f64", 8)), mir.NewImmediate(1e6, mir.NewScalarType("f64", 8))},
+	}
+	out := emitARM64MachineInstr(i)
+	if !strings.Contains(out, "fdiv d0, d1, d15") {
+		t.Fatalf("fdiv emission = %q, expected register-operand form", out)
+	}
+	if strings.Contains(out, "#1e+06") {
+		t.Fatalf("fdiv emission still uses raw float immediate: %q", out)
+	}
+}
+
+func TestFormatARM64DataRegHighIndexFallsBackToScratch(t *testing.T) {
+	got := formatARM64DataReg(mir.NewRegister("t268", mir.VirtualReg, mir.NewScalarType("f64", 8)), mir.NewScalarType("f64", 8))
+	if got != "d15" {
+		t.Fatalf("formatARM64DataReg high index = %q, want d15", got)
+	}
+}
+
+func TestEmitARM64BinaryAndWithSymbolMaterializesAddress(t *testing.T) {
+	b := &mir.BinaryInstr{
+		Dst:   mir.NewRegister("x1", mir.PhysicalReg, mir.NewScalarType("i64", 8)),
+		Op:    "and",
+		Left:  mir.NewSymbol("_Lstr_deadbeef_0", nil),
+		Right: mir.NewImmediate(int64(255), mir.NewScalarType("i64", 8)),
+	}
+	out := emitARM64Instr(b)
+	if !strings.Contains(out, "adrp x9") || !strings.Contains(out, "and x1, x9, #255") {
+		t.Fatalf("expected symbol materialization in BinaryInstr and, got %q", out)
+	}
+}
+
+func TestEmitARM64UnaryTruncWithSymbolMaterializesAddress(t *testing.T) {
+	u := &mir.UnaryInstr{
+		Dst: mir.NewRegister("x1", mir.PhysicalReg, mir.NewScalarType("i32", 4)),
+		Op:  "trunc",
+		X:   mir.NewSymbol("_Lstr_deadbeef_0", nil),
+	}
+	out := emitARM64Instr(u)
+	if !strings.Contains(out, "adrp x9") || !strings.Contains(out, "and x1, x9, #4294967295") {
+		t.Fatalf("expected trunc symbol materialization, got %q", out)
+	}
+}

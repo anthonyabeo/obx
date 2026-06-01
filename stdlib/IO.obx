@@ -16,6 +16,7 @@ module IO
   import S := win32.Stdio
 <* ELSE *>
   import S := posix.Stdio
+  import CS := posix.Stdlib
 <* END *>
 
 // ── Exported stream handles ───────────────────────────────────────────────────
@@ -67,11 +68,19 @@ begin
   S.fprintf(StdOut, system.adr("%ld"), n)
 end WriteLongInt
 
-// WriteReal writes a REAL with 6 significant digits to stdout.
-proc WriteReal*(x: real)
+// WriteReal writes a floating-point value to stdout.
+proc WriteReal*(x: longreal)
+<* IF WINDOWS THEN *>
 begin
-  S.fprintf(StdOut, system.adr("%g"), x)
+  S.fprintf(StdOut, system.adr("%.6f"), x)
 end WriteReal
+<* ELSE *>
+  var buf: array 32 of char
+begin
+  CS.gcvt(x, 7, system.adr(buf))
+  S.fputs(system.adr(buf), StdOut)
+end WriteReal
+<* END *>
 
 // WriteLongReal writes a LONGREAL with full precision to stdout.
 proc WriteLongReal*(x: longreal)

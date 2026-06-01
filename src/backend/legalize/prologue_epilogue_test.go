@@ -12,8 +12,8 @@ import (
 func buildFn(name string, frameSize int, savedRegs []string) (*mir.Function, *mir.Block, *mir.Block) {
 	fn := mir.NewFunction(name, mir.NewScalarType("i64", 8))
 	fn.Frame = &mir.FrameLayout{
-		TotalSize: frameSize,
-		SavedRegs: savedRegs,
+		TotalSize:  frameSize,
+		SavedRegs:  savedRegs,
 		SpillSlots: make(map[string]int),
 	}
 
@@ -59,7 +59,7 @@ func TestARM64PrologueEpilogue_BasicFrame(t *testing.T) {
 		t.Fatalf("EmitPrologueEpilogue: %v", err)
 	}
 
-	// Entry block must start with stp.pre then mov
+	// Entry block must start with stp.pre then FP setup (add or mov)
 	if len(entry.Instrs) < 2 {
 		t.Fatalf("entry.Instrs len = %d, want >= 2", len(entry.Instrs))
 	}
@@ -68,8 +68,8 @@ func TestARM64PrologueEpilogue_BasicFrame(t *testing.T) {
 		t.Errorf("entry.Instrs[0] = %v, want MachineInstr{Op:\"stp.pre\"}", entry.Instrs[0])
 	}
 	mi1, ok := entry.Instrs[1].(*mir.MachineInstr)
-	if !ok || mi1.Op != "mov" {
-		t.Errorf("entry.Instrs[1] = %v, want MachineInstr{Op:\"mov\"}", entry.Instrs[1])
+	if !ok || (mi1.Op != "mov" && mi1.Op != "add") {
+		t.Errorf("entry.Instrs[1] = %v, want MachineInstr{Op:\"mov\"|\"add\"}", entry.Instrs[1])
 	}
 
 	// Exit block must start with ldp.post

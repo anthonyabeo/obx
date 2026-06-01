@@ -99,7 +99,7 @@ func fixCallArgMoveGroups(instrs []mir.Instr) []mir.Instr {
 		// immediately precedes this call.
 		start := len(out)
 		for start > 0 {
-			if _, ok := copyFromInstr(out[start-1]); ok {
+			if cpy, ok := copyFromInstr(out[start-1]); ok && isCallArgCopy(cpy) {
 				start--
 			} else {
 				break
@@ -141,14 +141,45 @@ func fixCallArgMoveGroups(instrs []mir.Instr) []mir.Instr {
 	return out
 }
 
+func isCallArgCopy(c target.Copy) bool {
+	if c.Dst == nil {
+		return false
+	}
+	dst := strings.ToLower(strings.TrimSpace(c.Dst.Name))
+	if dst == "" {
+		return false
+	}
+
+	if len(dst) == 2 {
+		switch dst[0] {
+		case 'x', 'w', 'd', 's':
+			if dst[1] >= '0' && dst[1] <= '7' {
+				return true
+			}
+		}
+	}
+
+	if strings.HasPrefix(dst, "a") && len(dst) == 2 && dst[1] >= '0' && dst[1] <= '7' {
+		return true
+	}
+	if strings.HasPrefix(dst, "fa") && len(dst) == 3 && dst[2] >= '0' && dst[2] <= '7' {
+		return true
+	}
+
+	return false
+}
+
 // foldStringPointerWriteCalls removes the synthetic stack staging sequence
 // used by some open-array string literal call sites:
-//   store $litPtr -> [$tmp]
-//   mov   x0 <- $tmp
-//   call  IO$Write/IO$WriteLn
+//
+//	store $litPtr -> [$tmp]
+//	mov   x0 <- $tmp
+//	call  IO$Write/IO$WriteLn
+//
 // and rewrites it into direct pointer passing:
-//   mov   x0 <- $litPtr
-//   call  ...
+//
+//	mov   x0 <- $litPtr
+//	call  ...
 func foldStringPointerWriteCalls(instrs []mir.Instr) []mir.Instr {
 	out := make([]mir.Instr, 0, len(instrs))
 
@@ -179,21 +210,21 @@ func foldStringPointerWriteCalls(instrs []mir.Instr) []mir.Instr {
 		}
 		if storeIdx >= 0 {
 			if addrReg, valReg, ok := extractStagedStoreRegs(out[storeIdx]); ok {
-					srcMatches := false
-					if argMoveDst != nil {
-						srcMatches = argMoveSrc != nil && argMoveSrc.Name == addrReg.Name
-					} else {
-						srcMatches = argRegName == addrReg.Name
-					}
+				srcMatches := false
+				if argMoveDst != nil {
+					srcMatches = argMoveSrc != nil && argMoveSrc.Name == addrReg.Name
+				} else {
+					srcMatches = argRegName == addrReg.Name
+				}
 
-					if srcMatches {
-						out = out[:storeIdx]
-						if argRegName != valReg.Name {
-							dst := &mir.Register{Name: argRegName, Kind: mir.PhysicalReg, Ty: valReg.Type()}
-							out = append(out, &mir.MoveInstr{Dst: dst, Src: valReg})
-						}
+				if srcMatches {
+					out = out[:storeIdx]
+					if argRegName != valReg.Name {
+						dst := &mir.Register{Name: argRegName, Kind: mir.PhysicalReg, Ty: valReg.Type()}
+						out = append(out, &mir.MoveInstr{Dst: dst, Src: valReg})
 					}
 				}
+			}
 		}
 
 		out = append(out, instr)
@@ -352,13 +383,13 @@ func rewriteInstr(instr mir.Instr, liveIn map[string]bool, alloc *regAllocResult
 	usedTemps := make(map[string]bool)
 	choose := func(hint *mir.Type) (*mir.Register, error) {
 		for _, reg := range alloc.scratchRegs {
-			if !occupied[reg] && !usedTemps[reg] {
+			if !occupied[reg] && !usedTemps[reg] && regMatchesType(reg, hint) {
 				usedTemps[reg] = true
 				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Ty: hint}, nil
 			}
 		}
-		for _, reg := range freeColorsFor(liveIn, alloc) {
-			if !occupied[reg] && !usedTemps[reg] {
+		for _, reg := range freeColorsFor(liveIn, alloc, hint) {
+			if !occupied[reg] && !usedTemps[reg] && regMatchesType(reg, hint) {
 				usedTemps[reg] = true
 				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Ty: hint}, nil
 			}
@@ -415,12 +446,19 @@ func rewriteInstr(instr mir.Instr, liveIn map[string]bool, alloc *regAllocResult
 
 		return nil, nil, nil, fmt.Errorf("register allocation: missing color for alloca destination %q", ins.Dst.Name)
 	case *mir.MoveInstr:
+		dst, pre0, post0, err := mapOperand(ins.Dst)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if r, ok := dst.(*mir.Register); ok {
+			ins.Dst = r
+		}
 		src, pre, post, err := mapOperand(ins.Src)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		ins.Src = src
-		return ins, pre, post, nil
+		return ins, append(pre0, pre...), append(post0, post...), nil
 	case *mir.LoadInstr:
 		addr, pre, post, err := mapOperand(ins.Addr)
 		if err != nil {
@@ -610,13 +648,13 @@ func rewriteTerminator(term mir.Terminator, liveIn map[string]bool, alloc *regAl
 	usedTemps := make(map[string]bool)
 	choose := func(hint *mir.Type) (*mir.Register, error) {
 		for _, reg := range alloc.scratchRegs {
-			if !occupied[reg] && !usedTemps[reg] {
+			if !occupied[reg] && !usedTemps[reg] && regMatchesType(reg, hint) {
 				usedTemps[reg] = true
 				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Ty: hint}, nil
 			}
 		}
-		for _, reg := range freeColorsFor(liveIn, alloc) {
-			if !occupied[reg] && !usedTemps[reg] {
+		for _, reg := range freeColorsFor(liveIn, alloc, hint) {
+			if !occupied[reg] && !usedTemps[reg] && regMatchesType(reg, hint) {
 				usedTemps[reg] = true
 				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Ty: hint}, nil
 			}
@@ -882,14 +920,14 @@ func rewriteOperandWithChooser(op mir.Operand, alloc *regAllocResult, frame *mir
 func rewriteOperand(op mir.Operand, alloc *regAllocResult, frame *mir.FrameLayout, abi target.ABI, live map[string]bool) (mir.Operand, []mir.Instr, []mir.Instr, error) {
 	choose := func(hint *mir.Type) (*mir.Register, error) {
 		occupied := physicalRegsInUse(live, alloc)
-		free := freeColorsFor(live, alloc)
+		free := freeColorsFor(live, alloc, hint)
 		for _, reg := range alloc.scratchRegs {
-			if !occupied[reg] {
+			if !occupied[reg] && regMatchesType(reg, hint) {
 				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Ty: hint}, nil
 			}
 		}
 		for _, reg := range free {
-			if !occupied[reg] {
+			if !occupied[reg] && regMatchesType(reg, hint) {
 				return &mir.Register{Name: reg, Kind: mir.PhysicalReg, Ty: hint}, nil
 			}
 		}
@@ -921,11 +959,14 @@ func frameOffset(slot int, wordSize int) int {
 	return -(slot + 1) * wordSize
 }
 
-func freeColorsFor(live map[string]bool, alloc *regAllocResult) []string {
+func freeColorsFor(live map[string]bool, alloc *regAllocResult, hint *mir.Type) []string {
 	occupied := physicalRegsInUse(live, alloc)
 	free := make([]string, 0)
 	for vreg, preg := range alloc.mapVRegToPReg {
 		if vreg == preg {
+			continue
+		}
+		if !regMatchesType(preg, hint) {
 			continue
 		}
 		if containsString(alloc.scratchRegs, preg) {
@@ -1003,10 +1044,12 @@ func operandRegs(op mir.Operand) []string {
 }
 
 func abiColorPools(abi target.ABI) (colors []string, scratch []string) {
-	colors = append(colors, abi.CallerSaved...)
 	colors = append(colors, abi.CalleeSaved...)
+	colors = append(colors, abi.CallerSaved...)
 	colors = append(colors, abi.IntArgRegs...)
 	colors = append(colors, abi.IntRetRegs...)
+	colors = append(colors, abi.FloatArgRegs...)
+	colors = append(colors, abi.FloatRetRegs...)
 	colors = uniqueStrings(colors)
 	colors = filterStrings(colors, func(reg string) bool {
 		return reg != abi.StackPointer && reg != abi.FramePointer && reg != abi.LinkRegister
@@ -1025,6 +1068,9 @@ func abiColorPools(abi target.ABI) (colors []string, scratch []string) {
 	preferredScratch = uniqueStrings(preferredScratch)
 	if len(preferredScratch) < 2 {
 		for _, reg := range colors {
+			if isFloatRegName(reg) {
+				continue
+			}
 			if containsString(preferredScratch, reg) {
 				continue
 			}
@@ -1036,6 +1082,20 @@ func abiColorPools(abi target.ABI) (colors []string, scratch []string) {
 	}
 	if len(preferredScratch) > 2 {
 		preferredScratch = preferredScratch[:2]
+	}
+	if len(preferredScratch) < 2 {
+		for _, reg := range colors {
+			if !isFloatRegName(reg) {
+				continue
+			}
+			if containsString(preferredScratch, reg) {
+				continue
+			}
+			preferredScratch = append(preferredScratch, reg)
+			if len(preferredScratch) >= 2 {
+				break
+			}
+		}
 	}
 	scratch = preferredScratch
 	colors = filterStrings(colors, func(reg string) bool { return !containsString(scratch, reg) })

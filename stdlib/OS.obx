@@ -16,6 +16,7 @@ module OS
   import W   := win32.WinAPI
 <* ELSE *>
   import Lib := posix.Stdlib
+  import C   := posix.StringH
   import U   := posix.Unistd
 <* END *>
 
@@ -57,9 +58,9 @@ begin
     buf[0] := 0x
     return false
   end
-  // Copy from raw C pointer into Oberon array.
-  // (system.copy copies from an integer address until NUL.)
-  system.copy(p, system.adr(buf), len(buf))
+  // Copy from raw C pointer into Oberon array and guarantee NUL terminator.
+  C.strncpy(system.adr(buf), p, len(buf) - 1)
+  buf[len(buf) - 1] := 0x
   return true
 end Env
 <* END *>

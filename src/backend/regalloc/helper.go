@@ -1,6 +1,12 @@
 package regalloc
 
-import "github.com/anthonyabeo/obx/src/backend/mir"
+import (
+	"strconv"
+	"strings"
+
+	"github.com/anthonyabeo/obx/src/backend/mir"
+	"github.com/anthonyabeo/obx/src/backend/target"
+)
 
 func isPhi(instr mir.Instr) bool {
 	_, ok := instr.(*mir.PhiInstr)
@@ -74,3 +80,98 @@ func contains(list []string, want string) bool {
 }
 
 func containsString(list []string, want string) bool { return contains(list, want) }
+
+func isFloatRegName(name string) bool {
+	n := strings.ToLower(strings.TrimSpace(name))
+	if n == "" {
+		return false
+	}
+	if strings.HasPrefix(n, "d") && isDecimalSuffix(n[1:]) {
+		return true
+	}
+	if strings.HasPrefix(n, "fa") && isDecimalSuffix(n[2:]) {
+		return true
+	}
+	if strings.HasPrefix(n, "ft") && isDecimalSuffix(n[2:]) {
+		return true
+	}
+	if strings.HasPrefix(n, "fs") && isDecimalSuffix(n[2:]) {
+		return true
+	}
+	return false
+}
+
+func isDecimalSuffix(s string) bool {
+	if s == "" {
+		return false
+	}
+	_, err := strconv.Atoi(s)
+	return err == nil
+}
+
+func regMatchesType(reg string, ty *mir.Type) bool {
+	if ty == nil {
+		return true
+	}
+	wantFloat := target.IsFloatType(ty)
+	return wantFloat == isFloatRegName(reg)
+}
+
+func classifyVirtualRegs(fn *mir.Function) map[string]bool {
+	classes := make(map[string]bool)
+	if fn == nil {
+		return classes
+	}
+	for _, p := range fn.Params {
+		if p == nil || p.Name == "" || p.Type == nil {
+			continue
+		}
+		classes[p.Name] = target.IsFloatType(p.Type)
+	}
+	for _, blk := range fn.Blocks {
+		if blk == nil {
+			continue
+		}
+		for _, ins := range blk.Instrs {
+			collectVirtualRegClassesFromInstr(classes, ins)
+		}
+		collectVirtualRegClassesFromInstr(classes, blk.Term)
+	}
+	return classes
+}
+
+func collectVirtualRegClassesFromInstr(classes map[string]bool, ins mir.Instr) {
+	if ins == nil {
+		return
+	}
+	for _, d := range ins.Defs() {
+		updateVirtualRegClass(classes, d)
+	}
+	for _, u := range ins.Uses() {
+		collectVirtualRegClassesFromOperand(classes, u)
+	}
+}
+
+func collectVirtualRegClassesFromOperand(classes map[string]bool, op mir.Operand) {
+	switch v := op.(type) {
+	case *mir.Register:
+		updateVirtualRegClass(classes, v)
+	case *mir.Memory:
+		collectVirtualRegClassesFromOperand(classes, v.Base)
+		collectVirtualRegClassesFromOperand(classes, v.Offset)
+	}
+}
+
+func updateVirtualRegClass(classes map[string]bool, r *mir.Register) {
+	if r == nil || r.Kind != mir.VirtualReg || r.Name == "" || r.Type() == nil {
+		return
+	}
+	if target.IsFloatType(r.Type()) {
+		classes[r.Name] = true
+		return
+	}
+	if _, seen := classes[r.Name]; !seen {
+		classes[r.Name] = false
+	}
+}
+

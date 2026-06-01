@@ -111,6 +111,37 @@ func TestRewriteMachineInstrSpillReload(t *testing.T) {
 	}
 }
 
+func TestRewriteMoveInstrRewritesDestinationRegister(t *testing.T) {
+	i64 := mir.NewScalarType("i64", 8)
+	alloc := &regAllocResult{
+		mapVRegToPReg: map[string]string{"t13": "x0"},
+		spillSlots:    map[string]int{},
+		scratchRegs:   []string{"x15"},
+	}
+	frame := mir.NewFrameLayout()
+	abi := target.ABI{WordSize: 8, Align: 16, FramePointer: "x29", StackPointer: "sp"}
+
+	mv := &mir.MoveInstr{
+		Dst: &mir.Register{Name: "t13", Kind: mir.VirtualReg, Ty: i64},
+		Src: &mir.Symbol{Name: "_Lstr_8b1a9953_7", Ty: mir.NewPointerType(i64, 8)},
+	}
+
+	rewritten, pre, post, err := rewriteInstr(mv, map[string]bool{"t13": true}, alloc, frame, abi, &blockAnalysis{})
+	if err != nil {
+		t.Fatalf("rewriteInstr(move) failed: %v", err)
+	}
+	if len(pre) != 0 || len(post) != 0 {
+		t.Fatalf("move pre/post = %d/%d, want 0/0", len(pre), len(post))
+	}
+	out, ok := rewritten.(*mir.MoveInstr)
+	if !ok {
+		t.Fatalf("rewriteInstr(move) = %T, want *mir.MoveInstr", rewritten)
+	}
+	if out.Dst == nil || out.Dst.Kind != mir.PhysicalReg || out.Dst.Name != "x0" {
+		t.Fatalf("rewritten move dst = %#v, want physical x0", out.Dst)
+	}
+}
+
 func TestMaterializeEdgeBlocksRedirectsCriticalEdge(t *testing.T) {
 	i64 := mir.NewScalarType("i64", 8)
 	i1 := mir.NewScalarType("i1", 1)
@@ -204,12 +235,12 @@ func TestMaterializeEdgeBlocksRedirectsCriticalEdge(t *testing.T) {
 func TestColorGraphPrecolorsParams(t *testing.T) {
 	i64 := mir.NewScalarType("i64", 8)
 	abi := target.ABI{
-		WordSize:    8,
-		Align:       16,
-		IntArgRegs:  []string{"x0", "x1", "x2", "x3"},
-		IntRetRegs:  []string{"x0"},
-		CallerSaved: []string{"x0", "x1", "x2", "x3", "x9", "x10"},
-		CalleeSaved: []string{"x19", "x20"},
+		WordSize:     8,
+		Align:        16,
+		IntArgRegs:   []string{"x0", "x1", "x2", "x3"},
+		IntRetRegs:   []string{"x0"},
+		CallerSaved:  []string{"x0", "x1", "x2", "x3", "x9", "x10"},
+		CalleeSaved:  []string{"x19", "x20"},
 		StackPointer: "sp",
 		FramePointer: "x29",
 		LinkRegister: "x30",
@@ -246,12 +277,12 @@ func TestColorGraphPrecolorsParams(t *testing.T) {
 func TestColorGraphPrecolorsThreeParams(t *testing.T) {
 	i64 := mir.NewScalarType("i64", 8)
 	abi := target.ABI{
-		WordSize:    8,
-		Align:       16,
-		IntArgRegs:  []string{"x0", "x1", "x2", "x3"},
-		IntRetRegs:  []string{"x0"},
-		CallerSaved: []string{"x0", "x1", "x2", "x3", "x9", "x10"},
-		CalleeSaved: []string{"x19", "x20"},
+		WordSize:     8,
+		Align:        16,
+		IntArgRegs:   []string{"x0", "x1", "x2", "x3"},
+		IntRetRegs:   []string{"x0"},
+		CallerSaved:  []string{"x0", "x1", "x2", "x3", "x9", "x10"},
+		CalleeSaved:  []string{"x19", "x20"},
 		StackPointer: "sp",
 		FramePointer: "x29",
 		LinkRegister: "x30",
@@ -281,6 +312,75 @@ func TestColorGraphPrecolorsThreeParams(t *testing.T) {
 	} {
 		if got := result.mapVRegToPReg[tc.param]; got != tc.want {
 			t.Errorf("param[%d] %q mapped to %q, want %q", i, tc.param, got, tc.want)
+		}
+	}
+}
+
+func TestColorGraphPrecolorsMixedIntAndFloatParams(t *testing.T) {
+	i64 := mir.NewScalarType("i64", 8)
+	f64 := mir.NewScalarType("f64", 8)
+	abi := target.ABI{
+		WordSize:     8,
+		Align:        16,
+		IntArgRegs:   []string{"x0", "x1", "x2", "x3"},
+		IntRetRegs:   []string{"x0"},
+		FloatArgRegs: []string{"d0", "d1", "d2", "d3"},
+		FloatRetRegs: []string{"d0"},
+		CallerSaved:  []string{"x0", "x1", "x2", "x3", "x9", "x10"},
+		CalleeSaved:  []string{"x19", "x20"},
+		StackPointer: "sp",
+		FramePointer: "x29",
+		LinkRegister: "x30",
+	}
+
+	fn := mir.NewFunction("mix", i64)
+	fn.AddParam(&mir.Param{Name: "a", Type: i64})
+	fn.AddParam(&mir.Param{Name: "x", Type: f64})
+	fn.AddParam(&mir.Param{Name: "b", Type: i64})
+
+	blk := mir.NewBlock(0, "entry")
+	blk.Term = &mir.ReturnInstr{Value: &mir.Register{Name: "a", Kind: mir.VirtualReg, Ty: i64}}
+	fn.AddBlock(blk)
+	fn.SetEntry(blk)
+	fn.SetExit(blk)
+
+	analysis := analyzeFunction(fn)
+	colors, scratch := abiColorPools(abi)
+
+	result, err := colorGraph(fn, analysis, colors, scratch, abi)
+	if err != nil {
+		t.Fatalf("colorGraph failed: %v", err)
+	}
+
+	if got := result.mapVRegToPReg["a"]; got != "x0" {
+		t.Errorf("int param a mapped to %q, want x0", got)
+	}
+	if got := result.mapVRegToPReg["x"]; got != "d0" {
+		t.Errorf("float param x mapped to %q, want d0", got)
+	}
+	if got := result.mapVRegToPReg["b"]; got != "x1" {
+		t.Errorf("int param b mapped to %q, want x1", got)
+	}
+}
+
+func TestFixCallArgMoveGroupsIgnoresNonArgCopies(t *testing.T) {
+	i64 := mir.NewScalarType("i64", 8)
+	moves := []mir.Instr{
+		&mir.MoveInstr{Dst: mir.NewRegister("x19", mir.PhysicalReg, i64), Src: mir.NewRegister("x0", mir.PhysicalReg, i64)},
+		&mir.MoveInstr{Dst: mir.NewRegister("x20", mir.PhysicalReg, i64), Src: mir.NewRegister("x1", mir.PhysicalReg, i64)},
+		&mir.CallInstr{Callee: mir.NewSymbol("foo", nil), Args: nil, Dst: nil},
+	}
+	out := fixCallArgMoveGroups(moves)
+	if len(out) != len(moves) {
+		t.Fatalf("len(out)=%d, want %d", len(out), len(moves))
+	}
+	for i := 0; i < 2; i++ {
+		mv, ok := out[i].(*mir.MoveInstr)
+		if !ok {
+			t.Fatalf("out[%d] = %T, want *mir.MoveInstr", i, out[i])
+		}
+		if mv.Dst == nil || moves[i].(*mir.MoveInstr).Dst == nil || mv.Dst.Name != moves[i].(*mir.MoveInstr).Dst.Name {
+			t.Fatalf("out[%d] dst mutated: got=%v want=%v", i, mv.Dst, moves[i].(*mir.MoveInstr).Dst)
 		}
 	}
 }

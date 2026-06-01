@@ -2,6 +2,7 @@ package target
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,6 +14,8 @@ import (
 type ARM64Target struct {
 	*BaseTarget
 }
+
+var arm64FuncLabelScope string
 
 var arm64Default = &ARM64Target{
 	BaseTarget: NewBaseTarget(Arm64Name, ABI{
@@ -102,17 +105,41 @@ func emitARM64Module(mod *mir.Module) string {
 		buf.WriteString(emitARM64Function(mod, fn))
 	}
 
+	stdioInit := ""
+	if mod.DLLName == "libc" {
+		stdioInit = emitARM64StdioInit(mod)
+	}
+
+	if initStub := emitARM64ModuleInitStub(mod, stdioInit != ""); initStub != "" {
+		buf.WriteString(initStub)
+	}
+
 	// For DEFINITION modules with [dll "libc"], generate a platform-specific
 	// __init_<Name> function that loads the real stdio FILE* handles from libc
 	// globals into the module's stdin/stdout/stderr variables.  This is called
 	// automatically by the importer's prepended module-init call chain.
-	if mod.DLLName == "libc" {
-		if init := emitARM64StdioInit(mod); init != "" {
-			buf.WriteString(init)
-		}
+	if stdioInit != "" {
+		buf.WriteString(stdioInit)
 	}
 
 	return buf.String()
+}
+
+func emitARM64ModuleInitStub(mod *mir.Module, hasSynthesizedInit bool) string {
+	if mod == nil || mod.Name == "" {
+		return ""
+	}
+	if hasSynthesizedInit {
+		return ""
+	}
+	initName := "__init_" + mod.Name
+	for _, fn := range mod.Functions {
+		if fn != nil && fn.Name == initName {
+			return ""
+		}
+	}
+
+	return fmt.Sprintf("\t.section __TEXT,__text\n\t.p2align 2\n\t.globl _%s\n_%s:\n\tret\n", initName, initName)
 }
 
 func emitARM64Constants(buf *strings.Builder, consts []*mir.ConstDecl) {
@@ -200,6 +227,10 @@ func emitARM64Function(mod *mir.Module, fn *mir.Function) string {
 	}
 
 	mangled := "_" + name
+	prevScope := arm64FuncLabelScope
+	arm64FuncLabelScope = name
+	defer func() { arm64FuncLabelScope = prevScope }()
+
 	buf.WriteString("\t.section __TEXT,__text\n")
 	buf.WriteString("\t.p2align 2\n")
 	buf.WriteString("\t.globl " + mangled + "\n")
@@ -219,7 +250,7 @@ func emitARM64Function(mod *mir.Module, fn *mir.Function) string {
 			continue
 		}
 		if block.Label != "" && block.Label != "entry" {
-			buf.WriteString("L" + block.Label + ":\n")
+			buf.WriteString(arm64Label(block.Label) + ":\n")
 		}
 		for _, instr := range block.Instrs {
 			if line := emitARM64Instr(instr); line != "" {
@@ -254,7 +285,54 @@ func emitARM64Instr(instr mir.Instr) string {
 		}
 		return fmt.Sprintf("%s %s, %s", stOp, valReg, formatARM64Mem(i.Addr))
 	case *mir.BinaryInstr:
-		return fmt.Sprintf("%s %s, %s, %s", strings.ToLower(i.Op), formatARM64Operand(i.Dst), formatARM64Operand(i.Left), formatARM64Operand(i.Right))
+		op := strings.ToLower(i.Op)
+		switch op {
+		case "fadd", "fsub", "fmul", "fdiv":
+			dst := formatARM64DataReg(i.Dst, i.Dst.Type())
+			left, preL := arm64FloatOperand(i.Left, "d14")
+			rightScratch := "d15"
+			if left == rightScratch {
+				rightScratch = "d14"
+			}
+			right, preR := arm64FloatOperand(i.Right, rightScratch)
+			parts := make([]string, 0, 3)
+			if preL != "" {
+				parts = append(parts, preL)
+			}
+			if preR != "" {
+				parts = append(parts, preR)
+			}
+			parts = append(parts, fmt.Sprintf("%s %s, %s, %s", op, dst, left, right))
+			return strings.Join(parts, "\n\t")
+		default:
+			if op == "add" {
+				if imm, ok := i.Right.(*mir.Immediate); ok {
+					if n, ok2, _ := toInt64Immediate(imm); ok2 && n == 0 {
+						dst := formatARM64Operand(i.Dst)
+						src := formatARM64Operand(i.Left)
+						return emitARM64Move(dst, src)
+					}
+				}
+			}
+			if op == "and" {
+				dst := formatARM64Operand(i.Dst)
+				if sym, ok := arm64SymbolOperand(i.Left); ok {
+					tmp := "x9"
+					if strings.HasPrefix(dst, "w") {
+						tmp = "w9"
+					}
+					return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\tand %s, %s, %s", sym, sym, dst, tmp, formatARM64Operand(i.Right))
+				}
+				if sym, ok := arm64SymbolOperand(i.Right); ok {
+					tmp := "x9"
+					if strings.HasPrefix(dst, "w") {
+						tmp = "w9"
+					}
+					return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\tand %s, %s, %s", sym, sym, dst, formatARM64Operand(i.Left), tmp)
+				}
+			}
+			return fmt.Sprintf("%s %s, %s, %s", op, formatARM64Operand(i.Dst), formatARM64Operand(i.Left), formatARM64Operand(i.Right))
+		}
 	case *mir.CompareInstr:
 		if i.Dst != nil {
 			return fmt.Sprintf("cmp %s, %s\n\tcset %s, %s", formatARM64Operand(i.Left), formatARM64Operand(i.Right), formatARM64Operand(i.Dst), arm64CondSuffix(i.Pred))
@@ -268,15 +346,22 @@ func emitARM64Instr(instr mir.Instr) string {
 		case "bitcast", "zext", "sext":
 			return emitARM64Move(dst, src)
 		case "sitofp":
-			return fmt.Sprintf("scvtf %s, %s", dst, src)
+			return fmt.Sprintf("scvtf %s, %s", formatARM64DataReg(i.Dst, i.Dst.Type()), formatARM64DataReg(i.X, i.X.Type()))
 		case "fptosi":
-			return fmt.Sprintf("fcvtzs %s, %s", dst, src)
+			return fmt.Sprintf("fcvtzs %s, %s", formatARM64DataReg(i.Dst, i.Dst.Type()), formatARM64DataReg(i.X, i.X.Type()))
 		case "fpext", "fptrunc":
-			return fmt.Sprintf("fcvt %s, %s", dst, src)
+			return fmt.Sprintf("fcvt %s, %s", formatARM64DataReg(i.Dst, i.Dst.Type()), formatARM64DataReg(i.X, i.X.Type()))
 		case "trunc":
 			if i.Dst != nil && i.Dst.Type() != nil {
 				if bits := i.Dst.Type().Size * 8; bits > 0 && bits < 64 {
 					mask := int64((uint64(1) << bits) - 1)
+					if sym, ok := arm64SymbolOperand(i.X); ok {
+						tmp := "x9"
+						if strings.HasPrefix(dst, "w") {
+							tmp = "w9"
+						}
+						return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\tand %s, %s, #%d", sym, sym, dst, tmp, mask)
+					}
 					return fmt.Sprintf("and %s, %s, #%d", dst, src, mask)
 				}
 			}
@@ -310,7 +395,28 @@ func emitARM64MachineInstr(i *mir.MachineInstr) string {
 		}
 		return formatGenericARM64(i)
 	case "add", "sub", "mul", "and", "orr", "eor", "lsl", "lsr", "asr", "madd", "msub":
+		if op == "add" && len(i.Dsts) > 0 && len(i.Srcs) >= 2 {
+			if imm, ok := i.Srcs[1].(*mir.Immediate); ok {
+				if n, ok2, _ := toInt64Immediate(imm); ok2 && n == 0 {
+					dst := formatARM64Operand(i.Dsts[0])
+					src := formatARM64Operand(i.Srcs[0])
+					if strings.HasPrefix(dst, "d") || strings.HasPrefix(dst, "s") || strings.HasPrefix(src, "d") || strings.HasPrefix(src, "s") {
+						return emitARM64Move(dst, src)
+					}
+				}
+			}
+		}
+		if op == "and" && len(i.Dsts) > 0 && len(i.Srcs) >= 2 {
+			if sym, ok := arm64SymbolOperand(i.Srcs[0]); ok {
+				return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\tand %s, x9, %s", sym, sym, formatARM64Operand(i.Dsts[0]), formatARM64Operand(i.Srcs[1]))
+			}
+			if sym, ok := arm64SymbolOperand(i.Srcs[1]); ok {
+				return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\tand %s, %s, x9", sym, sym, formatARM64Operand(i.Dsts[0]), formatARM64Operand(i.Srcs[0]))
+			}
+		}
 		return formatGenericARM64(i)
+	case "fadd", "fsub", "fmul", "fdiv":
+		return emitARM64FloatBinary(i, op)
 
 	// ── Frame prologue / epilogue ─────────────────────────────────────────────
 	//
@@ -552,6 +658,23 @@ func formatARM64Operand(op mir.Operand) string {
 			}
 			return "x15"
 		}
+		if strings.HasPrefix(v.Name, "__Lstr_") || strings.HasPrefix(v.Name, "_Lstr_") {
+			return arm64ScratchRegForType(v.Type())
+		}
+		if isARM64XReg(v.Name) || isARM64WReg(v.Name) || isARM64FloatReg(v.Name) || v.Name == "sp" || v.Name == "xzr" || v.Name == "wzr" {
+			return v.Name
+		}
+		if strings.HasPrefix(v.Name, "t") {
+			if idx, err := strconv.Atoi(v.Name[1:]); err == nil {
+				if idx >= 0 && idx <= 30 {
+					return formatARM64DataReg(v, v.Type())
+				}
+				return arm64ScratchRegForType(v.Type())
+			}
+		}
+		if v.Kind == mir.VirtualReg {
+			return arm64ScratchRegForType(v.Type())
+		}
 		return v.Name
 	case *mir.Label:
 		return arm64Label(v.Name)
@@ -589,6 +712,21 @@ func emitARM64Move(dst, src string) string {
 		// Materialize the address using page+pageoff relocations.
 		return fmt.Sprintf("adrp %s, %s@PAGE\n\tadd %s, %s, %s@PAGEOFF", dst, src, dst, dst, src)
 	}
+	if strings.HasPrefix(src, "#") {
+		if isARM64FloatReg(dst) {
+			if f, ok := parseARM64ImmediateFloat(src); ok {
+				intReg, bits, ok := arm64FloatImmediateBits(dst, f)
+				if ok {
+					return emitARM64LoadImmediateBits(intReg, bits) + "\n\tfmov " + dst + ", " + intReg
+				}
+			}
+		}
+		if isARM64XReg(dst) || isARM64WReg(dst) {
+			if bits, ok := parseARM64ImmediateBits(src, isARM64WReg(dst)); ok {
+				return emitARM64LoadImmediateBits(dst, bits)
+			}
+		}
+	}
 	if isARM64FloatReg(dst) || isARM64FloatReg(src) {
 		return fmt.Sprintf("fmov %s, %s", dst, src)
 	}
@@ -602,8 +740,178 @@ func isARM64XReg(name string) bool {
 	if !strings.HasPrefix(name, "x") || len(name) < 2 {
 		return false
 	}
-	_, err := strconv.Atoi(name[1:])
-	return err == nil
+	n, err := strconv.Atoi(name[1:])
+	return err == nil && n >= 0 && n <= 30
+}
+
+func isARM64WReg(name string) bool {
+	if name == "wzr" {
+		return true
+	}
+	if !strings.HasPrefix(name, "w") || len(name) < 2 {
+		return false
+	}
+	n, err := strconv.Atoi(name[1:])
+	return err == nil && n >= 0 && n <= 30
+}
+
+func arm64ScratchRegForType(ty *mir.Type) string {
+	if arm64IsFloatType(ty) {
+		if arm64TypeSize(ty) <= 4 {
+			return "s15"
+		}
+		return "d15"
+	}
+	if arm64TypeSize(ty) <= 4 {
+		return "w15"
+	}
+	return "x15"
+}
+
+func arm64SymbolOperand(op mir.Operand) (string, bool) {
+	switch v := op.(type) {
+	case *mir.Symbol:
+		return formatARM64Operand(v), true
+	case *mir.Register:
+		if v != nil && (strings.HasPrefix(v.Name, "__Lstr_") || strings.HasPrefix(v.Name, "_Lstr_")) {
+			if strings.HasPrefix(v.Name, "_") {
+				return v.Name, true
+			}
+			return "_" + v.Name, true
+		}
+	}
+	return "", false
+}
+
+func parseARM64ImmediateFloat(src string) (float64, bool) {
+	if !strings.HasPrefix(src, "#") {
+		return 0, false
+	}
+	raw := strings.TrimPrefix(src, "#")
+	f, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, false
+	}
+	return f, true
+}
+
+func parseARM64ImmediateBits(src string, forWReg bool) (uint64, bool) {
+	if !strings.HasPrefix(src, "#") {
+		return 0, false
+	}
+	raw := strings.TrimPrefix(src, "#")
+	if i, err := strconv.ParseInt(raw, 0, 64); err == nil {
+		if forWReg {
+			return uint64(uint32(i)), true
+		}
+		return uint64(i), true
+	}
+	if u, err := strconv.ParseUint(raw, 0, 64); err == nil {
+		if forWReg {
+			return uint64(uint32(u)), true
+		}
+		return u, true
+	}
+	if f, err := strconv.ParseFloat(raw, 64); err == nil {
+		if forWReg {
+			return uint64(math.Float32bits(float32(f))), true
+		}
+		return math.Float64bits(f), true
+	}
+	return 0, false
+}
+
+func toInt64Immediate(imm *mir.Immediate) (int64, bool, error) {
+	if imm == nil {
+		return 0, false, nil
+	}
+	switch v := imm.Value.(type) {
+	case int:
+		return int64(v), true, nil
+	case int8:
+		return int64(v), true, nil
+	case int16:
+		return int64(v), true, nil
+	case int32:
+		return int64(v), true, nil
+	case int64:
+		return v, true, nil
+	case uint:
+		return int64(v), true, nil
+	case uint8:
+		return int64(v), true, nil
+	case uint16:
+		return int64(v), true, nil
+	case uint32:
+		return int64(v), true, nil
+	case uint64:
+		if v > uint64(math.MaxInt64) {
+			return 0, false, fmt.Errorf("immediate %v overflows int64", v)
+		}
+		return int64(v), true, nil
+	default:
+		return 0, false, nil
+	}
+}
+
+func arm64FloatImmediateBits(floatReg string, f float64) (string, uint64, bool) {
+	if strings.HasPrefix(floatReg, "s") {
+		idx := strings.TrimPrefix(floatReg, "s")
+		if _, err := strconv.Atoi(idx); err != nil {
+			return "", 0, false
+		}
+		return "w" + idx, uint64(math.Float32bits(float32(f))), true
+	}
+	if strings.HasPrefix(floatReg, "d") {
+		idx := strings.TrimPrefix(floatReg, "d")
+		if _, err := strconv.Atoi(idx); err != nil {
+			return "", 0, false
+		}
+		return "x" + idx, math.Float64bits(f), true
+	}
+	return "", 0, false
+}
+
+func emitARM64LoadImmediateBits(dst string, bits uint64) string {
+	if isARM64WReg(dst) {
+		bits = uint64(uint32(bits))
+		if bits == 0 {
+			return fmt.Sprintf("mov %s, #0", dst)
+		}
+		return emitARM64MovZK(dst, bits, 2)
+	}
+	if bits == 0 {
+		return fmt.Sprintf("mov %s, #0", dst)
+	}
+	return emitARM64MovZK(dst, bits, 4)
+}
+
+func emitARM64MovZK(dst string, bits uint64, halfWords int) string {
+	parts := make([]string, 0, halfWords)
+	started := false
+	for i := 0; i < halfWords; i++ {
+		chunk := uint16((bits >> (16 * i)) & 0xFFFF)
+		if !started {
+			if chunk == 0 {
+				continue
+			}
+			if i == 0 {
+				parts = append(parts, fmt.Sprintf("movz %s, #%d", dst, chunk))
+			} else {
+				parts = append(parts, fmt.Sprintf("movz %s, #%d, lsl #%d", dst, chunk, 16*i))
+			}
+			started = true
+			continue
+		}
+		if chunk == 0 {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("movk %s, #%d, lsl #%d", dst, chunk, 16*i))
+	}
+	if !started {
+		return fmt.Sprintf("mov %s, #0", dst)
+	}
+	return strings.Join(parts, "\n\t")
 }
 
 func emitARM64Trunc(i *mir.MachineInstr) string {
@@ -662,21 +970,55 @@ func emitARM64SIToFP(i *mir.MachineInstr) string {
 	if i == nil || len(i.Dsts) == 0 || len(i.Srcs) == 0 {
 		return formatGenericARM64(i)
 	}
-	return fmt.Sprintf("scvtf %s, %s", formatARM64Operand(i.Dsts[0]), formatARM64Operand(i.Srcs[0]))
+	return fmt.Sprintf("scvtf %s, %s", formatARM64DataReg(i.Dsts[0], i.Dsts[0].Type()), formatARM64DataReg(i.Srcs[0], i.Srcs[0].Type()))
 }
 
 func emitARM64FPToSI(i *mir.MachineInstr) string {
 	if i == nil || len(i.Dsts) == 0 || len(i.Srcs) == 0 {
 		return formatGenericARM64(i)
 	}
-	return fmt.Sprintf("fcvtzs %s, %s", formatARM64Operand(i.Dsts[0]), formatARM64Operand(i.Srcs[0]))
+	return fmt.Sprintf("fcvtzs %s, %s", formatARM64DataReg(i.Dsts[0], i.Dsts[0].Type()), formatARM64DataReg(i.Srcs[0], i.Srcs[0].Type()))
 }
 
 func emitARM64FPCvt(i *mir.MachineInstr) string {
 	if i == nil || len(i.Dsts) == 0 || len(i.Srcs) == 0 {
 		return formatGenericARM64(i)
 	}
-	return fmt.Sprintf("fcvt %s, %s", formatARM64Operand(i.Dsts[0]), formatARM64Operand(i.Srcs[0]))
+	return fmt.Sprintf("fcvt %s, %s", formatARM64DataReg(i.Dsts[0], i.Dsts[0].Type()), formatARM64DataReg(i.Srcs[0], i.Srcs[0].Type()))
+}
+
+func emitARM64FloatBinary(i *mir.MachineInstr, op string) string {
+	if i == nil || len(i.Dsts) == 0 || len(i.Srcs) < 2 {
+		return formatGenericARM64(i)
+	}
+	dst := formatARM64DataReg(i.Dsts[0], i.Dsts[0].Type())
+	left, preL := arm64FloatOperand(i.Srcs[0], "d14")
+	rightScratch := "d15"
+	if left == rightScratch {
+		rightScratch = "d14"
+	}
+	right, preR := arm64FloatOperand(i.Srcs[1], rightScratch)
+
+	parts := make([]string, 0, 3)
+	if preL != "" {
+		parts = append(parts, preL)
+	}
+	if preR != "" {
+		parts = append(parts, preR)
+	}
+	parts = append(parts, fmt.Sprintf("%s %s, %s, %s", op, dst, left, right))
+	return strings.Join(parts, "\n\t")
+}
+
+func arm64FloatOperand(op mir.Operand, scratch string) (reg string, pre string) {
+	if r, ok := op.(*mir.Register); ok {
+		return formatARM64DataReg(r, r.Type()), ""
+	}
+	if imm, ok := op.(*mir.Immediate); ok {
+		src := formatARM64Operand(imm)
+		return scratch, emitARM64Move(scratch, src)
+	}
+	return formatARM64Operand(op), ""
 }
 
 func scalarBitWidth(ty *mir.Type) int {
@@ -759,10 +1101,16 @@ func formatARM64DataReg(op mir.Operand, ty *mir.Type) string {
 	}
 
 	if arm64IsFloatType(ty) {
+		if idx > 31 {
+			return arm64ScratchRegForType(ty)
+		}
 		if arm64TypeSize(ty) <= 4 {
 			return fmt.Sprintf("s%d", idx)
 		}
 		return fmt.Sprintf("d%d", idx)
+	}
+	if idx > 30 {
+		return arm64ScratchRegForType(ty)
 	}
 
 	if arm64TypeSize(ty) <= 4 {
@@ -781,16 +1129,17 @@ func isARM64FloatReg(name string) bool {
 	if len(name) < 2 {
 		return false
 	}
-	_, err := strconv.Atoi(name[1:])
-	return err == nil
+	n, err := strconv.Atoi(name[1:])
+	return err == nil && n >= 0 && n <= 31
 }
 
 func arm64Label(name string) string {
 	if name == "" {
 		return "L"
 	}
-	if strings.HasPrefix(name, "L") {
-		return name
+	name = strings.TrimPrefix(name, "L")
+	if arm64FuncLabelScope != "" && !strings.HasPrefix(name, arm64FuncLabelScope+"$") {
+		name = arm64FuncLabelScope + "$" + name
 	}
 	return "L" + name
 }

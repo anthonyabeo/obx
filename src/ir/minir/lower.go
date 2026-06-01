@@ -410,6 +410,26 @@ func (l *Lowerer) lowerStmt(s desugar.Stmt) {
 
 func (l *Lowerer) lowerAssign(st *desugar.AssignStmt) {
 	addr := l.lowerAddr(st.Left)
+	if pty, ok := addr.Type().(*PointerType); ok {
+		switch pty.Elem.(type) {
+		case *ArrayType, *RecordType:
+			src := l.lowerAddr(st.Right)
+			dt := l.dimType()
+			copyBytes := int64(st.Left.Type().Width())
+			if copyBytes <= 0 {
+				copyBytes = l.wordSize()
+			}
+			if lit, ok := st.Right.(*desugar.Literal); ok && (lit.Kind == token.STR_LIT || lit.Kind == token.HEX_STR_LIT) {
+				litBytes := int64(len(lit.Value) + 1)
+				if litBytes < copyBytes {
+					copyBytes = litBytes
+				}
+			}
+			sizeConst := NewConst(fmt.Sprintf("%d", copyBytes), copyBytes, dt)
+			l.emit(&CallInst{Callee: l.memcpyFuncName(), Args: []Value{addr, src, sizeConst}})
+			return
+		}
+	}
 	val := l.lowerValue(st.Right)
 	val = l.coerceValue(val, addr.Type().(*PointerType).Elem) // coerce RHS to match LHS pointee type
 	l.emit(&StoreInst{Val: val, Addr: addr})
@@ -955,6 +975,22 @@ func (l *Lowerer) lowerAddr(expr desugar.Expr) Value {
 	switch e := expr.(type) {
 	case *desugar.VariableRef:
 		return l.resolveVar(e.Mangled, e.Name)
+	case *desugar.ConstantRef:
+		v := l.lowerValue(e)
+		if IsAddrValue(v) {
+			return v
+		}
+		if g, ok := v.(*GlobalRef); ok {
+			return g
+		}
+		addrTy := LowerType(e.SemaType)
+		if addrTy == nil {
+			addrTy = I32()
+		}
+		addr := l.newAddrTemp(e.Name, addrTy)
+		l.emit(&AllocaInst{Dst: addr, AllocType: addrTy})
+		l.emit(&StoreInst{Val: v, Addr: addr})
+		return addr
 	case *desugar.Param:
 		v := l.resolveVar(e.Name, e.Name)
 		// Forbid taking the address of a ValueParam (non-address temp).
@@ -984,6 +1020,27 @@ func (l *Lowerer) lowerAddr(expr desugar.Expr) Value {
 		t := l.ensureTemp(ptrVal, Ptr(LowerType(e.SemaType)))
 		t.IsAddr = true
 		return t
+	case *desugar.Literal:
+		if e.Kind == token.STR_LIT || e.Kind == token.HEX_STR_LIT {
+			strTy := LowerType(e.SemaType)
+			if strTy == nil {
+				strTy = NewArrayType(len(e.Value)+1, U8())
+			}
+			lit := l.internStringLiteral(e.Value, strTy)
+			addrTy := Ptr(strTy)
+			addr := l.newAddrTemp("", addrTy.Elem)
+			l.emit(&AddrInstr{Dst: addr, Of: lit})
+			return addr
+		}
+		val := l.lowerValue(e)
+		ty := LowerType(e.SemaType)
+		if ty == nil {
+			ty = I32()
+		}
+		addr := l.newAddrTemp("", ty)
+		l.emit(&AllocaInst{Dst: addr, AllocType: ty})
+		l.emit(&StoreInst{Val: val, Addr: addr})
+		return addr
 	case *desugar.TypeGuardExpr:
 		// TODO implement support for type guard address expressions
 		panic("lowerAddr: type guard address expressions not implemented")

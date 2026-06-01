@@ -7,7 +7,7 @@ package minir
 type Module struct {
 	Name      string
 	IsEntry   bool
-	DLLName   string         // non-empty for DEFINITION modules: the external library name (e.g. "libc")
+	DLLName   string          // non-empty for DEFINITION modules: the external library name (e.g. "libc")
 	Globals   []*GlobalVar    // mutable module-scope variables
 	Constants []*GlobalConst  // read-only module-scope constants
 	Externals []*ExternalFunc // imported / FFI function declarations
@@ -21,4 +21,14 @@ type Module struct {
 // at the level of the minir IR.
 type Program struct {
 	Modules []*Module
+}
+
+func (m *Module) FunctionByName(name string) *Function {
+	for _, fn := range m.Functions {
+		if fn.FnName == name {
+			return fn
+		}
+	}
+
+	return nil
 }

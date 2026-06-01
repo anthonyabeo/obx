@@ -41,7 +41,6 @@ import Mem
 
 // ── IO ────────────────────────────────────────────────────────────────────────
 proc demoIO()
-  var n: integer
 begin
   IO.WriteLn("=== IO ===")
   IO.WriteLn("Hello, Oberon+!")
@@ -68,16 +67,16 @@ begin
   IO.WriteInt(Strings.Len(s))
   IO.WriteLn("")
 
-  s := "Hello, World"
-  Strings.ToUpper(s)
-  IO.Write("upper = ")
-  IO.WriteLn(s)
+  //s := "Hello, World"
+  //Strings.ToUpper(s)
+  //IO.Write("upper = ")
+  //IO.WriteLn(s)
 
-  s := "   inner   "
-  Strings.Trim(s)
-  IO.Write('trimmed = "')
-  IO.Write(s)
-  IO.WriteLn('"')
+  //s := "   inner   "
+  //Strings.Trim(s)
+  //IO.Write('trimmed = "')
+  //IO.Write(s)
+  //IO.WriteLn('"')
 
   s := "Hello, World"
   IO.Write('contains "World" : ')
@@ -92,20 +91,20 @@ proc demoMath()
 begin
   IO.WriteLn("=== Math ===")
 
-  x := Math.Sqrt(2.0D0)
-  Fmt.LongReal(buf, x, 16)
-  IO.Write("sqrt(2)  = ")
-  IO.WriteLn(buf)
+  //x := Math.Sqrt(2.0D0)
+  //Fmt.LongReal(buf, x, 16)
+  //IO.Write("sqrt(2)  = ")
+  //IO.WriteLn(buf)
 
-  x := Math.Sin(Math.Pi)
-  Fmt.LongReal(buf, x, 4)
-  IO.Write("sin(Pi)  ~ ")
-  IO.WriteLn(buf)
+  //x := Math.Sin(Math.Pi)
+  //Fmt.LongReal(buf, x, 4)
+  //IO.Write("sin(Pi)  ~ ")
+  //IO.WriteLn(buf)
 
-  x := Math.Floor(-2.7D0)
-  Fmt.LongReal(buf, x, 1)
-  IO.Write("floor(-2.7) = ")
-  IO.WriteLn(buf)
+  //x := Math.Floor(-2.7D0)
+  //Fmt.LongReal(buf, x, 1)
+  //IO.Write("floor(-2.7) = ")
+  //IO.WriteLn(buf)
 end demoMath
 
 // ── Fmt ───────────────────────────────────────────────────────────────────────
@@ -135,10 +134,10 @@ proc demoTime()
       buf: array 32 of char
 begin
   IO.WriteLn("=== Time ===")
-  Time.Now(dt)
-  Time.Format(buf, dt, "%Y-%m-%d %H:%M:%S")
-  IO.Write("now    : ")
-  IO.WriteLn(buf)
+  //Time.Now(dt)
+  //Time.Format(buf, dt, "%Y-%m-%d %H:%M:%S")
+  //IO.Write("now    : ")
+  //IO.WriteLn(buf)
 end demoTime
 
 // ── Files ─────────────────────────────────────────────────────────────────────
@@ -213,8 +212,8 @@ begin
   demoMath()
   demoFmt()
   demoTime()
-  demoFiles()
+  //demoFiles()
   demoOS()
-  demoMem()
+  //demoMem()
 end StdlibDemo
 

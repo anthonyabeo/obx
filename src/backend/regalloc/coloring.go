@@ -24,6 +24,13 @@ type graphNode struct {
 }
 
 func colorGraph(fn *mir.Function, fa *functionAnalysis, colors, scratch []string, abi target.ABI) (*regAllocResult, error) {
+	vregIsFloat := classifyVirtualRegs(fn)
+	intColors := filterStrings(colors, func(reg string) bool { return !isFloatRegName(reg) })
+	floatColors := filterStrings(colors, func(reg string) bool { return isFloatRegName(reg) })
+	intScratch := filterStrings(scratch, func(reg string) bool { return !isFloatRegName(reg) })
+	floatScratch := filterStrings(scratch, func(reg string) bool { return isFloatRegName(reg) })
+	combinedScratch := append(append([]string(nil), intScratch...), floatScratch...)
+
 	// Build pre-coloring for function parameters mapped to ABI argument registers.
 	// Integer and floating-point parameters use independent index counters so
 	// that mixed signatures (e.g., func(int, float, int)) map correctly.
@@ -34,12 +41,16 @@ func colorGraph(fn *mir.Function, fa *functionAnalysis, colors, scratch []string
 			continue
 		}
 		if target.IsFloatType(param.Type) {
+			vregIsFloat[param.Name] = true
 			if reg, ok := abi.FloatArgReg(floatIdx); ok {
 				precolored[param.Name] = reg
 			}
 			// Params beyond FloatArgRegs are stack-passed; no pre-coloring needed.
 			floatIdx++
 		} else {
+			if _, seen := vregIsFloat[param.Name]; !seen {
+				vregIsFloat[param.Name] = false
+			}
 			if reg, ok := abi.ArgReg(intIdx); ok {
 				precolored[param.Name] = reg
 			}
@@ -168,11 +179,19 @@ func colorGraph(fn *mir.Function, fa *functionAnalysis, colors, scratch []string
 	}
 	sort.Strings(order)
 
-	allowedCount := func(name string) int {
-		if nodes[name].crossCall {
-			return len(calleeSavedOnly(colors, abi))
+	allowedPool := func(name string) []string {
+		if vregIsFloat[name] {
+			return floatColors
 		}
-		return len(colors)
+		return intColors
+	}
+
+	allowedCount := func(name string) int {
+		pool := allowedPool(name)
+		if nodes[name].crossCall && !vregIsFloat[name] {
+			pool = calleeSavedOnly(pool, abi)
+		}
+		return len(pool)
 	}
 
 	for len(remaining) > 0 {
@@ -196,7 +215,7 @@ func colorGraph(fn *mir.Function, fa *functionAnalysis, colors, scratch []string
 		mapVRegToPReg: make(map[string]string),
 		spillSlots:    make(map[string]int),
 		savedRegs:     make([]string, 0),
-		scratchRegs:   append([]string(nil), scratch...),
+		scratchRegs:   combinedScratch,
 	}
 
 	// Seed the result with pre-colored parameters so that neighbor color
@@ -213,11 +232,11 @@ func colorGraph(fn *mir.Function, fa *functionAnalysis, colors, scratch []string
 			continue
 		}
 
-		available := colors
-		if node.crossCall {
-			available = calleeSavedOnly(colors, abi)
+		available := allowedPool(name)
+		if node.crossCall && !vregIsFloat[name] {
+			available = calleeSavedOnly(available, abi)
 			if len(available) == 0 {
-				available = colors
+				available = allowedPool(name)
 			}
 		}
 

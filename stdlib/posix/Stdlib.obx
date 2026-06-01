@@ -24,6 +24,7 @@ PROCEDURE atol*(str: INTEGER): LONGINT;
 PROCEDURE atof*(str: INTEGER): LONGREAL;
 PROCEDURE strtol*(str: INTEGER; endptr: INTEGER; base: INTEGER): LONGINT;
 PROCEDURE strtod*(str: INTEGER; endptr: INTEGER): LONGREAL;
+PROCEDURE gcvt*(value: LONGREAL; ndigit: INTEGER; buf: INTEGER): INTEGER;
 
 // ── Sorting and searching ─────────────────────────────────────────────────────
 PROCEDURE qsort*(base: CPOINTER TO VOID; nmemb: INTEGER; size: INTEGER;
