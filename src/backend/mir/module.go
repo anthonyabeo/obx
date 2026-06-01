@@ -145,8 +145,8 @@ type ExternDecl struct {
 	// FixedArgCount is the number of non-variadic parameters in the declared
 	// extern signature. For non-variadic externs this is the full arity.
 	FixedArgCount int
-	CallConv string
-	Linkage  Linkage
+	CallConv      string
+	Linkage       Linkage
 }
 
 func NewExternDecl(name string, ty *Type) *ExternDecl {

@@ -126,4 +126,3 @@ func pow2Const(v minir.Value) (uint, bool) {
 func shiftConst(exp uint, ty minir.Type) minir.Value {
 	return constIntLike(ty, uint64(exp))
 }
-

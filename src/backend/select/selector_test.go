@@ -592,4 +592,3 @@ func TestSelectorCastRuleRejectsWrongOutputClass(t *testing.T) {
 		t.Fatalf("expected invalid output class combo to keep original instr, got %#v", selected)
 	}
 }
-

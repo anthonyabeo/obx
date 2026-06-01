@@ -85,9 +85,9 @@ type DefParam struct {
 // DefTypeExpr is implemented by all parsed type expressions.
 type DefTypeExpr interface{ defTypeExpr() }
 
-type BasicTExpr struct{ Name string }    // integer, longint, real, …
+type BasicTExpr struct{ Name string }     // integer, longint, real, …
 type CptrTExpr struct{ Base DefTypeExpr } // cptr <base>
-type ArrayTExpr struct {                 // array [n] of <elem>
+type ArrayTExpr struct {                  // array [n] of <elem>
 	Open bool
 	Len  int
 	Elem DefTypeExpr
@@ -645,4 +645,3 @@ func ParseDef(src string) (*DefModule, error) {
 	p := newDefParser(tokens)
 	return p.parseModule()
 }
-

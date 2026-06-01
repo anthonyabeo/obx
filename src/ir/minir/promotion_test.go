@@ -1253,6 +1253,3 @@ func TestIntegration_ReturnValueCoercion_FloatTarget_F32toF64(t *testing.T) {
 	// If lowerReturn called coerceValue(f32_param, f64):
 	// coerceValue would emit 1 CastInst (fpext)
 }
-
-
-

@@ -82,4 +82,3 @@ func TestLower_StringLiteralInterning(t *testing.T) {
 		t.Fatalf("string constants=%d, want 1", len(mod.Constants))
 	}
 }
-

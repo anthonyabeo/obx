@@ -58,30 +58,30 @@ func SameType(Ta, Tb Type) bool {
 			if namedA.Name == namedB.Name {
 				return true
 			}
-		// Cross-module: qualified name may differ (e.g. "Files.File" vs "File").
-		// Only treat them as the same when one is the qualified form of the other
-		// (i.e. one name is a suffix "<module>.<base>" of the other base name).
-		unqualA := namedA.Name
-		if i := strings.LastIndex(unqualA, "."); i >= 0 {
-			unqualA = unqualA[i+1:]
-		}
-		unqualB := namedB.Name
-		if i := strings.LastIndex(unqualB, "."); i >= 0 {
-			unqualB = unqualB[i+1:]
-		}
-		if unqualA == unqualB {
-			// Fast path: identical Def pointers (inlined / same compilation unit).
-			if namedA.Def != nil && namedA.Def == namedB.Def {
-				return true
+			// Cross-module: qualified name may differ (e.g. "Files.File" vs "File").
+			// Only treat them as the same when one is the qualified form of the other
+			// (i.e. one name is a suffix "<module>.<base>" of the other base name).
+			unqualA := namedA.Name
+			if i := strings.LastIndex(unqualA, "."); i >= 0 {
+				unqualA = unqualA[i+1:]
 			}
-			// Slow path: different Def pointers can arise when the same module
-			// is decoded from cached .obxi bundles (each decode allocates fresh
-			// type instances).  Use aggregate-aware structural comparison so that
-			// record types with the same fields and base chain are treated as
-			// the same type across bundle-decode boundaries.
-			return identicalAggregate(Underlying(Ta), Underlying(Tb))
-		}
-		return false
+			unqualB := namedB.Name
+			if i := strings.LastIndex(unqualB, "."); i >= 0 {
+				unqualB = unqualB[i+1:]
+			}
+			if unqualA == unqualB {
+				// Fast path: identical Def pointers (inlined / same compilation unit).
+				if namedA.Def != nil && namedA.Def == namedB.Def {
+					return true
+				}
+				// Slow path: different Def pointers can arise when the same module
+				// is decoded from cached .obxi bundles (each decode allocates fresh
+				// type instances).  Use aggregate-aware structural comparison so that
+				// record types with the same fields and base chain are treated as
+				// the same type across bundle-decode boundaries.
+				return identicalAggregate(Underlying(Ta), Underlying(Tb))
+			}
+			return false
 		}
 	}
 

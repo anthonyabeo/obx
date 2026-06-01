@@ -82,7 +82,6 @@ func (p *PipelineDriver) Run(prog *minir.Program) (*lower.LoweredProgram, error)
 		return nil, err
 	}
 
-
 	return &lower.LoweredProgram{MIR: mprog, Plans: plans}, nil
 }
 

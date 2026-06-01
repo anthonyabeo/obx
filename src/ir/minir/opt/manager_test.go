@@ -28,9 +28,9 @@ func TestNewPassManager(t *testing.T) {
 // TestConfigureFromLevel sets passes based on optimization level.
 func TestConfigureFromLevel(t *testing.T) {
 	tests := []struct {
-		level       int
+		level                int
 		shouldHaveFixedPoint bool
-		minPassCount int
+		minPassCount         int
 	}{
 		{0, false, 0},
 		{1, false, 1},
@@ -39,7 +39,7 @@ func TestConfigureFromLevel(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(strings.Join([]string{"O", string(rune('0'+tt.level))}, ""), func(t *testing.T) {
+		t.Run(strings.Join([]string{"O", string(rune('0' + tt.level))}, ""), func(t *testing.T) {
 			pm := miniropt.NewPassManager()
 			pm.ConfigureFromLevel(tt.level)
 
@@ -180,8 +180,8 @@ func TestRunOnModule(t *testing.T) {
 			SymTab: minir.SymbolTable{},
 		}
 
-		entry := &minir.Block{ID: i*2, Label: "entry", Preds: map[int]*minir.Block{}, Succs: map[int]*minir.Block{}}
-		exit := &minir.Block{ID: i*2+1, Label: "exit", Preds: map[int]*minir.Block{}, Succs: map[int]*minir.Block{}}
+		entry := &minir.Block{ID: i * 2, Label: "entry", Preds: map[int]*minir.Block{}, Succs: map[int]*minir.Block{}}
+		exit := &minir.Block{ID: i*2 + 1, Label: "exit", Preds: map[int]*minir.Block{}, Succs: map[int]*minir.Block{}}
 
 		entry.Term = &minir.JumpInst{Target: exit.Label}
 		entry.Instrs = append(entry.Instrs, entry.Term)
@@ -222,8 +222,8 @@ func TestRunOnProgram(t *testing.T) {
 			SymTab: minir.SymbolTable{},
 		}
 
-		entry := &minir.Block{ID: m*2, Label: "entry", Preds: map[int]*minir.Block{}, Succs: map[int]*minir.Block{}}
-		exit := &minir.Block{ID: m*2+1, Label: "exit", Preds: map[int]*minir.Block{}, Succs: map[int]*minir.Block{}}
+		entry := &minir.Block{ID: m * 2, Label: "entry", Preds: map[int]*minir.Block{}, Succs: map[int]*minir.Block{}}
+		exit := &minir.Block{ID: m*2 + 1, Label: "exit", Preds: map[int]*minir.Block{}, Succs: map[int]*minir.Block{}}
 
 		entry.Term = &minir.JumpInst{Target: exit.Label}
 		entry.Instrs = append(entry.Instrs, entry.Term)
@@ -481,12 +481,3 @@ func TestConfigurationPreservesOrder(t *testing.T) {
 		t.Fatal("expected statistics")
 	}
 }
-
-
-
-
-
-
-
-
-

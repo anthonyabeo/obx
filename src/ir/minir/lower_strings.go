@@ -39,4 +39,3 @@ func generateStringLiteralName(s string, idx int) string {
 	prefix := fmt.Sprintf("%x", h[:4])
 	return fmt.Sprintf("_Lstr_%s_%d", prefix, idx)
 }
-

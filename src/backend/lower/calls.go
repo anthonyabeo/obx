@@ -187,4 +187,3 @@ var knownDarwinVariadicFixedArgs = map[string]int{
 	"fscanf":   2,
 	"sscanf":   2,
 }
-

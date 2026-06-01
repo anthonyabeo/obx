@@ -172,4 +172,3 @@ func returnMoveInstr(tgt target.Target, src mir.Operand, retReg string) mir.Inst
 		return mir.NewMachineInstr("mov", []*mir.Register{dst}, []mir.Operand{src})
 	}
 }
-

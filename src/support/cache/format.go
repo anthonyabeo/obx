@@ -227,4 +227,3 @@ func ReadRecordPayload(r io.Reader, length uint32) ([]byte, error) {
 	}
 	return buf, nil
 }
-

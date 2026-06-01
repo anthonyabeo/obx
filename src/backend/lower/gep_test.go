@@ -147,7 +147,7 @@ func TestGEPLoweringNestedArray(t *testing.T) {
 		Dst:      addr,
 		Base:     base,
 		ElemType: minir.I32(),
-		Offsets:  []int{0, 0},    // both dynamic
+		Offsets:  []int{0, 0}, // both dynamic
 		Indices:  []minir.Value{i, j},
 	}
 
@@ -394,19 +394,3 @@ func TestGEPStrideComputation(t *testing.T) {
 		})
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

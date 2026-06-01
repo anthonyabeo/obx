@@ -10,8 +10,8 @@ import (
 
 type stubTarget struct{ name string }
 
-func (s stubTarget) Name() string { return s.name }
-func (s stubTarget) ABIInfo() target.ABI { return target.ABI{} }
+func (s stubTarget) Name() string                         { return s.name }
+func (s stubTarget) ABIInfo() target.ABI                  { return target.ABI{} }
 func (s stubTarget) SupportsIntegerScalar(*mir.Type) bool { return true }
 func (s stubTarget) LowerPhiBlock(string, []*mir.PhiInstr) (*target.PhiPlan, error) {
 	return &target.PhiPlan{}, nil
@@ -67,4 +67,3 @@ func TestLinkFlagsNonDarwinKeepsLibc(t *testing.T) {
 		t.Fatalf("linkFlags() = %v, want %v", got, want)
 	}
 }
-

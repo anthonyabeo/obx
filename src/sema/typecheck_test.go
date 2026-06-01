@@ -164,7 +164,7 @@ func TestTypeCheckInvalidPrograms(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name: "Invalid assignments - incompatible types",
+			name:     "Invalid assignments - incompatible types",
 			filename: "test.obx",
 			source: `
 		MODULE Test;

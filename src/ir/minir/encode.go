@@ -72,17 +72,17 @@ const (
 
 // ── value opcodes ─────────────────────────────────────────────────────────────
 const (
-	valNil          byte = 0x00
-	valConstInt     byte = 0x01
-	valConstFloat   byte = 0x02
-	valConstNamed   byte = 0x03
-	valTemp         byte = 0x04
-	valGlobalRef    byte = 0x05
-	valConstString  byte = 0x06 // [str] NameStr, [str] Value
-	valConstNil     byte = 0x07 // [str] NameStr, [T] type
-	valTypedInt     byte = 0x08 // [i64] value, [T] type          — typed anonymous int
-	valTypedNamed   byte = 0x09 // [str] name, [i64] value, [T] type — typed named const
-	valTypedFloat   byte = 0x0A // [f64] value, [T] type          — typed float const
+	valNil         byte = 0x00
+	valConstInt    byte = 0x01
+	valConstFloat  byte = 0x02
+	valConstNamed  byte = 0x03
+	valTemp        byte = 0x04
+	valGlobalRef   byte = 0x05
+	valConstString byte = 0x06 // [str] NameStr, [str] Value
+	valConstNil    byte = 0x07 // [str] NameStr, [T] type
+	valTypedInt    byte = 0x08 // [i64] value, [T] type          — typed anonymous int
+	valTypedNamed  byte = 0x09 // [str] name, [i64] value, [T] type — typed named const
+	valTypedFloat  byte = 0x0A // [f64] value, [T] type          — typed float const
 )
 
 // ── instruction opcodes ───────────────────────────────────────────────────────

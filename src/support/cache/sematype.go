@@ -458,4 +458,3 @@ func EncodeSemaTypeBytes(t types.Type) ([]byte, error) {
 	}
 	return buf.Bytes(), nil
 }
-

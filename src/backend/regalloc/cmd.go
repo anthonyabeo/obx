@@ -69,4 +69,3 @@ func allocateFunction(fn *mir.Function, tgt target.Target) (*mir.FrameLayout, er
 
 	return frame, nil
 }
-

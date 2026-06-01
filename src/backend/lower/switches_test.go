@@ -303,4 +303,3 @@ func TestLowerSwitchesProgramMultipleFunctions(t *testing.T) {
 		t.Fatal("SwitchInstr still present after LowerSwitchesInProgram")
 	}
 }
-

@@ -174,4 +174,3 @@ func updateVirtualRegClass(classes map[string]bool, r *mir.Register) {
 		classes[r.Name] = false
 	}
 }
-

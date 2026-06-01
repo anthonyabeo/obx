@@ -45,4 +45,3 @@ func TestEncodeDecodeInstrAddrInstr(t *testing.T) {
 		t.Fatalf("decoded Of mismatch: got %+v, want name=%q id=%d isAddr=true", outOf, of.NameStr, of.ID)
 	}
 }
-

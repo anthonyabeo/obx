@@ -210,12 +210,12 @@ func (s *Selector) SelectModule(mod *mir.Module) (*mir.Module, error) {
 	if mod == nil {
 		return nil, nil
 	}
-        out := mir.NewModule(mod.Name)
-        out.IsEntry = mod.IsEntry
-        out.DLLName = mod.DLLName
-        for _, g := range mod.Globals {
-                out.AddGlobal(g)
-        }
+	out := mir.NewModule(mod.Name)
+	out.IsEntry = mod.IsEntry
+	out.DLLName = mod.DLLName
+	for _, g := range mod.Globals {
+		out.AddGlobal(g)
+	}
 	for _, e := range mod.Externals {
 		out.AddExtern(e)
 	}

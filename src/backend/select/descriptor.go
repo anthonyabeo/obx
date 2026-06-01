@@ -344,4 +344,3 @@ type RecordField struct {
 	Sep string // "=" or ":"
 	Val *Value
 }
-

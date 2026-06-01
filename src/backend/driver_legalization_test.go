@@ -60,4 +60,3 @@ func TestPipelineDriverLegalizationRetargetsReturnMove(t *testing.T) {
 		t.Fatalf("return terminator was not normalized: %#v", mt)
 	}
 }
-

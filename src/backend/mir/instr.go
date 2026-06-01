@@ -81,10 +81,10 @@ func (i *AllocaInstr) String() string    { return fmt.Sprintf("alloca %s, #%d", 
 type GEPInstr struct {
 	Dst      *Register
 	Base     Operand
-	ElemType *Type        // the array element type (ArrayType); nil for scalar base
-	Strides  []int        // pre-computed bytes-per-element for each dimension (length = # dimensions)
-	Offsets  []int        // compile-time constant indices (0 = dynamic, consume from Indices)
-	Indices  []Operand    // runtime indices corresponding to each 0 in Offsets
+	ElemType *Type     // the array element type (ArrayType); nil for scalar base
+	Strides  []int     // pre-computed bytes-per-element for each dimension (length = # dimensions)
+	Offsets  []int     // compile-time constant indices (0 = dynamic, consume from Indices)
+	Indices  []Operand // runtime indices corresponding to each 0 in Offsets
 }
 
 func (i *GEPInstr) Defs() []*Register { return defs1(i.Dst) }

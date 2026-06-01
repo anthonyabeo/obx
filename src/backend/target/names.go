@@ -10,7 +10,6 @@ const (
 	RV64IMAFDName = "rv64imafd"
 
 	// Compatibility aliases still accepted by Lookup and CLI helpers.
-	RISCVAliasName    = "riscv"
-	RISCV64AliasName   = "riscv64"
+	RISCVAliasName   = "riscv"
+	RISCV64AliasName = "riscv64"
 )
-

@@ -18,4 +18,3 @@ func (s *switchLoweringStage) Run(p *backend.PipelineDriver, prog *mir.Program) 
 func init() {
 	backend.RegisterStage(backend.DefaultStageOrder[1], func() backend.Stage { return &switchLoweringStage{} })
 }
-

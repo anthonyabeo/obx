@@ -13,12 +13,12 @@ import (
 type PassID string
 
 const (
-	PassMem2Reg      PassID = "mem2reg"
-	PassLoadForward  PassID = "loadfwd"
-	PassConstFold    PassID = "constfold"
-	PassCleanCFG     PassID = "cleancfg"
-	PassSimplify     PassID = "simplify"
-	PassStrength     PassID = "strength"
+	PassMem2Reg     PassID = "mem2reg"
+	PassLoadForward PassID = "loadfwd"
+	PassConstFold   PassID = "constfold"
+	PassCleanCFG    PassID = "cleancfg"
+	PassSimplify    PassID = "simplify"
+	PassStrength    PassID = "strength"
 )
 
 // Pass describes a single optimization pass.
@@ -125,9 +125,9 @@ type PassLevel struct {
 // DefaultPassLevels returns the standard pass configuration for each opt level.
 func DefaultPassLevels() map[int][]PassID {
 	return map[int][]PassID{
-		0: {},                                                                          // None
-		1: {PassMem2Reg, PassLoadForward, PassConstFold, PassCleanCFG},                // Basic
-		2: {PassMem2Reg, PassLoadForward, PassConstFold, PassCleanCFG, PassSimplify},  // Default
+		0: {},                                                                                      // None
+		1: {PassMem2Reg, PassLoadForward, PassConstFold, PassCleanCFG},                             // Basic
+		2: {PassMem2Reg, PassLoadForward, PassConstFold, PassCleanCFG, PassSimplify},               // Default
 		3: {PassMem2Reg, PassLoadForward, PassConstFold, PassCleanCFG, PassSimplify, PassStrength}, // Aggressive
 	}
 }

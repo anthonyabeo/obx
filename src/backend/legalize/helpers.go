@@ -283,4 +283,3 @@ func abiReturnRegs(abi string) []string {
 		return nil
 	}
 }
-

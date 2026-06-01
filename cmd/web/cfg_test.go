@@ -259,4 +259,3 @@ func TestHandleStatic_MissingFileServes404Page(t *testing.T) {
 		t.Fatalf("expected custom 404 page, got: %s", body)
 	}
 }
-
