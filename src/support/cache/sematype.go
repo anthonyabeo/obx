@@ -12,6 +12,12 @@ package cache
 //	                      [bool] hasResult + [T?] result
 //	0x06  STYPE_VOID    – no payload
 //	0x07  STYPE_PTR     – [T] base type  (Oberon POINTER TO)
+//	0x08  STYPE_RECORD  – [4] field count + fields([str] name + [bool] exp + [T]) +
+//	                      [bool] hasBase + [T?] base
+//	0x09  STYPE_CSTRUCT – [4] field count + fields([str] name + [bool] exp + [T])
+//	0x0A  STYPE_CUNION  – [4] field count + fields([str] name + [bool] exp + [T])
+//	0x0B  STYPE_CARRAY  – [4] length (i32LE, -1 = open) + [T] elem
+//	0x0C  STYPE_ENUM    – [4] variant count + variants([str] name + [4] ordinal)
 
 import (
 	"bytes"
@@ -23,13 +29,18 @@ import (
 
 // sema type tag constants.
 const (
-	stypeBasic byte = 0x01
-	stypeCptr  byte = 0x02
-	stypeNamed byte = 0x03
-	stypeArray byte = 0x04
-	stypeProc  byte = 0x05
-	stypeVoid  byte = 0x06
-	stypePtr   byte = 0x07
+	stypeBasic   byte = 0x01
+	stypeCptr    byte = 0x02
+	stypeNamed   byte = 0x03
+	stypeArray   byte = 0x04
+	stypeProc    byte = 0x05
+	stypeVoid    byte = 0x06
+	stypePtr     byte = 0x07
+	stypeRecord  byte = 0x08
+	stypeCstruct byte = 0x09
+	stypeCunion  byte = 0x0A
+	stypeCarray  byte = 0x0B
+	stypeEnum    byte = 0x0C
 )
 
 // basicKindWire maps types.BasicKind → wire byte (identity cast is fine since
@@ -129,6 +140,99 @@ func EncodeSemaType(w io.Writer, t types.Type) error {
 		}
 		return EncodeSemaType(w, v.Base)
 
+	case *types.RecordType:
+		if err := WriteU8(w, stypeRecord); err != nil {
+			return err
+		}
+		if err := WriteU32LE(w, uint32(len(v.Fields))); err != nil {
+			return err
+		}
+		for _, f := range v.Fields {
+			if err := WriteString(w, f.Name); err != nil {
+				return err
+			}
+			if err := WriteBool(w, f.IsExported); err != nil {
+				return err
+			}
+			if err := EncodeSemaType(w, f.Type); err != nil {
+				return err
+			}
+		}
+		hasBase := v.Base != nil
+		if err := WriteBool(w, hasBase); err != nil {
+			return err
+		}
+		if hasBase {
+			return EncodeSemaType(w, v.Base)
+		}
+		return nil
+
+	case *types.CStructType:
+		if err := WriteU8(w, stypeCstruct); err != nil {
+			return err
+		}
+		if err := WriteU32LE(w, uint32(len(v.Fields))); err != nil {
+			return err
+		}
+		for _, f := range v.Fields {
+			if err := WriteString(w, f.Name); err != nil {
+				return err
+			}
+			if err := WriteBool(w, f.IsExported); err != nil {
+				return err
+			}
+			if err := EncodeSemaType(w, f.Type); err != nil {
+				return err
+			}
+		}
+		return nil
+
+	case *types.CUnionType:
+		if err := WriteU8(w, stypeCunion); err != nil {
+			return err
+		}
+		if err := WriteU32LE(w, uint32(len(v.Fields))); err != nil {
+			return err
+		}
+		for _, f := range v.Fields {
+			if err := WriteString(w, f.Name); err != nil {
+				return err
+			}
+			if err := WriteBool(w, f.IsExported); err != nil {
+				return err
+			}
+			if err := EncodeSemaType(w, f.Type); err != nil {
+				return err
+			}
+		}
+		return nil
+
+	case *types.CArrayType:
+		if err := WriteU8(w, stypeCarray); err != nil {
+			return err
+		}
+		if err := WriteI32LE(w, int32(v.Length)); err != nil {
+			return err
+		}
+		return EncodeSemaType(w, v.Elem)
+
+	case *types.EnumType:
+		if err := WriteU8(w, stypeEnum); err != nil {
+			return err
+		}
+		if err := WriteU32LE(w, uint32(len(v.Variants))); err != nil {
+			return err
+		}
+		for name, ord := range v.Variants {
+			if err := WriteString(w, name); err != nil {
+				return err
+			}
+			if err := WriteI32LE(w, int32(ord)); err != nil {
+				return err
+			}
+		}
+		return nil
+
 	default:
 		// Void / unknown
 		return WriteU8(w, stypeVoid)
@@ -224,6 +328,119 @@ func DecodeSemaType(r io.Reader) (types.Type, error) {
 			return nil, err
 		}
 		return &types.PointerType{Base: base}, nil
+
+	case stypeRecord:
+		fieldCount, err := ReadU32LE(r)
+		if err != nil {
+			return nil, err
+		}
+		fields := make([]*types.Field, fieldCount)
+		for i := range fields {
+			name, err := ReadString(r)
+			if err != nil {
+				return nil, err
+			}
+			exported, err := ReadBool(r)
+			if err != nil {
+				return nil, err
+			}
+			ft, err := DecodeSemaType(r)
+			if err != nil {
+				return nil, err
+			}
+			fields[i] = &types.Field{Name: name, Type: ft, IsExported: exported}
+		}
+		hasBase, err := ReadBool(r)
+		if err != nil {
+			return nil, err
+		}
+		rec := &types.RecordType{Fields: fields}
+		if hasBase {
+			baseType, err := DecodeSemaType(r)
+			if err != nil {
+				return nil, err
+			}
+			if bt, ok := baseType.(*types.RecordType); ok {
+				rec.Base = bt
+			}
+		}
+		return rec, nil
+
+	case stypeCstruct:
+		fieldCount, err := ReadU32LE(r)
+		if err != nil {
+			return nil, err
+		}
+		fields := make([]*types.Field, fieldCount)
+		for i := range fields {
+			name, err := ReadString(r)
+			if err != nil {
+				return nil, err
+			}
+			exported, err := ReadBool(r)
+			if err != nil {
+				return nil, err
+			}
+			ft, err := DecodeSemaType(r)
+			if err != nil {
+				return nil, err
+			}
+			fields[i] = &types.Field{Name: name, Type: ft, IsExported: exported}
+		}
+		return &types.CStructType{Fields: fields}, nil
+
+	case stypeCunion:
+		fieldCount, err := ReadU32LE(r)
+		if err != nil {
+			return nil, err
+		}
+		fields := make([]*types.Field, fieldCount)
+		for i := range fields {
+			name, err := ReadString(r)
+			if err != nil {
+				return nil, err
+			}
+			exported, err := ReadBool(r)
+			if err != nil {
+				return nil, err
+			}
+			ft, err := DecodeSemaType(r)
+			if err != nil {
+				return nil, err
+			}
+			fields[i] = &types.Field{Name: name, Type: ft, IsExported: exported}
+		}
+		return &types.CUnionType{Fields: fields}, nil
+
+	case stypeCarray:
+		length, err := ReadI32LE(r)
+		if err != nil {
+			return nil, err
+		}
+		elem, err := DecodeSemaType(r)
+		if err != nil {
+			return nil, err
+		}
+		return &types.CArrayType{Length: int(length), Elem: elem}, nil
+
+	case stypeEnum:
+		varCount, err := ReadU32LE(r)
+		if err != nil {
+			return nil, err
+		}
+		variants := make(map[string]int, varCount)
+		for i := uint32(0); i < varCount; i++ {
+			name, err := ReadString(r)
+			if err != nil {
+				return nil, err
+			}
+			ord, err := ReadI32LE(r)
+			if err != nil {
+				return nil, err
+			}
+			variants[name] = int(ord)
+		}
+		return &types.EnumType{Variants: variants}, nil
 
 	case stypeVoid:
 		return types.VoidType, nil

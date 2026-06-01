@@ -18,6 +18,7 @@ import (
 	"github.com/anthonyabeo/obx/src/ir/minir"
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/syntax/ast"
+	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
 // Bundle is the decoded content of an .obxi file.
@@ -105,6 +106,13 @@ func DecodeBundle(data []byte, srcContent []byte) (*Bundle, error) {
 		}
 
 		switch tag {
+		case TagSymConst:
+			sym, err := decodeConstSymbol(payload)
+			if err != nil {
+				return nil, fmt.Errorf("cache: decode ConstantSymbol: %w", err)
+			}
+			bundle.Scope.Insert(sym)
+
 		case TagSymType:
 			sym, err := decodeTypeSymbol(payload)
 			if err != nil {
@@ -125,6 +133,15 @@ func DecodeBundle(data []byte, srcContent []byte) (*Bundle, error) {
 				return nil, fmt.Errorf("cache: decode ProcSymbol: %w", err)
 			}
 			bundle.Scope.Insert(sym)
+
+		case TagMirModuleMeta:
+			// Module-level metadata: currently just DLLName.
+			r := bytes.NewReader(payload)
+			dllName, err := ReadString(r)
+			if err != nil {
+				return nil, fmt.Errorf("cache: decode module DLLName: %w", err)
+			}
+			bundle.Module.DLLName = dllName
 
 		case TagMirExtern, TagMirGlobal, TagMirConst, TagMirFunc:
 			// The payload was encoded by minir's per-entity encoders (EncodeGlobalVar,
@@ -292,6 +309,45 @@ func wireProps(b byte) ast.IdentProps {
 	default:
 		return ast.Unexported
 	}
+}
+
+func decodeConstSymbol(payload []byte) (*ast.ConstantSymbol, error) {
+	r := bytes.NewReader(payload)
+	name, err := ReadString(r)
+	if err != nil {
+		return nil, err
+	}
+	propsByte, err := ReadU8(r)
+	if err != nil {
+		return nil, err
+	}
+	mangled, err := ReadString(r)
+	if err != nil {
+		return nil, err
+	}
+	stype, err := DecodeSemaType(r)
+	if err != nil {
+		return nil, err
+	}
+	litKindRaw, err := ReadU32LE(r)
+	if err != nil {
+		return nil, err
+	}
+	litVal, err := ReadString(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Reconstruct the BasicLit value so sema can evaluate the constant.
+	var value ast.Expression
+	if litKindRaw != 0 && litVal != "" {
+		value = &ast.BasicLit{Kind: token.Kind(litKindRaw), Val: litVal, SemaType: stype}
+	}
+
+	sym := ast.NewConstantSymbol(name, wireProps(propsByte), value)
+	sym.SetType(stype)
+	sym.SetMangledName(mangled)
+	return sym, nil
 }
 
 // ── DefToBundle: .def source → Bundle (for precompile-stdlib) ─────────────────

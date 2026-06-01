@@ -41,15 +41,17 @@ var Magic = [8]byte{'O', 'B', 'X', 'I', 'v', '0', '1', 0}
 // Record tag constants.
 const (
 	// Sema symbol records.
-	TagSymType byte = 0x01
-	TagSymVar  byte = 0x02
-	TagSymProc byte = 0x03
+	TagSymType  byte = 0x01
+	TagSymVar   byte = 0x02
+	TagSymProc  byte = 0x03
+	TagSymConst byte = 0x04 // ConstantSymbol — name, props, mangledName, semaType, litKind, litVal
 
 	// minir section records.
-	TagMirExtern byte = 0x10
-	TagMirGlobal byte = 0x11
-	TagMirConst  byte = 0x12
-	TagMirFunc   byte = 0x13
+	TagMirExtern     byte = 0x10
+	TagMirGlobal     byte = 0x11
+	TagMirConst      byte = 0x12
+	TagMirFunc       byte = 0x13
+	TagMirModuleMeta byte = 0x14 // module-level metadata: DLLName
 )
 
 // IdentProps wire codes (must match ast.IdentProps bit positions).

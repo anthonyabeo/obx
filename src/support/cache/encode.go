@@ -55,8 +55,8 @@ func (e *Encoder) WriteHeader(moduleName string, srcContent []byte) error {
 // ── Sema scope ────────────────────────────────────────────────────────────────
 
 // WriteScope serialises all symbols in scope into TagSym* records.
-// Only TypeSymbol, VariableSymbol, and ProcedureSymbol are serialised; other
-// symbol kinds (module, field, param) are skipped.
+// Only TypeSymbol, VariableSymbol, ProcedureSymbol, and ConstantSymbol are
+// serialized; other symbol kinds (module, field, param) are skipped.
 func (e *Encoder) WriteScope(scope *ast.LexicalScope) error {
 	for _, sym := range scope.Elems() {
 		switch s := sym.(type) {
@@ -70,6 +70,10 @@ func (e *Encoder) WriteScope(scope *ast.LexicalScope) error {
 			}
 		case *ast.ProcedureSymbol:
 			if err := e.writeProcSymbol(s); err != nil {
+				return err
+			}
+		case *ast.ConstantSymbol:
+			if err := e.writeConstSymbol(s); err != nil {
 				return err
 			}
 		}
@@ -159,6 +163,16 @@ func (e *Encoder) writeProcSymbol(s *ast.ProcedureSymbol) error {
 // Previous versions wrote raw minir bytes (opcodes 0x20–0x23) that the decoder
 // never matched (it expected 0x10–0x13), silently producing empty modules.
 func (e *Encoder) WriteModule(m *minir.Module) error {
+	// Write module-level metadata (DLLName) so the decoder can restore it.
+	if m.DLLName != "" {
+		var mbuf bytes.Buffer
+		if err := WriteString(&mbuf, m.DLLName); err != nil {
+			return fmt.Errorf("encode module DLLName: %w", err)
+		}
+		if err := WriteRecord(e.w, TagMirModuleMeta, mbuf.Bytes()); err != nil {
+			return err
+		}
+	}
 	for _, gv := range m.Globals {
 		var buf bytes.Buffer
 		if err := minir.EncodeGlobalVar(&buf, gv); err != nil {
@@ -226,6 +240,41 @@ func SaveBundle(path string, moduleName string, src []byte,
 		}
 	}
 	return nil
+}
+
+// writeConstSymbol serialises a ConstantSymbol.
+// The Value field (AST Expression) is stored as a (litKind u32, litVal string)
+// pair sourced from the *ast.BasicLit that the constant evaluates to.
+// If the Value is nil or is not a *ast.BasicLit, litKind=0 and litVal="" are
+// written so the decoder can still reconstruct a placeholder symbol.
+func (e *Encoder) writeConstSymbol(s *ast.ConstantSymbol) error {
+	var buf bytes.Buffer
+	if err := WriteString(&buf, s.Name()); err != nil {
+		return err
+	}
+	if err := WriteU8(&buf, propsWire(s.Props())); err != nil {
+		return err
+	}
+	if err := WriteString(&buf, s.MangledName()); err != nil {
+		return err
+	}
+	if err := EncodeSemaType(&buf, s.Type()); err != nil {
+		return err
+	}
+	// Encode the concrete value as (litKind u32LE, litVal string).
+	var litKind uint32
+	var litVal string
+	if lit, ok := s.Value.(*ast.BasicLit); ok && lit != nil {
+		litKind = uint32(lit.Kind)
+		litVal = lit.Val
+	}
+	if err := WriteU32LE(&buf, litKind); err != nil {
+		return err
+	}
+	if err := WriteString(&buf, litVal); err != nil {
+		return err
+	}
+	return WriteRecord(e.w, TagSymConst, buf.Bytes())
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
