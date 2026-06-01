@@ -1,6 +1,7 @@
 package regalloc
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/backend/mir"
@@ -281,6 +282,138 @@ func TestColorGraphPrecolorsThreeParams(t *testing.T) {
 		if got := result.mapVRegToPReg[tc.param]; got != tc.want {
 			t.Errorf("param[%d] %q mapped to %q, want %q", i, tc.param, got, tc.want)
 		}
+	}
+}
+
+func TestFixCallArgMoveGroupsLinearizesMachineMovsBeforeBL(t *testing.T) {
+	i64 := mir.NewScalarType("i64", 8)
+	instrs := []mir.Instr{
+		&mir.MachineInstr{Op: "mov", Dsts: []*mir.Register{{Name: "x0", Kind: mir.PhysicalReg, Ty: i64}}, Srcs: []mir.Operand{&mir.Register{Name: "x1", Kind: mir.PhysicalReg, Ty: i64}}},
+		&mir.MachineInstr{Op: "mov", Dsts: []*mir.Register{{Name: "x1", Kind: mir.PhysicalReg, Ty: i64}}, Srcs: []mir.Operand{&mir.Register{Name: "x2", Kind: mir.PhysicalReg, Ty: i64}}},
+		&mir.MachineInstr{Op: "mov", Dsts: []*mir.Register{{Name: "x2", Kind: mir.PhysicalReg, Ty: i64}}, Srcs: []mir.Operand{&mir.Register{Name: "x0", Kind: mir.PhysicalReg, Ty: i64}}},
+		&mir.MachineInstr{Op: "bl", Srcs: []mir.Operand{&mir.Symbol{Name: "fprintf", Ty: i64}}},
+	}
+
+	got := fixCallArgMoveGroups(instrs)
+	if len(got) != 5 {
+		t.Fatalf("expected 5 instructions after linearization (4 moves + call), got %d", len(got))
+	}
+
+	sawTemp := false
+	for i := 0; i < 4; i++ {
+		mv, ok := got[i].(*mir.MoveInstr)
+		if !ok {
+			t.Fatalf("instr[%d] = %T, want *mir.MoveInstr", i, got[i])
+		}
+		if mv.Dst != nil && mv.Dst.Name == "x15" {
+			sawTemp = true
+		}
+	}
+	if !sawTemp {
+		t.Fatalf("expected a temp move using x15 to break cycle, got %#v", got[:4])
+	}
+
+	if _, ok := got[4].(*mir.MachineInstr); !ok {
+		t.Fatalf("last instruction = %T, want *mir.MachineInstr call", got[4])
+	}
+}
+
+func TestRewriteAllocaInstrMaterializesFrameAddress(t *testing.T) {
+	i64 := mir.NewScalarType("i64", 8)
+	alloc := &regAllocResult{
+		mapVRegToPReg: map[string]string{"slotptr": "x0"},
+		scratchRegs:   []string{"x15"},
+	}
+	frame := mir.NewFrameLayout()
+	frame.AllocaSlots["slotptr"] = -8
+	abi := target.ABI{WordSize: 8, Align: 16, StackPointer: "sp", FramePointer: "x29"}
+
+	ins := &mir.AllocaInstr{Dst: &mir.Register{Name: "slotptr", Kind: mir.VirtualReg, Ty: i64}, Size: 8}
+	rewritten, pre, post, err := rewriteInstr(ins, map[string]bool{}, alloc, frame, abi, &blockAnalysis{})
+	if err != nil {
+		t.Fatalf("rewriteInstr(alloca) failed: %v", err)
+	}
+	if len(pre) != 0 || len(post) != 0 {
+		t.Fatalf("alloca pre/post = %d/%d, want 0/0", len(pre), len(post))
+	}
+	mi, ok := rewritten.(*mir.MachineInstr)
+	if !ok {
+		t.Fatalf("rewriteInstr(alloca) = %T, want *mir.MachineInstr", rewritten)
+	}
+	if mi.Op != "sub" {
+		t.Fatalf("alloca opcode = %q, want %q", mi.Op, "sub")
+	}
+	if len(mi.Dsts) != 1 || mi.Dsts[0].Name != "x0" {
+		t.Fatalf("alloca dst = %#v, want x0", mi.Dsts)
+	}
+	if len(mi.Srcs) != 2 {
+		t.Fatalf("alloca src count = %d, want 2", len(mi.Srcs))
+	}
+	base, ok := mi.Srcs[0].(*mir.Register)
+	if !ok || base.Name != "x29" {
+		t.Fatalf("alloca base = %#v, want x29", mi.Srcs[0])
+	}
+	off, ok := mi.Srcs[1].(*mir.Immediate)
+	if !ok || off.Value != 8 {
+		t.Fatalf("alloca offset = %#v, want immediate 8", mi.Srcs[1])
+	}
+}
+
+func TestFoldStringPointerWriteCallsRemovesStackStagingStore(t *testing.T) {
+	i64 := mir.NewScalarType("i64", 8)
+	seq := []mir.Instr{
+		&mir.MachineInstr{Op: "sub", Dsts: []*mir.Register{{Name: "x0", Kind: mir.PhysicalReg, Ty: i64}}, Srcs: []mir.Operand{&mir.Register{Name: "x29", Kind: mir.PhysicalReg, Ty: i64}, &mir.Immediate{Value: 44, Ty: i64}}},
+		&mir.MoveInstr{Dst: &mir.Register{Name: "x1", Kind: mir.PhysicalReg, Ty: i64}, Src: &mir.Symbol{Name: "_Lstr", Ty: i64}},
+		&mir.StoreInstr{Addr: &mir.Register{Name: "x0", Kind: mir.PhysicalReg, Ty: i64}, Value: &mir.Register{Name: "x1", Kind: mir.PhysicalReg, Ty: i64}},
+		&mir.MoveInstr{Dst: &mir.Register{Name: "x0", Kind: mir.PhysicalReg, Ty: i64}, Src: &mir.Register{Name: "x0", Kind: mir.PhysicalReg, Ty: i64}},
+		&mir.CallInstr{Callee: &mir.Symbol{Name: "IO$Write", Ty: i64}},
+	}
+
+	got := foldStringPointerWriteCalls(seq)
+	if len(got) != 4 {
+		t.Fatalf("expected 4 instructions after fold, got %d", len(got))
+	}
+	if _, ok := got[2].(*mir.StoreInstr); ok {
+		t.Fatalf("expected staging store to be removed")
+	}
+	mv, ok := got[2].(*mir.MoveInstr)
+	if !ok {
+		t.Fatalf("expected direct arg move at index 2, got %T", got[2])
+	}
+	if mv.Dst == nil || mv.Dst.Name != "x0" {
+		t.Fatalf("expected move dst x0, got %#v", mv.Dst)
+	}
+	if src, ok := mv.Src.(*mir.Register); !ok || src.Name != "x1" {
+		t.Fatalf("expected move src x1, got %#v", mv.Src)
+	}
+}
+
+func TestFoldStringPointerWriteCallsHandlesMachineStoreAndBL(t *testing.T) {
+	i64 := mir.NewScalarType("i64", 8)
+	seq := []mir.Instr{
+		&mir.MachineInstr{Op: "sub", Dsts: []*mir.Register{{Name: "x0", Kind: mir.PhysicalReg, Ty: i64}}, Srcs: []mir.Operand{&mir.Register{Name: "x29", Kind: mir.PhysicalReg, Ty: i64}, &mir.Immediate{Value: 44, Ty: i64}}},
+		&mir.MachineInstr{Op: "mov", Dsts: []*mir.Register{{Name: "x1", Kind: mir.PhysicalReg, Ty: i64}}, Srcs: []mir.Operand{&mir.Symbol{Name: "_Lstr", Ty: i64}}},
+		&mir.MachineInstr{Op: "store", Srcs: []mir.Operand{&mir.Register{Name: "x1", Kind: mir.PhysicalReg, Ty: i64}, &mir.Register{Name: "x0", Kind: mir.PhysicalReg, Ty: i64}}},
+		&mir.MachineInstr{Op: "mov", Dsts: []*mir.Register{{Name: "x0", Kind: mir.PhysicalReg, Ty: i64}}, Srcs: []mir.Operand{&mir.Register{Name: "x0", Kind: mir.PhysicalReg, Ty: i64}}},
+		&mir.MachineInstr{Op: "bl", Srcs: []mir.Operand{&mir.Symbol{Name: "IO$Write", Ty: i64}}},
+	}
+
+	got := foldStringPointerWriteCalls(seq)
+	if len(got) != 4 {
+		t.Fatalf("expected 4 instructions after fold, got %d", len(got))
+	}
+	if mi, ok := got[2].(*mir.MachineInstr); ok && strings.ToLower(mi.Op) == "store" {
+		t.Fatalf("expected staging machine store to be removed")
+	}
+	mv, ok := got[2].(*mir.MoveInstr)
+	if !ok {
+		t.Fatalf("expected direct arg move at index 2, got %T", got[2])
+	}
+	if mv.Dst == nil || mv.Dst.Name != "x0" {
+		t.Fatalf("expected move dst x0, got %#v", mv.Dst)
+	}
+	if src, ok := mv.Src.(*mir.Register); !ok || src.Name != "x1" {
+		t.Fatalf("expected move src x1, got %#v", mv.Src)
 	}
 }
 

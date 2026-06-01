@@ -35,6 +35,8 @@ func (p *Program) ModuleByName(name string) *Module {
 // Module groups functions and module-scope data.
 type Module struct {
 	Name      string
+	IsEntry   bool
+	DLLName   string // non-empty for DEFINITION modules (e.g. "libc")
 	Globals   []*GlobalDecl
 	Externals []*ExternDecl
 	Constants []*ConstDecl
@@ -49,6 +51,7 @@ type Module struct {
 func NewModule(name string) *Module {
 	return &Module{
 		Name:            name,
+		IsEntry:         false,
 		Globals:         make([]*GlobalDecl, 0),
 		Externals:       make([]*ExternDecl, 0),
 		Constants:       make([]*ConstDecl, 0),
@@ -122,10 +125,11 @@ func (m *Module) FunctionByName(name string) *Function {
 
 // GlobalDecl models a module-scope mutable global.
 type GlobalDecl struct {
-	Name    string
-	Type    *Type
-	Linkage Linkage
-	Init    Operand
+	Name        string
+	Type        *Type
+	Linkage     Linkage
+	Init        Operand
+	IsExternRef bool // true = reference to symbol defined in another module; emit .extern, not BSS
 }
 
 func NewGlobalDecl(name string, ty *Type, linkage Linkage, init Operand) *GlobalDecl {
@@ -138,6 +142,9 @@ type ExternDecl struct {
 	Type     *Type
 	DLLName  string
 	Variadic bool
+	// FixedArgCount is the number of non-variadic parameters in the declared
+	// extern signature. For non-variadic externs this is the full arity.
+	FixedArgCount int
 	CallConv string
 	Linkage  Linkage
 }

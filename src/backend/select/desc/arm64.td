@@ -760,6 +760,20 @@ block arithmetic {
 	  instr { opcode: "add"; dst: $rd; src: [$rd, pageoff($sym)]; def: $rd; uses: [$rd]; };
 	}
   }
+
+  // addr(rd, rs) -> add rd, rs, #0
+  // Used when addr-of is applied to a value that is already an address in a register.
+  rule ADDR_reg {
+  match {
+    out $rd : GPR:virt;
+    in $rs : GPR:virt;
+    pattern addr($rs);
+  }
+  cost 1;
+  emit {
+    instr { opcode: "add"; dst: $rd; src: [$rs, 0]; def: $rd; uses: [$rs]; };
+  }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -849,6 +863,113 @@ block move {
 //	}
  // }
 
+}
+
+// ---------------------------------------------------------------------------
+// Cast lowering.
+//
+// These MIR cast ops are represented as unary nodes in selector classification.
+// For now, lower them as register moves so they enter machine-instr form and
+// participate in register allocation.
+// ---------------------------------------------------------------------------
+
+block casts {
+
+  rule CAST_bitcast {
+  match {
+    out $rd : GPR:virt;
+    in $rs : any;
+    pattern bitcast($rs);
+  }
+  cost 1;
+  emit {
+    instr { opcode: "mov"; dst: $rd; src: [$rs]; def: $rd; uses: [$rs]; };
+  }
+  }
+
+  rule CAST_trunc {
+  match {
+    out $rd : GPRStrict:virt;
+    in $rs : GPRStrict:virt;
+    pattern trunc($rs);
+  }
+  cost 1;
+  emit {
+    instr { opcode: "trunc"; dst: $rd; src: [$rs]; def: $rd; uses: [$rs]; };
+  }
+  }
+
+  rule CAST_zext {
+  match {
+    out $rd : GPRStrict:virt;
+    in $rs : GPRStrict:virt;
+    pattern zext($rs);
+  }
+  cost 1;
+  emit {
+    instr { opcode: "zext"; dst: $rd; src: [$rs]; def: $rd; uses: [$rs]; };
+  }
+  }
+
+  rule CAST_sext {
+  match {
+    out $rd : GPRStrict:virt;
+    in $rs : GPRStrict:virt;
+    pattern sext($rs);
+  }
+  cost 1;
+  emit {
+    instr { opcode: "sext"; dst: $rd; src: [$rs]; def: $rd; uses: [$rs]; };
+  }
+  }
+
+  rule CAST_fpext {
+  match {
+    out $rd : FPRStrict:virt;
+    in $rs : FPRStrict:virt;
+    pattern fpext($rs);
+  }
+  cost 1;
+  emit {
+    instr { opcode: "fpext"; dst: $rd; src: [$rs]; def: $rd; uses: [$rs]; };
+  }
+  }
+
+  rule CAST_fptrunc {
+  match {
+    out $rd : FPRStrict:virt;
+    in $rs : FPRStrict:virt;
+    pattern fptrunc($rs);
+  }
+  cost 1;
+  emit {
+    instr { opcode: "fptrunc"; dst: $rd; src: [$rs]; def: $rd; uses: [$rs]; };
+  }
+  }
+
+  rule CAST_sitofp {
+  match {
+    out $rd : FPRStrict:virt;
+    in $rs : GPRStrict:virt;
+    pattern sitofp($rs);
+  }
+  cost 1;
+  emit {
+    instr { opcode: "sitofp"; dst: $rd; src: [$rs]; def: $rd; uses: [$rs]; };
+  }
+  }
+
+  rule CAST_fptosi {
+  match {
+    out $rd : GPRStrict:virt;
+    in $rs : FPRStrict:virt;
+    pattern fptosi($rs);
+  }
+  cost 1;
+  emit {
+    instr { opcode: "fptosi"; dst: $rd; src: [$rs]; def: $rd; uses: [$rs]; };
+  }
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/anthonyabeo/obx/src/backend/mir"
 )
@@ -159,7 +160,7 @@ func LinearizeParallelCopy(pc ParallelCopy) []Copy {
 
 		// All remaining copies form cycles; break the first one with a temp.
 		cycle := pending[0]
-		tmp := &mir.Register{Name: fmt.Sprintf("__pc_tmp%d", tmpSeq), Kind: mir.VirtualReg, Ty: copyType(cycle)}
+		tmp := newParallelCopyTemp(tmpSeq, cycle)
 		tmpSeq++
 		out = append(out, Copy{Dst: tmp, Src: cycle.Src})
 		cycleSrcReg, _ := cycle.Src.(*mir.Register)
@@ -171,6 +172,35 @@ func LinearizeParallelCopy(pc ParallelCopy) []Copy {
 	}
 
 	return out
+}
+
+func newParallelCopyTemp(seq int, cycle Copy) *mir.Register {
+	name := fmt.Sprintf("__pc_tmp%d", seq)
+	kind := mir.VirtualReg
+
+	seed := cycle.Dst
+	if seed == nil {
+		if srcReg, ok := cycle.Src.(*mir.Register); ok {
+			seed = srcReg
+		}
+	}
+
+	if seed != nil && seed.Kind == mir.PhysicalReg {
+		kind = mir.PhysicalReg
+		name = "x15"
+		if isFloatRegName(seed.Name) {
+			name = "d15"
+		}
+	}
+
+	return &mir.Register{Name: name, Kind: kind, Ty: copyType(cycle)}
+}
+
+func isFloatRegName(name string) bool {
+	if name == "" {
+		return false
+	}
+	return strings.HasPrefix(name, "d") || strings.HasPrefix(name, "s")
 }
 
 // BuildSwitchPlan validates the switch and chooses jump-table lowering when the
@@ -240,7 +270,15 @@ func BuildCallPlan(call *mir.CallInstr, abi ABI) (*CallPlan, error) {
 
 	for i, arg := range call.Args {
 		if !supportsIntegerOperand(arg) {
-			return nil, fmt.Errorf("call argument %d (%s) has unsupported type", i, arg)
+			tyStr := "<nil>"
+			if r, ok := arg.(*mir.Register); ok && r.Type() != nil {
+				tyStr = r.Type().String()
+			} else if imm, ok := arg.(*mir.Immediate); ok && imm.Type() != nil {
+				tyStr = imm.Type().String()
+			} else if sym, ok := arg.(*mir.Symbol); ok && sym.Type() != nil {
+				tyStr = sym.Type().String()
+			}
+			return nil, fmt.Errorf("call argument %d (%s) has unsupported type %s", i, arg, tyStr)
 		}
 		loc := ArgLocation{Index: i, Value: arg}
 		if reg, ok := abi.ArgReg(i); ok {
@@ -378,6 +416,8 @@ func supportsIntegerOperand(op mir.Operand) bool {
 	case *mir.Register:
 		return SupportsIntegerScalar(v.Type())
 	case *mir.Immediate:
+		return SupportsIntegerScalar(v.Type())
+	case *mir.Symbol:
 		return SupportsIntegerScalar(v.Type())
 	default:
 		return false

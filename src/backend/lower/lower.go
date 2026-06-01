@@ -41,6 +41,8 @@ func LowerModule(mod *minir.Module) (*mir.Module, error) {
 		return nil, fmt.Errorf("lower module: nil module")
 	}
 	out := mir.NewModule(mod.Name)
+	out.IsEntry = mod.IsEntry
+	out.DLLName = mod.DLLName
 	globalsByName := make(map[string]*mir.Symbol)
 
 	for _, g := range mod.Globals {
@@ -297,10 +299,40 @@ func lowerInstr(inst minir.Instr, regByTemp map[*minir.Temp]*mir.Register, globa
 		}
 
 		return &mir.AllocaInstr{Dst: dst, Size: allocSize}, nil
+	case *minir.AddrInstr:
+		of, err := lowerOperand(i.Of, regByTemp, globals)
+		if err != nil {
+			return nil, err
+		}
+		dst, err := lowerTemp(i.Dst, regByTemp)
+		if err != nil {
+			return nil, err
+		}
+		return &mir.UnaryInstr{Dst: dst, Op: "addr", X: of}, nil
 	case *minir.CastInst:
-		return nil, fmt.Errorf("cast lowering not implemented in first bridge pass")
+		src, err := lowerOperand(i.Src, regByTemp, globals)
+		if err != nil {
+			return nil, err
+		}
+		dst, err := lowerTemp(i.Dst, regByTemp)
+		if err != nil {
+			return nil, err
+		}
+		return &mir.UnaryInstr{Dst: dst, Op: i.Op, X: src}, nil
 	case *minir.FCmpInst:
-		return nil, fmt.Errorf("floating-point comparison lowering not implemented in first bridge pass")
+		left, err := lowerOperand(i.Left, regByTemp, globals)
+		if err != nil {
+			return nil, err
+		}
+		right, err := lowerOperand(i.Right, regByTemp, globals)
+		if err != nil {
+			return nil, err
+		}
+		dst, err := lowerTemp(i.Dst, regByTemp)
+		if err != nil {
+			return nil, err
+		}
+		return &mir.CompareInstr{Dst: dst, Pred: strings.ToLower(i.Pred), Left: left, Right: right}, nil
 	default:
 		return nil, fmt.Errorf("unsupported instruction type %T", inst)
 	}
@@ -423,6 +455,7 @@ func lowerGlobalVar(g *minir.GlobalVar) (*mir.GlobalDecl, *mir.Symbol, error) {
 		return nil, nil, err
 	}
 	decl := mir.NewGlobalDecl(g.Name, ty, lowerLinkage(g.Linkage), nil)
+	decl.IsExternRef = g.IsExternRef
 	if g.Init != nil {
 		init, err := lowerConstant(g.Init)
 		if err != nil {
@@ -455,6 +488,9 @@ func lowerExtern(e *minir.ExternalFunc) (*mir.ExternDecl, error) {
 	}
 	decl := mir.NewExternDecl(e.Name, nil)
 	decl.Linkage = lowerLinkage(e.Linkage)
+	if e.Sig != nil {
+		decl.FixedArgCount = len(e.Sig.Params)
+	}
 	if e.Attrs != nil {
 		decl.DLLName = e.Attrs.DLLName
 		decl.Variadic = e.Attrs.Variadic
@@ -491,6 +527,8 @@ func lowerType(ty minir.Type) (*mir.Type, error) {
 			return mir.NewScalarType("f32", 4), nil
 		case "f64":
 			return mir.NewScalarType("f64", 8), nil
+		case "void":
+			return mir.NewScalarType("void", 0), nil
 		default:
 			return nil, fmt.Errorf("unsupported primitive type %s", t.String())
 		}
@@ -501,30 +539,28 @@ func lowerType(ty minir.Type) (*mir.Type, error) {
 		}
 		return mir.NewPointerType(elem, 8), nil
 	case *minir.ArrayType:
-		return nil, fmt.Errorf("array types are not supported in the first bridge pass")
+		elem, err := lowerType(t.Elem)
+		if err != nil {
+			return nil, fmt.Errorf("array element type: %w", err)
+		}
+		arrTy := mir.NewArrayType(elem, t.Len)
+		arrTy.Size = t.Len * mirSizeOf(elem)
+		return arrTy, nil
 	case *minir.RecordType:
 		return nil, fmt.Errorf("record types are not supported in the first bridge pass")
 	case *minir.FunctionType:
 		return nil, fmt.Errorf("function types are not supported in the first bridge pass")
+	case *minir.OpenArrayType:
+		elem, err := lowerType(t.Elem)
+		if err != nil {
+			return nil, fmt.Errorf("open array element type: %w", err)
+		}
+		// Open arrays are represented as a pointer to the first element, so they
+		// have the same type as a pointer to the element type.
+		return mir.NewPointerType(elem, 8), nil
 	default:
 		return nil, fmt.Errorf("unsupported type %T", ty)
 	}
-}
-
-func lowerPointerElemType(ty *minir.PointerType) *mir.Type {
-	if ty == nil {
-		return nil
-	}
-	elem, _ := lowerType(ty.Elem)
-	return elem
-}
-
-func lowerTempType(t *minir.Temp) *mir.Type {
-	if t == nil {
-		return nil
-	}
-	res, _ := lowerType(t.Type())
-	return res
 }
 
 func lowerParamKind(kinds []desugar.ParamKind, idx int) string {
@@ -667,3 +703,16 @@ func lowerGEP(gepInst *minir.GEPInst, regByTemp map[*minir.Temp]*mir.Register, g
 	}, nil
 }
 
+// mirSizeOf returns the byte size of a lowered MIR type
+func mirSizeOf(ty *mir.Type) int {
+	if ty == nil {
+		return 8
+	}
+	if ty.Size > 0 {
+		return ty.Size
+	}
+	if ty.Len > 0 && ty.Elem != nil {
+		return ty.Len * mirSizeOf(ty.Elem)
+	}
+	return 8
+}

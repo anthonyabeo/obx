@@ -139,22 +139,149 @@ func TestLowerCallsStackArgs(t *testing.T) {
 	}
 
 	instrs := fn.Blocks[0].Instrs
-	// 8 reg moves + 2 stack stores + 1 bare call = 11
+	// 2 stack stores + 8 reg moves + 1 bare call = 11
 	if len(instrs) != 11 {
 		t.Fatalf("expected 11 instrs, got %d", len(instrs))
 	}
-	for i := 0; i < 8; i++ {
-		if _, ok := instrs[i].(*mir.MoveInstr); !ok {
-			t.Fatalf("instrs[%d]: expected MoveInstr, got %T", i, instrs[i])
-		}
-	}
-	for i := 8; i < 10; i++ {
+	for i := 0; i < 2; i++ {
 		if _, ok := instrs[i].(*mir.StoreInstr); !ok {
 			t.Fatalf("instrs[%d]: expected StoreInstr (stack arg), got %T", i, instrs[i])
 		}
 	}
+	for i := 2; i < 10; i++ {
+		if _, ok := instrs[i].(*mir.MoveInstr); !ok {
+			t.Fatalf("instrs[%d]: expected MoveInstr, got %T", i, instrs[i])
+		}
+	}
 	if _, ok := instrs[10].(*mir.CallInstr); !ok {
 		t.Fatalf("instrs[10]: expected bare CallInstr, got %T", instrs[10])
+	}
+}
+
+func TestLowerCallsARM64RegisterCycleUsesTemp(t *testing.T) {
+	tgt, err := target.Lookup(target.Arm64Name)
+	if err != nil {
+		t.Fatalf("lookup arm64 target: %v", err)
+	}
+	x0 := mir.NewRegister("x0", mir.PhysicalReg, i64)
+	x1 := mir.NewRegister("x1", mir.PhysicalReg, i64)
+	x2 := mir.NewRegister("x2", mir.PhysicalReg, i64)
+
+	fn := callFn(&mir.CallInstr{
+		Callee: mir.NewSymbol("foo", nil),
+		Args:   []mir.Operand{x1, x2, x0},
+	})
+	if err := lower.LowerCallsInFunction(fn, tgt); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	instrs := fn.Blocks[0].Instrs
+	if len(instrs) != 5 {
+		t.Fatalf("expected 5 instrs (4 moves + call), got %d", len(instrs))
+	}
+
+	sawTempMove := false
+	for i := 0; i < 4; i++ {
+		mv, ok := instrs[i].(*mir.MoveInstr)
+		if !ok {
+			t.Fatalf("instrs[%d]: expected MoveInstr, got %T", i, instrs[i])
+		}
+		if mv.Dst != nil && mv.Dst.Name == "x15" {
+			sawTempMove = true
+		}
+	}
+	if !sawTempMove {
+		t.Fatalf("expected temp register move to break cycle, got %v", instrs[:4])
+	}
+
+	if _, ok := instrs[4].(*mir.CallInstr); !ok {
+		t.Fatalf("instrs[4]: expected bare CallInstr, got %T", instrs[4])
+	}
+}
+
+func TestLowerCallsProgramARM64VariadicExternSpillsUnnamedArgs(t *testing.T) {
+	tgt, err := target.Lookup(target.Arm64Name)
+	if err != nil {
+		t.Fatalf("lookup arm64 target: %v", err)
+	}
+
+	mod := mir.NewModule("IO")
+	ext := mir.NewExternDecl("fprintf", nil)
+	ext.Variadic = true
+	ext.FixedArgCount = 2
+	mod.AddExtern(ext)
+
+	fn := mir.NewFunction("f", nil)
+	b := mir.NewBlock(0, "entry")
+	b.AddInstr(&mir.CallInstr{
+		Callee: mir.NewSymbol("fprintf", nil),
+		Args: []mir.Operand{
+			mir.NewRegister("stream", mir.VirtualReg, i64),
+			mir.NewRegister("fmt", mir.VirtualReg, i64),
+			mir.NewImmediate(610, i64),
+		},
+	})
+	fn.AddBlock(b)
+	mod.AddFunction(fn)
+
+	prog := mir.NewProgram()
+	prog.AddModule(mod)
+
+	if _, err := lower.LowerCallsInProgram(prog, tgt); err != nil {
+		t.Fatalf("LowerCallsInProgram failed: %v", err)
+	}
+
+	instrs := fn.Blocks[0].Instrs
+	if len(instrs) != 4 {
+		t.Fatalf("expected 4 instrs (store + 2 moves + call), got %d", len(instrs))
+	}
+	if _, ok := instrs[0].(*mir.StoreInstr); !ok {
+		t.Fatalf("instrs[0]: expected variadic stack StoreInstr, got %T", instrs[0])
+	}
+	if mv, ok := instrs[1].(*mir.MoveInstr); !ok || mv.Dst.Name != "x0" {
+		t.Fatalf("instrs[1]: expected move into x0, got %T %#v", instrs[1], instrs[1])
+	}
+	if mv, ok := instrs[2].(*mir.MoveInstr); !ok || mv.Dst.Name != "x1" {
+		t.Fatalf("instrs[2]: expected move into x1, got %T %#v", instrs[2], instrs[2])
+	}
+	if _, ok := instrs[3].(*mir.CallInstr); !ok {
+		t.Fatalf("instrs[3]: expected bare CallInstr, got %T", instrs[3])
+	}
+}
+
+func TestLowerCallsProgramARM64VariadicFallbackByName(t *testing.T) {
+	tgt, err := target.Lookup(target.Arm64Name)
+	if err != nil {
+		t.Fatalf("lookup arm64 target: %v", err)
+	}
+
+	mod := mir.NewModule("IO")
+	fn := mir.NewFunction("f", nil)
+	b := mir.NewBlock(0, "entry")
+	b.AddInstr(&mir.CallInstr{
+		Callee: mir.NewSymbol("fprintf", nil),
+		Args: []mir.Operand{
+			mir.NewRegister("stream", mir.VirtualReg, i64),
+			mir.NewRegister("fmt", mir.VirtualReg, i64),
+			mir.NewImmediate(610, i64),
+		},
+	})
+	fn.AddBlock(b)
+	mod.AddFunction(fn)
+
+	prog := mir.NewProgram()
+	prog.AddModule(mod)
+
+	if _, err := lower.LowerCallsInProgram(prog, tgt); err != nil {
+		t.Fatalf("LowerCallsInProgram failed: %v", err)
+	}
+
+	instrs := fn.Blocks[0].Instrs
+	if len(instrs) != 4 {
+		t.Fatalf("expected 4 instrs (store + 2 moves + call), got %d", len(instrs))
+	}
+	if _, ok := instrs[0].(*mir.StoreInstr); !ok {
+		t.Fatalf("instrs[0]: expected variadic stack StoreInstr, got %T", instrs[0])
 	}
 }
 

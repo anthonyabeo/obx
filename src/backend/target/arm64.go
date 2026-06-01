@@ -3,6 +3,7 @@ package target
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/anthonyabeo/obx/src/backend/mir"
@@ -55,17 +56,32 @@ func emitARM64Module(mod *mir.Module) string {
 	}
 
 	if len(mod.Globals) > 0 {
-		buf.WriteString("\t.section __DATA,__bss\n")
+		var bssGlobals []*mir.GlobalDecl
 		for _, g := range mod.Globals {
 			if g == nil || g.Name == "" {
 				continue
 			}
-			size := 8
-			if g.Type != nil && g.Type.Size > 0 {
-				size = g.Type.Size
+			if g.IsExternRef {
+				// Cross-module reference: declare as extern, not as a local BSS allocation.
+				buf.WriteString(fmt.Sprintf("\t.extern _%s\n", g.Name))
+			} else {
+				bssGlobals = append(bssGlobals, g)
 			}
-			buf.WriteString(fmt.Sprintf("\t.p2align 3\n_%s:\n\t.zero %d\n\n", g.Name, size))
 		}
+		if len(bssGlobals) > 0 {
+			buf.WriteString("\t.section __DATA,__bss\n")
+			for _, g := range bssGlobals {
+				size := 8
+				if g.Type != nil && g.Type.Size > 0 {
+					size = g.Type.Size
+				}
+				buf.WriteString(fmt.Sprintf("\t.globl _%s\n\t.p2align 3\n_%s:\n\t.zero %d\n\n", g.Name, g.Name, size))
+			}
+		}
+	}
+
+	if len(mod.Constants) > 0 {
+		emitARM64Constants(&buf, mod.Constants)
 	}
 
 	funcs := append([]*mir.Function(nil), mod.Functions...)
@@ -83,16 +99,103 @@ func emitARM64Module(mod *mir.Module) string {
 		if fn == nil {
 			continue
 		}
-		buf.WriteString(emitARM64Function(fn))
+		buf.WriteString(emitARM64Function(mod, fn))
+	}
+
+	// For DEFINITION modules with [dll "libc"], generate a platform-specific
+	// __init_<Name> function that loads the real stdio FILE* handles from libc
+	// globals into the module's stdin/stdout/stderr variables.  This is called
+	// automatically by the importer's prepended module-init call chain.
+	if mod.DLLName == "libc" {
+		if init := emitARM64StdioInit(mod); init != "" {
+			buf.WriteString(init)
+		}
 	}
 
 	return buf.String()
 }
 
-func emitARM64Function(fn *mir.Function) string {
+func emitARM64Constants(buf *strings.Builder, consts []*mir.ConstDecl) {
+	if buf == nil || len(consts) == 0 {
+		return
+	}
+
+	var cstrings []*mir.ConstDecl
+	var scalars []*mir.ConstDecl
+	for _, c := range consts {
+		if c == nil || c.Name == "" || c.Value == nil {
+			continue
+		}
+		if imm, ok := c.Value.(*mir.Immediate); ok {
+			if _, ok := imm.Value.(string); ok {
+				cstrings = append(cstrings, c)
+				continue
+			}
+		}
+		scalars = append(scalars, c)
+	}
+
+	if len(cstrings) > 0 {
+		buf.WriteString("\t.section __TEXT,__cstring,cstring_literals\n")
+		for _, c := range cstrings {
+			imm := c.Value.(*mir.Immediate)
+			s, _ := imm.Value.(string)
+			buf.WriteString(fmt.Sprintf("_%s:\n", c.Name))
+			buf.WriteString("\t.asciz " + strconv.Quote(s) + "\n")
+		}
+		buf.WriteString("\n")
+	}
+
+	if len(scalars) > 0 {
+		buf.WriteString("\t.section __DATA,__const\n")
+		for _, c := range scalars {
+			if imm, ok := c.Value.(*mir.Immediate); ok {
+				if lit, ok := arm64ConstDirective(imm, c.Type); ok {
+					buf.WriteString(fmt.Sprintf("\t.p2align 3\n_%s:\n\t%s\n", c.Name, lit))
+				}
+			}
+		}
+		buf.WriteString("\n")
+	}
+}
+
+func arm64ConstDirective(imm *mir.Immediate, ty *mir.Type) (string, bool) {
+	if imm == nil {
+		return "", false
+	}
+	sz := 8
+	if ty != nil && ty.Size > 0 {
+		sz = ty.Size
+	}
+	// Keep scalar emission conservative; string constants are handled separately.
+	switch v := imm.Value.(type) {
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		switch sz {
+		case 1:
+			return fmt.Sprintf(".byte %v", v), true
+		case 2:
+			return fmt.Sprintf(".short %v", v), true
+		case 4:
+			return fmt.Sprintf(".long %v", v), true
+		default:
+			return fmt.Sprintf(".quad %v", v), true
+		}
+	case float32:
+		return fmt.Sprintf(".float %v", v), true
+	case float64:
+		return fmt.Sprintf(".double %v", v), true
+	default:
+		return "", false
+	}
+}
+
+func emitARM64Function(mod *mir.Module, fn *mir.Function) string {
 	var buf strings.Builder
 	name := fn.Name
-	if strings.HasPrefix(name, "__init_") {
+	// Only rename the entry module's OWN init function to "main".
+	// Imported-module init functions keep their __init_<Name> symbols so the
+	// linker can distinguish them from the program entrypoint.
+	if mod != nil && mod.IsEntry && name == "__init_"+mod.Name {
 		name = "main"
 	}
 
@@ -135,17 +238,21 @@ func emitARM64Instr(instr mir.Instr) string {
 	case *mir.MachineInstr:
 		return emitARM64MachineInstr(i)
 	case *mir.MoveInstr:
-		return fmt.Sprintf("mov %s, %s", formatARM64Operand(i.Dst), formatARM64Operand(i.Src))
+		return emitARM64Move(formatARM64Operand(i.Dst), formatARM64Operand(i.Src))
 	case *mir.LoadInstr:
+		ldOp := arm64LoadOpcode(i.Dst.Type())
+		dstReg := formatARM64DataReg(i.Dst, i.Dst.Type())
 		if sym, ok := i.Addr.(*mir.Symbol); ok {
-			return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\tldr %s, [x9]", formatARM64Operand(sym), formatARM64Operand(sym), formatARM64Operand(i.Dst))
+			return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\t%s %s, [x9]", formatARM64Operand(sym), formatARM64Operand(sym), ldOp, dstReg)
 		}
-		return fmt.Sprintf("ldr %s, %s", formatARM64Operand(i.Dst), formatARM64Mem(i.Addr))
+		return fmt.Sprintf("%s %s, %s", ldOp, dstReg, formatARM64Mem(i.Addr))
 	case *mir.StoreInstr:
+		stOp := arm64StoreOpcode(i.Value.Type())
+		valReg := formatARM64DataReg(i.Value, i.Value.Type())
 		if sym, ok := i.Addr.(*mir.Symbol); ok {
-			return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\tstr %s, [x9]", formatARM64Operand(sym), formatARM64Operand(sym), formatARM64Operand(i.Value))
+			return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\t%s %s, [x9]", formatARM64Operand(sym), formatARM64Operand(sym), stOp, valReg)
 		}
-		return fmt.Sprintf("str %s, %s", formatARM64Operand(i.Value), formatARM64Mem(i.Addr))
+		return fmt.Sprintf("%s %s, %s", stOp, valReg, formatARM64Mem(i.Addr))
 	case *mir.BinaryInstr:
 		return fmt.Sprintf("%s %s, %s, %s", strings.ToLower(i.Op), formatARM64Operand(i.Dst), formatARM64Operand(i.Left), formatARM64Operand(i.Right))
 	case *mir.CompareInstr:
@@ -154,7 +261,29 @@ func emitARM64Instr(instr mir.Instr) string {
 		}
 		return fmt.Sprintf("cmp %s, %s", formatARM64Operand(i.Left), formatARM64Operand(i.Right))
 	case *mir.UnaryInstr:
-		return fmt.Sprintf("%s %s, %s", strings.ToLower(i.Op), formatARM64Operand(i.Dst), formatARM64Operand(i.X))
+		op := strings.ToLower(i.Op)
+		dst := formatARM64Operand(i.Dst)
+		src := formatARM64Operand(i.X)
+		switch op {
+		case "bitcast", "zext", "sext":
+			return emitARM64Move(dst, src)
+		case "sitofp":
+			return fmt.Sprintf("scvtf %s, %s", dst, src)
+		case "fptosi":
+			return fmt.Sprintf("fcvtzs %s, %s", dst, src)
+		case "fpext", "fptrunc":
+			return fmt.Sprintf("fcvt %s, %s", dst, src)
+		case "trunc":
+			if i.Dst != nil && i.Dst.Type() != nil {
+				if bits := i.Dst.Type().Size * 8; bits > 0 && bits < 64 {
+					mask := int64((uint64(1) << bits) - 1)
+					return fmt.Sprintf("and %s, %s, #%d", dst, src, mask)
+				}
+			}
+			return emitARM64Move(dst, src)
+		default:
+			return fmt.Sprintf("%s %s, %s", op, dst, src)
+		}
 	case *mir.CallInstr:
 		callee := formatARM64Operand(i.Callee)
 		line := fmt.Sprintf("bl %s", callee)
@@ -175,7 +304,12 @@ func emitARM64MachineInstr(i *mir.MachineInstr) string {
 	switch op {
 	case "nop":
 		return "nop"
-	case "mov", "add", "sub", "mul", "and", "orr", "eor", "lsl", "lsr", "asr", "madd", "msub":
+	case "mov":
+		if len(i.Dsts) > 0 && len(i.Srcs) > 0 {
+			return emitARM64Move(formatARM64Operand(i.Dsts[0]), formatARM64Operand(i.Srcs[0]))
+		}
+		return formatGenericARM64(i)
+	case "add", "sub", "mul", "and", "orr", "eor", "lsl", "lsr", "asr", "madd", "msub":
 		return formatGenericARM64(i)
 
 	// ── Frame prologue / epilogue ─────────────────────────────────────────────
@@ -221,26 +355,34 @@ func emitARM64MachineInstr(i *mir.MachineInstr) string {
 	case "str":
 		// str Rn, [base, #offset]  — MachineInstr form (odd-register spill)
 		if len(i.Srcs) >= 2 {
-			return fmt.Sprintf("str %s, %s", formatARM64Operand(i.Srcs[0]), formatARM64Mem(i.Srcs[1]))
+			op := arm64StoreOpcode(i.Srcs[0].Type())
+			reg := formatARM64DataReg(i.Srcs[0], i.Srcs[0].Type())
+			return fmt.Sprintf("%s %s, %s", op, reg, formatARM64Mem(i.Srcs[1]))
 		}
 	case "ldr":
 		// ldr Rn, [base, #offset]  — MachineInstr form (odd-register reload)
 		if len(i.Dsts) >= 1 && len(i.Srcs) >= 1 {
-			return fmt.Sprintf("ldr %s, %s", formatARM64Operand(i.Dsts[0]), formatARM64Mem(i.Srcs[0]))
+			op := arm64LoadOpcode(i.Dsts[0].Type())
+			reg := formatARM64DataReg(i.Dsts[0], i.Dsts[0].Type())
+			return fmt.Sprintf("%s %s, %s", op, reg, formatARM64Mem(i.Srcs[0]))
 		}
 	case "load":
 		if len(i.Dsts) > 0 && len(i.Srcs) > 0 {
+			op := arm64LoadOpcode(i.Dsts[0].Type())
+			reg := formatARM64DataReg(i.Dsts[0], i.Dsts[0].Type())
 			if sym, ok := i.Srcs[0].(*mir.Symbol); ok {
-				return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\tldr %s, [x9]", formatARM64Operand(sym), formatARM64Operand(sym), formatARM64Operand(i.Dsts[0]))
+				return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\t%s %s, [x9]", formatARM64Operand(sym), formatARM64Operand(sym), op, reg)
 			}
-			return fmt.Sprintf("ldr %s, %s", formatARM64Operand(i.Dsts[0]), formatARM64Mem(i.Srcs[0]))
+			return fmt.Sprintf("%s %s, %s", op, reg, formatARM64Mem(i.Srcs[0]))
 		}
 	case "store":
 		if len(i.Srcs) == 2 {
+			op := arm64StoreOpcode(i.Srcs[0].Type())
+			reg := formatARM64DataReg(i.Srcs[0], i.Srcs[0].Type())
 			if sym, ok := i.Srcs[1].(*mir.Symbol); ok {
-				return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\tstr %s, [x9]", formatARM64Operand(sym), formatARM64Operand(sym), formatARM64Operand(i.Srcs[0]))
+				return fmt.Sprintf("adrp x9, %s@PAGE\n\tadd x9, x9, %s@PAGEOFF\n\t%s %s, [x9]", formatARM64Operand(sym), formatARM64Operand(sym), op, reg)
 			}
-			return fmt.Sprintf("str %s, %s", formatARM64Operand(i.Srcs[0]), formatARM64Mem(i.Srcs[1]))
+			return fmt.Sprintf("%s %s, %s", op, reg, formatARM64Mem(i.Srcs[1]))
 		}
 	case "cmp":
 		return formatGenericARM64(i)
@@ -257,6 +399,18 @@ func emitARM64MachineInstr(i *mir.MachineInstr) string {
 		if len(i.Dsts) > 0 && len(i.Srcs) >= 2 {
 			return fmt.Sprintf("cmp %s, %s\n\tcset %s, %s", formatARM64Operand(i.Srcs[0]), formatARM64Operand(i.Srcs[1]), formatARM64Operand(i.Dsts[0]), arm64CondSuffix(op))
 		}
+	case "trunc":
+		return emitARM64Trunc(i)
+	case "zext":
+		return emitARM64ZExt(i)
+	case "sext":
+		return emitARM64SExt(i)
+	case "sitofp":
+		return emitARM64SIToFP(i)
+	case "fptosi":
+		return emitARM64FPToSI(i)
+	case "fpext", "fptrunc":
+		return emitARM64FPCvt(i)
 	case "call":
 		if len(i.Srcs) > 0 {
 			line := fmt.Sprintf("bl %s", formatARM64Operand(i.Srcs[0]))
@@ -389,6 +543,15 @@ func formatARM64Operand(op mir.Operand) string {
 	case nil:
 		return ""
 	case *mir.Register:
+		if strings.HasPrefix(v.Name, "__pc_tmp") {
+			if v.Type() != nil {
+				ty := strings.ToLower(v.Type().String())
+				if strings.HasPrefix(ty, "f") {
+					return "d15"
+				}
+			}
+			return "x15"
+		}
 		return v.Name
 	case *mir.Label:
 		return arm64Label(v.Name)
@@ -406,12 +569,220 @@ func formatARM64Operand(op mir.Operand) string {
 func formatARM64Mem(op mir.Operand) string {
 	m, ok := op.(*mir.Memory)
 	if !ok || m == nil {
+		if r, ok := op.(*mir.Register); ok && r != nil {
+			return fmt.Sprintf("[%s]", formatARM64Operand(r))
+		}
 		return formatARM64Operand(op)
 	}
 	if m.Offset == nil {
 		return fmt.Sprintf("[%s]", formatARM64Operand(m.Base))
 	}
 	return fmt.Sprintf("[%s, %s]", formatARM64Operand(m.Base), formatARM64Operand(m.Offset))
+}
+
+func emitARM64Move(dst, src string) string {
+	if dst == "" || src == "" {
+		return fmt.Sprintf("mov %s, %s", dst, src)
+	}
+	if strings.HasPrefix(src, "_") && isARM64XReg(dst) {
+		// Darwin AArch64 cannot encode symbol addresses with a plain mov.
+		// Materialize the address using page+pageoff relocations.
+		return fmt.Sprintf("adrp %s, %s@PAGE\n\tadd %s, %s, %s@PAGEOFF", dst, src, dst, dst, src)
+	}
+	if isARM64FloatReg(dst) || isARM64FloatReg(src) {
+		return fmt.Sprintf("fmov %s, %s", dst, src)
+	}
+	return fmt.Sprintf("mov %s, %s", dst, src)
+}
+
+func isARM64XReg(name string) bool {
+	if name == "xzr" || name == "sp" {
+		return true
+	}
+	if !strings.HasPrefix(name, "x") || len(name) < 2 {
+		return false
+	}
+	_, err := strconv.Atoi(name[1:])
+	return err == nil
+}
+
+func emitARM64Trunc(i *mir.MachineInstr) string {
+	if i == nil || len(i.Dsts) == 0 || len(i.Srcs) == 0 {
+		return formatGenericARM64(i)
+	}
+	dst := formatARM64Operand(i.Dsts[0])
+	src := formatARM64Operand(i.Srcs[0])
+
+	bw := scalarBitWidth(i.Dsts[0].Type())
+	switch {
+	case bw <= 0 || bw >= 64:
+		return emitARM64Move(dst, src)
+	default:
+		mask := (uint64(1) << bw) - 1
+		return fmt.Sprintf("and %s, %s, #%d", dst, src, mask)
+	}
+}
+
+func emitARM64ZExt(i *mir.MachineInstr) string {
+	if i == nil || len(i.Dsts) == 0 || len(i.Srcs) == 0 {
+		return formatGenericARM64(i)
+	}
+	dst := formatARM64Operand(i.Dsts[0])
+	src := formatARM64Operand(i.Srcs[0])
+
+	srcBits := scalarBitWidth(i.Srcs[0].Type())
+	if srcBits <= 0 || srcBits >= 64 {
+		return emitARM64Move(dst, src)
+	}
+	mask := (uint64(1) << srcBits) - 1
+	return fmt.Sprintf("and %s, %s, #%d", dst, src, mask)
+}
+
+func emitARM64SExt(i *mir.MachineInstr) string {
+	if i == nil || len(i.Dsts) == 0 || len(i.Srcs) == 0 {
+		return formatGenericARM64(i)
+	}
+	dst := formatARM64Operand(i.Dsts[0])
+	src := formatARM64Operand(i.Srcs[0])
+
+	srcBits := scalarBitWidth(i.Srcs[0].Type())
+	switch srcBits {
+	case 8:
+		return fmt.Sprintf("sxtb %s, %s", dst, src)
+	case 16:
+		return fmt.Sprintf("sxth %s, %s", dst, src)
+	case 32:
+		return fmt.Sprintf("sxtw %s, %s", dst, src)
+	default:
+		return emitARM64Move(dst, src)
+	}
+}
+
+func emitARM64SIToFP(i *mir.MachineInstr) string {
+	if i == nil || len(i.Dsts) == 0 || len(i.Srcs) == 0 {
+		return formatGenericARM64(i)
+	}
+	return fmt.Sprintf("scvtf %s, %s", formatARM64Operand(i.Dsts[0]), formatARM64Operand(i.Srcs[0]))
+}
+
+func emitARM64FPToSI(i *mir.MachineInstr) string {
+	if i == nil || len(i.Dsts) == 0 || len(i.Srcs) == 0 {
+		return formatGenericARM64(i)
+	}
+	return fmt.Sprintf("fcvtzs %s, %s", formatARM64Operand(i.Dsts[0]), formatARM64Operand(i.Srcs[0]))
+}
+
+func emitARM64FPCvt(i *mir.MachineInstr) string {
+	if i == nil || len(i.Dsts) == 0 || len(i.Srcs) == 0 {
+		return formatGenericARM64(i)
+	}
+	return fmt.Sprintf("fcvt %s, %s", formatARM64Operand(i.Dsts[0]), formatARM64Operand(i.Srcs[0]))
+}
+
+func scalarBitWidth(ty *mir.Type) int {
+	if ty == nil || ty.Size <= 0 {
+		return 0
+	}
+	return ty.Size * 8
+}
+
+func arm64LoadOpcode(ty *mir.Type) string {
+	if arm64IsFloatType(ty) {
+		return "ldr"
+	}
+	switch arm64TypeSize(ty) {
+	case 1:
+		return "ldrb"
+	case 2:
+		return "ldrh"
+	default:
+		return "ldr"
+	}
+}
+
+func arm64StoreOpcode(ty *mir.Type) string {
+	if arm64IsFloatType(ty) {
+		return "str"
+	}
+	switch arm64TypeSize(ty) {
+	case 1:
+		return "strb"
+	case 2:
+		return "strh"
+	default:
+		return "str"
+	}
+}
+
+func arm64TypeSize(ty *mir.Type) int {
+	if ty == nil || ty.Size <= 0 {
+		return 8
+	}
+	return ty.Size
+}
+
+func arm64IsFloatType(ty *mir.Type) bool {
+	if ty == nil {
+		return false
+	}
+	name := strings.ToLower(ty.Name)
+	return name == "f32" || name == "f64"
+}
+
+func formatARM64DataReg(op mir.Operand, ty *mir.Type) string {
+	r, ok := op.(*mir.Register)
+	if !ok || r == nil {
+		return formatARM64Operand(op)
+	}
+
+	name := r.Name
+	if name == "" {
+		return name
+	}
+	if name == "sp" || name == "xzr" || name == "wzr" {
+		return name
+	}
+
+	idx := -1
+	prefixLen := 0
+	for i := 0; i < len(name); i++ {
+		if name[i] >= '0' && name[i] <= '9' {
+			prefixLen = i
+			if n, err := strconv.Atoi(name[i:]); err == nil {
+				idx = n
+			}
+			break
+		}
+	}
+	if idx < 0 || prefixLen == 0 {
+		return name
+	}
+
+	if arm64IsFloatType(ty) {
+		if arm64TypeSize(ty) <= 4 {
+			return fmt.Sprintf("s%d", idx)
+		}
+		return fmt.Sprintf("d%d", idx)
+	}
+
+	if arm64TypeSize(ty) <= 4 {
+		return fmt.Sprintf("w%d", idx)
+	}
+	return fmt.Sprintf("x%d", idx)
+}
+
+func isARM64FloatReg(name string) bool {
+	if name == "" {
+		return false
+	}
+	if !(strings.HasPrefix(name, "d") || strings.HasPrefix(name, "s")) {
+		return false
+	}
+	if len(name) < 2 {
+		return false
+	}
+	_, err := strconv.Atoi(name[1:])
+	return err == nil
 }
 
 func arm64Label(name string) string {
@@ -441,6 +812,132 @@ func arm64CondSuffix(op string) string {
 	default:
 		return "eq"
 	}
+}
+
+// emitARM64StdioInit generates a platform-specific __init_<ModuleName> function
+// for DEFINITION modules with [dll "libc"] that export stdin/stdout/stderr globals.
+// On Apple Darwin/macOS the C standard streams are accessed via __stdinp,
+// __stdoutp, __stderrp (the underlying FILE* pointers in libSystem).
+// On other POSIX targets (Linux etc.) the symbols are stdin, stdout, stderr.
+//
+// The generated function is called automatically by any module that imports this
+// DEFINITION module, via the __init_<ImportedModule> call prepended to the
+// importer's own init body.
+func emitARM64StdioInit(mod *mir.Module) string {
+	if mod == nil {
+		return ""
+	}
+
+	// Detect which platform-specific stdio symbol names to use based on the
+	// module globals present (e.g. Stdio$stdin, Stdio$stdout, Stdio$stderr).
+	type stdioPair struct {
+		global   string // name of our BSS global (e.g. "Stdio$stdin")
+		platform string // Darwin: "___stdinp", Linux: "_stdin" etc.
+	}
+
+	var pairs []stdioPair
+	for _, g := range mod.Globals {
+		if g == nil || g.Name == "" {
+			continue
+		}
+		// Match <ModuleName>$stdin, <ModuleName>$stdout, <ModuleName>$stderr
+		suffix := ""
+		switch {
+		case strings.HasSuffix(g.Name, "$stdin"):
+			suffix = "stdin"
+		case strings.HasSuffix(g.Name, "$stdout"):
+			suffix = "stdout"
+		case strings.HasSuffix(g.Name, "$stderr"):
+			suffix = "stderr"
+		}
+		if suffix == "" {
+			continue
+		}
+		// On Apple Darwin the platform symbols are __stdinp/__stdoutp/__stderrp
+		// (with the leading underscore added by the assembler → ___stdinp etc.).
+		// On Linux/POSIX the symbols are stdin/stdout/stderr.
+		platformSym := platformStdioSym(suffix)
+		pairs = append(pairs, stdioPair{global: g.Name, platform: platformSym})
+	}
+
+	if len(pairs) == 0 {
+		return ""
+	}
+
+	var buf strings.Builder
+	initName := fmt.Sprintf("__init_%s", mod.Name)
+
+	// Declare the Darwin platform symbols as extern so the assembler/linker
+	// can find them in libSystem.
+	seen := make(map[string]bool)
+	for _, p := range pairs {
+		if !seen[p.platform] {
+			buf.WriteString(fmt.Sprintf("\t.extern %s\n", p.platform))
+			seen[p.platform] = true
+		}
+	}
+
+	// If this module is not Stdio itself, declare __init_Stdio as extern so
+	// the init chain ensures the Stdio FILE* globals are populated before any
+	// caller uses them.
+	if mod.Name != "Stdio" {
+		buf.WriteString("\t.extern ___init_Stdio\n")
+	}
+
+	buf.WriteString("\t.section __TEXT,__text\n")
+	buf.WriteString("\t.p2align 2\n")
+	buf.WriteString(fmt.Sprintf("\t.globl _%s\n", initName))
+	buf.WriteString(fmt.Sprintf("_%s:\n", initName))
+	buf.WriteString("\tstp x29, x30, [sp, #-16]!\n")
+	buf.WriteString("\tmov x29, sp\n")
+
+	// Call __init_Stdio to ensure stdin/stdout/stderr globals are loaded from
+	// libSystem before any code in this module tries to read them.
+	// Skip the self-call when this IS the Stdio init to avoid infinite recursion.
+	if mod.Name != "Stdio" {
+		buf.WriteString("\tbl ___init_Stdio\n")
+	}
+
+	for _, p := range pairs {
+		// Darwin ARM64: __stdinp/__stdoutp/__stderrp are extern globals in libSystem.
+		// External symbols must be reached via the GOT (two-level namespace):
+		//   adrp x9, ___stdinp@GOTPAGE        ; x9 = page of GOT entry
+		//   ldr  x9, [x9, ___stdinp@GOTPAGEOFF] ; x9 = GOT slot → address of __stdinp
+		//   ldr  x0, [x9]                     ; x0 = *__stdinp = FILE*
+		buf.WriteString(fmt.Sprintf("\tadrp x9, %s@GOTPAGE\n", p.platform))
+		buf.WriteString(fmt.Sprintf("\tldr x9, [x9, %s@GOTPAGEOFF]\n", p.platform))
+		buf.WriteString("\tldr x0, [x9]\n")
+		buf.WriteString(fmt.Sprintf("\tadrp x9, _%s@PAGE\n", p.global))
+		buf.WriteString(fmt.Sprintf("\tadd x9, x9, _%s@PAGEOFF\n", p.global))
+		buf.WriteString("\tstr x0, [x9]\n")
+	}
+
+	exitLabel := fmt.Sprintf("L_%s_exit", initName)
+	buf.WriteString(fmt.Sprintf("\tb %s\n", exitLabel))
+	buf.WriteString(fmt.Sprintf("%s:\n", exitLabel))
+	buf.WriteString("\tldp x29, x30, [sp], #16\n")
+	buf.WriteString("\tret\n")
+
+	return buf.String()
+}
+
+// platformStdioSym returns the assembler symbol for the given C stdio stream
+// name on the current platform.  On Apple Darwin/macOS the streams are
+// indirected via __stdinp/__stdoutp/__stderrp; on POSIX/Linux they are direct
+// globals named stdin/stdout/stderr.
+func platformStdioSym(stream string) string {
+	// Darwin/macOS: the runtime exports __stdinp etc. (ARM64 adds one _ → ___stdinp).
+	// We hard-code Darwin here because the ARM64 target is currently only built
+	// for Apple Silicon.  A future POSIX-generic path would inspect tgt.OS.
+	switch stream {
+	case "stdin":
+		return "___stdinp"
+	case "stdout":
+		return "___stdoutp"
+	case "stderr":
+		return "___stderrp"
+	}
+	return "_" + stream
 }
 
 func arm64BranchOpcode(op string) string {

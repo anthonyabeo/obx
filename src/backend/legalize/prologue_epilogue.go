@@ -27,7 +27,7 @@ func EmitPrologueEpilogue(prog *mir.Program, tgt target.Target) error {
 			if fn == nil {
 				continue
 			}
-			if err := emitFunctionPrologueEpilogue(fn, tgt); err != nil {
+			if err := emitFunctionPrologueEpilogue(mod, fn, tgt); err != nil {
 				return fmt.Errorf("function %s: %w", fn.Name, err)
 			}
 		}
@@ -37,7 +37,7 @@ func EmitPrologueEpilogue(prog *mir.Program, tgt target.Target) error {
 }
 
 // emitFunctionPrologueEpilogue emits prologue/epilogue for a single function.
-func emitFunctionPrologueEpilogue(fn *mir.Function, tgt target.Target) error {
+func emitFunctionPrologueEpilogue(mod *mir.Module, fn *mir.Function, tgt target.Target) error {
 	if fn == nil || fn.Frame == nil {
 		// No frame layout; skip prologue/epilogue
 		return nil
@@ -78,12 +78,12 @@ func emitFunctionPrologueEpilogue(fn *mir.Function, tgt target.Target) error {
 			var srcs []mir.Operand
 			if term.Value != nil {
 				srcs = []mir.Operand{term.Value}
-			} else if strings.HasPrefix(fn.Name, "__init_") {
-				// __init_ functions map to C _main; the OS reads x0 as the
-				// process exit code, so we must return 0 for a clean exit.
-				// Append a "mov x0, #0" before the ret so that any leftover
-				// value in x0 (e.g. from a preceding cset) does not cause a
-				// spurious failure.
+			} else if mod != nil && mod.IsEntry && fn.Name == "__init_"+mod.Name {
+				// Only the entry module's own __init_<Name> function maps to C
+				// _main.  The OS reads x0 as the process exit code, so we must
+				// return 0 for a clean exit.  Append a "mov x0, #0" before the
+				// ret so that any leftover value in x0 does not cause a spurious
+				// failure.
 				fn.Exit.Instrs = append(fn.Exit.Instrs, &mir.MoveInstr{
 					Dst: &mir.Register{Name: "x0", Kind: mir.PhysicalReg},
 					Src: mir.NewImmediate(0, nil),
@@ -94,7 +94,7 @@ func emitFunctionPrologueEpilogue(fn *mir.Function, tgt target.Target) error {
 			if strings.EqualFold(term.Op, "ret") {
 				// For void __init_ functions (which become C _main), ensure x0=0
 				// so the OS sees a clean exit code rather than a leftover value.
-				if len(term.Srcs) == 0 && strings.HasPrefix(fn.Name, "__init_") {
+				if len(term.Srcs) == 0 && mod != nil && mod.IsEntry && fn.Name == "__init_"+mod.Name {
 					fn.Exit.Instrs = append(fn.Exit.Instrs, &mir.MoveInstr{
 						Dst: &mir.Register{Name: "x0", Kind: mir.PhysicalReg},
 						Src: mir.NewImmediate(0, nil),

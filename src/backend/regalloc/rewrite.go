@@ -67,10 +67,238 @@ func rewriteFunction(fn *mir.Function, alloc *regAllocResult, fa *functionAnalys
 			newInstrs = append(newInstrs, post...)
 		}
 
-		ba.block.Instrs = newInstrs
+		ba.block.Instrs = foldStringPointerWriteCalls(fixCallArgMoveGroups(newInstrs))
 	}
 
 	return materializeEdgeBlocks(fn, fa, edgeLoads)
+}
+
+// fixCallArgMoveGroups scans the instruction list for contiguous groups of
+// argument-move instructions that immediately precede a call boundary, and applies
+// LinearizeParallelCopy to each group so that register-to-register cycles in
+// the call argument moves are resolved correctly.
+//
+// Background: call-lowering (stage [0]) inserts sequential move instructions
+// in ABI order (x0 ← arg0, x1 ← arg1, …).  After register allocation
+// replaces virtual registers with physical ones, those sequential moves may
+// form a cyclic dependency (e.g., x0←x1, x1←x2, x2←x0) that overwrites a
+// source value before it has been consumed.  LinearizeParallelCopy detects
+// cycles and breaks them using a scratch register (x15), producing a safe
+// sequential ordering.
+func fixCallArgMoveGroups(instrs []mir.Instr) []mir.Instr {
+	out := make([]mir.Instr, 0, len(instrs))
+	i := 0
+	for i < len(instrs) {
+		instr := instrs[i]
+		if !isCallBoundary(instr) {
+			out = append(out, instr)
+			i++
+			continue
+		}
+		// Walk backwards to collect the contiguous arg-move group that
+		// immediately precedes this call.
+		start := len(out)
+		for start > 0 {
+			if _, ok := copyFromInstr(out[start-1]); ok {
+				start--
+			} else {
+				break
+			}
+		}
+		moveGroup := out[start:]
+		if len(moveGroup) < 2 {
+			// 0 or 1 moves — no ordering problem possible.
+			out = append(out, instr)
+			i++
+			continue
+		}
+		// Build a ParallelCopy from the move group.
+		copies := make([]target.Copy, 0, len(moveGroup))
+		for _, m := range moveGroup {
+			cpy, ok := copyFromInstr(m)
+			if !ok || cpy.Dst == nil {
+				// No destination — leave the group as-is.
+				copies = nil
+				break
+			}
+			copies = append(copies, cpy)
+		}
+		if copies == nil {
+			out = append(out, instr)
+			i++
+			continue
+		}
+		linearized := target.LinearizeParallelCopy(target.ParallelCopy{Copies: copies})
+		// Rebuild: replace the move group in out with the linearized version.
+		newMoves := make([]mir.Instr, 0, len(linearized))
+		for _, c := range linearized {
+			newMoves = append(newMoves, &mir.MoveInstr{Dst: c.Dst, Src: c.Src})
+		}
+		out = append(out[:start], newMoves...)
+		out = append(out, instr)
+		i++
+	}
+	return out
+}
+
+// foldStringPointerWriteCalls removes the synthetic stack staging sequence
+// used by some open-array string literal call sites:
+//   store $litPtr -> [$tmp]
+//   mov   x0 <- $tmp
+//   call  IO$Write/IO$WriteLn
+// and rewrites it into direct pointer passing:
+//   mov   x0 <- $litPtr
+//   call  ...
+func foldStringPointerWriteCalls(instrs []mir.Instr) []mir.Instr {
+	out := make([]mir.Instr, 0, len(instrs))
+
+	for _, instr := range instrs {
+		if !isIOStringWriteCallInstr(instr) {
+			out = append(out, instr)
+			continue
+		}
+
+		argRegName := "x0"
+		var argMoveDst *mir.Register
+		var argMoveSrc *mir.Register
+		if len(out) > 0 {
+			if cpy, ok := copyFromInstr(out[len(out)-1]); ok && cpy.Dst != nil {
+				argMoveDst = cpy.Dst
+				if srcReg, ok := cpy.Src.(*mir.Register); ok {
+					argMoveSrc = srcReg
+				}
+				if argMoveDst.Name != "" {
+					argRegName = argMoveDst.Name
+				}
+			}
+		}
+
+		storeIdx := len(out) - 1
+		if argMoveDst != nil {
+			storeIdx = len(out) - 2
+		}
+		if storeIdx >= 0 {
+			if addrReg, valReg, ok := extractStagedStoreRegs(out[storeIdx]); ok {
+					srcMatches := false
+					if argMoveDst != nil {
+						srcMatches = argMoveSrc != nil && argMoveSrc.Name == addrReg.Name
+					} else {
+						srcMatches = argRegName == addrReg.Name
+					}
+
+					if srcMatches {
+						out = out[:storeIdx]
+						if argRegName != valReg.Name {
+							dst := &mir.Register{Name: argRegName, Kind: mir.PhysicalReg, Ty: valReg.Type()}
+							out = append(out, &mir.MoveInstr{Dst: dst, Src: valReg})
+						}
+					}
+				}
+		}
+
+		out = append(out, instr)
+	}
+
+	return out
+}
+
+func isIOStringWriteCallInstr(instr mir.Instr) bool {
+	name, ok := ioStringWriteCalleeName(instr)
+	if !ok {
+		return false
+	}
+	switch name {
+	case "IO$Write", "IO$WriteLn":
+		return true
+	default:
+		return false
+	}
+}
+
+func ioStringWriteCalleeName(instr mir.Instr) (string, bool) {
+	switch c := instr.(type) {
+	case *mir.CallInstr:
+		sym, ok := c.Callee.(*mir.Symbol)
+		if !ok || sym == nil {
+			return "", false
+		}
+		return sym.Name, true
+	case *mir.MachineInstr:
+		op := strings.ToLower(c.Op)
+		if op != "bl" && op != "call" {
+			return "", false
+		}
+		if len(c.Srcs) == 0 {
+			return "", false
+		}
+		sym, ok := c.Srcs[0].(*mir.Symbol)
+		if !ok || sym == nil {
+			return "", false
+		}
+		return sym.Name, true
+	default:
+		return "", false
+	}
+}
+
+func extractStagedStoreRegs(instr mir.Instr) (addrReg, valReg *mir.Register, ok bool) {
+	switch st := instr.(type) {
+	case *mir.StoreInstr:
+		addr, okA := st.Addr.(*mir.Register)
+		val, okV := st.Value.(*mir.Register)
+		if !okA || !okV || addr == nil || val == nil {
+			return nil, nil, false
+		}
+		return addr, val, true
+	case *mir.MachineInstr:
+		if strings.ToLower(st.Op) != "store" || len(st.Srcs) < 2 {
+			return nil, nil, false
+		}
+		val, okV := st.Srcs[0].(*mir.Register)
+		addr, okA := st.Srcs[1].(*mir.Register)
+		if !okA || !okV || addr == nil || val == nil {
+			return nil, nil, false
+		}
+		return addr, val, true
+	default:
+		return nil, nil, false
+	}
+}
+
+func isCallBoundary(instr mir.Instr) bool {
+	if instr == nil {
+		return false
+	}
+	if _, ok := instr.(*mir.CallInstr); ok {
+		return true
+	}
+	mi, ok := instr.(*mir.MachineInstr)
+	if !ok || mi == nil {
+		return false
+	}
+	switch strings.ToLower(mi.Op) {
+	case "call", "bl", "blr":
+		return true
+	default:
+		return false
+	}
+}
+
+func copyFromInstr(instr mir.Instr) (target.Copy, bool) {
+	switch mv := instr.(type) {
+	case *mir.MoveInstr:
+		if mv == nil || mv.Dst == nil {
+			return target.Copy{}, false
+		}
+		return target.Copy{Dst: mv.Dst, Src: mv.Src}, true
+	case *mir.MachineInstr:
+		if mv == nil || strings.ToLower(mv.Op) != "mov" || len(mv.Dsts) == 0 || len(mv.Srcs) == 0 || mv.Dsts[0] == nil {
+			return target.Copy{}, false
+		}
+		return target.Copy{Dst: mv.Dsts[0], Src: mv.Srcs[0]}, true
+	default:
+		return target.Copy{}, false
+	}
 }
 
 func rewritePhi(phi *mir.PhiInstr, ba *blockAnalysis, fa *functionAnalysis, alloc *regAllocResult, frame *mir.FrameLayout, abi target.ABI) (*mir.PhiInstr, map[edgeKey][]mir.Instr, error) {
@@ -143,6 +371,49 @@ func rewriteInstr(instr mir.Instr, liveIn map[string]bool, alloc *regAllocResult
 	}
 
 	switch ins := instr.(type) {
+	case *mir.AllocaInstr:
+		if ins == nil || ins.Dst == nil {
+			return nil, nil, nil, nil
+		}
+		offset, ok := frame.AllocaSlots[ins.Dst.Name]
+		if !ok {
+			return nil, nil, nil, fmt.Errorf("register allocation: missing alloca slot for %q", ins.Dst.Name)
+		}
+
+		base := abi.FramePointer
+		if base == "" {
+			base = abi.StackPointer
+		}
+		baseReg := &mir.Register{Name: base, Kind: mir.PhysicalReg, Ty: ins.Dst.Type()}
+
+		emitAddr := func(dst *mir.Register) mir.Instr {
+			if offset == 0 {
+				return &mir.MoveInstr{Dst: dst, Src: baseReg}
+			}
+			imm := &mir.Immediate{Value: offset, Ty: ins.Dst.Type()}
+			op := "add"
+			if offset < 0 {
+				op = "sub"
+				imm = &mir.Immediate{Value: -offset, Ty: ins.Dst.Type()}
+			}
+			return &mir.MachineInstr{Op: op, Dsts: []*mir.Register{dst}, Srcs: []mir.Operand{baseReg, imm}}
+		}
+
+		if preg, ok := alloc.mapVRegToPReg[ins.Dst.Name]; ok {
+			dst := &mir.Register{Name: preg, Kind: mir.PhysicalReg, Ty: ins.Dst.Type()}
+			return emitAddr(dst), nil, nil, nil
+		}
+
+		if slot, spilled := alloc.spillSlots[ins.Dst.Name]; spilled {
+			tmp, err := choose(ins.Dst.Type())
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			pre := []mir.Instr{emitAddr(tmp), &mir.StoreInstr{Addr: spillSlotAddr(slot, abi), Value: tmp}}
+			return nil, pre, nil, nil
+		}
+
+		return nil, nil, nil, fmt.Errorf("register allocation: missing color for alloca destination %q", ins.Dst.Name)
 	case *mir.MoveInstr:
 		src, pre, post, err := mapOperand(ins.Src)
 		if err != nil {
@@ -261,7 +532,7 @@ func rewriteInstr(instr mir.Instr, liveIn map[string]bool, alloc *regAllocResult
 			if err != nil {
 				return nil, nil, nil, err
 			}
-				if reg, ok := mapped.(*mir.Register); ok {
+			if reg, ok := mapped.(*mir.Register); ok {
 				slotName := dstReg.Name
 				slot, ok := alloc.spillSlots[slotName]
 				if !ok {

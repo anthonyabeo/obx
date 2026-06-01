@@ -1,6 +1,7 @@
 package target
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/anthonyabeo/obx/src/backend/mir"
@@ -10,8 +11,9 @@ func TestSupportsIntegerScalar(t *testing.T) {
 	if !SupportsIntegerScalar(mir.NewScalarType("i32", 4)) {
 		t.Fatalf("expected i32 scalar to be supported")
 	}
-	if SupportsIntegerScalar(mir.NewPointerType(mir.NewScalarType("i32", 4), 8)) {
-		t.Fatalf("expected pointer type to be rejected")
+	// Pointer types are passed in integer registers on all supported targets.
+	if !SupportsIntegerScalar(mir.NewPointerType(mir.NewScalarType("i32", 4), 8)) {
+		t.Fatalf("expected pointer type to be supported (pointers go in integer registers)")
 	}
 	if SupportsIntegerScalar(nil) {
 		t.Fatalf("expected nil type to be rejected")
@@ -202,6 +204,26 @@ func TestEmitARM64MachineInstrFormatsCSetConditionCode(t *testing.T) {
 	}
 }
 
+func TestEmitARM64FunctionRenamesEntryInitOnly(t *testing.T) {
+	fn := mir.NewFunction("__init_Main", nil)
+
+	entryMod := mir.NewModule("Main")
+	entryMod.IsEntry = true
+	gotEntry := emitARM64Function(entryMod, fn)
+	if !strings.Contains(gotEntry, "_main:") {
+		t.Fatalf("entry module init should emit _main, got:\n%s", gotEntry)
+	}
+
+	otherMod := mir.NewModule("IO")
+	gotOther := emitARM64Function(otherMod, fn)
+	if strings.Contains(gotOther, "_main:") {
+		t.Fatalf("non-entry module init should not emit _main, got:\n%s", gotOther)
+	}
+	if !strings.Contains(gotOther, "___init_Main:") {
+		t.Fatalf("non-entry module init should keep its symbol, got:\n%s", gotOther)
+	}
+}
+
 func TestEmitARM64HaltWithImmediateCode(t *testing.T) {
 	got := emitARM64Terminator(&mir.HaltInstr{
 		Code: mir.NewImmediate(1, mir.NewScalarType("i32", 4)),
@@ -268,3 +290,183 @@ func TestEmitARM64CondBranchCondBrInstr(t *testing.T) {
 		t.Fatalf("emitARM64Terminator(CondBrInstr) =\n%q\nwant\n%q", got, want)
 	}
 }
+
+func TestEmitARM64MachineInstrTruncMasksToDstWidth(t *testing.T) {
+	got := emitARM64MachineInstr(&mir.MachineInstr{
+		Op:   "trunc",
+		Dsts: []*mir.Register{mir.NewRegister("x10", mir.PhysicalReg, mir.NewScalarType("i8", 1))},
+		Srcs: []mir.Operand{mir.NewRegister("x11", mir.PhysicalReg, mir.NewScalarType("i64", 8))},
+	})
+	want := "and x10, x11, #255"
+	if got != want {
+		t.Fatalf("emitARM64MachineInstr(trunc i64->i8) = %q, want %q", got, want)
+	}
+}
+
+func TestEmitARM64MachineInstrZExtMasksToSrcWidth(t *testing.T) {
+	got := emitARM64MachineInstr(&mir.MachineInstr{
+		Op:   "zext",
+		Dsts: []*mir.Register{mir.NewRegister("x12", mir.PhysicalReg, mir.NewScalarType("i64", 8))},
+		Srcs: []mir.Operand{mir.NewRegister("x13", mir.PhysicalReg, mir.NewScalarType("i16", 2))},
+	})
+	want := "and x12, x13, #65535"
+	if got != want {
+		t.Fatalf("emitARM64MachineInstr(zext i16->i64) = %q, want %q", got, want)
+	}
+}
+
+func TestEmitARM64MachineInstrSExtUsesSignExtendOpcode(t *testing.T) {
+	got := emitARM64MachineInstr(&mir.MachineInstr{
+		Op:   "sext",
+		Dsts: []*mir.Register{mir.NewRegister("x14", mir.PhysicalReg, mir.NewScalarType("i64", 8))},
+		Srcs: []mir.Operand{mir.NewRegister("x15", mir.PhysicalReg, mir.NewScalarType("i8", 1))},
+	})
+	want := "sxtb x14, x15"
+	if got != want {
+		t.Fatalf("emitARM64MachineInstr(sext i8->i64) = %q, want %q", got, want)
+	}
+}
+
+func TestEmitARM64MachineInstrSIToFP(t *testing.T) {
+	got := emitARM64MachineInstr(&mir.MachineInstr{
+		Op:   "sitofp",
+		Dsts: []*mir.Register{mir.NewRegister("d0", mir.PhysicalReg, mir.NewScalarType("f64", 8))},
+		Srcs: []mir.Operand{mir.NewRegister("x0", mir.PhysicalReg, mir.NewScalarType("i64", 8))},
+	})
+	want := "scvtf d0, x0"
+	if got != want {
+		t.Fatalf("emitARM64MachineInstr(sitofp i64->f64) = %q, want %q", got, want)
+	}
+}
+
+func TestEmitARM64MachineInstrFPToSI(t *testing.T) {
+	got := emitARM64MachineInstr(&mir.MachineInstr{
+		Op:   "fptosi",
+		Dsts: []*mir.Register{mir.NewRegister("x1", mir.PhysicalReg, mir.NewScalarType("i64", 8))},
+		Srcs: []mir.Operand{mir.NewRegister("d1", mir.PhysicalReg, mir.NewScalarType("f64", 8))},
+	})
+	want := "fcvtzs x1, d1"
+	if got != want {
+		t.Fatalf("emitARM64MachineInstr(fptosi f64->i64) = %q, want %q", got, want)
+	}
+}
+
+func TestEmitARM64MachineInstrFPCvt(t *testing.T) {
+	got := emitARM64MachineInstr(&mir.MachineInstr{
+		Op:   "fpext",
+		Dsts: []*mir.Register{mir.NewRegister("d2", mir.PhysicalReg, mir.NewScalarType("f64", 8))},
+		Srcs: []mir.Operand{mir.NewRegister("s2", mir.PhysicalReg, mir.NewScalarType("f32", 4))},
+	})
+	want := "fcvt d2, s2"
+	if got != want {
+		t.Fatalf("emitARM64MachineInstr(fpext f32->f64) = %q, want %q", got, want)
+	}
+}
+
+func TestEmitARM64LoadStoreUsesWidthSpecificMnemonics(t *testing.T) {
+	byteTy := mir.NewScalarType("u8", 1)
+	wordTy := mir.NewScalarType("i32", 4)
+
+	ldByte := emitARM64Instr(&mir.LoadInstr{
+		Dst:  mir.NewRegister("x10", mir.PhysicalReg, byteTy),
+		Addr: mir.NewMemory(mir.NewRegister("x1", mir.PhysicalReg, mir.NewPointerType(byteTy, 8)), nil, nil),
+	})
+	if ldByte != "ldrb w10, [x1]" {
+		t.Fatalf("byte load = %q, want %q", ldByte, "ldrb w10, [x1]")
+	}
+
+	stByte := emitARM64Instr(&mir.StoreInstr{
+		Value: mir.NewRegister("x11", mir.PhysicalReg, byteTy),
+		Addr:  mir.NewMemory(mir.NewRegister("x2", mir.PhysicalReg, mir.NewPointerType(byteTy, 8)), nil, nil),
+	})
+	if stByte != "strb w11, [x2]" {
+		t.Fatalf("byte store = %q, want %q", stByte, "strb w11, [x2]")
+	}
+
+	ldWord := emitARM64Instr(&mir.LoadInstr{
+		Dst:  mir.NewRegister("x3", mir.PhysicalReg, wordTy),
+		Addr: mir.NewMemory(mir.NewRegister("x4", mir.PhysicalReg, mir.NewPointerType(wordTy, 8)), nil, nil),
+	})
+	if ldWord != "ldr w3, [x4]" {
+		t.Fatalf("word load = %q, want %q", ldWord, "ldr w3, [x4]")
+	}
+
+	stWord := emitARM64Instr(&mir.StoreInstr{
+		Value: mir.NewRegister("x5", mir.PhysicalReg, wordTy),
+		Addr:  mir.NewMemory(mir.NewRegister("x6", mir.PhysicalReg, mir.NewPointerType(wordTy, 8)), nil, nil),
+	})
+	if stWord != "str w5, [x6]" {
+		t.Fatalf("word store = %q, want %q", stWord, "str w5, [x6]")
+	}
+}
+
+func TestEmitARM64LoadStoreUsesFloatRegsForFloatTypes(t *testing.T) {
+	f64 := mir.NewScalarType("f64", 8)
+	ld := emitARM64Instr(&mir.LoadInstr{
+		Dst:  mir.NewRegister("x0", mir.PhysicalReg, f64),
+		Addr: mir.NewMemory(mir.NewRegister("x1", mir.PhysicalReg, mir.NewPointerType(f64, 8)), nil, nil),
+	})
+	if ld != "ldr d0, [x1]" {
+		t.Fatalf("float load = %q, want %q", ld, "ldr d0, [x1]")
+	}
+
+	st := emitARM64Instr(&mir.StoreInstr{
+		Value: mir.NewRegister("x2", mir.PhysicalReg, f64),
+		Addr:  mir.NewMemory(mir.NewRegister("x3", mir.PhysicalReg, mir.NewPointerType(f64, 8)), nil, nil),
+	})
+	if st != "str d2, [x3]" {
+		t.Fatalf("float store = %q, want %q", st, "str d2, [x3]")
+	}
+}
+
+func TestEmitARM64ModuleEmitsStringConstants(t *testing.T) {
+	mod := mir.NewModule("IO")
+	mod.AddConst(mir.NewConstDecl(
+		"_Lstr_deadbeef_0",
+		mir.NewArrayType(mir.NewScalarType("i8", 1), 5),
+		mir.NewImmediate("%d", mir.NewArrayType(mir.NewScalarType("i8", 1), 3)),
+		mir.InternalLinkage,
+	))
+
+	asm := emitARM64Module(mod)
+	if !strings.Contains(asm, "\t.section __TEXT,__cstring,cstring_literals") {
+		t.Fatalf("missing cstring section in emitted module:\n%s", asm)
+	}
+	if !strings.Contains(asm, "__Lstr_deadbeef_0:") {
+		t.Fatalf("missing string symbol label in emitted module:\n%s", asm)
+	}
+	if !strings.Contains(asm, "\t.asciz \"%d\"") {
+		t.Fatalf("missing asciz directive for string const in emitted module:\n%s", asm)
+	}
+}
+
+func TestEmitARM64ModuleExportsNonExternGlobals(t *testing.T) {
+	mod := mir.NewModule("Stdio")
+	ptrTy := mir.NewPointerType(mir.NewScalarType("void", 0), 8)
+
+	stdin := mir.NewGlobalDecl("Stdio$stdin", ptrTy, mir.ExternalLinkage, nil)
+	mod.AddGlobal(stdin)
+
+	externOnly := mir.NewGlobalDecl("Other$stdin", ptrTy, mir.ExternalLinkage, nil)
+	externOnly.IsExternRef = true
+	mod.AddGlobal(externOnly)
+
+	asm := emitARM64Module(mod)
+	if !strings.Contains(asm, "\t.globl _Stdio$stdin") {
+		t.Fatalf("missing global export for Stdio global:\n%s", asm)
+	}
+	if !strings.Contains(asm, "\t.extern _Other$stdin") {
+		t.Fatalf("missing extern decl for external-ref global:\n%s", asm)
+	}
+}
+
+func TestEmitARM64MoveFromSymbolUsesAddressMaterialization(t *testing.T) {
+	got := emitARM64Move("x1", "__Lstr_abc")
+	if !strings.Contains(got, "adrp x1, __Lstr_abc@PAGE") {
+		t.Fatalf("expected adrp for symbol move, got %q", got)
+	}
+	if !strings.Contains(got, "add x1, x1, __Lstr_abc@PAGEOFF") {
+		t.Fatalf("expected add pageoff for symbol move, got %q", got)
+	}
+}
+

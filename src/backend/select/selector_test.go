@@ -518,3 +518,78 @@ func TestParseSelectorFile(t *testing.T) {
 		t.Fatal("expected non-nil selector")
 	}
 }
+
+func TestSelectorCastRuleRespectsRegisterClasses(t *testing.T) {
+	sel := mustSelector(t, `
+		target test {
+			rule cast_sitofp {
+				match {
+					out $rd : FPRStrict:virt;
+					in $rs : GPRStrict:virt;
+					pattern sitofp($rs);
+				}
+				cost 1;
+				emit { instr { opcode: "sitofp"; dst: $rd; src: [$rs]; }; }
+			}
+		}
+	`)
+
+	valid := &mir.UnaryInstr{
+		Dst: mir.NewRegister("vf0", mir.VirtualReg, mir.NewScalarType("f64", 8)),
+		Op:  "sitofp",
+		X:   mir.NewRegister("vi0", mir.VirtualReg, mir.NewScalarType("i64", 8)),
+	}
+	selected, err := sel.SelectInstr(valid)
+	if err != nil {
+		t.Fatalf("SelectInstr(valid) failed: %v", err)
+	}
+	if len(selected) != 1 {
+		t.Fatalf("len(selected) = %d, want 1", len(selected))
+	}
+	if mi, ok := selected[0].(*mir.MachineInstr); !ok || mi.Op != "sitofp" {
+		t.Fatalf("selected valid cast = %#v, want machine sitofp", selected[0])
+	}
+
+	invalid := &mir.UnaryInstr{
+		Dst: mir.NewRegister("vf1", mir.VirtualReg, mir.NewScalarType("f64", 8)),
+		Op:  "sitofp",
+		X:   mir.NewRegister("vf2", mir.VirtualReg, mir.NewScalarType("f64", 8)),
+	}
+	selected, err = sel.SelectInstr(invalid)
+	if err != nil {
+		t.Fatalf("SelectInstr(invalid) failed: %v", err)
+	}
+	if len(selected) != 1 || selected[0] != invalid {
+		t.Fatalf("expected invalid class combo to keep original instr, got %#v", selected)
+	}
+}
+
+func TestSelectorCastRuleRejectsWrongOutputClass(t *testing.T) {
+	sel := mustSelector(t, `
+		target test {
+			rule cast_fptosi {
+				match {
+					out $rd : GPRStrict:virt;
+					in $rs : FPRStrict:virt;
+					pattern fptosi($rs);
+				}
+				cost 1;
+				emit { instr { opcode: "fptosi"; dst: $rd; src: [$rs]; }; }
+			}
+		}
+	`)
+
+	invalidOut := &mir.UnaryInstr{
+		Dst: mir.NewRegister("vf0", mir.VirtualReg, mir.NewScalarType("f64", 8)),
+		Op:  "fptosi",
+		X:   mir.NewRegister("vf1", mir.VirtualReg, mir.NewScalarType("f64", 8)),
+	}
+	selected, err := sel.SelectInstr(invalidOut)
+	if err != nil {
+		t.Fatalf("SelectInstr(invalidOut) failed: %v", err)
+	}
+	if len(selected) != 1 || selected[0] != invalidOut {
+		t.Fatalf("expected invalid output class combo to keep original instr, got %#v", selected)
+	}
+}
+

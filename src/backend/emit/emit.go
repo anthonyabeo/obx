@@ -211,10 +211,62 @@ func (e *Emitter) linkFlags() []string {
 	}
 	libs := make([]string, 0, len(e.linkLibs))
 	for lib := range e.linkLibs {
-		libs = append(libs, "-l"+lib)
+		norm, keep := e.normalizeLinkLibrary(lib)
+		if !keep || norm == "" {
+			continue
+		}
+		libs = append(libs, "-l"+norm)
 	}
 	sort.Strings(libs)
 	return libs
+}
+
+func (e *Emitter) normalizeLinkLibrary(lib string) (string, bool) {
+	name := canonicalLinkLibraryName(lib)
+	if name == "" {
+		return "", false
+	}
+
+	if isDarwinTarget(e.cfg.Target) {
+		if name == "c" {
+			if usesClangDriver(e.cfg.Toolchain.Linker) {
+				return "", false // clang driver already links libSystem on Darwin
+			}
+			return "System", true // direct ld expects libSystem
+		}
+	}
+
+	return name, true
+}
+
+func canonicalLinkLibraryName(lib string) string {
+	name := strings.TrimSpace(lib)
+	if name == "" {
+		return ""
+	}
+	name = strings.TrimPrefix(name, "-l")
+	lower := strings.ToLower(name)
+	if strings.HasSuffix(lower, ".dylib") || strings.HasSuffix(lower, ".so") || strings.HasSuffix(lower, ".a") {
+		name = name[:strings.LastIndex(name, ".")]
+		lower = strings.ToLower(name)
+	}
+	if strings.HasPrefix(lower, "lib") && len(name) > 3 {
+		name = name[3:]
+	}
+	return name
+}
+
+func isDarwinTarget(t target.Target) bool {
+	if t == nil {
+		return false
+	}
+	name := strings.ToLower(strings.TrimSpace(t.Name()))
+	return strings.Contains(name, "darwin") || strings.Contains(name, "macos")
+}
+
+func usesClangDriver(linker string) bool {
+	base := strings.ToLower(filepath.Base(strings.TrimSpace(linker)))
+	return strings.Contains(base, "clang")
 }
 
 func defaultConfig(cfg Config) Config {

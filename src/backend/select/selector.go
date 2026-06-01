@@ -210,10 +210,12 @@ func (s *Selector) SelectModule(mod *mir.Module) (*mir.Module, error) {
 	if mod == nil {
 		return nil, nil
 	}
-	out := mir.NewModule(mod.Name)
-	for _, g := range mod.Globals {
-		out.AddGlobal(g)
-	}
+        out := mir.NewModule(mod.Name)
+        out.IsEntry = mod.IsEntry
+        out.DLLName = mod.DLLName
+        for _, g := range mod.Globals {
+                out.AddGlobal(g)
+        }
 	for _, e := range mod.Externals {
 		out.AddExtern(e)
 	}
@@ -690,9 +692,30 @@ func bindingMatches(ts TypeSpec, actual mir.Operand) bool {
 		return true
 	}
 	switch strings.ToLower(ts.Kind) {
-	case "gpr", "fpr", "spr":
+	case "gpr", "spr":
 		reg, ok := actual.(*mir.Register)
 		if !ok {
+			return false
+		}
+		if ts.Sub != "" {
+			switch strings.ToLower(ts.Sub) {
+			case "virt":
+				if reg.Kind != mir.VirtualReg {
+					return false
+				}
+			case "phys":
+				if reg.Kind != mir.PhysicalReg {
+					return false
+				}
+			}
+		}
+		return true
+	case "fpr", "fprstrict", "gprstrict":
+		reg, ok := actual.(*mir.Register)
+		if !ok {
+			return false
+		}
+		if !registerMatchesClass(strings.ToLower(ts.Kind), reg) {
 			return false
 		}
 		if ts.Sub != "" {
@@ -723,6 +746,63 @@ func bindingMatches(ts TypeSpec, actual mir.Operand) bool {
 	default:
 		return true
 	}
+}
+
+func registerMatchesClass(class string, reg *mir.Register) bool {
+	if reg == nil {
+		return false
+	}
+	switch class {
+	case "fpr", "fprstrict":
+		return isFloatRegister(reg)
+	case "gprstrict":
+		return !isFloatRegister(reg)
+	default:
+		return true
+	}
+}
+
+func isFloatRegister(reg *mir.Register) bool {
+	if reg == nil {
+		return false
+	}
+	if ty := reg.Type(); ty != nil {
+		if isFloatType(ty) {
+			return true
+		}
+		return false
+	}
+	return looksFloatRegisterName(reg.Name)
+}
+
+func isFloatType(ty *mir.Type) bool {
+	if ty == nil {
+		return false
+	}
+	name := strings.ToLower(ty.Name)
+	return strings.HasPrefix(name, "f")
+}
+
+func looksFloatRegisterName(name string) bool {
+	n := strings.ToLower(strings.TrimSpace(name))
+	if n == "" || n == "fp" {
+		return false
+	}
+	if strings.HasPrefix(n, "f") {
+		return true // riscv: f0/ft0/fa0
+	}
+	if len(n) >= 2 {
+		head := n[:1]
+		if head == "d" || head == "s" || head == "h" || head == "q" || head == "v" {
+			for _, r := range n[1:] {
+				if r < '0' || r > '9' {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Selector) checkPredicates(rule *compiledRule, env map[string]any) bool {

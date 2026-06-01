@@ -65,9 +65,22 @@ func (abi ABI) JumpTableDensity() float64 {
 }
 
 // SupportsIntegerScalar reports whether ty is in the first-pass supported
-// type set: scalar integers only.
+// type set: scalar integers and pointer types (pointers are always passed
+// in integer registers on all supported targets).
 func SupportsIntegerScalar(ty *mir.Type) bool {
-	return ty != nil && ty.Elem == nil && ty.Len == 0 && ty.Size > 0
+	if ty == nil {
+		return false
+	}
+	// Scalar integer: no element type, no array length, positive size.
+	if ty.Elem == nil && ty.Len == 0 && ty.Size > 0 {
+		return true
+	}
+	// Pointer type: has an element type, no array length, positive size.
+	// Pointers are pointer-sized integers and go in integer registers.
+	if ty.Elem != nil && ty.Len == 0 && ty.Size > 0 {
+		return true
+	}
+	return false
 }
 
 // IsFloatType reports whether ty is a floating-point scalar (f32 or f64).

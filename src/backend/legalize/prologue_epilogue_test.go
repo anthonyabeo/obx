@@ -40,6 +40,14 @@ func buildProg(fn *mir.Function) *mir.Program {
 	return prog
 }
 
+func buildProgWithModules(mods ...*mir.Module) *mir.Program {
+	prog := mir.NewProgram()
+	for _, mod := range mods {
+		prog.AddModule(mod)
+	}
+	return prog
+}
+
 // ── ARM64 tests ───────────────────────────────────────────────────────────────
 
 func TestARM64PrologueEpilogue_BasicFrame(t *testing.T) {
@@ -160,6 +168,39 @@ func TestARM64PrologueEpilogue_ExitBlockEmptyInstrs(t *testing.T) {
 	}
 }
 
+func TestARM64PrologueEpilogue_EntryInitOnlyZerosExitCode(t *testing.T) {
+	entryFn, _, entryExit := buildFn("__init_Main", 16, []string{"x29", "x30"})
+	otherFn, _, otherExit := buildFn("__init_IO", 16, []string{"x29", "x30"})
+
+	entryMod := mir.NewModule("Main")
+	entryMod.IsEntry = true
+	entryMod.AddFunction(entryFn)
+	otherMod := mir.NewModule("IO")
+	otherMod.AddFunction(otherFn)
+
+	prog := buildProgWithModules(entryMod, otherMod)
+	tgt, _ := target.Lookup(target.Arm64Name)
+	if err := EmitPrologueEpilogue(prog, tgt); err != nil {
+		t.Fatalf("EmitPrologueEpilogue: %v", err)
+	}
+
+	foundEntryMove := false
+	for _, ins := range entryExit.Instrs {
+		if mi, ok := ins.(*mir.MachineInstr); ok && mi.Op == "mov" {
+			foundEntryMove = true
+		}
+	}
+	if !foundEntryMove {
+		t.Fatalf("expected entry init to zero x0 before return")
+	}
+
+	for _, ins := range otherExit.Instrs {
+		if mi, ok := ins.(*mir.MachineInstr); ok && mi.Op == "mov" {
+			t.Fatalf("non-entry init should not zero x0, got %v", mi)
+		}
+	}
+}
+
 // ── RISC-V tests ──────────────────────────────────────────────────────────────
 
 func TestRISCVPrologueEpilogue_BasicFrame(t *testing.T) {
@@ -277,4 +318,3 @@ func checkMemOffset(t *testing.T, mi *mir.MachineInstr, wantOffset int, label st
 		t.Errorf("%s: offset = %d, want %d", label, gotOffset, wantOffset)
 	}
 }
-
