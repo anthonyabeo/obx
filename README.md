@@ -2,8 +2,9 @@
 
 Obx is a compiler for the [Oberon+](https://oberon-lang.github.io/) programming language, targeting
 **RISC-V (rv64imafd)** on Linux and **ARM64** on macOS.  It is written in Go and implements the
-full compilation pipeline: module discovery → parsing → semantic analysis → IR lowering →
-SSA optimisation → instruction selection → register allocation → assembly emission.
+full compilation pipeline: module discovery → parsing → semantic analysis → desugar/minir lowering →
+minir optimisation + verification → backend stages (call/switch lowering, isel, legalization,
+regalloc, prologue/epilogue, phi-removal) → assembly + linking.
 
 It also ships a built-in HTTP server (`obx web`) that provides a browser-based editor and a
 JSON API for interactive type-checking and diagnostics.
@@ -318,105 +319,89 @@ See **[stdlib/README.md](stdlib/README.md)** for the full API reference.
 
 ---
 
+### ARM64 macOS smoke test
+
+To validate the build pipeline end to end on Apple Silicon, use the small
+`examples/smoke/Main.obx` program and check that the produced executable is a
+Mach-O arm64 binary.
+
+```shell
+# Run the helper script from the repo root
+bash scripts/arm64_macos_smoke.sh
+
+# Optional: also verify the aarch64-apple-darwin alias target
+bash scripts/arm64_macos_smoke.sh --alias
+```
+
+The script performs:
+
+1. `go run ./cmd/obx.go build --target arm64-apple-macos -r examples/smoke -e Main`
+2. `file build/obx-arm64-smoke`
+3. `otool -hv build/obx-arm64-smoke`
+4. execution of the produced binary
+
+If you want a slightly richer smoke test that also exercises stdlib linking,
+point it at the loop example instead:
+
+```shell
+bash scripts/arm64_macos_smoke.sh --source-root examples/loop --entry LoopTest --output loop-smoke
+```
+
 ## Examples
 
-### Loop — `examples/loop/loop.obx`
+### Main Smoke — `examples/smoke/Main.obx`
+
+This small program computes Fibonacci iteratively and prints the result through
+the stdlib `IO` module.
 
 ```oberon
-MODULE LoopTest;
-    VAR x, y: INTEGER;
+module Main
 
-    BEGIN
-        x := 0;
-        y := 20;
-        WHILE x < y DO
-            x := x + 1
-        END
-        printf("Final x: %d\n", x)
-END LoopTest.
+IMPORT IO
+  var res: integer
+
+  PROCEDURE fib(n: INTEGER): INTEGER;
+  VAR
+    a, b, temp, count: INTEGER;
+  BEGIN
+    IF n <= 0 THEN
+      RETURN 0
+    ELSIF n = 1 THEN
+      RETURN 1
+    ELSE
+      a := 0;
+      b := 1;
+      count := 2;
+      WHILE count <= n DO
+        temp := a + b;
+        a := b;
+        b := temp;
+        INC(count)
+      END;
+      RETURN b
+    END
+  END fib;
+
+begin
+  res := fib(15);
+  IO.Write("fib(15) = ");
+  IO.WriteInt(res);
+  IO.WriteLn("")
+end Main
 ```
 
 ```shell
-$ obx build -S -r examples/loop
-Building 1 module(s)  (entry: LoopTest)
-  loop/LoopTest           examples/loop/loop.obx
+$ obx build -r examples/smoke -e Main
+Building 3 module(s)  (entry: Main)
+  posix.Stdio                     stdlib/posix/Stdio.obx
+  IO                              stdlib/IO.obx
+  Main                            examples/smoke/Main.obx
 ```
 
-<details>
-<summary>Generated RISC-V assembly (rv64imafd)</summary>
-
-```asm
-	.section .bss
-	.align 2
-x: .skip 4
-
-	.align 2
-y: .skip 4
-
-	.section .rodata
-str_const_0: .string "Final x: %d\n"
-
-	.section .text
-	.align 2
-	.globl main
-	.type main, @function
-main:
-	addi sp, sp, -48
-	sd fp, 40(sp)
-	sd ra, 32(sp)
-	sd s11, 24(sp)
-	sd s10, 16(sp)
-	sd s9, 8(sp)
-	addi fp, sp, 48
-	li s11, 0
-	la t0, x
-	sw s11, 0(t0)
-	li s11, 20
-	la t1, y
-	sw s11, 0(t1)
-	j while_loop_0_1
-
-while_loop_0_1:
-	la t2, x
-	lw s11, 0(t2)
-	la t3, y
-	lw s10, 0(t3)
-	slt s9, s11, s10
-	seqz s10, s9
-	bne s10, x0, while_loop_0_exit_2
-	j if_end_3
-
-if_end_3:
-	li s10, 1
-	la t4, x
-	lw s9, 0(t4)
-	add s11, s9, s10
-	la t5, x
-	sw s11, 0(t5)
-	j while_loop_0_1
-
-while_loop_0_exit_2:
-	la s11, str_const_0
-	mv a0, s11
-	la t6, x
-	lw s11, 0(t6)
-	mv a1, s11
-	jal ra, printf
-	mv s11, a0
-	j __init_LoopTest_exit
-
-__init_LoopTest_exit:
-	ld s9, 8(sp)
-	ld s10, 16(sp)
-	ld s11, 24(sp)
-	ld ra, 32(sp)
-	ld fp, 40(sp)
-	addi sp, sp, 48
-	ret
-	.size main, .-main
+```shell
+$ ./build/obx
+fib(15) = 610
 ```
-
-</details>
 
 ### Stdlib Demo — `examples/stdlib/StdlibDemo.obx`
 
@@ -474,62 +459,51 @@ Source files
                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │  2. Parsing  (src/syntax)                                        │
-│     Scanner tokenises each file; the recursive-descent parser    │
-│     produces an AST whose nodes carry position info and will     │
-│     later be annotated with resolved types.                      │
+│     Scanner tokenises each file; recursive-descent parser builds │
+│     AST units with source positions.                             │
 └─────────────────────────┬────────────────────────────────────────┘
                           │
                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │  3. Semantic analysis  (src/sema)                                │
-│     Name resolution, type checking (src/sema/types), and        │
-│     control-flow analysis.  Diagnostics are emitted through      │
-│     the buffered reporter (src/support/diag).                    │
+│     Name resolution, type checking, and flow checks.             │
+│     Diagnostics are emitted via src/support/diag.                │
 └─────────────────────────┬────────────────────────────────────────┘
                           │
                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  4. Desugaring — AST → Desugared IR  (src/ir/desugar)            │
-│     Eliminates syntactic sugar (FOR, CASE, WITH, string ops,     │
-│     built-in procedure calls) into a simpler, explicitly-typed   │
-│     intermediate tree.                                           │
+│  4. Desugar  (src/ir/desugar)                                    │
+│     Lower high-level language sugar into a simpler typed IR.     │
 └─────────────────────────┬────────────────────────────────────────┘
                           │
                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  5. ObxIR construction  (src/ir/obxir)                           │
-│     IRBuilder lowers the desugared IR into SSA-form ObxIR:       │
-│     three-address instructions organised into basic blocks with  │
-│     explicit φ-nodes and a CFG.                                  │
+│  5. Lower to minir  (src/ir/minir)                               │
+│     Build module/function IR with explicit blocks and SSA forms. │
 └─────────────────────────┬────────────────────────────────────────┘
                           │
                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  6. Optimisation  (src/opt)                                      │
-│     The PassManager runs the configured set of passes (constant  │
-│     folding, DCE, SCCP, loop unrolling) to a fixed point.        │
+│  6. Merge precompiled stdlib + dedup externs  (cmd/cli helpers)  │
 └─────────────────────────┬────────────────────────────────────────┘
                           │
                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  7. Instruction selection  (src/codegen/isel)                    │
-│     ObxIR trees are matched against patterns described in the    │
-│     bud DSL (src/codegen/bud) to produce target instructions.    │
+│  7. minir optimisation passes  (src/ir/minir/opt)                │
+│     PassManager runs configured passes from -O / --passes.       │
 └─────────────────────────┬────────────────────────────────────────┘
                           │
                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  8. Register allocation  (src/codegen/ralloc)                    │
-│     Live-range analysis builds intervals; linear-scan assigns    │
-│     virtual registers to physical ones and inserts spill code.   │
+│  8. minir verification  (src/ir/minir)                           │
 └─────────────────────────┬────────────────────────────────────────┘
                           │
                           ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│  9. Assembly emission  (src/codegen/target)                      │
-│     The active target backend (rv64imafd or arm64-apple-macos)   │
-│     formats instructions, computes the frame layout, and writes  │
-│     .s and .o files to build/.                                   │
+│  9. Backend pipeline  (src/backend)                              │
+│     call-lowering → switch-lowering → isel → legalization →      │
+│     scheduling → regalloc → prologue/epilogue → phi-removal      │
+│     → assemble → link                                             │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -542,25 +516,27 @@ Passes are selected by `-O` level or overridden with `--passes` / `--disable-pas
 | Level | Passes enabled |
 |---|---|
 | `-O0` | *(none)* |
-| `-O1` | `constprop`, `dce` |
-| `-O2` *(default)* | `constprop`, `dce`, `sccp` |
-| `-O3` | `constprop`, `dce`, `sccp`, `loopunroll` |
+| `-O1` | `mem2reg`, `loadfwd`, `constfold`, `cleancfg` |
+| `-O2` *(default)* | `mem2reg`, `loadfwd`, `constfold`, `cleancfg`, `simplify` *(fixed-point)* |
+| `-O3` | `mem2reg`, `loadfwd`, `constfold`, `cleancfg`, `simplify`, `strength` *(fixed-point)* |
 
 | Pass | Description |
 |---|---|
-| `constprop` | **Constant folding** — replaces instructions whose operands are all compile-time constants with a direct move of the folded value. |
-| `dce` | **Dead-code elimination** — removes unreachable basic blocks and instructions whose results are never used. |
-| `sccp` | **Sparse conditional constant propagation** — propagates constants through branch conditions, pruning paths that are statically unreachable. |
-| `loopunroll` | **Loop unrolling** — replicates loop bodies to reduce branch overhead and expose more instruction-level parallelism. |
+| `mem2reg` | **Promote allocas to SSA** — converts non-escaping stack allocas into SSA values/phis. |
+| `loadfwd` | **Load forwarding** — forwards recently stored values through matching loads. |
+| `constfold` | **Constant folding** — evaluates operations with compile-time constants. |
+| `cleancfg` | **CFG cleanup** — removes/merges trivial or unreachable control-flow structure. |
+| `simplify` | **Algebraic simplification** — identity/annihilator simplifications. |
+| `strength` | **Strength reduction** — replaces expensive ops with cheaper equivalents when legal. |
 
 **Custom pass selection examples**
 
 ```shell
-# Only constant folding, no DCE
-$ obx build -O0 --passes constprop
+# Only constant folding
+$ obx build -O0 --passes constfold
 
-# Full O3 but skip loop unrolling
-$ obx build -O3 --disable-passes loopunroll
+# Full O3 but skip strength reduction
+$ obx build -O3 --disable-passes strength
 
 # Verbose output showing IR before and after each pass
 $ obx build -O2 --verbose
@@ -602,53 +578,31 @@ cmd/
 └── web/                HTTP server, route handlers, and embedded static UI
 
 src/
-├── support/            Infrastructure shared across all stages
-│   ├── source/         Source-file and source-location tracking
-│   ├── compiler/       Shared compiler context (diagnostics, directives)
-│   ├── diag/           Diagnostic context, buffered reporter, and
-│   │   └── formatter/  formatters (plain text, JSON)
-│   └── testutil/       Shared test helpers for pipeline tests
+├── syntax/             Frontend lexer/parser/AST/directive handling
+│   ├── token/
+│   ├── scan/
+│   ├── parser/
+│   ├── ast/
+│   └── directive/
 │
-├── syntax/             Frontend
-│   ├── token/          Token kinds and literal values
-│   ├── scan/           Scanner / lexer
-│   ├── ast/            Parse-tree node definitions and visitor interface
-│   └── parser/         Recursive-descent parser
+├── sema/               Semantic analysis and type checking
+│   └── types/
 │
-├── sema/               Semantic analysis
-│   ├── types/          Type system (basic, array, record, pointer,
-│   │                   procedure, enum, named types)
-│   ├── resolve.go      Name resolution and symbol mangling
-│   ├── typecheck.go    Type checker (visitor over the AST)
-│   └── flow.go         Control-flow analysis
+├── ir/
+│   ├── desugar/        AST desugaring
+│   └── minir/          Core IR, verifier, emitter, lowering, and minir passes
+│       └── opt/        PassManager + passes (mem2reg/loadfwd/constfold/...)
 │
-├── ir/                 Intermediate representations
-│   ├── desugar/        Desugared IR — explicit lowering of AST sugar
-│   └── obxir/          ObxIR — SSA three-address code with basic blocks,
-│                       φ-nodes, CFG, and DOT CFG visualisation; includes
-│                       the IRBuilder and a pretty-printer
+├── backend/            Target-lowering and machine pipeline
+│   ├── lower/          Backend MIR lowering from minir
+│   ├── mir/            Backend MIR model
+│   ├── select/         Instruction selection (.td descriptor-driven)
+│   ├── legalize/       Target-specific legalization
+│   ├── regalloc/       Register allocation and rewrite
+│   ├── target/         Target descriptors and emitters (rv64/arm64)
+│   ├── emit/           Assemble/link integration
+│   └── stages/         Stage registration and pipeline orchestration
 │
-├── opt/                Optimisation passes (all operate on ObxIR)
-│   ├── pass.go         Pass interface, PassManager, pass registry
-│   ├── fold.go         Constant folding
-│   ├── dce.go          Dead-code elimination
-│   ├── ssa.go          SSA construction (dominators, φ-node placement)
-│   └── control.go      CFG construction and dominance computation
-│
-├── codegen/            Code generation
-│   ├── asm/            Assembly-level IR (symbols, instructions, blocks)
-│   ├── bud/            Pattern-description DSL and its lexer/parser
-│   │   ├── ast/        AST nodes for bud rules and predicates
-│   │   └── parser/     bud parser
-│   ├── isel/           Instruction selection via bud pattern matching
-│   ├── ralloc/         Register allocation
-│   │                   (liveness analysis, live intervals, linear scan,
-│   │                    graph colouring)
-│   └── target/         Target machine abstraction
-│       ├── desc/       Machine description files (*.td)
-│       ├── riscv/      RISC-V rv64imafd implementation
-│       └── arm64/      ARM64 (apple-macos) implementation
-│
-└── project/            Project manifest (obx.mod) — loading, writing,
-                        project-root discovery, module-graph resolution
+├── project/            Module graph + manifest loading/resolution
+└── support/            Compiler context, diagnostics, source mapping, cache
 ```
