@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/sema/types"
 	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
 	"github.com/anthonyabeo/obx/src/support/source"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -19,6 +21,9 @@ import (
 type Lowerer struct {
 	// module-level state (shared across all functions in the program)
 	mod *Module // the module being built; set by Lower()
+	// interned string literal content -> synthesized global const
+	stringGlobals map[string]*GlobalConst
+	stringSeq     int
 
 	// per-function mutable state, reset by lowerFunction
 	blockSeq int               // monotone block-ID counter
@@ -35,15 +40,37 @@ type Lowerer struct {
 	// diagnostics/context
 	dctx     *compiler.Context
 	reported map[string]bool // dedupe map keyed by rttiName@module
+
+	// noInitModules is an externally provided set of module names that must
+	// NOT have an __init_X() call synthesised (e.g., FFI DEFINITION modules
+	// compiled in a separate phase whose desugar.Module never appears in
+	// prog.Modules). Merged with the locally derived defModules set inside
+	// Lower(). Populated via SetNoInitModules before calling Lower.
+	noInitModules map[string]bool
 }
 
 func New(dctx *compiler.Context) *Lowerer {
 	return &Lowerer{
-		dctx:     dctx,
-		varEnv:   make(map[string]*Temp),
-		constEnv: make(map[string]Value),
-		loopExit: make(map[string]string),
-		reported: make(map[string]bool),
+		dctx:          dctx,
+		varEnv:        make(map[string]*Temp),
+		constEnv:      make(map[string]Value),
+		loopExit:      make(map[string]string),
+		reported:      make(map[string]bool),
+		stringGlobals: make(map[string]*GlobalConst),
+		noInitModules: make(map[string]bool),
+	}
+}
+
+// SetNoInitModules registers module names for which no __init_X() call should
+// be generated. Call this before Lower() when some imported modules are known
+// to be DEFINITION-only (no body) but are not visible in prog.Modules because
+// they were compiled in a separate phase (e.g. FFI bindings from precompile
+// Phase 1).
+func (l *Lowerer) SetNoInitModules(names map[string]bool) {
+	for name := range names {
+		if name != "" {
+			l.noInitModules[name] = true
+		}
 	}
 }
 
@@ -75,9 +102,29 @@ func Lower(prog *desugar.Program) *Program {
 func (l *Lowerer) Lower(prog *desugar.Program) *Program {
 	outProg := &Program{}
 
+	// Build the combined no-init set:
+	//   1. Modules in this program with Init==nil AND DLLName=="" (pure DEFINITION,
+	//      no body and no DLL binding — truly has no __init_X).
+	//      FFI DEFINITION modules (DLLName != "") have a backend-synthesised
+	//      __init_X (from emitARM64StdioInit etc.) and must NOT be skipped.
+	//   2. Externally registered names via SetNoInitModules (pure DEFINITION
+	//      modules compiled in a prior phase whose desugar.Module is not in
+	//      prog.Modules).
+	allNoInit := make(map[string]bool)
+	for k := range l.noInitModules {
+		allNoInit[k] = true
+	}
+	for _, m := range prog.Modules {
+		if m.Init == nil && m.DLLName == "" {
+			allNoInit[m.Name] = true
+		}
+	}
+
 	for _, hirMod := range prog.Modules {
-		mod := &Module{Name: hirMod.Name}
+		mod := &Module{Name: hirMod.Name, IsEntry: hirMod.IsEntry, DLLName: hirMod.DLLName}
 		l.mod = mod
+		l.stringGlobals = make(map[string]*GlobalConst)
+		l.stringSeq = 0
 		// expose module to LowerType so it can emit module-level constants
 		currentModule = mod
 
@@ -101,7 +148,9 @@ func (l *Lowerer) Lower(prog *desugar.Program) *Program {
 			}
 		}
 		if hirMod.Init != nil && hirMod.Init.Body != nil {
-			mod.Functions = append(mod.Functions, l.lowerFunction(hirMod.Init))
+			initFn := *hirMod.Init
+			initFn.Body = prependModuleInitCalls(hirMod.Name, hirMod.Imports, hirMod.Init.Body, allNoInit)
+			mod.Functions = append(mod.Functions, l.lowerFunction(&initFn))
 		}
 
 		outProg.Modules = append(outProg.Modules, mod)
@@ -110,6 +159,51 @@ func (l *Lowerer) Lower(prog *desugar.Program) *Program {
 	}
 
 	return outProg
+}
+
+func prependModuleInitCalls(moduleName string, imports []*ast.Import, body *desugar.CompoundStmt, defModules map[string]bool) *desugar.CompoundStmt {
+	if body == nil || len(imports) == 0 {
+		return body
+	}
+
+	calls := make([]desugar.Stmt, 0, len(imports))
+	seen := make(map[string]bool)
+	for _, imp := range imports {
+		if imp == nil {
+			continue
+		}
+		// Use the bare module name (last segment of the import path).
+		// For "import S := posix.Stdio", imp.Name is "posix.Stdio" but
+		// the module's own declared name is "Stdio" (last path segment).
+		bareName := imp.Name
+		if len(imp.ImportPath) > 0 {
+			bareName = imp.ImportPath[len(imp.ImportPath)-1]
+		}
+		if bareName == "" || bareName == moduleName || seen[bareName] {
+			continue
+		}
+		// DEFINITION modules (no BEGIN..END body) have no __init_ function;
+		// skip generating a call for them.
+		if defModules[bareName] {
+			continue
+		}
+		seen[bareName] = true
+		calls = append(calls, &desugar.FuncCall{
+			Func: &desugar.FunctionRef{
+				Name:    "__init_" + bareName,
+				Mangled: "__init_" + bareName,
+				Module:  bareName,
+			},
+		})
+	}
+	if len(calls) == 0 {
+		return body
+	}
+
+	stmts := make([]desugar.Stmt, 0, len(calls)+len(body.Stmts))
+	stmts = append(stmts, calls...)
+	stmts = append(stmts, body.Stmts...)
+	return &desugar.CompoundStmt{Stmts: stmts}
 }
 
 // ── function lowering ─────────────────────────────────────────────────────────
@@ -545,6 +639,12 @@ func (l *Lowerer) lowerCase(st *desugar.CaseStmt) {
 
 func (l *Lowerer) emitCaseTest(key *Temp, lr *desugar.LabelRange, bodyLabel, fallLabel string) {
 	loVal := l.lowerValue(lr.Low)
+	// Coerce the label constant to the same integer type as the key.
+	// BYTE_LIT labels produce u8 constants, but the key may be i32, causing
+	// ICmpInst type mismatches.
+	if key.Type() != nil && loVal != nil && loVal.Type() != nil && !loVal.Type().Equal(key.Type()) {
+		loVal = l.coerceValue(loVal, key.Type())
+	}
 	singleton := lr.Low == lr.High
 	if !singleton {
 		if la, ok := lr.Low.(*desugar.Literal); ok {
@@ -562,6 +662,9 @@ func (l *Lowerer) emitCaseTest(key *Temp, lr *desugar.LabelRange, bodyLabel, fal
 		return
 	}
 	hiVal := l.lowerValue(lr.High)
+	if key.Type() != nil && hiVal != nil && hiVal.Type() != nil && !hiVal.Type().Equal(key.Type()) {
+		hiVal = l.coerceValue(hiVal, key.Type())
+	}
 	loOk := NewAnonTemp(I1())
 	hiOk := NewAnonTemp(I1())
 	both := NewAnonTemp(I1())
@@ -575,9 +678,14 @@ func (l *Lowerer) emitCaseTest(key *Temp, lr *desugar.LabelRange, bodyLabel, fal
 
 func (l *Lowerer) lowerCallStmt(call *desugar.FuncCall) {
 	// Dispatch to inline builtin lowering first.
-	if fn, ok := builtinLowering[strings.ToLower(call.Func.Name)]; ok {
-		fn(l, call)
-		return
+	// Only dispatch predeclared (unqualified, non-external) functions.
+	// Module-qualified calls (e.g. Math.Floor) and FFI calls (e.g. M.floor)
+	// share names with builtins but must not be intercepted here.
+	if !call.Func.IsExternal && call.Func.Module == "" {
+		if fn, ok := builtinLowering[strings.ToLower(call.Func.Name)]; ok {
+			fn(l, call)
+			return
+		}
 	}
 
 	callee := call.Func.Mangled
@@ -909,12 +1017,40 @@ func (l *Lowerer) lowerFieldAddr(e *desugar.FieldAccess) *Temp {
 	ft := LowerType(e.SemaType)
 	dst := l.newAddrTemp(e.Field, ft)
 
+	// Resolve the RecordType that the base pointer points at.
+	// base.Type() is always a PointerType because lowerAddr always yields an
+	// address.  Two cases arise:
+	//
+	//   1. Direct record variable: var tm: Rec → base = ptr.RecordType
+	//      pt.Elem is a RecordType → straightforward GEP.
+	//
+	//   2. Pointer-to-record variable (CPOINTER / POINTER TO Rec):
+	//      var p: Ptr → alloca gives base of type ptr.(ptr.RecordType).
+	//      We must emit a LoadInst to dereference the pointer and get a
+	//      base of type ptr.RecordType before doing the GEP.
+	//
 	var recTy *RecordType
 	if pt, ok := base.Type().(*PointerType); ok {
-		recTy, _ = pt.Elem.(*RecordType)
+		switch inner := pt.Elem.(type) {
+		case *RecordType:
+			// Case 1: base is directly ptr.RecordType.
+			recTy = inner
+		case *PointerType:
+			// Case 2: base is ptr.(ptr.RecordType) — auto-deref needed.
+			if inner.Elem != nil {
+				if rec, ok2 := inner.Elem.(*RecordType); ok2 {
+					// Load the pointer to get ptr.RecordType.
+					loaded := NewAnonTemp(inner)
+					loaded.IsAddr = true
+					l.emit(&LoadInst{Dst: loaded, Addr: base})
+					base = loaded
+					recTy = rec
+				}
+			}
+		}
 	}
 
-	var elemType = ft
+	var elemType Type = ft
 	var offsets []int
 	if recTy != nil {
 		if idx := recTy.FieldIndex(e.Field); idx >= 0 {
@@ -1574,34 +1710,94 @@ func (l *Lowerer) lowerWith(st *desugar.WithStmt) {
 	l.switchTo(endBlk)
 }
 
+// lowerSysAdr lowers a system.adr(x) call, returning a value that carries the
+// machine address of x as an INTEGER (i64 / ptr-sized).
+//
+// Three cases are handled:
+//
+//  1. VAR / IN parameter — the param temp already holds the incoming pointer
+//     (the caller passed the address). There is no stack slot to take the
+//     address of; we simply bitcast the pointer value to i64 directly.
+//
+//  2. String literal — the literal is interned as a module-scope global
+//     constant. AddrInstr over the GlobalRef lets isel emit the appropriate
+//     PC-relative address sequence (e.g. adrp/add on arm64).
+//
+//  3. Local variable, global variable, or constant reference — lowerAddr
+//     returns the alloca / GlobalRef, and AddrInstr lets isel compute the
+//     stack-slot or data-section address.
+func (l *Lowerer) lowerSysAdr(arg desugar.Expr) Value {
+	switch e := arg.(type) {
+	case *desugar.Param:
+		if e.Kind != desugar.ValueParam {
+			// VAR/IN: param IS the pointer — bitcast to i64; no AddrInstr needed.
+			ptr := l.lowerAddr(e)
+			dst := NewTemp(fmt.Sprintf("%s$adr", ptr.String()), I64())
+			l.emit(&CastInst{Dst: dst, Op: "bitcast", Src: ptr})
+			return dst
+		}
+		// Value param: spill to a stack slot via lowerAddr's fallback, then addr-of.
+		v := l.lowerAddr(e)
+		dst := l.newAddrTemp(fmt.Sprintf("%s$adr", v.String()), Ptr(Void()))
+		l.emit(&AddrInstr{Dst: dst, Of: v})
+		return dst
+	case *desugar.VariableRef, *desugar.ConstantRef:
+		v := l.lowerAddr(arg)
+		dst := l.newAddrTemp(fmt.Sprintf("%s$adr", v.String()), Ptr(Void()))
+		l.emit(&AddrInstr{Dst: dst, Of: v})
+		return dst
+	case *desugar.Literal:
+		if e.Kind == token.STR_LIT {
+			strType := LowerType(e.SemaType)
+			v := l.internStringLiteral(e.Value, strType)
+			dst := l.newAddrTemp(fmt.Sprintf("%s$adr", v.String()), Ptr(Void()))
+			l.emit(&AddrInstr{Dst: dst, Of: v})
+			return dst
+		}
+		panic(fmt.Sprintf("lowerSysAdr: non-string literal argument %q", e.Value))
+	default:
+		panic(fmt.Sprintf("lowerSysAdr: unsupported argument type %T", arg))
+	}
+}
+
 func (l *Lowerer) lowerCallExpr(call *desugar.FuncCall) Value {
 	// Dispatch to inline builtin lowering first.
-	if fn, ok := builtinLowering[strings.ToLower(call.Func.Name)]; ok {
-		v := fn(l, call)
-		if v != nil {
-			return v
+	// Only dispatch predeclared (unqualified, non-external) functions.
+	// Module-qualified calls (e.g. Math.Floor) and FFI calls (e.g. M.floor)
+	// share names with builtins but must not be intercepted here.
+	if !call.Func.IsExternal && call.Func.Module == "" {
+		if fn, ok := builtinLowering[strings.ToLower(call.Func.Name)]; ok {
+			v := fn(l, call)
+			if v != nil {
+				return v
+			}
+
+			// Builtin failed to produce a value in expression context: warn and
+			// return a conservative zero value of the expected return type.
+			msg := fmt.Sprintf("lowerCallExpr: builtin %q returned nil in expression context", call.Func.Name)
+			l.reportLoweringDiagnostic(msg, call.StartOffset, call.EndOffset)
+
+			rt := LowerType(call.RetType)
+			if rt == nil {
+				rt = I32()
+			}
+
+			if rt == I1() {
+				return NewConst("false", int64(0), I1())
+			}
+
+			return NewConst("0", int64(0), rt)
 		}
-
-		// Builtin failed to produce a value in expression context: warn and
-		// return a conservative zero value of the expected return type.
-		msg := fmt.Sprintf("lowerCallExpr: builtin %q returned nil in expression context", call.Func.Name)
-		l.reportLoweringDiagnostic(msg, call.StartOffset, call.EndOffset)
-
-		rt := LowerType(call.RetType)
-		if rt == nil {
-			rt = I32()
-		}
-
-		if rt == I1() {
-			return NewConst("false", int64(0), I1())
-		}
-
-		return NewConst("0", int64(0), rt)
 	}
 
 	callee := call.Func.Mangled
 	if callee == "" {
 		callee = call.Func.Name
+	}
+
+	// system.adr(x) returns the machine address of x as INTEGER.
+	if callee == "system$adr" {
+		return l.lowerSysAdr(call.Args[0])
 	}
 
 	// Determine which formals expect addresses (VAR/IN) when possible.
@@ -1681,14 +1877,26 @@ func (l *Lowerer) lowerLiteralExpr(expr desugar.Expr) Value {
 	case token.FALSE:
 		return NewConst("false", int64(0), I1())
 	case token.CHAR_LIT, token.WCHAR_LIT:
-		char, err := parseCharConst(lit.Value, lit.Kind, LowerType(lit.SemaType))
+		// Use the sema type when available; fall back to the natural type so
+		// that 0x (null char) and similar literals never produce nil-typed constants.
+		charTy := LowerType(lit.SemaType)
+		if charTy == nil {
+			if lit.Kind == token.WCHAR_LIT {
+				charTy = U16()
+			} else {
+				charTy = U8()
+			}
+		}
+		char, err := parseCharConst(lit.Value, lit.Kind, charTy)
 		if err != nil {
 			l.reportLoweringDiagnostic(fmt.Sprintf("lowerLiteralExpr: cannot parse char literal %q: %v",
 				lit.Value, err), lit.StartOffset, lit.EndOffset)
+			return NewConst("0", uint64(0), charTy)
 		}
 		return char
 	case token.STR_LIT, token.HEX_STR_LIT:
-		return NewConst(lit.Value, lit.Value, NewArrayType(len(lit.Value)+1, U16()))
+		strTy := NewArrayType(len(lit.Value)+1, U16())
+		return l.internStringLiteral(lit.Value, strTy)
 	case token.NIL:
 		return NewConst("nil", int64(0), Ptr(Void()))
 	default:
@@ -1956,9 +2164,24 @@ func (l *Lowerer) resolveVar(mangled, bare string) Value {
 			return v
 		}
 	}
-	// Undefined variable: emit a diagnostic and return a synthetic addressable
-	// temporary so lowering can continue. The reporter (when present) will
-	// include no source Range for this site.
+	// Undefined variable: check if this is a cross-module reference (name
+	// contains '$') before falling back to a synthetic alloca.  Cross-module
+	// references arise when IO.obx accesses imported DEFINITION module globals
+	// such as Stdio$stdout.  Emit an external GlobalVar for the name so that
+	// the backend knows to emit an extern declaration and resolves the load
+	// against the correct object file.
+	if l.mod != nil && strings.Contains(mangled, "$") {
+		ty := Ptr(Void())
+		// Register the external global in this module's globals and symbol table.
+		// IsExternRef=true tells the backend to emit .extern _Name rather than a
+		// local BSS allocation (the symbol is defined in another module's object).
+		gv := &GlobalVar{Name: mangled, Ty: ty, Linkage: ExternalLinkage, IsExternRef: true}
+		l.mod.Globals = append(l.mod.Globals, gv)
+		ref := &GlobalRef{GlobalName: mangled, Ty: ty}
+		_ = l.mod.SymTab.Define(mangled, ref)
+		return ref
+	}
+
 	msg := fmt.Sprintf("lowerer: undefined variable %q / %q", mangled, bare)
 	l.reportLoweringDiagnostic(msg, 0, 0)
 	// Create an addressable alloca as a fallback.
@@ -2069,29 +2292,17 @@ func parseIntegerConst(value string, kind token.Kind, ty Type) (Constant, error)
 }
 
 func parseCharConst(value string, kind token.Kind, ty Type) (Constant, error) {
-	var bitSize int
 	switch kind {
-	case token.CHAR_LIT:
-		bitSize = 8
-	case token.WCHAR_LIT:
-		bitSize = 16
+	case token.CHAR_LIT, token.WCHAR_LIT:
+		// The scanner emits the actual Unicode rune as the value string (via
+		// string(character)).  Decode the first rune to obtain the numeric value.
+		if len(value) == 0 {
+			return NewConst("0", uint64(0), ty), nil
+		}
+		r, _ := utf8.DecodeRuneInString(value)
+		iv := uint64(r)
+		return NewConst(fmt.Sprintf("%d", iv), iv, ty), nil
 	default:
 		return nil, fmt.Errorf("parseCharConst: invalid kind %v", kind)
 	}
-
-	v := value
-	var iv uint64
-	var err error
-	if strings.HasSuffix(v, "x") || strings.HasSuffix(v, "X") {
-		v2 := v[:len(v)-1]
-		iv, err = strconv.ParseUint(v2, 16, bitSize)
-	} else {
-		iv, err = strconv.ParseUint(v, 16, bitSize)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return NewConst(fmt.Sprintf("%d", iv), iv, ty), nil
 }

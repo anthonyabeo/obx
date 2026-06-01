@@ -5,6 +5,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/sema/types"
+	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/token"
 )
 
@@ -73,6 +74,48 @@ func TestLower_Identity(t *testing.T) {
 		}},
 	}
 	checkLower(t, "identity", Lower(hirProg(fn)))
+}
+
+func TestLower_PrependsImportedModuleInits(t *testing.T) {
+	tempIDCounter = 0
+	i32 := types.Int32Type
+
+	initFn := &desugar.Function{
+		Name: "Main",
+		Body: &desugar.CompoundStmt{Stmts: []desugar.Stmt{
+			&desugar.ReturnStmt{Result: hirLit("0", i32)},
+		}},
+	}
+	prog := &desugar.Program{
+		Modules: []*desugar.Module{{
+			Name:    "Main",
+			IsEntry: true,
+			Imports: []*ast.Import{{Name: "IO"}, {Name: "Math"}},
+			Init:    initFn,
+		}},
+	}
+
+	out := Lower(prog)
+	if len(out.Modules) != 1 {
+		t.Fatalf("expected 1 lowered module, got %d", len(out.Modules))
+	}
+	if !out.Modules[0].IsEntry {
+		t.Fatalf("expected lowered module to preserve IsEntry")
+	}
+	loweredInit := out.Modules[0].FunctionByName("Main")
+	if loweredInit == nil {
+		t.Fatalf("expected lowered init function Main")
+	}
+	if loweredInit.Entry == nil || len(loweredInit.Entry.Instrs) == 0 {
+		t.Fatalf("expected init function to contain imported init calls")
+	}
+	call, ok := loweredInit.Entry.Instrs[0].(*CallInst)
+	if !ok {
+		t.Fatalf("first instruction = %T, want *CallInst", initFn.Entry.Instrs[0])
+	}
+	if call.Callee != "__init_IO" {
+		t.Fatalf("first call callee = %q, want %q", call.Callee, "__init_IO")
+	}
 }
 
 // ── 2. max(a, b: INT32): INT32 – if-else ─────────────────────────────────────

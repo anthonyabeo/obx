@@ -56,11 +56,12 @@ func (g *GlobalRef) IsMem() bool { return true }
 // GlobalVar is a mutable, module-scope variable.
 // Analogous to "@name = [linkage] global <type> <init>" in LLVM IR.
 type GlobalVar struct {
-	Name    string
-	Ty      Type
-	Init    Constant // optional literal initializer; nil → zero-initialized
-	Linkage Linkage
-	ref     *GlobalRef // lazily created, stable address value
+	Name        string
+	Ty          Type
+	Init        Constant // optional literal initializer; nil → zero-initialized
+	Linkage     Linkage
+	IsExternRef bool       // true = reference to a symbol defined in another module (no local BSS)
+	ref         *GlobalRef // lazily created, stable address value
 }
 
 // Ref returns the stable *GlobalRef representing this variable's address.
@@ -142,7 +143,7 @@ func (e *ExternalFunc) String() string {
 	}
 	out := fmt.Sprintf("declare @%s(%s) -> %s", e.Name, joinStrings(params, ", "), res)
 	// Render optional external attributes in a compact bracketed list. Keep
-	// backward-compatible textual appearance by using the previous [dll="..."]
+	//  a backward-compatible textual appearance by using the previous [dll="..."]
 	// form when DLLName is present.
 	if e.Attrs != nil {
 		var parts []string

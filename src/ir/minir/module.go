@@ -6,6 +6,8 @@ package minir
 // all indexed by a unified symbol table.
 type Module struct {
 	Name      string
+	IsEntry   bool
+	DLLName   string         // non-empty for DEFINITION modules: the external library name (e.g. "libc")
 	Globals   []*GlobalVar    // mutable module-scope variables
 	Constants []*GlobalConst  // read-only module-scope constants
 	Externals []*ExternalFunc // imported / FFI function declarations

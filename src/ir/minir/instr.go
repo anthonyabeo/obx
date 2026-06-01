@@ -255,3 +255,12 @@ func (s *SwitchInst) String() string { return FormatInstr(s) }
 func (s *SwitchInst) Uses() []Value  { return []Value{s.Key} }
 func (s *SwitchInst) Def() *Temp     { return nil }
 func (s *SwitchInst) isTerminator()  {}
+
+type AddrInstr struct {
+	Dst *Temp
+	Of  Value
+}
+
+func (a *AddrInstr) String() string { return FormatInstr(a) }
+func (a *AddrInstr) Uses() []Value  { return []Value{a.Of} }
+func (a *AddrInstr) Def() *Temp     { return a.Dst }

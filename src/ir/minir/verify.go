@@ -182,34 +182,38 @@ func VerifyIR(fn *Function) []VerifyError {
 					}
 				}
 			case *ReturnInst:
-				if instr.Result != nil && fn.Result != nil {
-					if !instr.Result.Type().Equal(fn.Result) {
-						add(bl, is, fmt.Sprintf("ReturnInst result type %q does not match function result type %q", instr.Result.Type(), fn.Result))
-					}
+			if instr.Result != nil && fn.Result != nil {
+				rt := instr.Result.Type()
+				if rt != nil && !rt.Equal(fn.Result) {
+					add(bl, is, fmt.Sprintf("ReturnInst result type %q does not match function result type %q", rt, fn.Result))
 				}
-				if instr.Result != nil && fn.Result == nil {
-					add(bl, is, "ReturnInst returns a value but function result type is nil (void)")
+			}
+			if instr.Result != nil && fn.Result == nil {
+				add(bl, is, "ReturnInst returns a value but function result type is nil (void)")
+			}
+		case *BinaryInst:
+			if instr.Left != nil && instr.Right != nil {
+				lt, rt := instr.Left.Type(), instr.Right.Type()
+				if lt != nil && rt != nil && !lt.Equal(rt) {
+					add(bl, is, fmt.Sprintf("BinaryInst operand type mismatch: %q vs %q", lt, rt))
 				}
-			case *BinaryInst:
-				if instr.Left != nil && instr.Right != nil {
-					if !instr.Left.Type().Equal(instr.Right.Type()) {
-						add(bl, is, fmt.Sprintf("BinaryInst operand type mismatch: %q vs %q", instr.Left.Type(), instr.Right.Type()))
-					}
+			}
+		case *ICmpInst:
+			if instr.Left != nil && instr.Right != nil {
+				lt, rt := instr.Left.Type(), instr.Right.Type()
+				if lt != nil && rt != nil && !lt.Equal(rt) {
+					add(bl, is, fmt.Sprintf("ICmpInst operand type mismatch: %q vs %q", lt, rt))
 				}
-			case *ICmpInst:
-				if instr.Left != nil && instr.Right != nil {
-					if !instr.Left.Type().Equal(instr.Right.Type()) {
-						add(bl, is, fmt.Sprintf("ICmpInst operand type mismatch: %q vs %q", instr.Left.Type(), instr.Right.Type()))
-					}
+			}
+		case *FCmpInst:
+			// FCmpInst embeds ICmpInst; compare types similarly
+			base := &instr.ICmpInst
+			if base.Left != nil && base.Right != nil {
+				lt, rt := base.Left.Type(), base.Right.Type()
+				if lt != nil && rt != nil && !lt.Equal(rt) {
+					add(bl, is, fmt.Sprintf("FCmpInst operand type mismatch: %q vs %q", lt, rt))
 				}
-			case *FCmpInst:
-				// FCmpInst embeds ICmpInst; compare types similarly
-				base := &instr.ICmpInst
-				if base.Left != nil && base.Right != nil {
-					if !base.Left.Type().Equal(base.Right.Type()) {
-						add(bl, is, fmt.Sprintf("FCmpInst operand type mismatch: %q vs %q", base.Left.Type(), base.Right.Type()))
-					}
-				}
+			}
 			}
 		}
 	}

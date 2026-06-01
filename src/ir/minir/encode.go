@@ -41,7 +41,7 @@ package minir
 //	0x05  OP_LOAD    0x06  OP_STORE   0x07  OP_ALLOCA  0x08  OP_GEP
 //	0x09  OP_CALL    0x0A  OP_UNARY   0x0B  OP_CAST
 //	0x0C  OP_HALT    0x0D  OP_RET     0x0E  OP_JMP
-//	0x0F  OP_CONDBR  0x10  OP_SWITCH
+//	0x0F  OP_CONDBR  0x10  OP_SWITCH  0x11  OP_ADDR
 
 import (
 	"bytes"
@@ -61,24 +61,28 @@ const (
 
 // ── type opcodes ──────────────────────────────────────────────────────────────
 const (
-	mtypePrim   byte = 0x01
-	mtypePtr    byte = 0x02
-	mtypeRecord byte = 0x03
-	mtypeArray  byte = 0x04
-	mtypeFunc   byte = 0x05
-	mtypeNil    byte = 0x06
+	mtypePrim      byte = 0x01
+	mtypePtr       byte = 0x02
+	mtypeRecord    byte = 0x03
+	mtypeArray     byte = 0x04
+	mtypeFunc      byte = 0x05
+	mtypeNil       byte = 0x06
+	mtypeOpenArray byte = 0x07 // OpenArrayType: [u32] NDims, [T] Elem
 )
 
 // ── value opcodes ─────────────────────────────────────────────────────────────
 const (
-	valNil         byte = 0x00
-	valConstInt    byte = 0x01
-	valConstFloat  byte = 0x02
-	valConstNamed  byte = 0x03
-	valTemp        byte = 0x04
-	valGlobalRef   byte = 0x05
-	valConstString byte = 0x06 // [str] NameStr, [str] Value
-	valConstNil    byte = 0x07 // [str] NameStr, [T] type
+	valNil          byte = 0x00
+	valConstInt     byte = 0x01
+	valConstFloat   byte = 0x02
+	valConstNamed   byte = 0x03
+	valTemp         byte = 0x04
+	valGlobalRef    byte = 0x05
+	valConstString  byte = 0x06 // [str] NameStr, [str] Value
+	valConstNil     byte = 0x07 // [str] NameStr, [T] type
+	valTypedInt     byte = 0x08 // [i64] value, [T] type          — typed anonymous int
+	valTypedNamed   byte = 0x09 // [str] name, [i64] value, [T] type — typed named const
+	valTypedFloat   byte = 0x0A // [f64] value, [T] type          — typed float const
 )
 
 // ── instruction opcodes ───────────────────────────────────────────────────────
@@ -99,6 +103,7 @@ const (
 	opJmp    byte = 0x0E
 	opCondBr byte = 0x0F
 	opSwitch byte = 0x10
+	opAddr   byte = 0x11
 )
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -223,6 +228,15 @@ func EncodeType(w io.Writer, t Type) error {
 		}
 		return nil
 
+	case *OpenArrayType:
+		if err := encWriteU8(w, mtypeOpenArray); err != nil {
+			return err
+		}
+		if err := encWriteU32(w, uint32(v.NDims)); err != nil {
+			return err
+		}
+		return EncodeType(w, v.Elem)
+
 	default:
 		return encWriteU8(w, mtypeNil)
 	}
@@ -238,33 +252,49 @@ func EncodeValue(w io.Writer, v Value) error {
 	switch x := v.(type) {
 	case *IntegerConst:
 		if x.NameStr != "" {
-			if err := encWriteU8(w, valConstNamed); err != nil {
+			// Typed named constant (e.g. "true", "10", etc.) - preserve type.
+			if err := encWriteU8(w, valTypedNamed); err != nil {
 				return err
 			}
 			if err := encWriteString(w, x.NameStr); err != nil {
 				return err
 			}
-			return encWriteI64(w, int64(x.Value))
+			if err := encWriteI64(w, int64(x.Value)); err != nil {
+				return err
+			}
+			return EncodeType(w, x.Ty)
 		}
-		if err := encWriteU8(w, valConstInt); err != nil {
+		// Anonymous integer constant - write with type.
+		if err := encWriteU8(w, valTypedInt); err != nil {
 			return err
 		}
-		return encWriteI64(w, int64(x.Value))
+		if err := encWriteI64(w, int64(x.Value)); err != nil {
+			return err
+		}
+		return EncodeType(w, x.Ty)
 
 	case *FloatConst:
 		if x.NameStr != "" {
-			if err := encWriteU8(w, valConstNamed); err != nil {
+			// Typed named float constant - use typed named variant.
+			if err := encWriteU8(w, valTypedNamed); err != nil {
 				return err
 			}
 			if err := encWriteString(w, x.NameStr); err != nil {
 				return err
 			}
-			return encWriteU64(w, math.Float64bits(x.Value))
+			// Reuse i64 slot for float bits.
+			if err := encWriteU64(w, math.Float64bits(x.Value)); err != nil {
+				return err
+			}
+			return EncodeType(w, x.Ty)
 		}
-		if err := encWriteU8(w, valConstFloat); err != nil {
+		if err := encWriteU8(w, valTypedFloat); err != nil {
 			return err
 		}
-		return encWriteU64(w, math.Float64bits(x.Value))
+		if err := encWriteU64(w, math.Float64bits(x.Value)); err != nil {
+			return err
+		}
+		return EncodeType(w, x.Ty)
 
 	case *NilConst:
 		if err := encWriteU8(w, valConstNil); err != nil {
@@ -282,23 +312,32 @@ func EncodeValue(w io.Writer, v Value) error {
 		if err := encWriteString(w, x.NameStr); err != nil {
 			return err
 		}
-		return encWriteString(w, x.Value)
+		if err := encWriteString(w, x.Value); err != nil {
+			return err
+		}
+		return EncodeType(w, x.Ty)
 
 	case *AggregateConst:
 		// Best-effort: encode numerically when possible, otherwise write zero.
 		if x.NameStr != "" {
-			if err := encWriteU8(w, valConstNamed); err != nil {
+			if err := encWriteU8(w, valTypedNamed); err != nil {
 				return err
 			}
 			if err := encWriteString(w, x.NameStr); err != nil {
 				return err
 			}
-			return encWriteI64(w, toInt64(x.Val))
+			if err := encWriteI64(w, toInt64(x.Val)); err != nil {
+				return err
+			}
+			return EncodeType(w, x.Ty)
 		}
-		if err := encWriteU8(w, valConstInt); err != nil {
+		if err := encWriteU8(w, valTypedInt); err != nil {
 			return err
 		}
-		return encWriteI64(w, toInt64(x.Val))
+		if err := encWriteI64(w, toInt64(x.Val)); err != nil {
+			return err
+		}
+		return EncodeType(w, x.Ty)
 
 	case *Temp:
 		if err := encWriteU8(w, valTemp); err != nil {
@@ -601,6 +640,17 @@ func EncodeInstr(w io.Writer, ins Instr) error {
 			}
 		}
 
+	case *AddrInstr:
+		if err := encWriteU8(w, opAddr); err != nil {
+			return err
+		}
+		if err := encodeTemp(w, v.Dst); err != nil {
+			return err
+		}
+		if err := EncodeValue(w, v.Of); err != nil {
+			return err
+		}
+
 	default:
 		return fmt.Errorf("EncodeInstr: unknown instruction type %T", ins)
 	}
@@ -829,7 +879,9 @@ func encodeGlobalVar(w io.Writer, gv *GlobalVar) error {
 			return err
 		}
 	}
-	return nil
+	// IsExternRef: true when this global is defined in another module (cross-module
+	// reference). The backend emits ".extern _Name" for these instead of BSS.
+	return encWriteBool(w, gv.IsExternRef)
 }
 
 // EncodeGlobalConst writes the payload bytes for a REC_CONST / TagMirConst

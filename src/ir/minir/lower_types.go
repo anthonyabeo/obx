@@ -237,6 +237,51 @@ func LowerType(ty types.Type) Type {
 			return NewOpenArrayType(ndims, LowerType(innerSema))
 		}
 		return NewArrayType(t.Length, LowerType(t.Elem))
+	case *types.CStructType:
+		// CSTRUCT types (FFI-bound C structs) lower identically to RecordType:
+		// compute aligned byte offsets using the C-struct width/alignment rules.
+		var fields []RecordField
+		offset := 0
+		for _, f := range t.Fields {
+			ft := LowerType(f.Type)
+			// Align field to its natural alignment before assigning offset.
+			align := 1
+			if f.Type != nil {
+				if a := f.Type.Alignment(); a > 0 {
+					align = a
+				}
+			}
+			if align > 1 {
+				offset = (offset + align - 1) / align * align
+			}
+			fields = append(fields, RecordField{Name: f.Name, Type: ft, Offset: offset})
+			if f.Type != nil {
+				fw := f.Type.Width()
+				if fw > 0 {
+					offset += fw
+				}
+			}
+		}
+		return NewRecordType("cstruct", fields)
+	case *types.CUnionType:
+		// CUNION: represent as a struct whose sole field is the widest member.
+		// For simplicity, just use a struct with the full union width as a byte array.
+		total := t.Width()
+		if total <= 0 {
+			total = 8
+		}
+		// Materialise as a single opaque byte-array field.
+		arrTy := NewArrayType(total, I8())
+		return NewRecordType("cunion", []RecordField{{Name: "_data", Type: arrTy, Offset: 0}})
+	case *types.CArrayType:
+		if t.Elem == nil {
+			return nil
+		}
+		if t.Length < 0 {
+			// Open CARRAY: treat as pointer to element.
+			return Ptr(LowerType(t.Elem))
+		}
+		return NewArrayType(t.Length, LowerType(t.Elem))
 	case *types.RecordType:
 		var fields []RecordField
 		offset := 0

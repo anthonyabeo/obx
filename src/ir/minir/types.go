@@ -59,12 +59,26 @@ type PointerType struct {
 	Elem Type
 }
 
-func (p *PointerType) String() string { return "ptr." + p.Elem.String() }
-func (p *PointerType) Equal(t Type) bool {
-	if o, ok := t.(*PointerType); ok {
-		return p.Elem.Equal(o.Elem)
+func (p *PointerType) String() string {
+	if p.Elem == nil {
+		return "ptr.void"
 	}
-	return false
+	return "ptr." + p.Elem.String()
+}
+func (p *PointerType) Equal(t Type) bool {
+	o, ok := t.(*PointerType)
+	if !ok {
+		return false
+	}
+	// Both are void-pointers (ptr.void has nil Elem).
+	if p.Elem == nil && o.Elem == nil {
+		return true
+	}
+	// Exactly one is a void-pointer.
+	if p.Elem == nil || o.Elem == nil {
+		return false
+	}
+	return p.Elem.Equal(o.Elem)
 }
 
 // FunctionType represents a function signature.

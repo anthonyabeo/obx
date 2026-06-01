@@ -30,6 +30,8 @@ func ValueString(v Value) string {
 	switch x := v.(type) {
 	case *Temp:
 		return TempString(x)
+	case *StringConst:
+		return fmt.Sprintf("\"%s\"", x.Value)
 	case Constant:
 		if x.Name() != "" {
 			return x.Name()
@@ -206,6 +208,9 @@ func FormatInstr(ins Instr) string {
 			arms = append(arms, fmt.Sprintf("%d:%s", a.Val, a.Label))
 		}
 		return fmt.Sprintf("switch %s, default=%s [%s]", ShortValueString(v.Key), v.Default, strings.Join(arms, ", "))
+
+	case *AddrInstr:
+		return fmt.Sprintf("%s = addr %s", ShortValueString(v.Dst), ShortValueString(v.Of))
 	}
 	// fallback
 	return ins.String()

@@ -162,6 +162,17 @@ func DecodeType(r io.Reader) (Type, error) {
 		}
 		return &FunctionType{Params: params, Result: result}, nil
 
+	case mtypeOpenArray:
+		ndims, err := decReadU32(r)
+		if err != nil {
+			return nil, err
+		}
+		elem, err := DecodeType(r)
+		if err != nil {
+			return nil, err
+		}
+		return NewOpenArrayType(int(ndims), elem), nil
+
 	case mtypeNil:
 		return nil, nil
 
@@ -183,20 +194,51 @@ func DecodeValue(r io.Reader) (Value, error) {
 		return nil, nil
 
 	case valConstInt:
+		// Legacy: anonymous integer constant without type info → I64.
 		v, err := decReadI64(r)
 		if err != nil {
 			return nil, err
 		}
 		return NewConst("", int64(v), I64()), nil
 
+	case valTypedInt:
+		v, err := decReadI64(r)
+		if err != nil {
+			return nil, err
+		}
+		ty, err := DecodeType(r)
+		if err != nil {
+			return nil, err
+		}
+		if ty == nil {
+			ty = I64()
+		}
+		return NewConst("", int64(v), ty), nil
+
 	case valConstFloat:
+		// Legacy: anonymous float without type info → F64.
 		bits, err := decReadU64(r)
 		if err != nil {
 			return nil, err
 		}
 		return NewConst("", math.Float64frombits(bits), F64()), nil
 
+	case valTypedFloat:
+		bits, err := decReadU64(r)
+		if err != nil {
+			return nil, err
+		}
+		ty, err := DecodeType(r)
+		if err != nil {
+			return nil, err
+		}
+		if ty == nil {
+			ty = F64()
+		}
+		return NewConst("", math.Float64frombits(bits), ty), nil
+
 	case valConstNamed:
+		// Legacy: named constant without type info → I64.
 		name, err := decReadString(r)
 		if err != nil {
 			return nil, err
@@ -207,6 +249,28 @@ func DecodeValue(r io.Reader) (Value, error) {
 		}
 		return NewConst(name, int64(v), I64()), nil
 
+	case valTypedNamed:
+		name, err := decReadString(r)
+		if err != nil {
+			return nil, err
+		}
+		v, err := decReadI64(r)
+		if err != nil {
+			return nil, err
+		}
+		ty, err := DecodeType(r)
+		if err != nil {
+			return nil, err
+		}
+		if ty == nil {
+			ty = I64()
+		}
+		// Preserve the original float value for float-typed named constants.
+		if ty != nil && (ty.String() == "f32" || ty.String() == "f64") {
+			return NewConst(name, math.Float64frombits(uint64(v)), ty), nil
+		}
+		return NewConst(name, int64(v), ty), nil
+
 	case valConstString:
 		name, err := decReadString(r)
 		if err != nil {
@@ -216,7 +280,14 @@ func DecodeValue(r io.Reader) (Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		return ConstString(name, val), nil
+		ty, err := DecodeType(r)
+		if err != nil {
+			return nil, err
+		}
+		if ty == nil {
+			return ConstString(name, val), nil
+		}
+		return ConstStringTyped(name, val, ty), nil
 
 	case valConstNil:
 		name, err := decReadString(r)
@@ -584,6 +655,17 @@ func DecodeInstr(r io.Reader) (Instr, error) {
 		}
 		return &SwitchInst{Key: key, Default: def, Arms: arms}, nil
 
+	case opAddr:
+		dst, err := decodeTemp(r)
+		if err != nil {
+			return nil, err
+		}
+		of, err := DecodeValue(r)
+		if err != nil {
+			return nil, err
+		}
+		return &AddrInstr{Dst: dst, Of: of}, nil
+
 	default:
 		return nil, fmt.Errorf("DecodeInstr: unknown opcode 0x%02X", op)
 	}
@@ -848,6 +930,10 @@ func decodeGlobalVar(payload []byte) (*GlobalVar, error) {
 		if c, ok := init.(Constant); ok {
 			gv.Init = c
 		}
+	}
+	// IsExternRef (added in bundle format v2): may be absent in older bundles.
+	if isExternRef, err := decReadBool(r); err == nil {
+		gv.IsExternRef = isExternRef
 	}
 	return gv, nil
 }
