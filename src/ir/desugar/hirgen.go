@@ -38,6 +38,7 @@ func (g Generator) VisitModule(module *ast.Module) any {
 	return &Module{
 		Name:    name,
 		IsEntry: module.IsEntry,
+		Imports: module.ImportList,
 		Decls:   decls,
 		Init: &Function{
 			Name: fmt.Sprintf("__init_%s", name),
@@ -101,11 +102,11 @@ func (g Generator) VisitDefinition(definition *ast.Definition) any {
 				continue
 			}
 		}
-		return &Module{Name: name, Decls: decls}
+		return &Module{Name: name, Imports: definition.ImportList, Decls: decls, DLLName: definition.Attrs.DLLName()}
 	}
 
 	decls := g.visitDeclSeq(definition.DeclSeq)
-	return &Module{Name: name, Decls: decls}
+	return &Module{Name: name, Imports: definition.ImportList, Decls: decls}
 }
 
 func (g Generator) VisitIdentifier(def *ast.Identifier) any { return def }
@@ -139,10 +140,20 @@ func (g Generator) VisitDesignator(dsg *ast.Designator) any {
 				EndOffset:   sel.EndOffset,
 			}
 		case *ast.IndexOp:
+			// The result type of an index expression is the element type, not the
+			// array type.  Unwrap NamedType → ArrayType → Elem.
+			arrTy := Dsg.Type()
+			elemTy := arrTy // fallback: if not an array, use the array type
+			if arrTy != nil {
+				underlying := types.Underlying(arrTy)
+				if at, ok := underlying.(*types.ArrayType); ok && at.Elem != nil {
+					elemTy = at.Elem
+				}
+			}
 			Dsg = &IndexExpr{
 				Array:       Dsg,
 				Index:       g.visitExprList(sel.List),
-				SemaType:    Dsg.Type(),
+				SemaType:    elemTy,
 				StartOffset: sel.StartOffset,
 				EndOffset:   sel.EndOffset,
 			}

@@ -306,11 +306,13 @@ func parseHeaderWithResolver(key ModuleKey, file string, src []byte, resolver di
 			if err != nil {
 				return Header{}, err
 			}
-			hdr.Imports = imps
-			return hdr, nil
+			// Accumulate imports: Oberon+ allows multiple separate IMPORT
+			// clauses in a module header (e.g. `import IO\nimport Strings`).
+			hdr.Imports = append(hdr.Imports, imps...)
+			// Continue scanning — there may be more IMPORT clauses.
 
 		case hEND, hCONST, hTYPE, hVAR, hPROC, hPROCEDURE, hBEGIN, hEOF:
-			return hdr, nil // no import section
+			return hdr, nil // no more header content
 
 		case hDIRECTIVE:
 			// Consume the '<*' token and process the directive. processDirective
