@@ -71,7 +71,8 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 		}
 
 		// ── 0a. Prepend stdlib root (dual-root discovery) ─────────────────
-		if stdlibRoot := project.ResolveStdlibRoot(manifest); stdlibRoot != "" {
+		stdlibRoot := project.ResolveStdlibRoot(manifest)
+		if stdlibRoot != "" {
 			roots = append([]string{stdlibRoot}, roots...)
 		}
 
@@ -99,7 +100,7 @@ Exit code is 0 when all modules are clean, 1 when errors are found.`,
 		// ── 2. Parse ─────────────────────────────────────────────────────
 		obx := ast.NewOberonX()
 
-		_, loadedNames := loadPrecompiledBundles(ctx, sorted)
+		_, loadedNames := loadPrecompiledBundles(ctx, sorted, stdlibRoot)
 		toParse, skipped := splitParsedHeaders(sorted, loadedNames)
 		if len(skipped) > 0 {
 			zlog.Info().Int("count", len(skipped)).Str("modules", strings.Join(skipped, ", ")).Msg("check: skipping parse/sema for precompiled modules")

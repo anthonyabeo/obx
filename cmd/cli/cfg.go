@@ -63,7 +63,8 @@ otherwise the module entry or the first lowered function is used.`,
 		roots := boot.Roots
 		entry = boot.Entry
 
-		if stdlibRoot := project.ResolveStdlibRoot(manifest); stdlibRoot != "" {
+		stdlibRoot := project.ResolveStdlibRoot(manifest)
+		if stdlibRoot != "" {
 			roots = append([]string{stdlibRoot}, roots...)
 		}
 
@@ -81,7 +82,7 @@ otherwise the module entry or the first lowered function is used.`,
 		}
 
 		obx := ast.NewOberonX()
-		preBundles, loadedNames := loadPrecompiledBundles(ctx, sorted)
+		preBundles, loadedNames := loadPrecompiledBundles(ctx, sorted, stdlibRoot)
 		toParse, skipped := splitParsedHeaders(sorted, loadedNames)
 		if len(skipped) > 0 {
 			zlog.Info().Int("count", len(skipped)).Str("modules", strings.Join(skipped, ", ")).Msg("cfg: skipping parse/sema for precompiled modules")

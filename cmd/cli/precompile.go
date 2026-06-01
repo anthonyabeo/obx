@@ -42,6 +42,7 @@ import (
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/minir"
+	miniropt "github.com/anthonyabeo/obx/src/ir/minir/opt"
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/support/cache"
@@ -55,7 +56,7 @@ var precompileCmd = &cobra.Command{
 	Run:   runPrecompile,
 }
 
-// ffiBundle holds the precompiled artefacts for one FFI module (DEFINITION file).
+// ffiBundle holds the precompiled artifacts for one FFI module (DEFINITION file).
 type ffiBundle struct {
 	scope  *ast.LexicalScope
 	module *minir.Module
@@ -101,7 +102,7 @@ func runPrecompile(_ *cobra.Command, _ []string) {
 	compileRootModules(stdlibRoot, cacheDir, phase1)
 }
 
-// ── Phase 1 helper ────────────────────────────────────────────────────────────
+// ── Phase 1 helper ─────��──────────────────────────────────────────────────────
 
 // compileSubdir compiles every .obx file directly inside subdir (all of them
 // are DEFINITION files — FFI bindings) in a fresh compiler context, saves
@@ -128,7 +129,7 @@ func compileSubdir(
 	}
 
 	ctx, _ := newContext(100)
-	injectPlatformDirectives(ctx, runtime.GOOS+"/"+runtime.GOARCH)
+	injectPlatformDirectives(ctx, platformForSubdir(subdirName))
 	res := directive.ResolverFromContext(ctx)
 
 	// Scan headers (using subdir as the root so keys are bare: "Stdio" not "posix.Stdio").
@@ -173,6 +174,40 @@ func compileSubdir(
 
 	hirProg := desugar.NewGenerator(obx, ctx).Generate()
 	mirProg := minir.New(ctx).Lower(hirProg)
+
+	// ── 6. Run optimization passes ─────────────────────────────────────
+	pm := miniropt.NewPassManager()
+
+	// Configure passes based on CLI flags
+	if buildArgs.EnablePasses != "" {
+		// Explicit pass list overrides -O level
+		if err := pm.ConfigureFromPassList(buildArgs.EnablePasses); err != nil {
+			log.Fatalf("build: invalid pass list: %v", err)
+		}
+	} else {
+		// Use passes for the selected optimization level
+		pm.ConfigureFromLevel(buildArgs.OptLevel)
+	}
+
+	// Apply disable-passes filter
+	if buildArgs.DisablePasses != "" {
+		if err := pm.DisablePasses(buildArgs.DisablePasses); err != nil {
+			log.Fatalf("build: invalid disable-passes list: %v", err)
+		}
+	}
+
+	// Enable verbose output if requested
+	if buildArgs.Verbose {
+		pm.SetVerbose(true)
+		pm.SetLogWriter(os.Stdout)
+	}
+
+	// Run passes on the entire program
+	totalChanges := pm.RunOnProgram(mirProg)
+	if buildArgs.Verbose {
+		stats := pm.Stats()
+		fmt.Printf("Passes applied: %d total changes across %d pass invocations\n", totalChanges, len(stats))
+	}
 
 	// Save bundles and collect results.
 	outSubdir := filepath.Join(cacheDir, subdirName)
@@ -268,7 +303,54 @@ func compileRootModules(
 	}
 
 	hirProg := desugar.NewGenerator(obx, ctx).Generate()
-	mirProg := minir.New(ctx).Lower(hirProg)
+
+	// Register Phase-1 pure DEFINITION module names (DLLName=="") as "no-init"
+	// modules. FFI DEFINITION modules (DLLName != "") have a backend-synthesised
+	// __init_X function and must NOT be skipped — their init populates module
+	// globals (e.g. Stdio$stdin/stdout/stderr) before importers read them.
+	noInit := make(map[string]bool)
+	for _, e := range phase1 {
+		if e.module.DLLName == "" {
+			noInit[e.module.Name] = true
+		}
+	}
+	lowerer := minir.New(ctx)
+	lowerer.SetNoInitModules(noInit)
+	mirProg := lowerer.Lower(hirProg)
+
+	// ── 6. Run optimization passes ─────────────────────────────────────
+	pm := miniropt.NewPassManager()
+
+	// Configure passes based on CLI flags
+	if buildArgs.EnablePasses != "" {
+		// Explicit pass list overrides -O level
+		if err := pm.ConfigureFromPassList(buildArgs.EnablePasses); err != nil {
+			log.Fatalf("build: invalid pass list: %v", err)
+		}
+	} else {
+		// Use passes for the selected optimization level
+		pm.ConfigureFromLevel(buildArgs.OptLevel)
+	}
+
+	// Apply disable-passes filter
+	if buildArgs.DisablePasses != "" {
+		if err := pm.DisablePasses(buildArgs.DisablePasses); err != nil {
+			log.Fatalf("build: invalid disable-passes list: %v", err)
+		}
+	}
+
+	// Enable verbose output if requested
+	if buildArgs.Verbose {
+		pm.SetVerbose(true)
+		pm.SetLogWriter(os.Stdout)
+	}
+
+	// Run passes on the entire program
+	totalChanges := pm.RunOnProgram(mirProg)
+	if buildArgs.Verbose {
+		stats := pm.Stats()
+		fmt.Printf("Passes applied: %d total changes across %d pass invocations\n", totalChanges, len(stats))
+	}
 
 	modToFile := make(map[string]string)
 	for _, h := range rootHeaders {
@@ -295,7 +377,9 @@ func compileRootModules(
 // ── utilities ─────────────────────────────────────────────────────────────────
 
 // subdirectoriesOf returns the absolute paths of all immediate subdirectories
-// of dir (one level deep, non-recursive).
+// of dir (one level deep, non-recursive), excluding the "cache" output dir.
+// Both "posix" and "win32" are included regardless of the host OS so that
+// precompile-stdlib always produces bundles for every supported platform.
 func subdirectoriesOf(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -304,7 +388,7 @@ func subdirectoriesOf(dir string) ([]string, error) {
 
 	var out []string
 	for _, e := range entries {
-		if e.IsDir() && strings.Contains(e.Name(), hostPlatformPrefix()) {
+		if e.IsDir() && e.Name() != "cache" {
 			out = append(out, filepath.Join(dir, e.Name()))
 		}
 	}
@@ -319,6 +403,18 @@ func hostPlatformPrefix() string {
 		return "win32"
 	default:
 		return "posix" // darwin, linux, freebsd, …
+	}
+}
+
+// platformForSubdir maps a stdlib FFI subdirectory name to the target platform
+// string understood by injectPlatformDirectives.  This lets each FFI layer be
+// compiled with the correct directive context regardless of the host OS.
+func platformForSubdir(subdirName string) string {
+	switch strings.ToLower(subdirName) {
+	case "win32":
+		return "windows"
+	default:
+		return "linux" // posix: covers linux, darwin, etc. for DEFINITION files
 	}
 }
 

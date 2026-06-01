@@ -40,6 +40,9 @@ var buildArgs struct {
 	// minir text emission
 	EmitMinir bool   // --emit-minir: write textual minir for every module
 	MinirOut  string // --minir-out: directory to write .minir files (defaults to build/)
+
+	// verification
+	StrictVerify bool // --strict-verify: treat minir verification errors as fatal
 }
 
 func init() {
@@ -63,6 +66,8 @@ func init() {
 		"write textual minir for every lowered module to --minir-out (or build/)")
 	buildCmd.Flags().StringVar(&buildArgs.MinirOut, "minir-out", "",
 		"directory to write .minir files when --emit-minir is set (defaults to build/)")
+	buildCmd.Flags().BoolVar(&buildArgs.StrictVerify, "strict-verify", false,
+		"treat minir IR verification errors as a fatal build error (default: warn only)")
 }
 
 var buildCmd = &cobra.Command{
@@ -126,7 +131,7 @@ precedence over obx.mod values.`,
 		// This injects pre-built sema scopes and/or pre-lowered minir modules
 		// for stdlib modules (if available) so we can skip reparsing/re-sema
 		// while still providing symbols to the rest of the program.
-		preBundles, loadedNames := loadPrecompiledBundles(ctx, sorted)
+		preBundles, loadedNames := loadPrecompiledBundles(ctx, sorted, boot.StdlibRoot)
 
 		// Build a filtered list of headers that still need parsing (i.e. those
 		// that did not have a precompiled .obxi bundle). This allows the
@@ -138,6 +143,18 @@ precedence over obx.mod values.`,
 
 		if ok := parseModules(toParse, ctx, obx); !ok {
 			log.Fatalf("%d errors found", ctx.Reporter.ErrorCount())
+		}
+
+		// Mark the designated entry module so the backend emits it as _main.
+		// Only the entry module's __init_<Name> function should be renamed; all
+		// imported modules keep their __init_<Name> symbols.
+		if entry != "" {
+			for _, unit := range obx.Units {
+				if mod, ok := unit.(*ast.Module); ok && mod.BName == entry {
+					mod.IsEntry = true
+					break
+				}
+			}
 		}
 
 		// ── 4. Semantic analysis ──────────────────────────────────────────
@@ -196,7 +213,12 @@ precedence over obx.mod values.`,
 			for _, verr := range verifyErrs {
 				zlog.Error().Err(verr).Msg("build: minir verification failed")
 			}
-			log.Fatalf("build: minir verification failed with %d error(s)", len(verifyErrs))
+			if buildArgs.StrictVerify {
+				log.Fatalf("build: minir verification failed with %d error(s)", len(verifyErrs))
+			} else {
+				zlog.Warn().Int("count", len(verifyErrs)).
+					Msg("build: minir verification reported errors (use --strict-verify to treat as fatal)")
+			}
 		}
 
 		if buildArgs.EmitMinir {

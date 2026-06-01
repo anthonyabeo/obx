@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -111,33 +112,98 @@ func resolveOutputPath(projectDir string, manifest project.Manifest, targetName,
 	return filepath.Join(projectDir, "build", explicit)
 }
 
+// tryLoadBundle attempts to load a single .obxi bundle from path.
+// srcData is the raw source bytes used for staleness validation — if the
+// stored SHA-256 prefix does not match, cache.ErrStale is returned by
+// LoadBundle and the function returns false so the caller falls back to
+// re-parsing the source.
+func tryLoadBundle(
+	path string,
+	srcData []byte,
+	ctx *compiler.Context,
+	preBundles map[string]*minir.Module,
+	loadedNames map[string]bool,
+	h project.Header,
+) bool {
+	if _, err := os.Stat(path); err != nil {
+		return false
+	}
+	b, err := cache.LoadBundle(path, srcData)
+	if err != nil {
+		if errors.Is(err, cache.ErrStale) {
+			zlog.Warn().
+				Str("module", h.Key.Name()).
+				Str("path", path).
+				Msg("build: precompiled bundle is stale (source changed); falling back to parse")
+		}
+		return false
+	}
+	ctx.Env.AddModuleScope(b.ModuleName, b.Scope)
+	preBundles[b.ModuleName] = b.Module
+	loadedNames[h.Key.Name()] = true
+	zlog.Info().
+		Str("module", b.ModuleName).
+		Str("path", path).
+		Msg("build: precompiled module loaded; will skip parsing")
+	return true
+}
+
 // loadPrecompiledBundles looks for sibling/cache .obxi bundles and returns the
 // pre-lowered minir modules plus the names we should skip during parsing.
-func loadPrecompiledBundles(ctx *compiler.Context, sorted []project.Header) (map[string]*minir.Module, map[string]bool) {
+//
+// Probe order for each module header:
+//  1. Sibling .obxi  — same directory as the .obx file (e.g. stdlib/IO.obxi).
+//  2. Stdlib cache   — stdlibRoot/cache[/<subdir>]/Name.obxi, matching the
+//     layout written by "obx precompile-stdlib". This is the primary location
+//     for FFI subdirectory bundles (e.g. stdlibRoot/cache/posix/Stdio.obxi).
+//  3. Legacy project cache — <dir>/cache/Name.obxi, for user-project caches
+//     created outside the stdlib tree.
+//
+// Each probe passes the source file content to LoadBundle so that the embedded
+// SHA-256 hash is validated. A stale bundle is skipped (logged as a warning),
+// and the module falls back to normal parse + sema.
+func loadPrecompiledBundles(
+	ctx *compiler.Context,
+	sorted []project.Header,
+	stdlibRoot string,
+) (map[string]*minir.Module, map[string]bool) {
 	preBundles := make(map[string]*minir.Module)
 	loadedNames := make(map[string]bool)
+
 	for _, h := range sorted {
-		// Attempt to load precompiled .obxi bundles for discovered modules.
 		obxPath := h.File
+		// Read source once; used for staleness validation across all probes.
+		srcData, _ := os.ReadFile(obxPath)
+		baseName := filepath.Base(obxPath[:len(obxPath)-len(".obx")])
+
+		// ── Probe 1: sibling .obxi ────────────────────────────────────────
 		obxiPath := obxPath[:len(obxPath)-len(".obx")] + ".obxi"
-		if _, err := os.Stat(obxiPath); err == nil {
-			if b, err := cache.LoadBundle(obxiPath, nil); err == nil {
-				ctx.Env.AddModuleScope(b.ModuleName, b.Scope)
-				preBundles[b.ModuleName] = b.Module
-				loadedNames[h.Key.Name()] = true
-				zlog.Info().Str("module", b.ModuleName).Str("path", obxiPath).Msg("build: precompiled module loaded; will skip parsing")
-				continue
+		if tryLoadBundle(obxiPath, srcData, ctx, preBundles, loadedNames, h) {
+			continue
+		}
+
+		// ── Probe 2: stdlibRoot/cache[/<subdir>]/Name.obxi ────────────────
+		// Matches the output layout of "obx precompile-stdlib":
+		//   stdlib/IO.obx        → stdlib/cache/IO.obxi
+		//   stdlib/posix/Stdio.obx → stdlib/cache/posix/Stdio.obxi
+		if stdlibRoot != "" {
+			rel, err := filepath.Rel(stdlibRoot, filepath.Dir(obxPath))
+			if err == nil && !strings.HasPrefix(rel, "..") {
+				var cp string
+				if rel == "." {
+					cp = filepath.Join(stdlibRoot, "cache", baseName+".obxi")
+				} else {
+					cp = filepath.Join(stdlibRoot, "cache", rel, baseName+".obxi")
+				}
+				if tryLoadBundle(cp, srcData, ctx, preBundles, loadedNames, h) {
+					continue
+				}
 			}
 		}
-		cachePath := filepath.Join(filepath.Dir(obxPath), "cache", filepath.Base(obxPath[:len(obxPath)-len(".obx")]+".obxi"))
-		if _, err := os.Stat(cachePath); err == nil {
-			if b, err := cache.LoadBundle(cachePath, nil); err == nil {
-				ctx.Env.AddModuleScope(b.ModuleName, b.Scope)
-				preBundles[b.ModuleName] = b.Module
-				loadedNames[h.Key.Name()] = true
-				zlog.Info().Str("module", b.ModuleName).Str("path", cachePath).Msg("build: precompiled module loaded; will skip parsing")
-			}
-		}
+
+		// ── Probe 3: legacy <dir>/cache/Name.obxi ─────────────────────────
+		legacyCache := filepath.Join(filepath.Dir(obxPath), "cache", baseName+".obxi")
+		tryLoadBundle(legacyCache, srcData, ctx, preBundles, loadedNames, h)
 	}
 	return preBundles, loadedNames
 }
@@ -171,6 +237,9 @@ func mergePrecompiledMinirModules(lowered *minir.Program, preBundles map[string]
 		if exist[name] {
 			continue
 		}
+		// Precompiled modules are never the program entry point; clear the flag
+		// so their __init_<Name> functions are NOT renamed to _main.
+		mod.IsEntry = false
 		lowered.Modules = append(lowered.Modules, mod)
 	}
 }

@@ -38,6 +38,7 @@ type bootstrapState struct {
 	Manifest   project.Manifest
 	Roots      []string
 	Entry      string
+	StdlibRoot string // resolved stdlib root; empty when no stdlib was found
 }
 
 // resolveModules discovers every .obx file under the given source roots,
@@ -136,8 +137,9 @@ func bootstrapFrontEnd(opts bootstrapOptions) (*bootstrapState, error) {
 		}
 	}
 
-	if stdlibRoot := project.ResolveStdlibRoot(state.Manifest); stdlibRoot != "" {
-		state.Roots = append([]string{stdlibRoot}, state.Roots...)
+	if sr := project.ResolveStdlibRoot(state.Manifest); sr != "" {
+		state.StdlibRoot = sr
+		state.Roots = append([]string{sr}, state.Roots...)
 	}
 
 	return state, nil
