@@ -18,6 +18,7 @@ import (
 	zlog "github.com/rs/zerolog/log"
 
 	"github.com/anthonyabeo/obx/src/ir/minir"
+	miniropt "github.com/anthonyabeo/obx/src/ir/minir/opt"
 	"github.com/anthonyabeo/obx/src/project"
 	"github.com/anthonyabeo/obx/src/support/cache"
 	"github.com/anthonyabeo/obx/src/support/compiler"
@@ -425,4 +426,107 @@ func deriveEntryFromFilename(fn string) string {
 		return "Main"
 	}
 	return stem
+}
+
+// applyPipeline keeps web lowering behavior aligned with the CLI
+// build pipeline: merge cached stdlib modules, deduplicate extern declarations,
+// run the default optimization level, then verify the final program.
+func applyPipeline(lowered *minir.Program, preBundles map[string]*minir.Module) []minir.VerifyError {
+	if lowered == nil {
+		return nil
+	}
+	mergePrecompiledMinirModulesWeb(lowered, preBundles)
+	dedupMinirExternalsWeb(lowered)
+
+	pm := miniropt.NewPassManager()
+	pm.ConfigureFromLevel(2)
+	pm.RunOnProgram(lowered)
+
+	return minir.VerifyProgram(lowered)
+}
+
+func mergePrecompiledMinirModulesWeb(lowered *minir.Program, preBundles map[string]*minir.Module) {
+	if lowered == nil || len(preBundles) == 0 {
+		return
+	}
+	exist := make(map[string]bool, len(lowered.Modules))
+	for _, m := range lowered.Modules {
+		if m != nil {
+			exist[m.Name] = true
+		}
+	}
+	for name, mod := range preBundles {
+		if mod == nil || exist[name] {
+			continue
+		}
+		mod.IsEntry = false
+		lowered.Modules = append(lowered.Modules, mod)
+	}
+}
+
+func dedupMinirExternalsWeb(lowered *minir.Program) {
+	if lowered == nil {
+		return
+	}
+	uniq := make(map[string]*minir.ExternalFunc)
+	for _, m := range lowered.Modules {
+		if m == nil {
+			continue
+		}
+		newExts := make([]*minir.ExternalFunc, 0, len(m.Externals))
+		seen := make(map[string]bool)
+		for _, e := range m.Externals {
+			if e == nil {
+				continue
+			}
+			key := externalFuncKeyWeb(e)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			if ex, ok := uniq[key]; ok {
+				if ex.Attrs == nil && e.Attrs != nil {
+					ex.Attrs = e.Attrs
+				}
+				newExts = append(newExts, ex)
+			} else {
+				uniq[key] = e
+				newExts = append(newExts, e)
+			}
+		}
+		m.Externals = newExts
+	}
+}
+
+func externalFuncKeyWeb(e *minir.ExternalFunc) string {
+	cname := e.Name
+	dll := ""
+	vari := false
+	if e.Attrs != nil {
+		if e.Attrs.CName != "" {
+			cname = e.Attrs.CName
+		}
+		dll = e.Attrs.DLLName
+		vari = e.Attrs.Variadic
+	}
+	sig := ""
+	if e.Sig != nil {
+		parts := make([]string, 0, len(e.Sig.Params)+1)
+		for _, p := range e.Sig.Params {
+			if p == nil {
+				parts = append(parts, "<nil>")
+			} else {
+				parts = append(parts, p.String())
+			}
+		}
+		if vari {
+			parts = append(parts, "...")
+		}
+		res := "void"
+		if e.Sig.Result != nil {
+			res = e.Sig.Result.String()
+		}
+		sig = res + "(" + strings.Join(parts, ",") + ")"
+	}
+	return cname + "|" + dll + "|" + sig
 }

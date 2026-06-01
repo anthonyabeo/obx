@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"mime"
 	"net/http"
 	"path"
@@ -19,7 +18,6 @@ import (
 
 	"github.com/anthonyabeo/obx/src/ir/desugar"
 	"github.com/anthonyabeo/obx/src/ir/minir"
-	miniropt "github.com/anthonyabeo/obx/src/ir/minir/opt"
 	"github.com/anthonyabeo/obx/src/sema"
 	"github.com/anthonyabeo/obx/src/support/compiler"
 	"github.com/anthonyabeo/obx/src/support/diag"
@@ -474,38 +472,15 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 
 	lowered := minir.New(ctx).Lower(hirProgram)
 
-	// Merge any precompiled stdlib minir modules so downstream emit/analysis
-	// can see the stdlib modules without re-lowering them. Prefer already
-	// lowered modules produced from the HIR; only append missing preBundles.
-	if preBundles != nil {
-		for name, m := range preBundles {
-			found := false
-			for _, mm := range lowered.Modules {
-				if mm.Name == name {
-					found = true
-					break
-				}
-			}
-			if !found {
-				lowered.Modules = append(lowered.Modules, m)
-			}
-		}
-	}
-	// Promote non-escaping scalar allocas, forward store-to-load pairs,
-	// then run CFG cleanup passes.
-	for _, mod := range lowered.Modules {
-		for _, fn := range mod.Functions {
-			miniropt.Mem2Reg(fn)
-			miniropt.LoadForward(fn)
-			//miniropt.CleanCFG(fn)
-		}
-	}
-
-	if verifyErrs := minir.VerifyProgram(lowered); len(verifyErrs) > 0 {
+	if verifyErrs := applyPipeline(lowered, preBundles); len(verifyErrs) > 0 {
 		for _, verr := range verifyErrs {
-			zlog.Error().Err(verr).Msg("build: minir verification failed")
+			zlog.Error().Err(verr).Msg("web: minir verification failed")
 		}
-		log.Fatalf("build: minir verification failed with %d error(s)", len(verifyErrs))
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"ok":    false,
+			"error": fmt.Sprintf("minir verification failed with %d error(s)", len(verifyErrs)),
+		})
+		return
 	}
 
 	for _, mod := range lowered.Modules {
@@ -724,7 +699,6 @@ func (s *Server) HandleMinir(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
-	_ = preBundles // pre-loaded stdlib minir modules available for merging
 
 	if reporter.ErrorCount() > 0 {
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -753,14 +727,16 @@ func (s *Server) HandleMinir(w http.ResponseWriter, r *http.Request) {
 	// ── lower and emit ────────────────────────────────────────────────────
 	hirProgram := desugar.NewGenerator(obx, ctx).Generate()
 	lowered := minir.New(ctx).Lower(hirProgram)
-	// Promote non-escaping scalar allocas, forward store-to-load pairs,
-	// then run CFG cleanup passes.
-	for _, mod := range lowered.Modules {
-		for _, fn := range mod.Functions {
-			miniropt.Mem2Reg(fn)
-			miniropt.LoadForward(fn)
-			miniropt.CleanCFG(fn)
+
+	if verifyErrs := applyPipeline(lowered, preBundles); len(verifyErrs) > 0 {
+		for _, verr := range verifyErrs {
+			zlog.Error().Err(verr).Msg("web: minir verification failed")
 		}
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
+			"ok":    false,
+			"error": fmt.Sprintf("minir verification failed with %d error(s)", len(verifyErrs)),
+		})
+		return
 	}
 
 	type moduleEntry struct {
