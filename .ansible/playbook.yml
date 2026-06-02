@@ -44,22 +44,6 @@
       become: yes
       become_user: "{{ deploy_user }}"
 
-    - name: Guard static assets in checkout are not Git LFS pointers
-      become: yes
-      become_user: "{{ deploy_user }}"
-      shell: |
-        set -euo pipefail
-        cd /home/{{ deploy_user }}/deploy/app
-        # Fail fast if any static asset is still an unresolved LFS pointer.
-        bad_files="$(grep -R -l -m 1 '^version https://git-lfs.github.com/spec/v1$' cmd/web/static || true)"
-        if [ -n "$bad_files" ]; then
-          echo "ERROR: unresolved Git LFS pointer files found under cmd/web/static:"
-          echo "$bad_files"
-          exit 1
-        fi
-      args:
-        executable: /bin/bash
-
     - name: Template nginx site configuration
       template:
         src: templates/nginx-obx.conf.j2

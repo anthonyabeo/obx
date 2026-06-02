@@ -1,8 +1,0 @@
-# Keep web static assets as regular Git objects (no LFS) so deploy/image
-# builds never serve LFS pointer files.
-/cmd/web/static/** -filter -diff -merge
-
-# Keep common text files normalized.
-/cmd/web/static/manifest.json text
-/cmd/web/static/index.html text
-# End of file
