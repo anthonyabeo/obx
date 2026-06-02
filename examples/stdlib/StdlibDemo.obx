@@ -67,16 +67,16 @@ begin
   IO.WriteInt(Strings.Len(s))
   IO.WriteLn("")
 
-  //s := "Hello, World"
+  s := "Hello, World"
   //Strings.ToUpper(s)
   //IO.Write("upper = ")
-  //IO.WriteLn(s)
+  IO.WriteLn(s)
 
-  //s := "   inner   "
+  s := "   inner   "
   //Strings.Trim(s)
   //IO.Write('trimmed = "')
-  //IO.Write(s)
-  //IO.WriteLn('"')
+  IO.Write(s)
+  IO.WriteLn('"')
 
   s := "Hello, World"
   IO.Write('contains "World" : ')

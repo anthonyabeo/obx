@@ -4,7 +4,7 @@
   become: yes
   vars:
     deploy_user: "ubuntu"
-    image: "obx:latest"
+    image: "anthonyabeo/obx:latest"
     domain: "obxplayground.trunkwhorl.com"
     email: "patty.wagers3t@icloud.com"
     git_repo: "https://github.com/anthonyabeo/obx.git"
