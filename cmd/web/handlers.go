@@ -31,6 +31,7 @@ import (
 var staticFS embed.FS
 
 var filenameRE = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+var fingerprintedAssetRE = regexp.MustCompile(`\.[0-9a-f]{8,}\.[A-Za-z0-9]+$`)
 
 func (s *Server) write404Page(w http.ResponseWriter, r *http.Request) {
 	data, err := staticFS.ReadFile("static/404.html")
@@ -192,8 +193,14 @@ func (s *Server) HandleStatic(w http.ResponseWriter, r *http.Request) {
 	// Default CSP for other static assets (allow scripts from self and HTTPS)
 	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data:; connect-src 'self' https:; font-src 'self' https: data:; frame-ancestors 'none';")
 
-	// Cache policy for non-index assets: relatively long-lived where appropriate
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	// Cache policy for non-index assets:
+	// - fingerprinted files: safe to cache aggressively
+	// - stable names (e.g. playground.js): require revalidation to avoid stale edge/browser caches
+	if fingerprintedAssetRE.MatchString(base) {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	} else {
+		w.Header().Set("Cache-Control", "no-cache")
+	}
 	w.Header().Set("Content-Type", mimeType)
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 	if r.Method == http.MethodGet {
