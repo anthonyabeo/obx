@@ -28,17 +28,6 @@
           - python3-certbot-nginx
         state: present
 
-    - name: Ensure app checkout exists (clone or update)
-      ansible.builtin.git:
-        repo: "{{ git_repo }}"
-        dest: "/home/{{ deploy_user }}/deploy/app"
-        version: "{{ git_ref }}"
-        force: yes
-        update: yes
-        accept_hostkey: yes
-      become: yes
-      become_user: "{{ deploy_user }}"
-
     - name: Ensure deploy directory exists
       file:
         path: "/home/{{ deploy_user }}/deploy"
@@ -57,16 +46,22 @@
       become: yes
       become_user: "{{ deploy_user }}"
 
-    - name: Ensure Git LFS objects are present (pull LFS files)
+    - name: Ensure Git LFS objects are present (fail if unresolved pointers remain)
       become: yes
       become_user: "{{ deploy_user }}"
       shell: |
         set -euo pipefail
         cd /home/{{ deploy_user }}/deploy/app
-        # ensure git-lfs is initialized for this repo
-        git lfs install --local || git lfs install || true
-        # pull all LFS objects (safe even if none)
-        git lfs pull || true
+        git lfs install --local
+        git lfs pull
+        git lfs checkout
+
+        # Guardrail: fail early if a critical web asset is still an LFS pointer.
+        first_line="$(head -n 1 cmd/web/static/js/playground.js || true)"
+        if [ "$first_line" = "version https://git-lfs.github.com/spec/v1" ]; then
+          echo "ERROR: cmd/web/static/js/playground.js is still an LFS pointer"
+          exit 1
+        fi
       args:
         executable: /bin/bash
 
