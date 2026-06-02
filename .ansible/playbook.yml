@@ -21,7 +21,6 @@
         name:
           - docker.io
           - git
-          - git-lfs
           - nginx
           - ufw
           - certbot
@@ -46,20 +45,17 @@
       become: yes
       become_user: "{{ deploy_user }}"
 
-    - name: Ensure Git LFS objects are present (fail if unresolved pointers remain)
+    - name: Guard static assets in checkout are not Git LFS pointers
       become: yes
       become_user: "{{ deploy_user }}"
       shell: |
         set -euo pipefail
         cd /home/{{ deploy_user }}/deploy/app
-        git lfs install --local
-        git lfs pull
-        git lfs checkout
-
-        # Guardrail: fail early if a critical web asset is still an LFS pointer.
-        first_line="$(head -n 1 cmd/web/static/js/playground.js || true)"
-        if [ "$first_line" = "version https://git-lfs.github.com/spec/v1" ]; then
-          echo "ERROR: cmd/web/static/js/playground.js is still an LFS pointer"
+        # Fail fast if any static asset is still an unresolved LFS pointer.
+        bad_files="$(grep -R -l -m 1 '^version https://git-lfs.github.com/spec/v1$' cmd/web/static || true)"
+        if [ -n "$bad_files" ]; then
+          echo "ERROR: unresolved Git LFS pointer files found under cmd/web/static:"
+          echo "$bad_files"
           exit 1
         fi
       args:
@@ -100,10 +96,9 @@
       become_user: "{{ deploy_user }}"
       shell: |
         set -euo pipefail
-        # Attempt to pull the image supplied via vars/extra-vars. Ignore
-        # failures so a subsequent docker run/systemd restart can surface
-        # a clearer error message.
-        docker pull {{ image }} || true
+        # Pull the exact image supplied via vars/extra-vars and fail fast
+        # when unavailable so stale local images are never reused silently.
+        docker pull {{ image }}
       args:
         executable: /bin/bash
 

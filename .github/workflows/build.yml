@@ -14,6 +14,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      - name: Verify critical static asset is not an LFS pointer
+        run: |
+          set -euo pipefail
+          first_line="$(head -n 1 cmd/web/static/js/playground.js)"
+          if [ "$first_line" = "version https://git-lfs.github.com/spec/v1" ]; then
+            echo "ERROR: cmd/web/static/js/playground.js is still an LFS pointer"
+            exit 1
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@v4
