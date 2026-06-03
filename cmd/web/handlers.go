@@ -439,7 +439,6 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
-
 	if reporter.ErrorCount() > 0 {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok":    false,
@@ -567,10 +566,12 @@ func (s *Server) HandleRun(w http.ResponseWriter, r *http.Request) {
 
 	obx := ast.NewOberonX()
 	entry := deriveEntryFromFilename(req.Filename)
-	if _, err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source); err != nil {
+	preBundles, err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source)
+	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
 		return
 	}
+	markEntryModule(obx, entry)
 
 	if reporter.ErrorCount() == 0 {
 		// run semantic checks
@@ -614,15 +615,39 @@ func (s *Server) HandleRun(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Placeholder output — real execution will be implemented later.
-	output := "[run] execution not implemented in playground yet\n"
+	output := ""
+	runErrMsg := ""
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":          userErrors == 0,
+	if userErrors == 0 {
+		hirProgram := desugar.NewGenerator(obx, ctx).Generate()
+		lowered := minir.New(ctx).Lower(hirProgram)
+
+		if verifyErrs := applyPipeline(lowered, preBundles); len(verifyErrs) > 0 {
+			for _, verr := range verifyErrs {
+				zlog.Error().Err(verr).Msg("web: run minir verification failed")
+			}
+			runErrMsg = fmt.Sprintf("minir verification failed with %d error(s)", len(verifyErrs))
+		} else {
+			runOut, runErr := compileAndRunLoweredProgram(lowered, entry)
+			output = runOut
+			if runErr != nil {
+				runErrMsg = runErr.Error()
+			}
+		}
+	}
+
+	ok := userErrors == 0 && runErrMsg == ""
+	resp := map[string]any{
+		"ok":          ok,
 		"error_count": userErrors,
 		"diagnostics": items,
 		"output":      output,
-	})
+	}
+	if runErrMsg != "" {
+		resp["error"] = runErrMsg
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // ── POST /api/minir ───────────────────────────────────────────────────────────

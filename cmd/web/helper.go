@@ -1,13 +1,17 @@
 package web
 
 import (
+	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -17,6 +21,10 @@ import (
 
 	zlog "github.com/rs/zerolog/log"
 
+	"github.com/anthonyabeo/obx/src/backend"
+	"github.com/anthonyabeo/obx/src/backend/emit"
+	_ "github.com/anthonyabeo/obx/src/backend/stages"
+	"github.com/anthonyabeo/obx/src/backend/target"
 	"github.com/anthonyabeo/obx/src/ir/minir"
 	miniropt "github.com/anthonyabeo/obx/src/ir/minir/opt"
 	"github.com/anthonyabeo/obx/src/project"
@@ -25,6 +33,11 @@ import (
 	"github.com/anthonyabeo/obx/src/syntax/ast"
 	"github.com/anthonyabeo/obx/src/syntax/directive"
 	"github.com/anthonyabeo/obx/src/syntax/parser"
+)
+
+const (
+	defaultWebRunTimeout   = 3 * time.Second
+	defaultWebRunOutputCap = 64 * 1024
 )
 
 var (
@@ -428,6 +441,19 @@ func deriveEntryFromFilename(fn string) string {
 	return stem
 }
 
+func markEntryModule(obx *ast.OberonX, entry string) {
+	if obx == nil || entry == "" {
+		return
+	}
+	for _, unit := range obx.Units {
+		mod, ok := unit.(*ast.Module)
+		if !ok {
+			continue
+		}
+		mod.IsEntry = mod.BName == entry
+	}
+}
+
 // applyPipeline keeps web lowering behavior aligned with the CLI
 // build pipeline: merge cached stdlib modules, deduplicate extern declarations,
 // run the default optimization level, then verify the final program.
@@ -530,3 +556,157 @@ func externalFuncKeyWeb(e *minir.ExternalFunc) string {
 	}
 	return cname + "|" + dll + "|" + sig
 }
+
+func compileAndRunLoweredProgram(lowered *minir.Program, entry string) (string, error) {
+	if lowered == nil {
+		return "", fmt.Errorf("nil lowered program")
+	}
+	if entry != "" {
+		for _, mod := range lowered.Modules {
+			if mod == nil {
+				continue
+			}
+			mod.IsEntry = mod.Name == entry
+		}
+	}
+	tgt, tc, err := hostRunBackendConfig()
+	if err != nil {
+		return "", err
+	}
+
+	td, err := os.MkdirTemp("", "obx-web-run-*")
+	if err != nil {
+		return "", fmt.Errorf("create temp run dir: %w", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(td); err != nil {
+			zlog.Warn().Err(err).Str("dir", td).Msg("web: failed to cleanup run temp dir")
+		}
+	}()
+
+	buildDir := filepath.Join(td, "build")
+	manifestName := entry
+	if manifestName == "" {
+		manifestName = "program"
+	}
+
+	emitter := emit.New(emit.Config{
+		ProjectDir: td,
+		BuildDir:   buildDir,
+		Output:     "program",
+		Manifest: project.Manifest{
+			Name: manifestName,
+		},
+		Target:    tgt,
+		Toolchain: tc,
+	})
+
+	pipeline := backend.NewPipelineDriver(tgt)
+	pipeline.Assemble = emitter.Assemble
+	pipeline.Link = emitter.Link
+
+	if _, err := pipeline.Run(lowered); err != nil {
+		return "", fmt.Errorf("compile failed: %w", err)
+	}
+
+	binPath := filepath.Join(buildDir, "program")
+	out, err := runCompiledBinary(binPath, defaultWebRunTimeout, defaultWebRunOutputCap)
+	if err != nil {
+		return out, err
+	}
+	return out, nil
+}
+
+func hostRunBackendConfig() (target.Target, emit.Toolchain, error) {
+	return hostRunBackendConfigFor(runtime.GOOS, runtime.GOARCH, exec.LookPath)
+}
+
+func hostRunBackendConfigFor(goos, goarch string, lookPath func(file string) (string, error)) (target.Target, emit.Toolchain, error) {
+	if goarch != "arm64" {
+		return nil, emit.Toolchain{}, fmt.Errorf("web run is currently supported only on arm64 hosts")
+	}
+	if goos != "darwin" && goos != "linux" {
+		return nil, emit.Toolchain{}, fmt.Errorf("web run is currently supported on darwin/arm64 and linux/arm64 hosts")
+	}
+
+	tgt, err := target.Lookup(target.Arm64Name)
+	if err != nil {
+		return nil, emit.Toolchain{}, err
+	}
+	if err := validateRunTargetForHost(tgt, goos); err != nil {
+		return nil, emit.Toolchain{}, err
+	}
+
+	if goos == "darwin" {
+		if _, err := lookPath("clang"); err != nil {
+			return nil, emit.Toolchain{}, fmt.Errorf("required toolchain not found: clang")
+		}
+		return tgt, emit.Toolchain{
+			Assembler:     "clang",
+			AssemblerArgs: []string{"-arch", "arm64"},
+			Linker:        "clang",
+			LinkerArgs:    []string{"-arch", "arm64"},
+		}, nil
+	}
+
+	if _, err := lookPath("clang"); err == nil {
+		return tgt, emit.Toolchain{
+			Assembler: "clang",
+			Linker:    "clang",
+		}, nil
+	}
+	if _, err := lookPath("aarch64-linux-gnu-gcc"); err == nil {
+		return tgt, emit.Toolchain{
+			Assembler: "aarch64-linux-gnu-gcc",
+			Linker:    "aarch64-linux-gnu-gcc",
+		}, nil
+	}
+
+	return nil, emit.Toolchain{}, fmt.Errorf("required toolchain not found: install clang or aarch64-linux-gnu-gcc")
+}
+
+func validateRunTargetForHost(tgt target.Target, goos string) error {
+	if tgt == nil {
+		return fmt.Errorf("backend target is nil")
+	}
+	if tgt.Name() != target.Arm64Name {
+		return fmt.Errorf("web run requires backend target %q, got %q", target.Arm64Name, tgt.Name())
+	}
+	if goos != "darwin" && goos != "linux" {
+		return fmt.Errorf("unsupported host OS %q for run target %q", goos, tgt.Name())
+	}
+	return nil
+}
+
+func runCompiledBinary(path string, timeout time.Duration, outputCap int) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, path)
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+
+	err := cmd.Run()
+	out := truncateRunOutput(buf.String(), outputCap)
+
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return out, fmt.Errorf("program timed out after %s", timeout)
+	}
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return out, fmt.Errorf("program exited with code %d", exitErr.ExitCode())
+		}
+		return out, fmt.Errorf("failed to execute compiled program: %w", err)
+	}
+	return out, nil
+}
+
+func truncateRunOutput(out string, max int) string {
+	if max <= 0 || len(out) <= max {
+		return out
+	}
+	return out[:max] + "\n[output truncated]\n"
+}
+
