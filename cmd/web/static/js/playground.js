@@ -9,11 +9,44 @@ const minirView      = document.getElementById('minirView');
 const minirTextEl    = document.getElementById('minirText');
 const minirModTabsEl = document.getElementById('minirModTabs');
 const cfgControls    = document.getElementById('cfgControls');
+const filenameHintEl = document.getElementById('filenameHint');
 
 const STORAGE_KEY = 'obx.playground.current';
 let monacoEditor = null;
 let pendingSource = null;
 let pendingOnChange = null;
+let preferredFilename = 'Main.obx';
+
+function inferFilenameFromSource(source) {
+  const text = String(source || '');
+  const re = /^\s*MODULE\s+([A-Za-z][A-Za-z0-9_]*)\s*;/gm;
+  const names = new Set();
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    names.add(m[1]);
+    if (names.size > 1) return '';
+  }
+  if (names.size !== 1) return '';
+  const only = Array.from(names)[0];
+  return only + '.obx';
+}
+
+function getEffectiveFilename(source) {
+  const inferred = inferFilenameFromSource(source);
+  if (inferred) {
+    preferredFilename = inferred;
+    syncFilenameHint(inferred);
+    return inferred;
+  }
+  const fallback = preferredFilename || 'Main.obx';
+  syncFilenameHint(fallback);
+  return fallback;
+}
+
+function syncFilenameHint(name) {
+  if (!filenameHintEl) return;
+  filenameHintEl.textContent = name || 'Main.obx';
+}
 
 // editor shim used by the rest of the script
 const editor = {
@@ -36,19 +69,22 @@ function loadInitialSource() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const obj = JSON.parse(raw);
+    if (obj && obj.filename) {
+      preferredFilename = String(obj.filename);
+      syncFilenameHint(preferredFilename);
+    }
     if (obj && obj.source) {
-      const fn = obj.filename || document.getElementById('filename').value || 'Main.obx';
-      document.getElementById('filename').value = fn;
       return obj.source;
     }
   } catch (e) { /* ignore */ }
+  syncFilenameHint(preferredFilename || 'Main.obx');
   return null;
 }
 
 function saveCurrentToStorage() {
   try {
-    const fn = document.getElementById('filename').value.trim() || 'Main.obx';
     const src = editor.getValue();
+    const fn = getEffectiveFilename(src);
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ filename: fn, source: src }));
   } catch (e) { /* ignore */ }
 }
@@ -181,7 +217,7 @@ if (cfgControls) cfgControls.style.display = '';
 /* ── run check (diagnostics only) ───────────── */
 async function runCheck() {
   const source   = editor.getValue();
-  const filename = document.getElementById('filename').value.trim() || 'Main.obx';
+  const filename = getEffectiveFilename(source);
   const btn = document.getElementById('checkBtn');
   // Show diagnostics pane for check and hide CFG pane
   const diagPane = document.getElementById('diagPane');
@@ -231,7 +267,7 @@ window.toggleCfg = toggleCfg;
 /* ── Graph format (CFG SVG) ─────────────────── */
 async function showCfgGraph() {
   const source   = editor.getValue();
-  const filename = document.getElementById('filename').value.trim() || 'Main.obx';
+  const filename = getEffectiveFilename(source);
   const cfgBtn = document.getElementById('cfgBtn');
   // Show CFG pane for CFG and hide diagnostics pane
   const cfgPane = document.getElementById('cfgPane');
@@ -249,7 +285,8 @@ async function showCfgGraph() {
   cfgBtn.disabled = false; setButtonText('cfgBtn', 'CFG');
 
   if (resp._err || !resp.ok) {
-    setCfgState('error', resp._err || resp.error || 'CFG unavailable');
+    const errMsg = resp._err || resp.error || 'CFG unavailable';
+    setCfgState('error', `Backend CFG error: ${errMsg}`);
     cfgShown = false;
   } else {
     renderCFG(resp.graphs || []);
@@ -263,7 +300,7 @@ let allMinirModules = [], activeMinirIdx = 0;
 
 async function showMinir() {
   const source   = editor.getValue();
-  const filename = document.getElementById('filename').value.trim() || 'Main.obx';
+  const filename = getEffectiveFilename(source);
   const cfgBtn  = document.getElementById('cfgBtn');
   const cfgPane = document.getElementById('cfgPane');
   const diagPane = document.getElementById('diagPane');
@@ -340,7 +377,7 @@ function clearMinirView() {
 /* ── Run (placeholder) ─────────────────────── */
 async function runProgram() {
   const source   = editor.getValue();
-  const filename = document.getElementById('filename').value.trim() || 'Main.obx';
+  const filename = getEffectiveFilename(source);
   const btn = document.getElementById('runBtn');
   // hide diagnostic and cfg panes for Run
   const diagPane = document.getElementById('diagPane');
@@ -414,7 +451,11 @@ fileInput.addEventListener('change', e => {
   const reader = new FileReader();
   reader.onload = ev => {
     editor.setValue(String(ev.target.result));
-    document.getElementById('filename').value = f.name;
+    preferredFilename = f.name && f.name.trim() ? f.name.trim() : preferredFilename;
+    if (!preferredFilename.toLowerCase().endsWith('.obx')) {
+      preferredFilename = preferredFilename + '.obx';
+    }
+    syncFilenameHint(preferredFilename);
     // persist
     saveCurrentToStorage();
   };
@@ -473,8 +514,49 @@ function setCfgState(kind, msg) {
   fnTabsEl.innerHTML = '';
   resetPanZoom();
   if (kind === 'loading') { cfgHolder.innerHTML = '⌛&nbsp; Building CFG…'; return; }
-  if (kind === 'error')   { cfgHolder.innerHTML = '⚠️&nbsp; ' + esc(msg); return; }
+  if (kind === 'error')   {
+    const hintHtml = buildCfgErrorHintHtml(msg || '');
+    cfgHolder.innerHTML = '<div style="max-width:100%; text-align:left; color:#fca5a5; font-weight:600;">'
+      + '⚠️&nbsp; CFG generation failed'
+      + '<div style="margin-top:6px; color:#fda4af; font-weight:500; white-space:pre-wrap; word-break:break-word;">'
+      + esc(msg)
+      + '</div>'
+      + hintHtml
+      + '</div>';
+    wireCfgErrorHintAction(msg || '');
+    return;
+  }
   cfgHolder.innerHTML = '🔍&nbsp; Press <strong style="color:#4b5563">Check</strong> to see the CFG';
+}
+
+function isEntryRelatedCfgError(msg) {
+  const t = String(msg || '').toLowerCase();
+  return t.includes('entry') || t.includes('reachable') || t.includes('invalid entry');
+}
+
+function buildCfgErrorHintHtml(msg) {
+  if (!isEntryRelatedCfgError(msg)) return '';
+  return '<button id="cfgErrEntryHintBtn" type="button"'
+    + ' style="margin-top:10px; background:transparent; color:#fda4af; border:1px solid #7f1d1d;'
+    + ' border-radius:6px; padding:6px 10px; cursor:pointer; font-size:.82rem;">'
+    + '💡 Hint: check filename/entry mismatch'
+    + '</button>';
+}
+
+function wireCfgErrorHintAction(msg) {
+  if (!isEntryRelatedCfgError(msg)) return;
+  const btn = document.getElementById('cfgErrEntryHintBtn');
+  if (!btn) return;
+  btn.onclick = function() {
+    const inferred = inferFilenameFromSource(editor.getValue());
+    if (inferred) {
+      preferredFilename = inferred;
+      saveCurrentToStorage();
+      appendTerminal('\n[hint] Auto-set filename to ' + inferred + ' from MODULE declaration.\n');
+    } else {
+      appendTerminal('\n[hint] Could not auto-set filename: MODULE declaration is missing or ambiguous.\n');
+    }
+  };
 }
 
 let allGraphs = [], activeIdx = 0;

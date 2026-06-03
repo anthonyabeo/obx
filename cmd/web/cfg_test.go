@@ -216,6 +216,30 @@ func TestHandleCFG_ParseError(t *testing.T) {
 	t.Logf("parse-error response: ok=%v error=%v", resp["ok"], resp["error"])
 }
 
+func TestHandleCFG_InvalidEntryReturnsError(t *testing.T) {
+	body := `{"source":"MODULE Main;\nBEGIN\nEND Main.","filename":"Main.obx", "entry": "DoesNotExist"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/cfg", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	newTestServer().HandleCFG(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if ok, _ := resp["ok"].(bool); ok {
+		t.Fatalf("expected ok=false for invalid entry, got response: %v", resp)
+	}
+	if errMsg, _ := resp["error"].(string); errMsg == "" {
+		t.Fatalf("expected explicit error message for invalid entry, got: %v", resp)
+	}
+}
+
 func TestHandleUI_RootServesPlayground(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()

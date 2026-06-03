@@ -78,4 +78,3 @@ func TestHostRunBackendConfigFor_UnsupportedHost(t *testing.T) {
 		t.Fatal("expected unsupported host arch error")
 	}
 }
-

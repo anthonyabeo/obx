@@ -202,11 +202,7 @@ func prepareStdlibUnits(ctx *compiler.Context, obx *ast.OberonX, entry, userFile
 	// Build resolver and compute sorted stdlib headers reachable from entry.
 	sorted, err := buildSortedStdlibHeaders(roots, ctx, entry)
 	if err != nil {
-		// Be tolerant in environments where a stdlib root was configured but
-		// is not present on disk (e.g. some test sandboxes). Log and continue
-		// without stdlib rather than failing the entire request.
-		zlog.Debug().Err(err).Msg("web: stdlib discovery failed — continuing without stdlib")
-		return nil, nil
+		return nil, err
 	}
 
 	// Print sorted stdlib file list for debugging/visibility.
@@ -322,7 +318,11 @@ func buildRoots(userFilename, userSource string) (roots []string, cleanup func()
 		cleanup = cl
 	}
 	if stdlibRoot != "" {
-		roots = append(roots, stdlibRoot)
+		if info, statErr := os.Stat(stdlibRoot); statErr == nil && info.IsDir() {
+			roots = append(roots, stdlibRoot)
+		} else {
+			zlog.Debug().Str("path", stdlibRoot).Err(statErr).Msg("web: stdlib root missing or invalid; skipping")
+		}
 	}
 	return roots, cleanup, nil
 }
@@ -709,4 +709,3 @@ func truncateRunOutput(out string, max int) string {
 	}
 	return out[:max] + "\n[output truncated]\n"
 }
-

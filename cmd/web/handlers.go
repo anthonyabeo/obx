@@ -434,6 +434,9 @@ func (s *Server) HandleCFG(w http.ResponseWriter, r *http.Request) {
 
 	obx := ast.NewOberonX()
 	entry := deriveEntryFromFilename(req.Filename)
+	if req.Entry != "" {
+		entry = req.Entry
+	}
 	preBundles, err := prepareStdlibUnits(ctx, obx, entry, req.Filename, req.Source)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})

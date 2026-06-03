@@ -43,5 +43,3 @@ END Main.`
 		t.Fatalf("expected output to contain 42, got: %q", output)
 	}
 }
-
-
