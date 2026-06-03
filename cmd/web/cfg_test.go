@@ -230,6 +230,23 @@ func TestHandleUI_RootServesPlayground(t *testing.T) {
 	}
 }
 
+func TestHandleUI_ResolvesAssetPlaceholders(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	newTestServer().HandleUI(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	for _, unresolved := range []string{"%PLAYGROUND_JS%", "%PLAYGROUND_CSS%"} {
+		if strings.Contains(body, unresolved) {
+			t.Fatalf("expected %q to be replaced in HandleUI output", unresolved)
+		}
+	}
+}
+
 func TestHandleUI_UnknownPathServes404Page(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/does/not/exist", nil)
 	rr := httptest.NewRecorder()

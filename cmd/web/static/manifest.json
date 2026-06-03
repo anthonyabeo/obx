@@ -1,4 +1,9 @@
 {
+  "PLAYGROUND_CSS": "/static/css/playground.bebba567.css",
+  "APPLE_TOUCH_ICON": "/static/favicon/apple-touch-icon.042e32bf.png",
+  "FAVICON_32": "/static/favicon/favicon-32x32.39704a7e.png",
+  "FAVICON_16": "/static/favicon/favicon-16x16.cf411950.png",
+  "PLAYGROUND_JS": "/static/js/playground.61f67ceb.js",
   "VIZ_JS": "/static/js/viz.f111f22b.js",
   "VIZ_FULL_RENDER_JS": "/static/js/full.render.3a0aace7.js",
   "MONACO_LOADER": "/static/js/monaco/vs/loader.js"

@@ -36,33 +36,87 @@ fi
 echo "Done. Verify files exist:"
 ls -l cmd/web/static/js/viz.js cmd/web/static/js/full.render.js cmd/web/static/js/monaco/vs/loader.js || true
 
-# fingerprint viz files (sha256 short) and write manifest.json mapping placeholders
+# fingerprint static assets (sha256 short) and write manifest.json mapping placeholders
 manifest="cmd/web/static/manifest.json"
 declare -A manifest_map
-for f in cmd/web/static/js/viz.js cmd/web/static/js/full.render.js; do
-  if [ -f "$f" ]; then
-    sum=$(shasum -a 256 "$f" | awk '{print $1}')
-    short=${sum:0:8}
-    base=$(basename "$f" .js)
-    dir=$(dirname "$f")
-    new="$dir/${base}.${short}.js"
-    mv "$f" "$new"
-    if [ "$base" = "viz" ]; then
-      manifest_map["VIZ_JS"]="/static/js/${base}.${short}.js"
-    else
-      # full.render has dot in name; use key FULL_RENDER_JS
-      manifest_map["VIZ_FULL_RENDER_JS"]="/static/js/${base}.${short}.js"
-    fi
+
+fingerprint_asset() {
+  local key="$1"
+  local src="$2"
+
+  if [ ! -f "$src" ]; then
+    echo "warning: missing asset for $key: $src" >&2
+    return 0
   fi
-done
-# add monaco loader mapping (not fingerprinted)
+
+  local dir base ext sum short out rel raw_base
+  dir=$(dirname "$src")
+  raw_base=$(basename "$src")
+  base="$raw_base"
+  ext=".${base##*.}"
+  base="${base%$ext}"
+  if [[ "$base" =~ ^(.+)\.[0-9a-f]{8,}$ ]]; then
+    base="${BASH_REMATCH[1]}"
+  fi
+
+  sum=$(shasum -a 256 "$src" | awk '{print $1}')
+  short=${sum:0:8}
+  out="$dir/${base}.${short}${ext}"
+
+  # Remove stale fingerprinted variants for this base/ext, keep source + current output.
+  shopt -s nullglob
+  for old in "$dir"/"$base".[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]"$ext"; do
+    if [ "$old" != "$out" ]; then
+      rm -f "$old"
+    fi
+  done
+  shopt -u nullglob
+
+  cp "$src" "$out"
+  rel="/${out#cmd/web/static/}"
+  manifest_map["$key"]="/static${rel}"
+}
+
+# Use canonical files when present; fall back to already-fingerprinted vendored files.
+find_js_src() {
+  local canonical="$1"
+  local pattern="$2"
+  if [ -f "$canonical" ]; then
+    printf '%s\n' "$canonical"
+    return
+  fi
+  shopt -s nullglob
+  local matches=( $pattern )
+  shopt -u nullglob
+  if [ ${#matches[@]} -gt 0 ]; then
+    printf '%s\n' "${matches[0]}"
+  fi
+}
+
+viz_src=$(find_js_src "cmd/web/static/js/viz.js" "cmd/web/static/js/viz.[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].js")
+full_render_src=$(find_js_src "cmd/web/static/js/full.render.js" "cmd/web/static/js/full.render.[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].js")
+
+if [ -n "${viz_src:-}" ]; then
+  fingerprint_asset "VIZ_JS" "$viz_src"
+fi
+if [ -n "${full_render_src:-}" ]; then
+  fingerprint_asset "VIZ_FULL_RENDER_JS" "$full_render_src"
+fi
+
+fingerprint_asset "PLAYGROUND_JS" "cmd/web/static/js/playground.js"
+fingerprint_asset "PLAYGROUND_CSS" "cmd/web/static/css/playground.css"
+fingerprint_asset "APPLE_TOUCH_ICON" "cmd/web/static/favicon/apple-touch-icon.png"
+fingerprint_asset "FAVICON_32" "cmd/web/static/favicon/favicon-32x32.png"
+fingerprint_asset "FAVICON_16" "cmd/web/static/favicon/favicon-16x16.png"
+
+# Keep monaco loader stable because upstream worker graph references static vs/* names.
 manifest_map["MONACO_LOADER"]="/static/js/monaco/vs/loader.js"
 
 echo "Writing manifest to $manifest"
 printf "{\n" > "$manifest"
 first=true
-for k in "VIZ_JS" "VIZ_FULL_RENDER_JS" "MONACO_LOADER"; do
-  v=${manifest_map[$k]}
+for k in "PLAYGROUND_CSS" "APPLE_TOUCH_ICON" "FAVICON_32" "FAVICON_16" "VIZ_JS" "VIZ_FULL_RENDER_JS" "PLAYGROUND_JS" "MONACO_LOADER"; do
+  v=${manifest_map[$k]:-}
   if [ -n "$v" ]; then
     if [ "$first" = true ]; then
       first=false
